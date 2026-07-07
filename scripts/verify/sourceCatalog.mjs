@@ -171,6 +171,7 @@ const textSourceFiles = {
   themeSource: ["src", "theme.ts"],
   verifySource: ["scripts", "verify.mjs"],
   verifyRuntimeSource: ["scripts", "verify", "runtime.mjs"],
+  verifySourceCatalogSource: ["scripts", "verify", "sourceCatalog.mjs"],
   biCliSource: ["tools", "bi_cli.py"],
   biCliContractsSource: ["tools", "bi_cli_contracts.py"],
   biCliEnvelopeSource: ["tools", "bi_cli_envelope.py"],

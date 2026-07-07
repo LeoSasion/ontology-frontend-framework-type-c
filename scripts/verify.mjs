@@ -842,6 +842,7 @@ const {
   themeSource,
   verifySource,
   verifyRuntimeSource,
+  verifySourceCatalogSource,
   biCliSource,
   biCliContractsSource,
   biCliEnvelopeSource,
@@ -1589,6 +1590,15 @@ checks.push(
       verifyRuntimeSource.includes("fullReceiptPath: verifyReceiptPath") &&
       verifyRuntimeSource.includes("writeFileSync(verifyReceiptPath") &&
       verifyRuntimeSource.includes("fullOutput ? receipt : compactReceipt(receipt)"),
+  },
+  {
+    label: "verify-source-catalog-boundary",
+    ok: verifySource.includes('from "./verify/sourceCatalog.mjs"') &&
+      verifySource.includes("readVerifySourceCatalog(root)") &&
+      !verifySource.includes("read" + "FileSync(") &&
+      verifySourceCatalogSource.includes("const textSourceFiles = {") &&
+      verifySourceCatalogSource.includes("export function readVerifySourceCatalog(root)") &&
+      verifySourceCatalogSource.includes("read" + "FileSync(join(root, ...pathSegments), \"utf8\")"),
   },
   {
     label: "source-pipeline-rich-contract",
