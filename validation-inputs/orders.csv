@@ -1,0 +1,11 @@
+order_id,order_date,channel,shop,sku,category,net_sales,refund_amount,quantity,status
+O-1001,2026-06-01,Douyin,Shanghai Flagship,SKU-001,Jackets,1280,0,4,paid
+O-1002,2026-06-01,Tmall,Hangzhou Store,SKU-002,Tops,620,120,3,refunded
+O-1003,2026-06-02,Douyin,Shanghai Flagship,SKU-003,Pants,860,0,2,paid
+O-1004,2026-06-02,JD,Beijing Store,SKU-001,Jackets,940,0,3,paid
+O-1005,2026-06-03,Tmall,Hangzhou Store,SKU-004,Accessories,310,0,5,paid
+O-1006,2026-06-03,Douyin,Chengdu Store,SKU-005,Tops,760,80,4,partial_refund
+O-1007,2026-06-04,JD,Beijing Store,SKU-003,Pants,1180,0,3,paid
+O-1008,2026-06-04,Douyin,Chengdu Store,SKU-002,Tops,540,0,2,paid
+O-1009,2026-06-05,Tmall,Hangzhou Store,SKU-001,Jackets,1510,200,5,partial_refund
+O-1010,2026-06-05,JD,Beijing Store,SKU-004,Accessories,290,0,4,paid

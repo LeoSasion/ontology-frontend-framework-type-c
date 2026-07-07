@@ -1,0 +1,4 @@
+refund_id,order_id,apply_date,channel,sku,refund_amount,refund_status,resolution_hours
+R-2001,O-1002,2026-06-02,Tmall,SKU-002,120,success,18
+R-2002,O-1006,2026-06-04,Douyin,SKU-005,80,success,26
+R-2003,O-1009,2026-06-06,Tmall,SKU-001,200,pending,40

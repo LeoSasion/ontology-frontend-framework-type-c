@@ -1,0 +1,44 @@
+# Dependencies and build outputs
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+
+# Local runtime data
+data/local/
+data/uploads/
+data/validation/
+data/**/*.duckdb*
+data/**/*.sqlite*
+data/**/*.db*
+data/**/*.wal
+data/**/*.parquet
+
+# Business data and private exports
+源数据-*/
+exports/
+reports/
+backups/
+archives/
+*.sqlite
+*.sqlite-*
+financial_reports.sqlite*
+
+# Runtime caches and logs
+tmp/
+.tmp/
+logs/
+*.log
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Local tools and secrets
+.env
+.env.*
+!.env.example
+.codex/
+.agents/
+.codegraph/
+.impeccable/
+docs/ux-audits/

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>AIBI Hybrid</title>
+    <script>
+      (function () {
+        var fallbackDarkTheme = {
+          themeKey: "D1",
+          mode: "dark",
+          tokens: {
+            railTop: "#10212a",
+            railMid: "#0f2d37",
+            railBottom: "#092029",
+            railActive: "#173744",
+            primary: "#67e8f9",
+            primaryHover: "#22d3ee",
+            selected: "#164e63",
+            soft: "#0e3744",
+            bg: "#0b1419",
+            surface: "#111c22",
+            panel: "#15262d",
+            border: "#28424d",
+            text: "#e5f3f7",
+            muted: "#9db4bd"
+          },
+          railActiveText: "#ffffff"
+        };
+        function readThemeFromWorkbench() {
+          try {
+            var request = new XMLHttpRequest();
+            request.open("GET", "/api/workbench?limit=1", false);
+            request.send(null);
+            if (request.status < 200 || request.status >= 300) return null;
+            var payload = JSON.parse(request.responseText || "{}");
+            var preferences = payload.preferences || {};
+            var palettes = Array.isArray(payload.themePalettes) ? payload.themePalettes : [];
+            return palettes.filter(function (theme) { return theme && theme.enabled !== false; }).find(function (theme) {
+              return theme.themeKey === preferences.themeKey;
+            }) || null;
+          } catch (error) {
+            return null;
+          }
+        }
+        function readStoredTheme() {
+          try {
+            var raw = window.localStorage.getItem("aibiHybrid.themeSnapshot");
+            return raw ? JSON.parse(raw) : null;
+          } catch (error) {
+            return null;
+          }
+        }
+        function applyTheme(theme) {
+          if (!theme || !theme.tokens) return;
+          var root = document.documentElement;
+          var mode = theme.mode === "dark" ? "dark" : "light";
+          root.dataset.themeKey = theme.themeKey || "";
+          root.dataset.themeMode = mode;
+          root.style.colorScheme = mode;
+          var tokenMap = {
+            bg: ["--bg", "--bi-bg"],
+            surface: ["--surface", "--bi-surface"],
+            panel: ["--surface-2", "--bi-panel"],
+            border: ["--line", "--bi-border", "--bi-border-soft"],
+            text: ["--text", "--bi-text"],
+            muted: ["--muted", "--soft", "--bi-muted"],
+            primary: ["--accent", "--bi-accent"],
+            primaryHover: ["--accent-strong", "--bi-accent-strong"],
+            selected: ["--accent-soft", "--bi-accent-tint"],
+            soft: ["--bi-accent-soft"],
+            railTop: ["--bi-rail-top"],
+            railMid: ["--bi-rail-mid"],
+            railBottom: ["--bi-rail-bottom"],
+            railActive: ["--bi-rail-active"]
+          };
+          Object.keys(theme.tokens).forEach(function (token) {
+            var variables = tokenMap[token] || ["--bi-theme-" + token];
+            variables.forEach(function (variable) {
+              root.style.setProperty(variable, theme.tokens[token]);
+            });
+          });
+          if (theme.railActiveText) {
+            root.style.setProperty("--bi-rail-active-text", theme.railActiveText);
+          }
+          try {
+            window.localStorage.setItem("aibiHybrid.themeSnapshot", JSON.stringify({
+              themeKey: theme.themeKey,
+              mode: mode,
+              tokens: theme.tokens,
+              railActiveText: theme.railActiveText
+            }));
+          } catch (error) {
+            // Theme is still applied even if storage is blocked.
+          }
+        }
+        try {
+          var theme = readStoredTheme() || readThemeFromWorkbench();
+          if (!theme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            theme = fallbackDarkTheme;
+          }
+          applyTheme(theme);
+        } catch (error) {
+          document.documentElement.dataset.themeMode = document.documentElement.dataset.themeMode || "light";
+        }
+      })();
+    </script>
+    <style>
+      html[data-theme-mode="dark"],
+      html[data-theme-mode="dark"] body {
+        background: var(--bg, #0b1419);
+        color: var(--text, #e5f3f7);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
