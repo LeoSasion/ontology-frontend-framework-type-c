@@ -45,7 +45,7 @@ export function DashboardBusinessTaskStrip({
           <textarea
             data-testid="dashboard-ai-chart-prompt"
             onChange={(event) => setPrompt(event.target.value)}
-            placeholder={biText("例如：按月份看销售额趋势，或按渠道看退款金额柱状图", "Example: monthly sales trend, or refund amount by channel as a bar chart")}
+            placeholder={biText("描述指标、维度、时间范围或想比较的对象", "Describe the metric, dimension, time range, or comparison")}
             value={prompt}
           />
         </label>

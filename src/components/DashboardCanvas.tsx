@@ -46,7 +46,7 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
   const dashboardPages = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
   const dashboard = dashboardPages.find((item) => item.dashboard_key === activeDashboardKey) ?? dashboardPages[0] ?? {
     dashboard_key: "fallback",
-    name: biText("临时看板", "Temporary dashboard"),
+    name: biText("未命名看板", "Untitled dashboard"),
     workspace_id: "default",
     default_table_key: query.query?.table ?? "",
     created_by: "fallback",

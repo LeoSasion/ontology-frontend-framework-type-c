@@ -182,7 +182,7 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
               <input
                 aria-label={biText("输入分析问题", "Enter analysis question")}
                 onChange={(event) => setPrompt(event.target.value)}
-                placeholder={biText("直接问：本月哪个渠道卖得最好？", "Ask: which channel sold best this month?")}
+                placeholder={biText("输入你想分析的问题或要生成的图表", "Enter the question to analyze or chart to create")}
                 value={prompt}
               />
               <button className="primaryButton" disabled={busy} type="submit">

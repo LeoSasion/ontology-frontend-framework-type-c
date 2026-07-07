@@ -962,6 +962,7 @@ const biCliContractDocSource = readFileSync(join(root, "docs", "bi-cli-contract.
 const docsReadmeSource = readFileSync(join(root, "docs", "README.md"), "utf8");
 const productUxStandardDocSource = readFileSync(join(root, "docs", "product-ux-standard.md"), "utf8");
 const productAcceptanceMatrixDocSource = readFileSync(join(root, "docs", "product-acceptance-matrix.md"), "utf8");
+const developmentRoadmapDocSource = readFileSync(join(root, "docs", "development-roadmap.md"), "utf8");
 const prdDocSource = readFileSync(join(root, "docs", "PRD.md"), "utf8");
 const verifyBiCliAgentContractSource = readFileSync(join(root, "scripts", "verify-bi-cli-agent-contract.mjs"), "utf8");
 const agentActionConfirmationsSource = readFileSync(join(root, "tools", "agent_action_confirmations.py"), "utf8");
@@ -5081,6 +5082,30 @@ checks.push(
       prdDocSource.includes("validation-inputs") &&
       !prdDocSource.includes("source-intelligence fixtures") &&
       implementationStatusSource.includes("Product activation model and panel boundary"),
+  },
+  {
+    label: "frontend-production-copy-no-example-placeholders",
+    ok: productAcceptanceMatrixDocSource.includes("- `npm run preflight`") &&
+      dashboardCanvasSource.includes('name: biText("未命名看板", "Untitled dashboard")') &&
+      !dashboardCanvasSource.includes("临时看板") &&
+      !dashboardCanvasSource.includes("Temporary dashboard") &&
+      dashboardBusinessTaskStripSource.includes("描述指标、维度、时间范围或想比较的对象") &&
+      dashboardBusinessTaskStripSource.includes("Describe the metric, dimension, time range, or comparison") &&
+      !dashboardBusinessTaskStripSource.includes("例如：") &&
+      !dashboardBusinessTaskStripSource.includes("Example:") &&
+      agentCommandDockSource.includes("输入你想分析的问题或要生成的图表") &&
+      agentCommandDockSource.includes("Enter the question to analyze or chart to create") &&
+      !agentCommandDockSource.includes("直接问：") &&
+      !agentCommandDockSource.includes("Ask: which channel") &&
+      docsReadmeSource.includes("development-roadmap.md") &&
+      docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
+      prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
+      developmentRoadmapDocSource.includes("## Development Order") &&
+      developmentRoadmapDocSource.includes("## Current Release Status") &&
+      developmentRoadmapDocSource.includes("Production copy and no-demo boundary") &&
+      developmentRoadmapDocSource.includes("AI one-chart path") &&
+      developmentRoadmapDocSource.includes("Complete for this baseline") &&
+      developmentRoadmapDocSource.includes("Use `npm run preflight` as the final local acceptance gate"),
   },
   {
     label: "home-detailed-path-panel-boundary",

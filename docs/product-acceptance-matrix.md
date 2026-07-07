@@ -23,6 +23,7 @@ This matrix defines the minimum product behavior for a clean, extensible AIBI wo
 
 ## Required Verification
 
+- `npm run preflight`
 - `npm run build`
 - `npm run verify`
 - `npm run verify:ui`

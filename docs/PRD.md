@@ -101,6 +101,7 @@
 
 ## Acceptance
 
+- `npm run preflight` 通过，作为本地交付前总入口。
 - `npm run build` 通过。
 - `npm run verify` 通过。
 - `npm run verify:bi-cli-contract` 通过。
