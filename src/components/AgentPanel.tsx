@@ -341,8 +341,8 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
             </h2>
             <p className="panelLead">
               <Bilingual
-                zh="当前没有可分析的数据表。AI 可以先带你判断该导入什么，但不会展示样例结论或写入任何内容。"
-                en="There are no analyzable tables yet. AI can help decide what to import, but it will not show sample conclusions or write anything."
+                zh="当前没有可分析的数据表。AI 可以先带你判断该导入什么，确认前不会写入任何内容。"
+                en="There are no analyzable tables yet. AI can help decide what to import, and it will not write anything before confirmation."
               />
             </p>
           </div>

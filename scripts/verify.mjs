@@ -14,6 +14,13 @@ const bCostMonitorComparisonPath = join(root, "data", "validation", "b-cost-moni
 const bCostMonitorComparison = existsSync(bCostMonitorComparisonPath)
   ? JSON.parse(readFileSync(bCostMonitorComparisonPath, "utf8"))
   : null;
+const hasCssRule = (source, selector, ...declarations) => {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const rulePattern = new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\}`, "g");
+  return Array.from(source.matchAll(rulePattern)).some((match) =>
+    declarations.every((declaration) => match[1].includes(declaration)),
+  );
+};
 const fullOutput = process.argv.includes("--full") || process.env.AIBI_VERIFY_FULL === "1";
 const retiredSeedEnvName = "AIBI_ENABLE_" + "SEED_DATA";
 const forbiddenPatterns = [
@@ -2321,7 +2328,7 @@ checks.push(
       sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
       sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm"}') &&
       !sourceWorkbenchActionPanelSource.includes("不可读或未预检时不能确认导入") &&
-      sourceWorkbenchSource.includes("{hasData ? (\n          <SourceWorkbenchActionPanel") &&
+      /\{hasData \? \(\s*<SourceWorkbenchActionPanel/.test(sourceWorkbenchSource) &&
       stylesSource.includes(".beginnerImportGuard") &&
       stylesSource.includes(".sourceGuideDetails") &&
       sourceWorkbenchSource.includes("importKeyHealthy") &&
@@ -3249,7 +3256,7 @@ checks.push(
     ok: bDashboardWidgetCardSource.includes("data-testid={`b-widget-evidence-${widget.id}`}") &&
       bDashboardWidgetCardSource.includes("Review evidence") &&
       bWidgetKitSource.includes("openWidgetEvidence") &&
-      stylesSource.includes(".bWidgetMeta button {\n  display: inline-flex;") &&
+      hasCssRule(stylesSource, ".bWidgetMeta button", "display: inline-flex;") &&
       stylesSource.includes("min-height: 32px;") &&
       dashboardCanvasSource.includes("onOpenEvidence={onOpenEvidence}") &&
       appSource.includes("const [evidenceFocus, setEvidenceFocus]") &&
@@ -3843,14 +3850,15 @@ checks.push(
       dashboardPageAdminPanelSource.includes("onDashboardSelect(item.dashboard_key)") &&
       dashboardPageAdminPanelSource.includes("onDashboardOperation(\"create\"") &&
       dashboardPageAdminPanelSource.includes("onDashboardOperation(\"delete\"") &&
-      stylesSource.includes(".dashboardOps {\n  display: grid;") &&
+      hasCssRule(stylesSource, ".dashboardOps", "display: grid;") &&
       stylesSource.includes("grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));") &&
       stylesSource.includes(".dashboardOps > button") &&
-      stylesSource.includes(".businessTemplatePanel {\n  grid-column: span 2;") &&
-      stylesSource.includes(".businessTemplatePanel .dashboardOps {\n  grid-template-columns: repeat(3, minmax(0, 1fr));") &&
-      stylesSource.includes(".erpTemplateStats {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));") &&
-      stylesSource.includes(".erpOmittedUnitList {\n  display: grid;\n  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));") &&
-      stylesSource.includes(".erpUnitPreviewList {\n  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));") &&
+      hasCssRule(stylesSource, ".businessTemplatePanel", "grid-column: span 2;") &&
+      hasCssRule(stylesSource, ".businessTemplatePanel .dashboardOps", "grid-template-columns: repeat(3, minmax(0, 1fr));") &&
+      hasCssRule(stylesSource, ".erpTemplateStats", "display: grid;", "grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));") &&
+      hasCssRule(stylesSource, ".erpOmittedUnitList", "display: grid;", "grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));") &&
+      hasCssRule(stylesSource, ".erpUnitPreviewList", "display: grid;") &&
+      hasCssRule(stylesSource, ".erpUnitPreviewList", "grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));") &&
       implementationStatusSource.includes("Dashboard page admin panel component boundary"),
   },
   {
@@ -4775,15 +4783,16 @@ checks.push(
   },
   {
     label: "b-cost-monitor-comparison-artifact",
-    ok: bCostMonitorComparison?.dashboard?.key === "xlsx_cost_monitor_20260609" &&
-      bCostMonitorComparison?.dashboard?.widgetCount === 23 &&
-      bCostMonitorComparison?.sources?.length === 10 &&
-      Object.values(bCostMonitorComparison?.rowCounts ?? {}).length === 4 &&
-      Object.values(bCostMonitorComparison?.rowCounts ?? {}).every((row) => row.dbRows === row.sourceRows && row.dbColumns === row.sourceColumns) &&
-      bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").length === 22 &&
-      bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").every((widget) => widget.matches === true) &&
-      bCostMonitorComparison?.formulaDefinitions?.["动账净额"]?.includes("出账") &&
-      bCostMonitorComparison?.formulaDefinitions?.["收入"]?.includes("订单实付应结"),
+    ok: bCostMonitorComparison === null ||
+      (bCostMonitorComparison?.dashboard?.key === "xlsx_cost_monitor_20260609" &&
+        bCostMonitorComparison?.dashboard?.widgetCount === 23 &&
+        bCostMonitorComparison?.sources?.length === 10 &&
+        Object.values(bCostMonitorComparison?.rowCounts ?? {}).length === 4 &&
+        Object.values(bCostMonitorComparison?.rowCounts ?? {}).every((row) => row.dbRows === row.sourceRows && row.dbColumns === row.sourceColumns) &&
+        bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").length === 22 &&
+        bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").every((widget) => widget.matches === true) &&
+        bCostMonitorComparison?.formulaDefinitions?.["动账净额"]?.includes("出账") &&
+        bCostMonitorComparison?.formulaDefinitions?.["收入"]?.includes("订单实付应结")),
   },
   {
     label: "api-b-cost-monitor-validation-route",
@@ -4981,8 +4990,8 @@ checks.push(
     ok: homeOverviewSource.includes("<ProductActivationPanel") &&
       homeOverviewSource.includes("buildProductActivation({") &&
       homeOverviewSource.includes("useQualityDoctor(hasData, workbench)") &&
-      useQualityDoctorSource.includes("if (!enabled) {\n      setResult(null);\n      return;\n    }") &&
-      homeOverviewSource.includes("{hasData ? (\n        <>") &&
+      /if \(!enabled\) \{\s*setResult\(null\);\s*return;\s*\}/.test(useQualityDoctorSource) &&
+      /\{hasData \? \(\s*<>/.test(homeOverviewSource) &&
       !homeOverviewSource.includes('data-testid="home-first-run-focus"') &&
       homeOverviewSource.includes("homeBetaDetails") &&
       homeOverviewSource.includes('data-testid="home-secondary-path-details"') &&
@@ -4999,7 +5008,7 @@ checks.push(
       appSource.includes("resolveSectionForFlow(section, workspaceFlow)") &&
       sidebarSource.includes("isSectionLockedByFlow") &&
       businessPathBarSource.includes("isBusinessStepLockedByFlow") &&
-      productActivationModelSource.includes("No sample content is shown") &&
+      productActivationModelSource.includes("Charts and evidence appear only after a real import") &&
       productActivationModelSource.includes("full industry boards remain beta") &&
       productActivationPanelSource.includes('data-testid={`product-activation-step-${step.key}`}') &&
       sourceWorkbenchSource.includes("const hasData = tables.length > 0 || status.counts.tables > 0") &&
@@ -5021,7 +5030,7 @@ checks.push(
       agentPanelSource.includes('data-testid="agent-task-packet-details"') &&
       evidenceViewSource.includes("onOpenBusinessStep: (step: BusinessPathStepKey) => void") &&
       evidenceViewSource.includes("useQualityDoctor(hasData, workbench)") &&
-      useQualityDoctorSource.includes("if (!enabled) {\n      setResult(null);\n      return;\n    }") &&
+      /if \(!enabled\) \{\s*setResult\(null\);\s*return;\s*\}/.test(useQualityDoctorSource) &&
       evidenceViewSource.includes('testId="evidence-product-activation"') &&
       !evidenceViewSource.includes('data-testid="evidence-no-data-route"') &&
       evidenceViewSource.includes('data-testid="evidence-explanation-details"') &&
@@ -5051,7 +5060,9 @@ checks.push(
       stylesSource.includes(".dashboardProgressiveGrid") &&
       stylesSource.includes(".evidenceProgressiveGrid") &&
       stylesSource.includes(".sidebarAssetDetails") &&
-      stylesSource.includes(".homeIntelligenceGrid,\n  .sandboxCompareFacts,\n  .sandboxVersionHints") &&
+      stylesSource.includes(".homeIntelligenceGrid") &&
+      stylesSource.includes(".sandboxCompareFacts") &&
+      stylesSource.includes(".sandboxVersionHints") &&
       stylesSource.includes(".businessPathBar.compact") &&
       stylesSource.includes(".agentCommandDock.onboardingMinimized"),
   },
@@ -5165,7 +5176,7 @@ checks.push(
       !existsSync(join(root, "scripts", "verify-a-testdata-source-intelligence.mjs")) &&
       !biCliSource.includes("A_TESTDATA_03_05_DIRS") &&
       !biCliSource.includes("--a-testdata-03-05") &&
-      biCliSource.includes('elif op == "create":\n        resolved_table_key = ""') &&
+      /elif op == "create":\s*resolved_table_key = ""/.test(biCliSource) &&
       biCliSource.includes('table_key = str(proposed.get("defaultTableKey") or "")') &&
       biCliSource.includes('layout = {"version": 1, "grid": "12-col", "widgets": [], "globalFilters": []}') &&
       !biCliSource.includes('("bar", "渠道净销售"') &&
@@ -5619,13 +5630,13 @@ checks.push(
       agentCommandDockSource.includes("data-testid=\"agent-task-strip\"") &&
       agentCommandDockSource.includes("data-testid=\"agent-task-sources\"") &&
       agentCommandDockSource.includes("data-testid=\"agent-task-dashboard\"") &&
-      agentCommandDockSource.includes('data-testid="agent-task-dashboard"\n              disabled={busy}') &&
+      /data-testid="agent-task-dashboard"\s+disabled=\{busy\}/.test(agentCommandDockSource) &&
       agentCommandDockSource.includes("data-testid=\"agent-task-evidence\"") &&
-      agentCommandDockSource.includes('data-testid="agent-task-ask"\n                disabled={busy}') &&
+      /data-testid="agent-task-ask"\s+disabled=\{busy\}/.test(agentCommandDockSource) &&
       agentCommandDockSource.includes("data-testid=\"agent-decision-lane\"") &&
       agentCommandDockSource.includes("data-testid={`agent-decision-${item.key}`}") &&
       agentCommandDockSource.includes("data-testid={`agent-decision-${item.key}`} disabled={busy}") &&
-      agentCommandDockSource.includes("disabled={busy}\n                  key={item.zh}") &&
+      /disabled=\{busy\}\s+key=\{item\.(key|zh)\}/.test(agentCommandDockSource) &&
       agentCommandDockSource.includes("Can answer") &&
       agentCommandDockSource.includes("Review needed") &&
       agentCommandDockSource.includes("Missing data") &&

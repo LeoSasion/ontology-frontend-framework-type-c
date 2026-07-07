@@ -185,8 +185,8 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
             </h2>
             <p className="panelLead">
               <Bilingual
-                zh="当前工作区没有可用数据表。这里不展示样例图表；完成导入后，可以让 AI 一次创建一个图表，也可以使用行业看板 Beta。"
-                en="This workspace has no usable tables. No sample charts are shown; after import, AI can create one chart at a time or use the industry dashboard beta."
+                zh="当前工作区没有可用数据表。完成导入后，可以让 AI 一次创建一个图表，也可以使用行业看板 Beta。"
+                en="This workspace has no usable tables. After import, AI can create one chart at a time or use the industry dashboard beta."
               />
             </p>
           </div>

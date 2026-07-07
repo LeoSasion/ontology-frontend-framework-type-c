@@ -68,8 +68,8 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
             </h2>
             <p className="panelLead">
               <Bilingual
-                zh="当前工作区没有数据表或导入回执。证据页只展示真实来源、口径、查询和动作回执，不使用样例内容。"
-                en="This workspace has no tables or import receipts. Evidence only shows real sources, metric logic, query receipts, and action receipts."
+                zh="当前工作区没有数据表或导入回执。证据页只展示真实来源、口径、查询和动作回执；没有真实来源时保持空状态。"
+                en="This workspace has no tables or import receipts. Evidence only shows real sources, metric logic, query receipts, and action receipts; without real sources it stays empty."
               />
             </p>
           </div>
@@ -190,7 +190,7 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
                   </div>
                 )) : (
                   <div className="info">
-                    <strong><Bilingual zh="暂无缺口样本" en="No gap samples" /></strong>
+                    <strong><Bilingual zh="暂无可核对缺口" en="No reviewable gaps" /></strong>
                     <span><Bilingual zh="生成 Source Intelligence 后，这里会列出不能推入看板的问题。" en="After Source Intelligence runs, questions that cannot enter dashboards appear here." /></span>
                   </div>
                 )}

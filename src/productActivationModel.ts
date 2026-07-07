@@ -140,7 +140,7 @@ export function buildProductActivation({
           ? biText("有草案待确认", "Drafts need approval")
           : biText("首次闭环已完成", "First success loop complete");
   const stateDetail = !flow.hasData
-    ? biText("系统不会展示样例内容；导入真实数据后再显示图表和证据。", "No sample content is shown; charts and evidence appear after real import.")
+    ? biText("导入真实数据后再显示图表和证据。", "Charts and evidence appear only after a real import.")
     : !flow.hasProfile
       ? biText("运行证据摘要后，字段、关系、指标缺口会进入可核对状态。", "Run evidence summary to make fields, links, and metric gaps reviewable.")
       : !flow.hasDashboard

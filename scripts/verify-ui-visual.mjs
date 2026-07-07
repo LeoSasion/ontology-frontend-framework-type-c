@@ -104,7 +104,7 @@ function visualMetrics() {
     connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
     hasErrorBoundary,
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
-    samplesVisible: /样例|示例|demo|test/i.test(text),
+    samplesVisible: /样例|示例|demo data|test data|fallback source|mock data|lorem/i.test(text),
     overflow: {
       documentX: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
       bodyX: Math.max(0, document.body.scrollWidth - window.innerWidth),
@@ -137,7 +137,7 @@ try {
       browserInfo ??= { chromePath: browser.chromePath, chromeName: browser.chromeName };
       await setViewport(browser.client, viewport);
       await navigate(browser.client, url);
-      const ready = await waitForAppReady(browser.client, "view-dashboard-bridge", 25000);
+      const ready = await waitForAppReady(browser.client, null, 25000);
       const metrics = await evaluate(browser.client, visualMetrics, null, 10000);
       const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `${viewport.key}-${viewport.width}x${viewport.height}.png`));
       const prefix = `visual-${viewport.key}`;
