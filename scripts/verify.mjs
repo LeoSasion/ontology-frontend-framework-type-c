@@ -1,14 +1,12 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createVerifyRuntime, finishVerify, hasCssRule } from "./verify/runtime.mjs";
+import { readProjectJsonIfExists, readVerifySourceCatalog } from "./verify/sourceCatalog.mjs";
 
 const { fullOutput, root, run, runExpectedFailure, verifyDataDir, verifyReceiptPath, walk } = createVerifyRuntime();
 const verifyFundsPath = join(verifyDataDir, "cost-monitor-funds.csv");
 const verifyPolicyPath = join(verifyDataDir, "cost-monitor-policy.csv");
-const bCostMonitorComparisonPath = join(root, "data", "validation", "b-cost-monitor", "b-cost-monitor-comparison.json");
-const bCostMonitorComparison = existsSync(bCostMonitorComparisonPath)
-  ? JSON.parse(readFileSync(bCostMonitorComparisonPath, "utf8"))
-  : null;
+const bCostMonitorComparison = readProjectJsonIfExists(root, "data", "validation", "b-cost-monitor", "b-cost-monitor-comparison.json");
 const retiredSeedEnvName = "AIBI_ENABLE_" + "SEED_DATA";
 const forbiddenPatterns = [
   /^financial_reports\.sqlite/i,
@@ -673,218 +671,220 @@ if (agentRejectDraftKey) {
 checks.push(run("cli-quality-doctor", "python", ["tools/bi_cli.py", "--json", "quality-doctor"]));
 
 const byLabel = Object.fromEntries(checks.map((check) => [check.label, check]));
-const bDashboardDrilldownSheetSource = readFileSync(join(root, "src", "components", "BiDashboardDrilldownSheet.tsx"), "utf8");
-const bDashboardWidgetCardSource = readFileSync(join(root, "src", "components", "BiDashboardWidgetCard.tsx"), "utf8");
-const bWidgetKitSource = readFileSync(join(root, "src", "components", "BiDashboardWidgetKit.tsx"), "utf8");
-const bWidgetKitOverviewSource = readFileSync(join(root, "src", "components", "BiDashboardWidgetKitOverview.tsx"), "utf8");
-const biDashboardModelSource = readFileSync(join(root, "src", "biDashboardModel.ts"), "utf8");
-const biDashboardValueModelSource = readFileSync(join(root, "src", "biDashboardValueModel.ts"), "utf8");
-const biDashboardPresentationSource = readFileSync(join(root, "src", "biDashboardPresentation.ts"), "utf8");
-const biDashboardRuntimeSource = readFileSync(join(root, "src", "biDashboardRuntime.ts"), "utf8");
-const biDashboardWidgetFactorySource = readFileSync(join(root, "src", "biDashboardWidgetFactory.ts"), "utf8");
-const bWidgetKitModelSource = readFileSync(join(root, "src", "biDashboardWidgetKitModel.ts"), "utf8");
-const dashboardCanvasSource = readFileSync(join(root, "src", "components", "DashboardCanvas.tsx"), "utf8");
-const dashboardCanvasWidgetModelSource = readFileSync(join(root, "src", "dashboardCanvasWidgetModel.ts"), "utf8");
-const dashboardCanvasSourceSwitchModelSource = readFileSync(join(root, "src", "dashboardCanvasSourceSwitchModel.ts"), "utf8");
-const dashboardCanvasReadinessModelSource = readFileSync(join(root, "src", "dashboardCanvasReadinessModel.ts"), "utf8");
-const dashboardCanvasPlanModelSource = readFileSync(join(root, "src", "dashboardCanvasPlanModel.ts"), "utf8");
-const dashboardCanvasFilterModelSource = readFileSync(join(root, "src", "dashboardCanvasFilterModel.ts"), "utf8");
-const dashboardCanvasFieldModelSource = readFileSync(join(root, "src", "dashboardCanvasFieldModel.ts"), "utf8");
-const dashboardCanvasActionRunnerSource = readFileSync(join(root, "src", "useDashboardCanvasActionRunner.ts"), "utf8");
-const dashboardCanvasActionsSource = readFileSync(join(root, "src", "useDashboardCanvasActions.ts"), "utf8");
-const dashboardCanvasStateSource = readFileSync(join(root, "src", "useDashboardCanvasState.ts"), "utf8");
-const dashboardCanvasRelationshipModelSource = readFileSync(join(root, "src", "dashboardCanvasRelationshipModel.ts"), "utf8");
-const dashboardCanvasSourceSwitchViewModelSource = readFileSync(join(root, "src", "dashboardCanvasSourceSwitchViewModel.ts"), "utf8");
-const dashboardCanvasEditorOptionsSource = readFileSync(join(root, "src", "dashboardCanvasEditorOptions.ts"), "utf8");
-const dashboardCanvasSummaryModelSource = readFileSync(join(root, "src", "dashboardCanvasSummaryModel.ts"), "utf8");
-const dashboardCanvasViewModelSource = readFileSync(join(root, "src", "dashboardCanvasViewModel.ts"), "utf8");
-const dashboardCanvasContractsSource = readFileSync(join(root, "src", "dashboardCanvasContracts.ts"), "utf8");
-const dashboardAdvancedWidgetWorkbenchSource = readFileSync(join(root, "src", "components", "DashboardAdvancedWidgetWorkbench.tsx"), "utf8");
-const dashboardBusinessTaskStripSource = readFileSync(join(root, "src", "components", "DashboardBusinessTaskStrip.tsx"), "utf8");
-const dashboardBeginnerEditorSource = readFileSync(join(root, "src", "components", "DashboardBeginnerEditor.tsx"), "utf8");
-const dashboardModuleSavePanelSource = readFileSync(join(root, "src", "components", "DashboardModuleSavePanel.tsx"), "utf8");
-const dashboardBusinessTemplatePanelSource = readFileSync(join(root, "src", "components", "DashboardBusinessTemplatePanel.tsx"), "utf8");
-const dashboardWidgetRecommendationPanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetRecommendationPanel.tsx"), "utf8");
-const dashboardSavedViewPanelSource = readFileSync(join(root, "src", "components", "DashboardSavedViewPanel.tsx"), "utf8");
-const dashboardRelationshipRecommendationPanelSource = readFileSync(join(root, "src", "components", "DashboardRelationshipRecommendationPanel.tsx"), "utf8");
-const dashboardRelationshipWidgetPanelSource = readFileSync(join(root, "src", "components", "DashboardRelationshipWidgetPanel.tsx"), "utf8");
-const dashboardWidgetManagePanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetManagePanel.tsx"), "utf8");
-const dashboardWidgetEditorPanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetEditorPanel.tsx"), "utf8");
-const dashboardWidgetBasicFormSource = readFileSync(join(root, "src", "components", "DashboardWidgetBasicForm.tsx"), "utf8");
-const dashboardWidgetStylePanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetStylePanel.tsx"), "utf8");
-const dashboardWidgetLocalFilterPanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetLocalFilterPanel.tsx"), "utf8");
-const dashboardWidgetLifecyclePanelSource = readFileSync(join(root, "src", "components", "DashboardWidgetLifecyclePanel.tsx"), "utf8");
-const dashboardPageAdminPanelSource = readFileSync(join(root, "src", "components", "DashboardPageAdminPanel.tsx"), "utf8");
-const dashboardContractBoundaryPanelSource = readFileSync(join(root, "src", "components", "DashboardContractBoundaryPanel.tsx"), "utf8");
-const dashboardFilterWorkbenchSource = readFileSync(join(root, "src", "components", "DashboardFilterWorkbench.tsx"), "utf8");
-const dashboardOverviewStripSource = readFileSync(join(root, "src", "components", "DashboardOverviewStrip.tsx"), "utf8");
-const bWidgetModelSource = readFileSync(join(root, "src", "biDashboardModel.ts"), "utf8");
-const serverIndexSource = readFileSync(join(root, "server", "index.ts"), "utf8");
-const serverRuntimeSource = readFileSync(join(root, "server", "serverRuntime.ts"), "utf8");
-const serverStaticSource = readFileSync(join(root, "server", "staticServer.ts"), "utf8");
-const serverWorkspaceRoutesSource = readFileSync(join(root, "server", "workspaceRoutes.ts"), "utf8");
-const serverDashboardRoutesSource = readFileSync(join(root, "server", "dashboardRoutes.ts"), "utf8");
-const serverSourceRoutesSource = readFileSync(join(root, "server", "sourceRoutes.ts"), "utf8");
-const serverSettingsRoutesSource = readFileSync(join(root, "server", "settingsRoutes.ts"), "utf8");
-const serverModelRoutesSource = readFileSync(join(root, "server", "modelRoutes.ts"), "utf8");
-const serverQueryRoutesSource = readFileSync(join(root, "server", "queryRoutes.ts"), "utf8");
-const serverAgentRoutesSource = readFileSync(join(root, "server", "agentRoutes.ts"), "utf8");
-const agentPromptRoutingSource = readFileSync(join(root, "src", "agentPromptRouting.ts"), "utf8");
-const agentCommandDockSource = readFileSync(join(root, "src", "components", "AgentCommandDock.tsx"), "utf8");
-const agentPanelSource = readFileSync(join(root, "src", "components", "AgentPanel.tsx"), "utf8");
-const agentPanelModelSource = readFileSync(join(root, "src", "agentPanelModel.ts"), "utf8");
-const agentAnswerCardSource = readFileSync(join(root, "src", "components", "AgentAnswerCard.tsx"), "utf8");
-const agentCanAnswerPanelSource = readFileSync(join(root, "src", "components", "AgentCanAnswerPanel.tsx"), "utf8");
-const agentContextPlanPanelSource = readFileSync(join(root, "src", "components", "AgentContextPlanPanel.tsx"), "utf8");
-const agentEvidenceAuditPanelsSource = readFileSync(join(root, "src", "components", "AgentEvidenceAuditPanels.tsx"), "utf8");
-const agentPendingChangesPanelSource = readFileSync(join(root, "src", "components", "AgentPendingChangesPanel.tsx"), "utf8");
-const agentPromptComposerSource = readFileSync(join(root, "src", "components", "AgentPromptComposer.tsx"), "utf8");
-const agentTaskPacketSource = readFileSync(join(root, "src", "components", "AgentTaskPacket.tsx"), "utf8");
-const evidenceViewSource = readFileSync(join(root, "src", "components", "EvidenceView.tsx"), "utf8");
-const evidenceBusinessSummaryPanelSource = readFileSync(join(root, "src", "components", "EvidenceBusinessSummaryPanel.tsx"), "utf8");
-const evidenceNumberExplainerPanelSource = readFileSync(join(root, "src", "components", "EvidenceNumberExplainerPanel.tsx"), "utf8");
-const evidenceViewModelSource = readFileSync(join(root, "src", "evidenceViewModel.ts"), "utf8");
-const viewWorkspaceSource = readFileSync(join(root, "src", "components", "ViewWorkspace.tsx"), "utf8");
-const viewAgentTaskStripSource = readFileSync(join(root, "src", "components", "ViewAgentTaskStrip.tsx"), "utf8");
-const viewDashboardBridgePanelSource = readFileSync(join(root, "src", "components", "ViewDashboardBridgePanel.tsx"), "utf8");
-const viewSavedListPanelSource = readFileSync(join(root, "src", "components", "ViewSavedListPanel.tsx"), "utf8");
-const viewWorkspaceModelSource = readFileSync(join(root, "src", "viewWorkspaceModel.ts"), "utf8");
-const homeActionDockSource = readFileSync(join(root, "src", "components", "HomeActionDock.tsx"), "utf8");
-const homeDetailedPathPanelSource = readFileSync(join(root, "src", "components", "HomeDetailedPathPanel.tsx"), "utf8");
-const homeOverviewSource = readFileSync(join(root, "src", "components", "HomeOverview.tsx"), "utf8");
-const productActivationPanelSource = readFileSync(join(root, "src", "components", "ProductActivationPanel.tsx"), "utf8");
-const homeOverviewModelSource = readFileSync(join(root, "src", "homeOverviewModel.ts"), "utf8");
-const safeValueSource = readFileSync(join(root, "src", "safeValue.ts"), "utf8");
-const homeOperatingSummaryPanelSource = readFileSync(join(root, "src", "components", "HomeOperatingSummaryPanel.tsx"), "utf8");
-const homeProductIntelligencePanelSource = readFileSync(join(root, "src", "components", "HomeProductIntelligencePanel.tsx"), "utf8");
-const homeScenarioPacksPanelSource = readFileSync(join(root, "src", "components", "HomeScenarioPacksPanel.tsx"), "utf8");
-const homeWorkspaceStartGuideSource = readFileSync(join(root, "src", "components", "HomeWorkspaceStartGuide.tsx"), "utf8");
-const businessPathModelSource = readFileSync(join(root, "src", "businessPathModel.ts"), "utf8");
-const businessPathBarSource = readFileSync(join(root, "src", "components", "BusinessPathBar.tsx"), "utf8");
-const metricSemanticRepairActionsSource = readFileSync(join(root, "src", "components", "MetricSemanticRepairActions.tsx"), "utf8");
-const inspectorPanelSource = readFileSync(join(root, "src", "components", "InspectorPanel.tsx"), "utf8");
-const inspectorPanelModelSource = readFileSync(join(root, "src", "inspectorPanelModel.ts"), "utf8");
-const apiSource = readFileSync(join(root, "src", "api.ts"), "utf8");
-const useQualityDoctorSource = readFileSync(join(root, "src", "useQualityDoctor.ts"), "utf8");
-const apiAgentSource = readFileSync(join(root, "src", "apiAgent.ts"), "utf8");
-const apiClientSource = readFileSync(join(root, "src", "apiClient.ts"), "utf8");
-const apiDashboardSource = readFileSync(join(root, "src", "apiDashboard.ts"), "utf8");
-const apiModelSource = readFileSync(join(root, "src", "apiModel.ts"), "utf8");
-const apiSettingsSource = readFileSync(join(root, "src", "apiSettings.ts"), "utf8");
-const apiSourceApiSource = readFileSync(join(root, "src", "apiSource.ts"), "utf8");
-const apiViewsSource = readFileSync(join(root, "src", "apiViews.ts"), "utf8");
-const apiWorkspaceSource = readFileSync(join(root, "src", "apiWorkspace.ts"), "utf8");
-const erpUnitLibraryViewModelSource = readFileSync(join(root, "src", "erpUnitLibraryViewModel.ts"), "utf8");
-const appSource = readFileSync(join(root, "src", "App.tsx"), "utf8");
-const appSectionsSource = readFileSync(join(root, "src", "appSections.ts"), "utf8");
-const appLazyModulesSource = readFileSync(join(root, "src", "appLazyModules.tsx"), "utf8");
-const appWorkspaceModelSource = readFileSync(join(root, "src", "appWorkspaceModel.ts"), "utf8");
-const emptyWorkspaceDataSource = readFileSync(join(root, "src", "emptyWorkspaceData.ts"), "utf8");
-const actionRecoveryModelSource = readFileSync(join(root, "src", "actionRecoveryModel.ts"), "utf8");
-const appAgentActionsSource = readFileSync(join(root, "src", "useAppAgentActions.ts"), "utf8");
-const appDataActionsSource = readFileSync(join(root, "src", "useAppDataActions.ts"), "utf8");
-const appDashboardActionsSource = readFileSync(join(root, "src", "useAppDashboardActions.ts"), "utf8");
-const appSettingsActionsSource = readFileSync(join(root, "src", "useAppSettingsActions.ts"), "utf8");
-const appRefreshModelSource = readFileSync(join(root, "src", "appRefreshModel.ts"), "utf8");
-const defaultThemeDataSource = readFileSync(join(root, "src", "defaultThemeData.ts"), "utf8");
-const productIntelligenceModelSource = readFileSync(join(root, "src", "productIntelligenceModel.ts"), "utf8");
-const productActivationModelSource = readFileSync(join(root, "src", "productActivationModel.ts"), "utf8");
-const workspaceFlowModelSource = readFileSync(join(root, "src", "workspaceFlowModel.ts"), "utf8");
-const metricRepairModelSource = readFileSync(join(root, "src", "metricRepairModel.ts"), "utf8");
-const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-const readmeSource = readFileSync(join(root, "README.md"), "utf8");
-const devScriptSource = readFileSync(join(root, "scripts", "dev.mjs"), "utf8");
-const verifyUiRealImportSource = readFileSync(join(root, "scripts", "verify-ui-real-import.mjs"), "utf8");
-const verifyAAdversarialSource = readFileSync(join(root, "scripts", "verify-a-adversarial-source-intelligence.mjs"), "utf8");
-const indexHtmlSource = readFileSync(join(root, "index.html"), "utf8");
-const topBarSource = readFileSync(join(root, "src", "components", "TopBar.tsx"), "utf8");
-const sourceWorkbenchSource = readFileSync(join(root, "src", "components", "SourceWorkbench.tsx"), "utf8");
-const agentPromptGridSource = readFileSync(join(root, "src", "components", "AgentPromptGrid.tsx"), "utf8");
-const sourceWorkbenchAgentStarterSource = readFileSync(join(root, "src", "components", "SourceWorkbenchAgentStarter.tsx"), "utf8");
-const sourceWorkbenchActionPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchActionPanel.tsx"), "utf8");
-const sourceWorkbenchConnectorPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchConnectorPanel.tsx"), "utf8");
-const sourceWorkbenchDataManagementPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchDataManagementPanel.tsx"), "utf8");
-const sourceWorkbenchDataEntryPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchDataEntryPanel.tsx"), "utf8");
-const sourceWorkbenchFieldMetricPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchFieldMetricPanel.tsx"), "utf8");
-const sourceWorkbenchFieldSemanticPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchFieldSemanticPanel.tsx"), "utf8");
-const sourceWorkbenchHeaderSource = readFileSync(join(root, "src", "components", "SourceWorkbenchHeader.tsx"), "utf8");
-const sourceWorkbenchImportPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchImportPanel.tsx"), "utf8");
-const sourceWorkbenchMetricDefinitionPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchMetricDefinitionPanel.tsx"), "utf8");
-const sourceWorkbenchOperationsPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchOperationsPanel.tsx"), "utf8");
-const sourceWorkbenchQueryFormulaPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchQueryFormulaPanel.tsx"), "utf8");
-const sourceWorkbenchRelationshipPanelSource = readFileSync(join(root, "src", "components", "SourceWorkbenchRelationshipPanel.tsx"), "utf8");
-const relationshipAutoModelGraphSource = readFileSync(join(root, "src", "components", "RelationshipAutoModelGraph.tsx"), "utf8");
-const relationshipAutoModelGraphModelSource = readFileSync(join(root, "src", "relationshipAutoModelGraphModel.ts"), "utf8");
-const sourceWorkbenchContractsSource = readFileSync(join(root, "src", "sourceWorkbenchContracts.ts"), "utf8");
-const sourceWorkbenchFieldMetricTypesSource = readFileSync(join(root, "src", "sourceWorkbenchFieldMetricTypes.ts"), "utf8");
-const sourceWorkbenchGuidanceModelSource = readFileSync(join(root, "src", "sourceWorkbenchGuidanceModel.ts"), "utf8");
-const sourceWorkbenchModelSource = readFileSync(join(root, "src", "sourceWorkbenchModel.ts"), "utf8");
-const sourceWorkbenchReceiptModelSource = readFileSync(join(root, "src", "sourceWorkbenchReceiptModel.ts"), "utf8");
-const sourceWorkbenchCommandModelSource = readFileSync(join(root, "src", "sourceWorkbenchCommandModel.ts"), "utf8");
-const sourceIntelligenceRunModelSource = readFileSync(join(root, "src", "sourceIntelligenceRunModel.ts"), "utf8");
-const sourceWorkbenchDraftModelSource = readFileSync(join(root, "src", "sourceWorkbenchDraftModel.ts"), "utf8");
-const sidebarSource = readFileSync(join(root, "src", "components", "Sidebar.tsx"), "utf8");
-const sidebarAssetSectionsSource = readFileSync(join(root, "src", "components", "SidebarAssetSections.tsx"), "utf8");
-const sidebarWorkspaceCardSource = readFileSync(join(root, "src", "components", "SidebarWorkspaceCard.tsx"), "utf8");
-const settingsPanelSource = readFileSync(join(root, "src", "components", "SettingsPanel.tsx"), "utf8");
-const settingsAcceptanceEvidencePanelSource = readFileSync(join(root, "src", "components", "SettingsAcceptanceEvidencePanel.tsx"), "utf8");
-const settingsConfigPortabilityPanelSource = readFileSync(join(root, "src", "components", "SettingsConfigPortabilityPanel.tsx"), "utf8");
-const settingsSandboxBoundaryPanelSource = readFileSync(join(root, "src", "components", "SettingsSandboxBoundaryPanel.tsx"), "utf8");
-const settingsThemePreferencePanelSource = readFileSync(join(root, "src", "components", "SettingsThemePreferencePanel.tsx"), "utf8");
-const stylesSource = readFileSync(join(root, "src", "styles.css"), "utf8");
-const typesSource = readFileSync(join(root, "src", "types.ts"), "utf8");
-const typesAgentSource = readFileSync(join(root, "src", "typesAgent.ts"), "utf8");
-const typesDashboardSource = readFileSync(join(root, "src", "typesDashboard.ts"), "utf8");
-const typesDomainSource = readFileSync(join(root, "src", "typesDomain.ts"), "utf8");
-const typesQuerySource = readFileSync(join(root, "src", "typesQuery.ts"), "utf8");
-const typesSourceContractsSource = readFileSync(join(root, "src", "typesSource.ts"), "utf8");
-const typesSourceIntelligenceSource = readFileSync(join(root, "src", "typesSourceIntelligence.ts"), "utf8");
-const typesWorkspaceSource = readFileSync(join(root, "src", "typesWorkspace.ts"), "utf8");
-const themeSource = readFileSync(join(root, "src", "theme.ts"), "utf8");
-const verifySource = readFileSync(join(root, "scripts", "verify.mjs"), "utf8");
-const verifyRuntimeSource = readFileSync(join(root, "scripts", "verify", "runtime.mjs"), "utf8");
-const biCliSource = readFileSync(join(root, "tools", "bi_cli.py"), "utf8");
-const biCliContractsSource = readFileSync(join(root, "tools", "bi_cli_contracts.py"), "utf8");
-const biCliEnvelopeSource = readFileSync(join(root, "tools", "bi_cli_envelope.py"), "utf8");
-const biCliEvidenceBundlesSource = readFileSync(join(root, "tools", "bi_cli_evidence_bundles.py"), "utf8");
-const biCliContractDocSource = readFileSync(join(root, "docs", "bi-cli-contract.md"), "utf8");
-const docsReadmeSource = readFileSync(join(root, "docs", "README.md"), "utf8");
-const productUxStandardDocSource = readFileSync(join(root, "docs", "product-ux-standard.md"), "utf8");
-const productAcceptanceMatrixDocSource = readFileSync(join(root, "docs", "product-acceptance-matrix.md"), "utf8");
-const developmentRoadmapDocSource = readFileSync(join(root, "docs", "development-roadmap.md"), "utf8");
-const prdDocSource = readFileSync(join(root, "docs", "PRD.md"), "utf8");
-const verifyBiCliAgentContractSource = readFileSync(join(root, "scripts", "verify-bi-cli-agent-contract.mjs"), "utf8");
-const agentActionConfirmationsSource = readFileSync(join(root, "tools", "agent_action_confirmations.py"), "utf8");
-const agentActionDraftStoreSource = readFileSync(join(root, "tools", "agent_action_draft_store.py"), "utf8");
-const agentConfirmExecutionHandlersSource = readFileSync(join(root, "tools", "agent_confirm_execution_handlers.py"), "utf8");
-const agentPromptResolutionSource = readFileSync(join(root, "tools", "agent_prompt_resolution.py"), "utf8");
-const agentRecommendedCommandsSource = readFileSync(join(root, "tools", "agent_recommended_commands.py"), "utf8");
-const biCliCoreSource = readFileSync(join(root, "tools", "bi_cli_core.py"), "utf8");
-const businessDashboardServiceSource = readFileSync(join(root, "tools", "business_dashboard_service.py"), "utf8");
-const erpDashboardUnitLibrarySource = readFileSync(join(root, "tools", "erp_dashboard_unit_library.py"), "utf8");
-const configCommandServiceSource = readFileSync(join(root, "tools", "config_command_service.py"), "utf8");
-const connectorCommandServiceSource = readFileSync(join(root, "tools", "connector_command_service.py"), "utf8");
-const importJobCommandServiceSource = readFileSync(join(root, "tools", "import_job_command_service.py"), "utf8");
-const importCommandServiceSource = readFileSync(join(root, "tools", "import_command_service.py"), "utf8");
-const importTableWriterServiceSource = readFileSync(join(root, "tools", "import_table_writer_service.py"), "utf8");
-const relationshipCommandServiceSource = readFileSync(join(root, "tools", "relationship_command_service.py"), "utf8");
-const sourceManagementCommandServiceSource = readFileSync(join(root, "tools", "source_management_command_service.py"), "utf8");
-const dashboardModuleOrchestrationSource = readFileSync(join(root, "tools", "dashboard_module_orchestration.py"), "utf8");
-const dashboardWidgetContractsSource = readFileSync(join(root, "tools", "dashboard_widget_contracts.py"), "utf8");
-const dashboardWidgetOperationsSource = readFileSync(join(root, "tools", "dashboard_widget_operations.py"), "utf8");
-const dashboardWidgetProposalServiceSource = readFileSync(join(root, "tools", "dashboard_widget_proposal_service.py"), "utf8");
-const dashboardWidgetCommandServiceSource = readFileSync(join(root, "tools", "dashboard_widget_command_service.py"), "utf8");
-const dashboardSaveTransactionsSource = readFileSync(join(root, "tools", "dashboard_save_transactions.py"), "utf8");
-const sourceIntelligenceReceiptsSource = readFileSync(join(root, "tools", "evidence_receipts.py"), "utf8");
-const sourceIntelligenceRunStoreSource = readFileSync(join(root, "tools", "evidence_run_store.py"), "utf8");
-const sourceIntelligenceDashboardDraftsSource = readFileSync(join(root, "tools", "evidence_dashboard_drafts.py"), "utf8");
-const semanticTextSource = readFileSync(join(root, "tools", "evidence_profile_runtime", "semantic_text.py"), "utf8");
-const sourceReadModelServiceSource = readFileSync(join(root, "tools", "source_read_model_service.py"), "utf8");
-const savedViewQueryServiceSource = readFileSync(join(root, "tools", "saved_view_query_service.py"), "utf8");
-const metricFormulaCommandServiceSource = readFileSync(join(root, "tools", "metric_formula_command_service.py"), "utf8");
-const workspaceCommandServiceSource = readFileSync(join(root, "tools", "workspace_command_service.py"), "utf8");
-const preferencesThemeCommandServiceSource = readFileSync(join(root, "tools", "preferences_theme_command_service.py"), "utf8");
-const implementationStatusSource = readFileSync(join(root, "docs", "implementation-status.md"), "utf8");
+const {
+  bDashboardDrilldownSheetSource,
+  bDashboardWidgetCardSource,
+  bWidgetKitSource,
+  bWidgetKitOverviewSource,
+  biDashboardModelSource,
+  biDashboardValueModelSource,
+  biDashboardPresentationSource,
+  biDashboardRuntimeSource,
+  biDashboardWidgetFactorySource,
+  bWidgetKitModelSource,
+  dashboardCanvasSource,
+  dashboardCanvasWidgetModelSource,
+  dashboardCanvasSourceSwitchModelSource,
+  dashboardCanvasReadinessModelSource,
+  dashboardCanvasPlanModelSource,
+  dashboardCanvasFilterModelSource,
+  dashboardCanvasFieldModelSource,
+  dashboardCanvasActionRunnerSource,
+  dashboardCanvasActionsSource,
+  dashboardCanvasStateSource,
+  dashboardCanvasRelationshipModelSource,
+  dashboardCanvasSourceSwitchViewModelSource,
+  dashboardCanvasEditorOptionsSource,
+  dashboardCanvasSummaryModelSource,
+  dashboardCanvasViewModelSource,
+  dashboardCanvasContractsSource,
+  dashboardAdvancedWidgetWorkbenchSource,
+  dashboardBusinessTaskStripSource,
+  dashboardBeginnerEditorSource,
+  dashboardModuleSavePanelSource,
+  dashboardBusinessTemplatePanelSource,
+  dashboardWidgetRecommendationPanelSource,
+  dashboardSavedViewPanelSource,
+  dashboardRelationshipRecommendationPanelSource,
+  dashboardRelationshipWidgetPanelSource,
+  dashboardWidgetManagePanelSource,
+  dashboardWidgetEditorPanelSource,
+  dashboardWidgetBasicFormSource,
+  dashboardWidgetStylePanelSource,
+  dashboardWidgetLocalFilterPanelSource,
+  dashboardWidgetLifecyclePanelSource,
+  dashboardPageAdminPanelSource,
+  dashboardContractBoundaryPanelSource,
+  dashboardFilterWorkbenchSource,
+  dashboardOverviewStripSource,
+  bWidgetModelSource,
+  serverIndexSource,
+  serverRuntimeSource,
+  serverStaticSource,
+  serverWorkspaceRoutesSource,
+  serverDashboardRoutesSource,
+  serverSourceRoutesSource,
+  serverSettingsRoutesSource,
+  serverModelRoutesSource,
+  serverQueryRoutesSource,
+  serverAgentRoutesSource,
+  agentPromptRoutingSource,
+  agentCommandDockSource,
+  agentPanelSource,
+  agentPanelModelSource,
+  agentAnswerCardSource,
+  agentCanAnswerPanelSource,
+  agentContextPlanPanelSource,
+  agentEvidenceAuditPanelsSource,
+  agentPendingChangesPanelSource,
+  agentPromptComposerSource,
+  agentTaskPacketSource,
+  evidenceViewSource,
+  evidenceBusinessSummaryPanelSource,
+  evidenceNumberExplainerPanelSource,
+  evidenceViewModelSource,
+  viewWorkspaceSource,
+  viewAgentTaskStripSource,
+  viewDashboardBridgePanelSource,
+  viewSavedListPanelSource,
+  viewWorkspaceModelSource,
+  homeActionDockSource,
+  homeDetailedPathPanelSource,
+  homeOverviewSource,
+  productActivationPanelSource,
+  homeOverviewModelSource,
+  safeValueSource,
+  homeOperatingSummaryPanelSource,
+  homeProductIntelligencePanelSource,
+  homeScenarioPacksPanelSource,
+  homeWorkspaceStartGuideSource,
+  businessPathModelSource,
+  businessPathBarSource,
+  metricSemanticRepairActionsSource,
+  inspectorPanelSource,
+  inspectorPanelModelSource,
+  apiSource,
+  useQualityDoctorSource,
+  apiAgentSource,
+  apiClientSource,
+  apiDashboardSource,
+  apiModelSource,
+  apiSettingsSource,
+  apiSourceApiSource,
+  apiViewsSource,
+  apiWorkspaceSource,
+  erpUnitLibraryViewModelSource,
+  appSource,
+  appSectionsSource,
+  appLazyModulesSource,
+  appWorkspaceModelSource,
+  emptyWorkspaceDataSource,
+  actionRecoveryModelSource,
+  appAgentActionsSource,
+  appDataActionsSource,
+  appDashboardActionsSource,
+  appSettingsActionsSource,
+  appRefreshModelSource,
+  defaultThemeDataSource,
+  productIntelligenceModelSource,
+  productActivationModelSource,
+  workspaceFlowModelSource,
+  metricRepairModelSource,
+  packageJson,
+  readmeSource,
+  devScriptSource,
+  verifyUiRealImportSource,
+  verifyAAdversarialSource,
+  indexHtmlSource,
+  topBarSource,
+  sourceWorkbenchSource,
+  agentPromptGridSource,
+  sourceWorkbenchAgentStarterSource,
+  sourceWorkbenchActionPanelSource,
+  sourceWorkbenchConnectorPanelSource,
+  sourceWorkbenchDataManagementPanelSource,
+  sourceWorkbenchDataEntryPanelSource,
+  sourceWorkbenchFieldMetricPanelSource,
+  sourceWorkbenchFieldSemanticPanelSource,
+  sourceWorkbenchHeaderSource,
+  sourceWorkbenchImportPanelSource,
+  sourceWorkbenchMetricDefinitionPanelSource,
+  sourceWorkbenchOperationsPanelSource,
+  sourceWorkbenchQueryFormulaPanelSource,
+  sourceWorkbenchRelationshipPanelSource,
+  relationshipAutoModelGraphSource,
+  relationshipAutoModelGraphModelSource,
+  sourceWorkbenchContractsSource,
+  sourceWorkbenchFieldMetricTypesSource,
+  sourceWorkbenchGuidanceModelSource,
+  sourceWorkbenchModelSource,
+  sourceWorkbenchReceiptModelSource,
+  sourceWorkbenchCommandModelSource,
+  sourceIntelligenceRunModelSource,
+  sourceWorkbenchDraftModelSource,
+  sidebarSource,
+  sidebarAssetSectionsSource,
+  sidebarWorkspaceCardSource,
+  settingsPanelSource,
+  settingsAcceptanceEvidencePanelSource,
+  settingsConfigPortabilityPanelSource,
+  settingsSandboxBoundaryPanelSource,
+  settingsThemePreferencePanelSource,
+  stylesSource,
+  typesSource,
+  typesAgentSource,
+  typesDashboardSource,
+  typesDomainSource,
+  typesQuerySource,
+  typesSourceContractsSource,
+  typesSourceIntelligenceSource,
+  typesWorkspaceSource,
+  themeSource,
+  verifySource,
+  verifyRuntimeSource,
+  biCliSource,
+  biCliContractsSource,
+  biCliEnvelopeSource,
+  biCliEvidenceBundlesSource,
+  biCliContractDocSource,
+  docsReadmeSource,
+  productUxStandardDocSource,
+  productAcceptanceMatrixDocSource,
+  developmentRoadmapDocSource,
+  prdDocSource,
+  verifyBiCliAgentContractSource,
+  agentActionConfirmationsSource,
+  agentActionDraftStoreSource,
+  agentConfirmExecutionHandlersSource,
+  agentPromptResolutionSource,
+  agentRecommendedCommandsSource,
+  biCliCoreSource,
+  businessDashboardServiceSource,
+  erpDashboardUnitLibrarySource,
+  configCommandServiceSource,
+  connectorCommandServiceSource,
+  importJobCommandServiceSource,
+  importCommandServiceSource,
+  importTableWriterServiceSource,
+  relationshipCommandServiceSource,
+  sourceManagementCommandServiceSource,
+  dashboardModuleOrchestrationSource,
+  dashboardWidgetContractsSource,
+  dashboardWidgetOperationsSource,
+  dashboardWidgetProposalServiceSource,
+  dashboardWidgetCommandServiceSource,
+  dashboardSaveTransactionsSource,
+  sourceIntelligenceReceiptsSource,
+  sourceIntelligenceRunStoreSource,
+  sourceIntelligenceDashboardDraftsSource,
+  semanticTextSource,
+  sourceReadModelServiceSource,
+  savedViewQueryServiceSource,
+  metricFormulaCommandServiceSource,
+  workspaceCommandServiceSource,
+  preferencesThemeCommandServiceSource,
+  implementationStatusSource,
+} = readVerifySourceCatalog(root);
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
