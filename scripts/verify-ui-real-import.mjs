@@ -180,6 +180,24 @@ try {
       await setViewport(browser.client, viewport);
 
       await navigate(browser.client, `${baseUrl}/?section=sources`);
+      const importControlsReady = await waitForUi(browser.client, "source import controls", () => {
+        const text = document.body?.innerText || "";
+        const importInput = document.querySelector(".sourceImportPanel input");
+        const importButton = document.querySelector('[data-testid="import-preview-button"]');
+        const folderButton = document.querySelector('[data-testid="folder-import-preview-button"]');
+        const sourceEntry = document.querySelector('[data-testid="source-intelligence-folder-entry"]');
+        const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
+        return {
+          ok: Boolean(importInput && importButton && folderButton && sourceEntry) && !error,
+          hasImportInput: Boolean(importInput),
+          hasImportButton: Boolean(importButton),
+          hasFolderButton: Boolean(folderButton),
+          hasSourceEntry: Boolean(sourceEntry),
+          hasError: Boolean(error),
+          text: text.slice(0, 700),
+        };
+      }, 45000);
+      checks.push(check("ui-import-controls-mounted", importControlsReady.ok, importControlsReady));
       const sourcesReady = await pageState(browser.client);
       checks.push(
         check("ui-import-sources-ready", sourcesReady.ready.ok, { ready: sourcesReady.ready }),

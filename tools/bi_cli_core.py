@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -16,6 +17,7 @@ DB_PATH = Path(os.environ.get("AIBI_HYBRID_DB_PATH", DEFAULT_DATA_DIR / "aibi_hy
 DUCKDB_PATH = Path(os.environ.get("AIBI_HYBRID_DUCKDB_PATH", DEFAULT_DATA_DIR / "aibi_hybrid.duckdb"))
 A_PROJECT_ROOT = Path(os.environ.get("AIBI_PROJECT_A_PATH", r"C:\Users\Administrator\Documents\AIBI"))
 B_PROJECT_ROOT = Path(os.environ.get("AIBI_PROJECT_B_PATH", r"C:\Users\Administrator\Documents\财务报表"))
+_UNIQUE_COUNTER = itertools.count()
 
 
 def now_iso() -> str:
@@ -23,7 +25,7 @@ def now_iso() -> str:
 
 
 def unique_key(prefix: str) -> str:
-    return f"{prefix}_{time.time_ns()}"
+    return f"{prefix}_{time.time_ns()}_{os.getpid()}_{next(_UNIQUE_COUNTER)}"
 
 
 def dump(value: Any) -> None:
