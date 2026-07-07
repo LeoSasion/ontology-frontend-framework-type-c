@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleAgentApi } from "./agentRoutes";
@@ -12,6 +13,36 @@ import { handleStatic } from "./staticServer";
 import { handleWorkspaceApi } from "./workspaceRoutes";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
+
+function unquoteEnvValue(value: string) {
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+}
+
+function loadLocalEnv(projectRoot: string) {
+  const envPath = resolve(projectRoot, ".env");
+  if (!existsSync(envPath)) return;
+
+  for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+
+    const separator = trimmed.indexOf("=");
+    if (separator <= 0) continue;
+
+    const key = trimmed.slice(0, separator).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || process.env[key] !== undefined) continue;
+
+    process.env[key] = unquoteEnvValue(trimmed.slice(separator + 1).trim());
+  }
+}
+
+loadLocalEnv(root);
 const port = Number(process.env.AIBI_API_PORT ?? 8787);
 const cli = (args: string[]) => runCli(root, args);
 

@@ -15,6 +15,32 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function waitForExit(child, timeoutMs = 2000) {
+  if (child.exitCode !== null || child.signalCode !== null) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(resolve, timeoutMs);
+    child.once("exit", () => {
+      clearTimeout(timeout);
+      resolve();
+    });
+  });
+}
+
+async function removeDirectoryWithRetry(directoryPath, attempts = 8) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      rmSync(directoryPath, { recursive: true, force: true });
+      return;
+    } catch (error) {
+      if (attempt === attempts) throw error;
+      await sleep(150 * attempt);
+    }
+  }
+}
+
 function getFreePort() {
   return new Promise((resolve, reject) => {
     const server = net.createServer();
@@ -200,8 +226,8 @@ export async function launchChrome() {
     async close() {
       client.close();
       if (!child.killed) child.kill();
-      await sleep(150);
-      rmSync(profileDir, { recursive: true, force: true });
+      await waitForExit(child);
+      await removeDirectoryWithRetry(profileDir);
     },
   };
 }

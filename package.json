@@ -10,6 +10,7 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173",
     "verify": "node scripts/verify.mjs && node scripts/verify-bi-cli-agent-contract.mjs",
+    "verify:ci": "npm run build && npm run verify",
     "verify:ui-flow": "node scripts/verify-ui-flow.mjs",
     "verify:ui-visual": "node scripts/verify-ui-visual.mjs",
     "verify:ui-empty": "node scripts/verify-ui-empty-workspace.mjs",
@@ -19,6 +20,9 @@
     "verify:a-adversarial": "node scripts/verify-a-adversarial-source-intelligence.mjs",
     "verify:erp-units": "node scripts/verify-erp-unit-library.mjs",
     "verify:old-projects": "node scripts/verify-old-projects-readonly.mjs",
+    "local:start": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-local.ps1",
+    "local:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/stop-local.ps1",
+    "local:health": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local-health.ps1",
     "start": "tsx server/index.ts"
   },
   "dependencies": {

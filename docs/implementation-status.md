@@ -18,12 +18,14 @@ This file is the current implementation index. It records the stable module boun
 | Agent confirmation boundary | Active | Agent answers are evidence-aware; write operations become dry-runs or action drafts before confirmation. |
 | Evidence surface | Active | Evidence pages summarize business meaning first, with technical details available on demand. |
 | UI runtime verification | Active | Live-browser checks cover the real-data Home -> Dashboard -> Evidence -> Sources -> Agent path, Views layout at landscape/portrait/square ratios, empty workspace routing, and a temporary-workspace real folder import loop with file fallback. |
+| Local operations and CI | Active | GitHub Actions runs the build plus core verification on Windows; local PowerShell scripts start, stop, and health-check the API/UI without touching workspace data. |
 
 Users should start from business actions. Advanced modeling, query, and command details stay available after the primary workflow is clear.
 
 ## Verification
 
 ```powershell
+npm run verify:ci
 npm run build
 npm run verify
 npm run verify:ui
@@ -35,6 +37,9 @@ python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
 python tools/bi_cli.py --json source-intelligence validation-inputs --label "Validation evidence profile"
 python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
+npm run local:start
+npm run local:health
+npm run local:stop
 ```
 
 `npm run verify:ui` expects the local API and UI to be running through `npm run dev` or equivalent live services on ports 8787 and 8686. The real-import UI check creates a temporary workspace, imports `AIBI_REAL_IMPORT_FOLDER` when present or `AIBI_REAL_IMPORT_FILE` as fallback, exercises evidence and chart entry points, then restores the original workspace and deletes the temporary workspace.

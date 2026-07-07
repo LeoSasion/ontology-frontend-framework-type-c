@@ -7,23 +7,34 @@
 ## Run
 
 ```powershell
-npm install
+npm ci
 python -m pip install -r requirements.txt
 npm run dev
 ```
 
 打开 `http://localhost:8686`。
 
-`npm run dev` 会启动本地 API `8787` 和前端 `8686`。需要单独调试时使用：
+`npm run dev` 会启动本地 API `8787` 和前端 `8686`。API 会读取仓库根目录的 `.env`，可从 `.env.example` 复制后填写本机路径和密钥；不要提交 `.env`。需要单独调试时使用：
 
 ```powershell
 npm run api
 npm run dev:ui
 ```
 
+本地交付验收建议使用后台启停脚本：
+
+```powershell
+npm run local:start
+npm run local:health
+npm run local:stop
+```
+
+`local:stop` 只会停止命令行中包含当前仓库路径的 `8686`/`8787` 监听进程，避免误关其他项目。
+
 ## Verify
 
 ```powershell
+npm run verify:ci
 npm run build
 npm run verify
 npm run verify:ui
@@ -35,6 +46,8 @@ python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
 python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
 ```
+
+GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建和核心契约验证。`npm run verify:ui` 仍保留为本机浏览器验收，因为它需要正在运行的本地 API/UI、浏览器和可选真实导入目录。
 
 `npm run verify:ui` 需要本地 `8686` 前端和 `8787` API 已运行。它包含已有真实数据只读流程、三种 PC 比例视觉检查、空工作区检查，以及一个临时工作区真实导入闭环。真实导入优先读取 `C:\Users\Administrator\Documents\财务报表\真实数据` 并走文件夹合并导入，可用 `AIBI_REAL_IMPORT_FOLDER` 覆盖；目录不存在时回退到 `AIBI_REAL_IMPORT_FILE` 指定的单文件。脚本会恢复原工作区并删除临时工作区。
 
@@ -55,4 +68,4 @@ python tools/bi_cli.py --json business-dashboard --template erp-units --op draft
 
 ## Deployment Notes
 
-正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。新环境启动后先执行 `npm install`、`python -m pip install -r requirements.txt`、`npm run build` 和 `npm run verify`，再启动 `npm run dev` 做 UI 验收。
+正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。新环境启动后先执行 `npm ci`、`python -m pip install -r requirements.txt` 和 `npm run verify:ci`，再用 `npm run local:start` 启动服务并执行 `npm run verify:ui` 做 UI 验收。
