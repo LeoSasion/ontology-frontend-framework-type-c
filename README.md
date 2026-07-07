@@ -34,6 +34,7 @@ npm run local:stop
 ## Verify
 
 ```powershell
+npm run preflight
 npm run verify:ci
 npm run build
 npm run verify
@@ -46,6 +47,8 @@ python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
 python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
 ```
+
+`npm run preflight` 是本地交付前的单入口：先跑核心构建和契约验证，再启动本地服务、检查健康状态，并执行完整 UI 闭环。只想快速检查核心契约时使用 `npm run preflight -- --skip-ui`；希望验收后自动停服务时追加 `--stop-after`。
 
 GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建和核心契约验证。`npm run verify:ui` 仍保留为本机浏览器验收，因为它需要正在运行的本地 API/UI、浏览器和可选真实导入目录。
 
@@ -68,4 +71,4 @@ GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建和核心契约
 
 ## Deployment Notes
 
-正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。新环境启动后先执行 `npm ci`、`python -m pip install -r requirements.txt` 和 `npm run verify:ci`，再用 `npm run local:start` 启动服务并执行 `npm run verify:ui` 做 UI 验收。
+正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。新环境启动后先执行 `npm ci` 和 `python -m pip install -r requirements.txt`，再运行 `npm run preflight` 做核心与 UI 验收。

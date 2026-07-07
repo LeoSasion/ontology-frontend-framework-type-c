@@ -18,13 +18,14 @@ This file is the current implementation index. It records the stable module boun
 | Agent confirmation boundary | Active | Agent answers are evidence-aware; write operations become dry-runs or action drafts before confirmation. |
 | Evidence surface | Active | Evidence pages summarize business meaning first, with technical details available on demand. |
 | UI runtime verification | Active | Live-browser checks cover the real-data Home -> Dashboard -> Evidence -> Sources -> Agent path, Views layout at landscape/portrait/square ratios, empty workspace routing, and a temporary-workspace real folder import loop with file fallback. |
-| Local operations and CI | Active | GitHub Actions runs the build plus core verification on Windows; local PowerShell scripts start, stop, and health-check the API/UI without touching workspace data. |
+| Local operations and CI | Active | GitHub Actions runs the build plus core verification on Windows; local PowerShell scripts start, stop, and health-check the API/UI without touching workspace data, and `npm run preflight` gives local release validation one command. |
 
 Users should start from business actions. Advanced modeling, query, and command details stay available after the primary workflow is clear.
 
 ## Verification
 
 ```powershell
+npm run preflight
 npm run verify:ci
 npm run build
 npm run verify
