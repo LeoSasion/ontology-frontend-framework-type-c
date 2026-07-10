@@ -165,6 +165,7 @@ const textSourceFiles = {
   sidebarAssetSectionsSource: ["src", "components", "SidebarAssetSections.tsx"],
   sidebarWorkspaceCardSource: ["src", "components", "SidebarWorkspaceCard.tsx"],
   settingsPanelSource: ["src", "components", "SettingsPanel.tsx"],
+  settingsPanelStylesSource: ["src", "components", "settingsPanel.css"],
   settingsAcceptanceEvidencePanelSource: ["src", "components", "SettingsAcceptanceEvidencePanel.tsx"],
   settingsConfigPortabilityPanelSource: ["src", "components", "SettingsConfigPortabilityPanel.tsx"],
   settingsSandboxBoundaryPanelSource: ["src", "components", "SettingsSandboxBoundaryPanel.tsx"],

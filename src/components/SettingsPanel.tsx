@@ -1,3 +1,4 @@
+import "./settingsPanel.css";
 import { useEffect, useMemo, useState } from "react";
 import { getUserPreferences, makeThemeCopy, resolveThemePalette } from "../theme";
 import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload } from "../types";

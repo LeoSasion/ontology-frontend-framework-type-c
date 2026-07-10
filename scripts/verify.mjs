@@ -815,6 +815,7 @@ const {
   sidebarAssetSectionsSource,
   sidebarWorkspaceCardSource,
   settingsPanelSource,
+  settingsPanelStylesSource,
   settingsAcceptanceEvidencePanelSource,
   settingsConfigPortabilityPanelSource,
   settingsSandboxBoundaryPanelSource,
@@ -877,7 +878,7 @@ const {
   preferencesThemeCommandServiceSource,
   implementationStatusSource,
 } = readVerifySourceCatalog(root);
-const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}`;
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${settingsPanelStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
@@ -5671,6 +5672,10 @@ checks.push(
     ok: existsSync(join(root, "src", "components", "SettingsThemePreferencePanel.tsx")) &&
       settingsPanelSource.includes('import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePreferencePanel"') &&
       settingsPanelSource.includes("<SettingsThemePreferencePanel") &&
+      settingsPanelSource.includes('import "./settingsPanel.css"') &&
+      settingsPanelStylesSource.includes(".settingsPanel {") &&
+      settingsPanelStylesSource.includes(".configRestoreForm {") &&
+      !globalStylesSource.includes(".settingsPanel {") &&
       !settingsPanelSource.includes('className="themePaletteGrid"') &&
       !settingsPanelSource.includes('className="preferenceList"') &&
       settingsThemePreferencePanelSource.includes("type SettingsThemePreferencePanelProps") &&
