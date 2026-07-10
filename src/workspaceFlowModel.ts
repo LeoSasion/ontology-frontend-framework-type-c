@@ -65,8 +65,8 @@ export function buildWorkspaceFlow({
   const resolvedDraftCount = positiveCount(pendingDraftCount ?? status?.counts.actionDrafts, agentRequiresConfirmation ? 1 : 0);
 
   const hasData = tableCount > 0 || tables.length > 0;
-  const hasEvidence = sourceProfileCount > 0 || sourceRunCount > 0;
-  const hasProfile = hasEvidence || fieldCount > 0 || metricCount > 0 || relationshipCount > 0;
+  const hasProfile = sourceProfileCount > 0;
+  const hasEvidence = hasProfile;
   const hasDashboard = resolvedDashboardCount > 0;
   const hasPendingDraft = resolvedDraftCount > 0 || agentRequiresConfirmation;
   const activeStage: WorkspaceFlowStage = hasPendingDraft
@@ -86,13 +86,7 @@ export function buildWorkspaceFlow({
         ? "evidence"
         : "confirm";
 
-  const completedCount = [
-    hasData,
-    hasProfile,
-    hasDashboard,
-    hasEvidence,
-    hasDashboard && !hasPendingDraft,
-  ].filter(Boolean).length;
+  const completedCount = [hasData, hasProfile, hasDashboard].filter(Boolean).length;
 
   return {
     hasData,
@@ -103,7 +97,7 @@ export function buildWorkspaceFlow({
     activeStage,
     nextStep,
     completedCount,
-    totalCount: 5,
+    totalCount: 3,
     counts: {
       tableCount,
       fieldCount,
@@ -118,9 +112,10 @@ export function buildWorkspaceFlow({
 }
 
 export function isBusinessStepLockedByFlow(step: BusinessPathStepKey, flow: WorkspaceFlowModel) {
-  if (step === "data" || step === "confirm") return false;
+  if (step === "data") return false;
   if (step === "chart") return !flow.hasProfile;
   if (step === "evidence") return !flow.hasEvidence;
+  if (step === "confirm") return !flow.hasPendingDraft;
   return false;
 }
 

@@ -22,7 +22,7 @@ function stepDetail(step: BusinessPathStep, flow: WorkspaceFlowModel) {
       : biText("说出想看的单个图表", "Describe one chart to create");
   }
   if (step.key === "evidence") {
-    const receiptCount = flow.counts.sourceProfileCount || flow.counts.sourceRunCount;
+    const receiptCount = flow.counts.sourceProfileCount;
     return receiptCount
       ? biText(`${receiptCount} 条运行回执`, `${receiptCount} run receipts`)
       : biText("查看来源、口径和缺口", "Trace sources, definitions, and gaps");
@@ -33,18 +33,24 @@ function stepDetail(step: BusinessPathStep, flow: WorkspaceFlowModel) {
 }
 
 export function BusinessPathBar({ activeSection, flow, onOpenStep }: BusinessPathBarProps) {
+  const visibleSteps = flow.hasPendingDraft
+    ? businessPathSteps
+    : businessPathSteps.filter((step) => step.key !== "confirm");
   const activeStepKey = businessStepForSection(activeSection);
-  const activeIndex = activeStepKey ? businessPathSteps.findIndex((step) => step.key === activeStepKey) : -1;
+  const resolvedActiveStepKey = activeStepKey && visibleSteps.some((step) => step.key === activeStepKey)
+    ? activeStepKey
+    : flow.nextStep;
+  const activeIndex = visibleSteps.findIndex((step) => step.key === resolvedActiveStepKey);
   const compact = activeSection !== "home";
   const mobileStepIndex = activeIndex >= 0 ? activeIndex : 0;
-  const mobileStep = businessPathSteps[mobileStepIndex];
+  const mobileStep = visibleSteps[mobileStepIndex];
 
   function stepIsLocked(step: BusinessPathStep) {
     return isBusinessStepLockedByFlow(step.key, flow);
   }
 
   function stepState(step: BusinessPathStep, index: number, forceActive = false) {
-    if (forceActive || step.key === activeStepKey) return "active";
+    if (forceActive || step.key === resolvedActiveStepKey) return "active";
     if (activeIndex > index) return "complete";
     return "";
   }
@@ -114,7 +120,7 @@ export function BusinessPathBar({ activeSection, flow, onOpenStep }: BusinessPat
         </div>
       </div>
       <ol className="businessPathSteps">
-        {businessPathSteps.map((step, index) => (
+        {visibleSteps.map((step, index) => (
           <li key={step.key}>
             {renderStepButton(step, index)}
           </li>

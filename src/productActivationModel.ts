@@ -69,7 +69,6 @@ export function buildProductActivation({
     fieldCount,
     metricCount,
     relationshipCount,
-    sourceRunCount,
     sourceProfileCount,
     dashboardCount: resolvedDashboardCount,
     pendingDraftCount: resolvedDraftCount,
@@ -77,7 +76,7 @@ export function buildProductActivation({
   const latestProfile = sourceIntelligenceRuns[0];
   const activeStepKey: ProductActivationStepKey = flow.activeStage;
 
-  const steps: ProductActivationStep[] = [
+  const allSteps: ProductActivationStep[] = [
     {
       key: "connect",
       route: "data",
@@ -113,10 +112,10 @@ export function buildProductActivation({
       icon: "evidence",
       title: biText("核对证据", "Review evidence"),
       detail: flow.hasEvidence
-        ? biText(`${sourceProfileCount || sourceRunCount} 条真实回执`, `${sourceProfileCount || sourceRunCount} real receipts`)
+        ? biText(`${sourceProfileCount} 条证据画像`, `${sourceProfileCount} evidence profiles`)
         : biText("只显示真实来源和回执", "Show only real sources and receipts"),
       actionLabel: biText("去证据页", "Open evidence"),
-      status: stepStatus(flow.hasEvidence, flow.hasDashboard && activeStepKey === "evidence"),
+      status: stepStatus(flow.hasDashboard && flow.hasEvidence, flow.hasDashboard && activeStepKey === "evidence"),
     },
     {
       key: "confirm",
@@ -125,9 +124,10 @@ export function buildProductActivation({
       title: biText("确认写入", "Approve writes"),
       detail: flow.hasPendingDraft ? biText(`${resolvedDraftCount} 个草案待处理`, `${resolvedDraftCount} drafts pending`) : biText("没有待确认写入", "No writes waiting"),
       actionLabel: biText("去 AI 助手", "Open AI"),
-      status: stepStatus(flow.hasDashboard && !flow.hasPendingDraft, flow.hasPendingDraft),
+      status: stepStatus(false, flow.hasPendingDraft),
     },
   ];
+  const steps = allSteps.filter((step) => step.key !== "confirm" || flow.hasPendingDraft);
 
   const primaryStep = steps.find((step) => step.key === activeStepKey) ?? steps[0];
   const stateLabel = !flow.hasData
@@ -138,7 +138,7 @@ export function buildProductActivation({
         ? biText("证据已就绪，下一步生成图表", "Evidence ready, create a chart next")
         : flow.hasPendingDraft
           ? biText("有草案待确认", "Drafts need approval")
-          : biText("首次闭环已完成", "First success loop complete");
+          : biText("结果已生成，建议核对证据", "Results are ready; review the evidence next");
   const stateDetail = !flow.hasData
     ? biText("导入真实数据后再显示图表和证据。", "Charts and evidence appear only after a real import.")
     : !flow.hasProfile
@@ -157,13 +157,21 @@ export function buildProductActivation({
     hasPendingDraft: flow.hasPendingDraft,
     activeStepKey,
     primaryStep,
-    progressLabel: `${flow.completedCount}/${flow.totalCount}`,
+    progressLabel: !flow.hasData
+      ? biText("待接入", "Connect data")
+      : !flow.hasProfile
+        ? biText("待画像", "Create profile")
+        : !flow.hasDashboard
+          ? biText("待生成", "Create chart")
+          : flow.hasPendingDraft
+            ? biText("待确认", "Review draft")
+            : biText("可核对", "Review evidence"),
     stateLabel,
     stateDetail,
     steps,
     facts: [
       { label: biText("数据表", "Tables"), value: String(tableCount), tone: flow.hasData ? "ok" : "warn" },
-      { label: biText("证据摘要", "Evidence runs"), value: String(sourceProfileCount || sourceRunCount), tone: flow.hasEvidence ? "ok" : "neutral" },
+      { label: biText("证据摘要", "Evidence runs"), value: String(sourceProfileCount), tone: flow.hasEvidence ? "ok" : "neutral" },
       { label: biText("看板", "Dashboards"), value: String(resolvedDashboardCount), tone: flow.hasDashboard ? "ok" : "neutral" },
       { label: biText("待确认", "Pending"), value: String(resolvedDraftCount), tone: flow.hasPendingDraft ? "warn" : "ok" },
     ],
