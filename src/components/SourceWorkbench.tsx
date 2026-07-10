@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import type { FieldConfig, FormulaMutationPayload } from "../types";
 import type { RelationshipSaveOptions } from "../dashboardCanvasContracts";
 import type { QueryOptions, SourceWorkbenchProps } from "../sourceWorkbenchContracts";
@@ -27,20 +27,23 @@ import {
 } from "../sourceWorkbenchDraftModel";
 import { buildSourceWorkbenchGuidance } from "../sourceWorkbenchGuidanceModel";
 import { buildProductActivation } from "../productActivationModel";
+import {
+  SourceWorkbenchAdvancedLoading,
+  SourceWorkbenchConnectorPanel,
+  SourceWorkbenchFieldMetricPanel,
+  SourceWorkbenchOperationsPanel,
+  SourceWorkbenchQueryFormulaPanel,
+  SourceWorkbenchRelationshipPanel,
+} from "../sourceWorkbenchAdvancedModules";
 import { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { useSourceWorkbenchImportController } from "../useSourceWorkbenchImportController";
 import { Bilingual, biText } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
 import { SourceWorkbenchActionPanel } from "./SourceWorkbenchActionPanel";
-import { SourceWorkbenchConnectorPanel } from "./SourceWorkbenchConnectorPanel";
 import { SourceWorkbenchDataManagementPanel } from "./SourceWorkbenchDataManagementPanel";
 import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel";
-import { SourceWorkbenchFieldMetricPanel } from "./SourceWorkbenchFieldMetricPanel";
 import { SourceWorkbenchHeader } from "./SourceWorkbenchHeader";
 import { SourceWorkbenchImportPanel } from "./SourceWorkbenchImportPanel";
-import { SourceWorkbenchOperationsPanel } from "./SourceWorkbenchOperationsPanel";
-import { SourceWorkbenchQueryFormulaPanel } from "./SourceWorkbenchQueryFormulaPanel";
-import { SourceWorkbenchRelationshipPanel } from "./SourceWorkbenchRelationshipPanel";
 
 export function SourceWorkbench({
   status,
@@ -434,7 +437,7 @@ export function SourceWorkbench({
         ) : null}
 
         {showExpertWorkbench ? (
-          <>
+          <Suspense fallback={<SourceWorkbenchAdvancedLoading />}>
             <SourceWorkbenchOperationsPanel
               busy={busy}
               navigationModules={navigationModules}
@@ -543,7 +546,7 @@ export function SourceWorkbench({
               runBusy={runBusy}
               onRemoveImportJob={onRemoveImportJob}
             />
-          </>
+          </Suspense>
         ) : (
           <details className="advancedDetails sourceExpertDetails" data-testid="source-expert-details">
             <summary><Bilingual zh="显示高级配置" en="Show advanced configuration" /></summary>

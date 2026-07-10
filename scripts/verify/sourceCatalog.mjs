@@ -127,6 +127,8 @@ const textSourceFiles = {
   indexHtmlSource: ["index.html"],
   topBarSource: ["src", "components", "TopBar.tsx"],
   sourceWorkbenchSource: ["src", "components", "SourceWorkbench.tsx"],
+  sourceWorkbenchAdvancedModulesSource: ["src", "sourceWorkbenchAdvancedModules.tsx"],
+  sourceWorkbenchAdvancedPanelsSource: ["src", "components", "SourceWorkbenchAdvancedPanels.ts"],
   sourceWorkbenchConnectorControllerSource: ["src", "useSourceWorkbenchConnectorController.ts"],
   sourceWorkbenchImportControllerSource: ["src", "useSourceWorkbenchImportController.ts"],
   agentPromptGridSource: ["src", "components", "AgentPromptGrid.tsx"],

@@ -778,6 +778,8 @@ const {
   indexHtmlSource,
   topBarSource,
   sourceWorkbenchSource,
+  sourceWorkbenchAdvancedModulesSource,
+  sourceWorkbenchAdvancedPanelsSource,
   sourceWorkbenchConnectorControllerSource,
   sourceWorkbenchImportControllerSource,
   agentPromptGridSource,
@@ -2793,7 +2795,8 @@ checks.push(
     label: "source-workbench-operations-panel-boundary",
     ok: existsSync(join(root, "src", "components", "SourceWorkbenchOperationsPanel.tsx")) &&
       existsSync(join(root, "src", "components", "SourceWorkbenchDataManagementPanel.tsx")) &&
-      sourceWorkbenchSource.includes('import { SourceWorkbenchOperationsPanel } from "./SourceWorkbenchOperationsPanel"') &&
+      sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchOperationsPanel = lazy") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchOperationsPanel"') &&
       sourceWorkbenchSource.includes('import { SourceWorkbenchDataManagementPanel } from "./SourceWorkbenchDataManagementPanel"') &&
       sourceWorkbenchSource.includes("<SourceWorkbenchOperationsPanel") &&
       sourceWorkbenchSource.includes("<SourceWorkbenchDataManagementPanel") &&
@@ -2840,7 +2843,8 @@ checks.push(
   {
     label: "source-workbench-connector-panel-boundary",
     ok: existsSync(join(root, "src", "components", "SourceWorkbenchConnectorPanel.tsx")) &&
-      sourceWorkbenchSource.includes('import { SourceWorkbenchConnectorPanel } from "./SourceWorkbenchConnectorPanel"') &&
+      sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchConnectorPanel = lazy") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchConnectorPanel"') &&
       sourceWorkbenchSource.includes("<SourceWorkbenchConnectorPanel") &&
       !sourceWorkbenchSource.includes('data-testid="connector-business-lead"') &&
       !sourceWorkbenchSource.includes('data-testid="connector-operation-receipt"') &&
@@ -2866,7 +2870,8 @@ checks.push(
       existsSync(join(root, "src", "components", "SourceWorkbenchFieldSemanticPanel.tsx")) &&
       existsSync(join(root, "src", "components", "SourceWorkbenchMetricDefinitionPanel.tsx")) &&
       existsSync(join(root, "src", "sourceWorkbenchFieldMetricTypes.ts")) &&
-      sourceWorkbenchSource.includes('import { SourceWorkbenchFieldMetricPanel } from "./SourceWorkbenchFieldMetricPanel"') &&
+      sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchFieldMetricPanel = lazy") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchFieldMetricPanel"') &&
       sourceWorkbenchSource.includes("<SourceWorkbenchFieldMetricPanel") &&
       !sourceWorkbenchSource.includes('data-testid="field-semantic-readiness"') &&
       !sourceWorkbenchSource.includes('data-testid="infer-metrics-dry-run-button"') &&
@@ -2891,7 +2896,8 @@ checks.push(
   {
     label: "source-workbench-query-formula-panel-boundary",
     ok: existsSync(join(root, "src", "components", "SourceWorkbenchQueryFormulaPanel.tsx")) &&
-      sourceWorkbenchSource.includes('import { SourceWorkbenchQueryFormulaPanel } from "./SourceWorkbenchQueryFormulaPanel"') &&
+      sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchQueryFormulaPanel = lazy") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchQueryFormulaPanel"') &&
       sourceWorkbenchSource.includes("<SourceWorkbenchQueryFormulaPanel") &&
       !sourceWorkbenchSource.includes('data-testid="query-run-button"') &&
       !sourceWorkbenchSource.includes('data-testid="formula-preview-button"') &&
@@ -2911,7 +2917,8 @@ checks.push(
   {
     label: "source-workbench-relationship-panel-boundary",
     ok: existsSync(join(root, "src", "components", "SourceWorkbenchRelationshipPanel.tsx")) &&
-      sourceWorkbenchSource.includes('import { SourceWorkbenchRelationshipPanel } from "./SourceWorkbenchRelationshipPanel"') &&
+      sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchRelationshipPanel = lazy") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchRelationshipPanel"') &&
       sourceWorkbenchSource.includes("<SourceWorkbenchRelationshipPanel") &&
       !sourceWorkbenchSource.includes('data-testid="relationship-preview-button"') &&
       !sourceWorkbenchSource.includes('data-testid="relationship-impact-panel"') &&
