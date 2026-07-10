@@ -778,6 +778,7 @@ const {
   indexHtmlSource,
   topBarSource,
   sourceWorkbenchSource,
+  sourceWorkbenchImportControllerSource,
   agentPromptGridSource,
   sourceWorkbenchAgentStarterSource,
   sourceWorkbenchActionPanelSource,
@@ -2085,7 +2086,7 @@ checks.push(
     ok: sourceWorkbenchSource.includes("buildSourceWorkbenchCollections(workbench, status, query)") &&
       sourceWorkbenchSource.includes("buildSourceWorkbenchSelection({") &&
       sourceWorkbenchSource.includes("buildSourceWorkbenchRuntimeSummary(workbench, status, query)") &&
-      sourceWorkbenchSource.includes("buildImportPreviewSummary({ preview, previewReadable, targetName })") &&
+      sourceWorkbenchImportControllerSource.includes("buildImportPreviewSummary({ preview, previewReadable, targetName })") &&
       !sourceWorkbenchSource.includes("const tables = Array.isArray(workbench.tables)") &&
       !sourceWorkbenchSource.includes("const selectedRowFormulas = rowFormulas.filter") &&
       !sourceWorkbenchSource.includes("const calculatedMeasureFields = selectedRowFormulas.map") &&
@@ -2224,9 +2225,8 @@ checks.push(
       /\{hasData \? \(\s*<SourceWorkbenchActionPanel/.test(sourceWorkbenchSource) &&
       stylesSource.includes(".beginnerImportGuard") &&
       stylesSource.includes(".sourceGuideDetails") &&
-      sourceWorkbenchSource.includes("importKeyHealthy") &&
-      sourceWorkbenchSource.includes("importDuplicateRows") &&
-      sourceWorkbenchSource.includes("importEmptyKeyRows") &&
+      sourceWorkbenchImportControllerSource.includes("const previewSummary = buildImportPreviewSummary") &&
+      sourceWorkbenchImportControllerSource.includes("...previewSummary") &&
       sourceWorkbenchGuidanceModelSource.includes("const recommendedPrimaryAction") &&
       sourceWorkbenchGuidanceModelSource.includes('"draft-dashboard"') &&
       sourceWorkbenchGuidanceModelSource.includes("sourceProfileComplete") &&
@@ -2258,10 +2258,11 @@ checks.push(
   {
     label: "source-workbench-receipt-model-boundary",
     ok: existsSync(join(root, "src", "sourceWorkbenchReceiptModel.ts")) &&
+      sourceWorkbenchImportControllerSource.includes('from "./sourceWorkbenchReceiptModel"') &&
+      sourceWorkbenchImportControllerSource.includes("buildImportPreviewReceipt({") &&
+      sourceWorkbenchImportControllerSource.includes("buildImportCommitReceipt({") &&
+      sourceWorkbenchImportControllerSource.includes("buildImportPolicyReceipt({") &&
       sourceWorkbenchSource.includes('from "../sourceWorkbenchReceiptModel"') &&
-      sourceWorkbenchSource.includes("buildImportPreviewReceipt({") &&
-      sourceWorkbenchSource.includes("buildImportCommitReceipt({") &&
-      sourceWorkbenchSource.includes("buildImportPolicyReceipt({") &&
       sourceWorkbenchSource.includes("buildConnectorSaveReceipt({") &&
       sourceWorkbenchSource.includes("buildConnectorSyncReceipt(connector, confirm)") &&
       sourceWorkbenchSource.includes("buildConnectorRemoveReceipt(connector)") &&
@@ -2283,9 +2284,10 @@ checks.push(
   {
     label: "source-workbench-command-model-boundary",
     ok: existsSync(join(root, "src", "sourceWorkbenchCommandModel.ts")) &&
+      sourceWorkbenchImportControllerSource.includes('from "./sourceWorkbenchCommandModel"') &&
+      sourceWorkbenchImportControllerSource.includes("buildImportOptions({") &&
+      sourceWorkbenchImportControllerSource.includes("buildImportPolicyOptions({") &&
       sourceWorkbenchSource.includes('from "../sourceWorkbenchCommandModel"') &&
-      sourceWorkbenchSource.includes("buildImportOptions({") &&
-      sourceWorkbenchSource.includes("buildImportPolicyOptions({") &&
       sourceWorkbenchSource.includes("buildSourceProfileOptions({") &&
       sourceWorkbenchSource.includes("buildConnectorOptions({") &&
       sourceWorkbenchSource.includes("buildMetricDraft({") &&
@@ -2401,11 +2403,11 @@ checks.push(
       !sourceWorkbenchSource.includes('data-testid="import-confirmation-summary"') &&
       !sourceWorkbenchSource.includes('data-testid="import-operation-receipt"') &&
       sourceWorkbenchImportPanelSource.includes("type SourceWorkbenchImportPanelProps") &&
-      sourceWorkbenchImportPanelSource.includes("ImportPolicy") &&
-      sourceWorkbenchImportPanelSource.includes("ImportPreview") &&
-      sourceWorkbenchImportPanelSource.includes("runImportPreviewAction: () => Promise<void>") &&
-      sourceWorkbenchImportPanelSource.includes("runImportCommitAction: (confirm: boolean) => Promise<void>") &&
-      sourceWorkbenchImportPanelSource.includes("runImportPolicyAction: (confirm: boolean) => Promise<void>") &&
+      sourceWorkbenchImportPanelSource.includes("ReturnType<typeof useSourceWorkbenchImportController>") &&
+      sourceWorkbenchImportControllerSource.includes("importPolicies: ImportPolicy[]") &&
+      sourceWorkbenchImportControllerSource.includes("async function runImportPreviewAction()") &&
+      sourceWorkbenchImportControllerSource.includes("async function runImportCommitAction(confirm: boolean)") &&
+      sourceWorkbenchImportControllerSource.includes("async function runImportPolicyAction(confirm: boolean)") &&
       sourceWorkbenchImportPanelSource.includes('data-testid="import-policy-dry-run-button"') &&
       sourceWorkbenchImportPanelSource.includes('data-testid="import-policy-confirm-button"') &&
       sourceWorkbenchImportPanelSource.includes("确认后才写入工作区") &&
@@ -2760,9 +2762,9 @@ checks.push(
       sourceWorkbenchConnectorPanelSource.includes("预览清理") &&
       sourceWorkbenchImportPanelSource.includes("Current state is preview") &&
       sourceWorkbenchSource.includes("WorkbenchOperationReceipt") &&
-      sourceWorkbenchSource.includes("runImportPreviewAction") &&
-      sourceWorkbenchSource.includes("runImportCommitAction") &&
-      sourceWorkbenchSource.includes("runImportPolicyAction") &&
+      sourceWorkbenchImportControllerSource.includes("runImportPreviewAction") &&
+      sourceWorkbenchImportControllerSource.includes("runImportCommitAction") &&
+      sourceWorkbenchImportControllerSource.includes("runImportPolicyAction") &&
       sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-receipt"') &&
       sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-technical-details"') &&
       sourceWorkbenchImportPanelSource.includes("确认后才写入工作区") &&

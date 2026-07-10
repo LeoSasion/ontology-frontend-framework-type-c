@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DataConnectorConfig, FieldConfig, FolderImportPlan, FormulaMutationPayload } from "../types";
+import type { DataConnectorConfig, FieldConfig, FormulaMutationPayload } from "../types";
 import type { RelationshipSaveOptions } from "../dashboardCanvasContracts";
 import type { QueryOptions, SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import {
   buildFieldSemanticReadiness,
-  buildImportPreviewSummary,
   buildSourceWorkbenchCollections,
   buildSourceWorkbenchRuntimeSummary,
   buildSourceWorkbenchSelection,
@@ -13,12 +12,9 @@ import {
 } from "../sourceWorkbenchModel";
 import {
   buildConnectorOptions,
-  buildImportOptions,
-  buildImportPolicyOptions,
   buildMetricDraft,
   buildSourceProfileOptions,
   type ConnectorOptions,
-  type ImportOptions,
   type MetricMutationOptions,
   type SourceIntelligenceRunOptions,
 } from "../sourceWorkbenchCommandModel";
@@ -32,8 +28,9 @@ import {
   type NavigationOperation,
 } from "../sourceWorkbenchDraftModel";
 import { buildSourceWorkbenchGuidance } from "../sourceWorkbenchGuidanceModel";
-import { buildConnectorRemoveReceipt, buildConnectorSaveReceipt, buildConnectorSyncReceipt, buildImportCommitReceipt, buildImportPolicyReceipt, buildImportPreviewReceipt, type WorkbenchOperationReceipt } from "../sourceWorkbenchReceiptModel";
+import { buildConnectorRemoveReceipt, buildConnectorSaveReceipt, buildConnectorSyncReceipt, type WorkbenchOperationReceipt } from "../sourceWorkbenchReceiptModel";
 import { buildProductActivation } from "../productActivationModel";
+import { useSourceWorkbenchImportController } from "../useSourceWorkbenchImportController";
 import { Bilingual, biText } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
 import { SourceWorkbenchActionPanel } from "./SourceWorkbenchActionPanel";
@@ -143,14 +140,6 @@ export function SourceWorkbench({
   }), [activeTableKey, fields, firstTableKey, metrics, rowFormulas, tables]);
   const fieldSemanticReadiness = useMemo(() => buildFieldSemanticReadiness(selectedFields), [selectedFields]);
 
-  const [filePath, setFilePath] = useState("");
-  const [targetTable, setTargetTable] = useState("");
-  const [targetName, setTargetName] = useState("");
-  const [importMode, setImportMode] = useState("merge");
-  const [uniqueFields, setUniqueFields] = useState("");
-  const [conflictRule, setConflictRule] = useState("overwrite");
-  const [folderImportPlan, setFolderImportPlan] = useState<FolderImportPlan | null>(null);
-  const activeImportPolicy = importPolicies.find((policy) => policy.table_key === targetTable);
   const [queryForm, setQueryForm] = useState<QueryOptions>({
     table: selectedTableKey,
     group: groupFields[0]?.field_name ?? "",
@@ -187,7 +176,6 @@ export function SourceWorkbench({
   const [connectorUniqueFields, setConnectorUniqueFields] = useState("");
   const [connectorConflictRule, setConnectorConflictRule] = useState("overwrite");
   const [connectorNotes, setConnectorNotes] = useState("");
-  const [importOperationReceipt, setImportOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
   const [connectorOperationReceipt, setConnectorOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
   const [sourceProfileInputs, setSourceProfileInputs] = useState("");
   const [sourceProfileLabel, setSourceProfileLabel] = useState(biText("证据摘要", "Source profile"));
@@ -196,6 +184,15 @@ export function SourceWorkbench({
   const [businessDashboardResult, setBusinessDashboardResult] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const importController = useSourceWorkbenchImportController({
+    preview,
+    importPolicies,
+    onPreview,
+    onCommitImport,
+    onPreviewFolderImport,
+    onCommitFolderImport,
+    onImportPolicy,
+  });
 
   useEffect(() => {
     if (!activeNavigationModule) return;
@@ -248,18 +245,6 @@ export function SourceWorkbench({
       };
     });
   }, [fieldsByTable, tableKeySet, tables]);
-
-  function importOptions(confirm = false): ImportOptions {
-    return buildImportOptions({
-      filePath,
-      targetTable,
-      targetName,
-      importMode,
-      uniqueFields,
-      conflictRule,
-      confirm,
-    });
-  }
 
   function sourceProfileOptions(): SourceIntelligenceRunOptions {
     return buildSourceProfileOptions({ sourceProfileInputs, sourceProfileLabel });
@@ -344,100 +329,6 @@ export function SourceWorkbench({
     }
   }
 
-  async function runImportPreviewAction() {
-    const result = await onPreview(importOptions(false));
-    setFolderImportPlan(null);
-    let receiptTargetTable = targetTable;
-    let receiptImportMode = importMode;
-    let receiptUniqueFields = uniqueFields;
-    if (result.ok && result.matchedTable) {
-      receiptTargetTable = result.matchedTable.table_key;
-      receiptImportMode = "merge";
-      setTargetTable(result.matchedTable.table_key);
-      setTargetName(result.matchedTable.display_name);
-      setImportMode("merge");
-    } else if (result.ok) {
-      const suggestedTable = String(result.suggestedTableKey || "").trim();
-      const suggestedName = String(result.suggestedDisplayName || suggestedTable).trim();
-      if (suggestedTable) {
-        setTargetTable(suggestedTable);
-        receiptTargetTable = suggestedTable;
-      }
-      if (suggestedName) setTargetName(suggestedName);
-      setImportMode("create");
-      receiptImportMode = "create";
-    }
-    if (result.ok) {
-      const suggestedUniqueFields = result.mergePolicyPreview.uniqueFields;
-      if (!uniqueFields.trim() && suggestedUniqueFields.length) {
-        receiptUniqueFields = suggestedUniqueFields.join(", ");
-        setUniqueFields(receiptUniqueFields);
-      }
-    }
-    setImportOperationReceipt(buildImportPreviewReceipt({ filePath, targetTable: receiptTargetTable, importMode: receiptImportMode, uniqueFields: receiptUniqueFields, conflictRule }));
-  }
-
-  async function runImportCommitAction(confirm: boolean) {
-    await onCommitImport(importOptions(confirm));
-    setFolderImportPlan(null);
-    setImportOperationReceipt(buildImportCommitReceipt({
-      confirm,
-      preview,
-      matchedTableName,
-      targetTable,
-      importInsertRows,
-      importUpdateRows,
-      importSkipRows,
-      importAfterRows,
-    }));
-  }
-
-  async function runFolderImportPreviewAction() {
-    const result = await onPreviewFolderImport({ path: filePath, limit: 200, recursive: true });
-    setFolderImportPlan(result);
-    const firstGroup = result.groups[0];
-    if (firstGroup) {
-      setTargetTable(firstGroup.tableKey);
-      setTargetName(firstGroup.displayName);
-      setImportMode(firstGroup.willMerge ? "merge" : "create");
-      setUniqueFields(firstGroup.uniqueFields.join(", "));
-    }
-    setImportOperationReceipt({
-      tone: result.fileCount > 0 ? "ok" : "warn",
-      title: result.fileCount > 0
-        ? biText(`发现 ${result.fileCount} 个可导入文件`, `${result.fileCount} importable files found`)
-        : biText("没有发现可导入文件", "No importable files found"),
-      detail: result.fileCount > 0
-        ? biText(`将归并为 ${result.tableCount} 张业务表。`, `They will be grouped into ${result.tableCount} business tables.`)
-        : biText("请选择包含 CSV 或 Excel 的文件夹。", "Choose a folder with CSV or Excel files."),
-      nextStep: result.fileCount > 0
-        ? biText("确认后按同类表合并导入，导入前不会写入。", "Confirm to merge similar files. Nothing writes before confirmation.")
-        : biText("粘贴文件夹路径后重新检查。", "Paste a folder path and check again."),
-      technical: result.groups.map((group) => `${group.displayName}: ${group.fileCount} files, ${group.rowCount} rows`).join("; ") || result.path,
-    });
-  }
-
-  async function runFolderImportCommitAction(confirm: boolean) {
-    const result = await onCommitFolderImport({ path: filePath, limit: 200, recursive: true, confirm });
-    setFolderImportPlan(result);
-    setImportOperationReceipt({
-      tone: result.committed ? "ok" : "warn",
-      title: result.committed
-        ? biText("文件夹导入已完成", "Folder import completed")
-        : biText("文件夹导入待确认", "Folder import needs confirmation"),
-      detail: biText(`已处理 ${result.fileCount} 个文件，归并为 ${result.tableCount} 张业务表。`, `${result.fileCount} files grouped into ${result.tableCount} business tables.`),
-      nextStep: result.committed
-        ? biText("下一步可以让 Agent 生成单图或看板草案。", "Next, ask Agent to create a chart or dashboard draft.")
-        : biText("确认后才会写入工作区。", "Confirm before writing to the workspace."),
-      technical: result.groups.map((group) => `${group.displayName}: ${group.fileCount} files, ${group.rowCount} rows`).join("; ") || result.path,
-    });
-  }
-
-  async function runImportPolicyAction(confirm: boolean) {
-    await onImportPolicy(buildImportPolicyOptions({ targetTable, uniqueFields, conflictRule, confirm }));
-    setImportOperationReceipt(buildImportPolicyReceipt({ confirm, targetTable, uniqueFields, conflictRule }));
-  }
-
   async function runConnectorSaveAction(confirm: boolean) {
     await onSaveConnector(connectorOptions(confirm));
     setConnectorOperationReceipt(buildConnectorSaveReceipt({
@@ -496,7 +387,6 @@ export function SourceWorkbench({
   const latestImportedSource = sourceRuns[0];
   const {
     sourceProfileComplete,
-    previewReadable,
     sourceProfileRunning,
     sourceProfileRunningLabel,
     dashboardMeasureName,
@@ -521,16 +411,6 @@ export function SourceWorkbench({
     latestSourceProfile,
     selectedTableKey,
   });
-  const {
-    matchedTableName,
-    importInsertRows,
-    importUpdateRows,
-    importSkipRows,
-    importDuplicateRows,
-    importEmptyKeyRows,
-    importAfterRows,
-    importKeyHealthy,
-  } = buildImportPreviewSummary({ preview, previewReadable, targetName });
   const hasData = tables.length > 0 || status.counts.tables > 0;
   const showExpertWorkbench = showAdvanced;
   const activation = buildProductActivation({ status, workbench });
@@ -577,38 +457,9 @@ export function SourceWorkbench({
         />
 
         <SourceWorkbenchImportPanel
-          preview={preview}
+          {...importController}
           busy={busy}
-          filePath={filePath}
-          targetTable={targetTable}
-          targetName={targetName}
-          importMode={importMode}
-          uniqueFields={uniqueFields}
-          conflictRule={conflictRule}
-          activeImportPolicy={activeImportPolicy}
-          previewReadable={previewReadable}
-          matchedTableName={matchedTableName}
-          importInsertRows={importInsertRows}
-          importUpdateRows={importUpdateRows}
-          importSkipRows={importSkipRows}
-          importAfterRows={importAfterRows}
-          importDuplicateRows={importDuplicateRows}
-          importEmptyKeyRows={importEmptyKeyRows}
-          importKeyHealthy={importKeyHealthy}
-          importOperationReceipt={importOperationReceipt}
-          folderImportPlan={folderImportPlan}
-          setFilePath={setFilePath}
-          setTargetTable={setTargetTable}
-          setTargetName={setTargetName}
-          setImportMode={setImportMode}
-          setUniqueFields={setUniqueFields}
-          setConflictRule={setConflictRule}
           runBusy={runBusy}
-          runImportPreviewAction={runImportPreviewAction}
-          runImportCommitAction={runImportCommitAction}
-          runFolderImportPreviewAction={runFolderImportPreviewAction}
-          runFolderImportCommitAction={runFolderImportCommitAction}
-          runImportPolicyAction={runImportPolicyAction}
         />
 
         {hasData ? (

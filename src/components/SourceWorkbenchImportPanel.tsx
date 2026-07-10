@@ -1,49 +1,11 @@
-import type { FolderImportPlan, ImportPolicy, ImportPreview } from "../types";
+import type { useSourceWorkbenchImportController } from "../useSourceWorkbenchImportController";
 import { countText } from "../sourceWorkbenchModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 
-type WorkbenchOperationReceipt = {
-  title: string;
-  detail: string;
-  nextStep: string;
-  technical: string;
-  tone: "ok" | "warn";
-};
-
-type SourceWorkbenchImportPanelProps = {
-  preview: ImportPreview;
+type SourceWorkbenchImportPanelProps = ReturnType<typeof useSourceWorkbenchImportController> & {
   busy: string | null;
-  filePath: string;
-  targetTable: string;
-  targetName: string;
-  importMode: string;
-  uniqueFields: string;
-  conflictRule: string;
-  activeImportPolicy?: ImportPolicy;
-  previewReadable: boolean;
-  matchedTableName: string;
-  importInsertRows: number;
-  importUpdateRows: number;
-  importSkipRows: number;
-  importAfterRows: number;
-  importDuplicateRows: number;
-  importEmptyKeyRows: number;
-  importKeyHealthy: boolean;
-  importOperationReceipt: WorkbenchOperationReceipt | null;
-  folderImportPlan: FolderImportPlan | null;
-  setFilePath: (value: string) => void;
-  setTargetTable: (value: string) => void;
-  setTargetName: (value: string) => void;
-  setImportMode: (value: string) => void;
-  setUniqueFields: (value: string) => void;
-  setConflictRule: (value: string) => void;
   runBusy: (label: string, action: () => Promise<void>) => Promise<void>;
-  runImportPreviewAction: () => Promise<void>;
-  runImportCommitAction: (confirm: boolean) => Promise<void>;
-  runFolderImportPreviewAction: () => Promise<void>;
-  runFolderImportCommitAction: (confirm: boolean) => Promise<void>;
-  runImportPolicyAction: (confirm: boolean) => Promise<void>;
 };
 
 export function SourceWorkbenchImportPanel({
