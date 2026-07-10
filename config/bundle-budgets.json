@@ -1,13 +1,15 @@
 {
   "schema": "aibi-bundle-budgets/v1",
   "budgets": [
-    { "label": "global-css", "pattern": "^index-[^.]+\\.css$", "maxBytes": 130000 },
+    { "label": "global-css", "pattern": "^index-[^.]+\\.css$", "maxBytes": 122000 },
     { "label": "main-js", "pattern": "^index-[^.]+\\.js$", "maxBytes": 310000 },
     { "label": "dashboard-route-js", "pattern": "^DashboardCanvas-[^.]+\\.js$", "maxBytes": 80000 },
     { "label": "source-route-js", "pattern": "^SourceWorkbench-[^.]+\\.js$", "maxBytes": 75000 },
     { "label": "agent-route-js", "pattern": "^AgentPanel-[^.]+\\.js$", "maxBytes": 48000 },
     { "label": "evidence-route-js", "pattern": "^EvidenceView-[^.]+\\.js$", "maxBytes": 24000 },
-    { "label": "view-route-js", "pattern": "^ViewWorkspace-[^.]+\\.js$", "maxBytes": 22000 },
+    { "label": "view-route-js", "pattern": "^ViewWorkspace-[^.]+\\.js$", "maxBytes": 20500 },
+    { "label": "view-agent-deferred-js", "pattern": "^ViewAgentTaskStrip-[^.]+\\.js$", "maxBytes": 1500 },
+    { "label": "view-bridge-deferred-js", "pattern": "^ViewDashboardBridgePanel-[^.]+\\.js$", "maxBytes": 4000 },
     { "label": "settings-route-js", "pattern": "^SettingsPanel-[^.]+\\.js$", "maxBytes": 28000 },
     { "label": "inspector-route-js", "pattern": "^InspectorPanel-[^.]+\\.js$", "maxBytes": 27000 },
     { "label": "home-route-js", "pattern": "^HomeOverview-[^.]+\\.js$", "maxBytes": 31000 },
@@ -17,6 +19,10 @@
     { "label": "dashboard-deferred-css", "pattern": "^DashboardDeferredPanels-[^.]+\\.css$", "maxBytes": 22000 },
     { "label": "source-advanced-css", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.css$", "maxBytes": 12000 },
     { "label": "settings-route-css", "pattern": "^SettingsPanel-[^.]+\\.css$", "maxBytes": 12000 },
-    { "label": "view-route-css", "pattern": "^ViewWorkspace-[^.]+\\.css$", "maxBytes": 9000 }
+    { "label": "view-route-css", "pattern": "^ViewWorkspace-[^.]+\\.css$", "maxBytes": 6000 },
+    { "label": "view-agent-deferred-css", "pattern": "^ViewAgentTaskStrip-[^.]+\\.css$", "maxBytes": 1000 },
+    { "label": "view-bridge-deferred-css", "pattern": "^ViewDashboardBridgePanel-[^.]+\\.css$", "maxBytes": 4000 },
+    { "label": "home-route-css", "pattern": "^HomeOverview-[^.]+\\.css$", "maxBytes": 7500 },
+    { "label": "product-activation-css", "pattern": "^ProductActivationPanel-[^.]+\\.css$", "maxBytes": 5500 }
   ]
 }

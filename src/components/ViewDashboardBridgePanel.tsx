@@ -1,3 +1,4 @@
+import "./viewDashboardBridgePanel.css";
 import type { SavedView, SourceIntelligenceRunSummary } from "../types";
 import type { ViewBridgeStep } from "../viewWorkspaceModel";
 import { Bilingual, biText } from "./Bilingual";

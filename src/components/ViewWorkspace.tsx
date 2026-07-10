@@ -1,5 +1,5 @@
 import "./viewWorkspace.css";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { EvidenceFocus, SavedView, TableQueryPayload, WorkbenchPayload } from "../types";
 import {
   buildViewAgentPrompts,
@@ -12,10 +12,13 @@ import {
   viewSort,
 } from "../viewWorkspaceModel";
 import { Bilingual, biText, translateName } from "./Bilingual";
-import { ViewDashboardBridgePanel } from "./ViewDashboardBridgePanel";
 import { Icon } from "./Icons";
-import { ViewAgentTaskStrip } from "./ViewAgentTaskStrip";
 import { ViewSavedListPanel } from "./ViewSavedListPanel";
+
+const loadViewDashboardBridgePanel = () => import("./ViewDashboardBridgePanel").then((module) => ({ default: module.ViewDashboardBridgePanel }));
+const loadViewAgentTaskStrip = () => import("./ViewAgentTaskStrip").then((module) => ({ default: module.ViewAgentTaskStrip }));
+const ViewDashboardBridgePanel = lazy(loadViewDashboardBridgePanel);
+const ViewAgentTaskStrip = lazy(loadViewAgentTaskStrip);
 
 type ViewWorkspaceProps = {
   workbench: WorkbenchPayload;
@@ -81,6 +84,8 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
   const [search, setSearch] = useState(viewSearch(activeView));
   const [busy, setBusy] = useState<string | null>(null);
   const [viewOperationReceipt, setViewOperationReceipt] = useState<ViewOperationReceipt | null>(null);
+  const [dashboardBridgeMounted, setDashboardBridgeMounted] = useState(false);
+  const [agentTaskMounted, setAgentTaskMounted] = useState(false);
   const activeTableName = activeView?.table_name ?? table?.display_name ?? activeView?.table_key ?? table?.table_key ?? "";
   const activeViewFilters = viewFilters(activeView);
   const activeViewSort = viewSort(activeView);
@@ -367,9 +372,12 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
             </div>
           </details>
 
-          <details className="progressiveDetails viewProgressiveDetails" data-testid="view-dashboard-bridge-details">
+          <details className="progressiveDetails viewProgressiveDetails" data-testid="view-dashboard-bridge-details" onToggle={(event) => {
+            if (event.currentTarget.open) setDashboardBridgeMounted(true);
+          }}>
             <summary>{biText("把当前视图用于看板", "Use this view in dashboards")}</summary>
-            <div className="progressiveDetailsBody single">
+            {dashboardBridgeMounted ? <div className="progressiveDetailsBody single">
+              <Suspense fallback={<div className="viewDeferredLoading" aria-busy="true">{biText("正在准备看板建议", "Preparing dashboard guidance")}</div>}>
               <ViewDashboardBridgePanel
                 activeTableName={activeTableName}
                 activeView={activeView}
@@ -384,12 +392,17 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
                 runBusy={runBusy}
                 viewCanFeedDashboard={viewCanFeedDashboard}
               />
+              </Suspense>
             </div>
+            : null}
           </details>
 
-          <details className="progressiveDetails viewProgressiveDetails" data-testid="view-agent-task-details">
+          <details className="progressiveDetails viewProgressiveDetails" data-testid="view-agent-task-details" onToggle={(event) => {
+            if (event.currentTarget.open) setAgentTaskMounted(true);
+          }}>
             <summary>{biText("让 Agent 解释或复用这个视图", "Ask Agent to explain or reuse this view")}</summary>
-            <div className="progressiveDetailsBody single">
+            {agentTaskMounted ? <div className="progressiveDetailsBody single">
+              <Suspense fallback={<div className="viewDeferredLoading" aria-busy="true">{biText("正在准备当前视图上下文", "Preparing view context")}</div>}>
               <ViewAgentTaskStrip
                 activeView={activeView}
                 busy={busy}
@@ -397,7 +410,9 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
                 runBusy={runBusy}
                 viewAgentPrompts={viewAgentPrompts}
               />
+              </Suspense>
             </div>
+            : null}
           </details>
 
           <div className={columns.length ? "tableScroll viewTableScroll" : "tableScroll viewTableScroll empty"}>

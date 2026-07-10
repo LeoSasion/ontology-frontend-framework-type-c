@@ -1,3 +1,4 @@
+import "./viewAgentTaskStrip.css";
 import type { SavedView } from "../types";
 import type { ViewAgentPrompt } from "../viewWorkspaceModel";
 import { biText } from "./Bilingual";

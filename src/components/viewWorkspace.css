@@ -234,224 +234,6 @@
   overflow-wrap: anywhere;
 }
 
-.viewBridgePanel {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(180px, 0.9fr) minmax(240px, 1.1fr);
-  gap: 12px;
-  align-items: center;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: linear-gradient(180deg, var(--surface-2), var(--surface));
-  padding: 12px;
-}
-
-.viewBridgeLead {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.viewBridgeLead strong,
-.viewBridgeLead p {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.viewBridgeLead strong {
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.viewBridgeLead p {
-  margin: 0;
-  color: var(--bi-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.viewBridgeFacts {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.viewBridgeFacts div {
-  min-width: 0;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--bi-surface);
-  padding: 8px;
-}
-
-.viewBridgeFacts div.ok {
-  border-color: var(--accent);
-}
-
-.viewBridgeFacts div.warn {
-  border-color: var(--amber);
-}
-
-.viewBridgeFacts strong,
-.viewBridgeFacts span {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.viewBridgeFacts strong {
-  color: var(--bi-text);
-  font-size: 17px;
-  line-height: 1;
-}
-
-.viewBridgeFacts span {
-  margin-top: 4px;
-  color: var(--bi-muted);
-  font-size: 11px;
-}
-
-.viewBridgeActions {
-  grid-column: 1 / -1;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-end;
-}
-
-.viewBridgeSteps {
-  grid-column: 1 / -1;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.viewBridgeStep {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 14px minmax(0, 1fr);
-  column-gap: 8px;
-  row-gap: 3px;
-  align-items: start;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--bi-surface);
-  padding: 9px;
-}
-
-.viewBridgeStep > span {
-  grid-row: 1 / span 3;
-  width: 10px;
-  height: 10px;
-  margin-top: 3px;
-  border: 2px solid var(--bi-border);
-  border-radius: 999px;
-  background: var(--surface);
-}
-
-.viewBridgeStep.ready > span {
-  border-color: var(--accent);
-  background: var(--accent);
-}
-
-.viewBridgeStep strong,
-.viewBridgeStep p,
-.viewBridgeStep small {
-  grid-column: 2;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.viewBridgeStep strong {
-  color: var(--bi-text);
-  font-size: 12px;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.viewBridgeStep p {
-  margin: 0;
-  color: var(--bi-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-.viewBridgeStep small {
-  color: var(--bi-text);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.viewBridgeActions button {
-  min-height: 34px;
-  min-width: 142px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  border: 1px solid var(--bi-border);
-  border-radius: 8px;
-  background: var(--bi-surface);
-  color: var(--bi-text);
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.viewBridgeActions button:hover:not(:disabled),
-.viewBridgeActions button:focus-visible {
-  border-color: var(--bi-accent);
-  background: var(--bi-accent-soft);
-  color: var(--bi-accent-strong);
-}
-
-.viewBridgeActions svg {
-  stroke: currentColor;
-}
-
-.viewAgentTaskStrip {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(420px, 1.15fr);
-  gap: 12px;
-  align-items: center;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--surface-2);
-  padding: 12px;
-}
-
-.viewAgentLead {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.viewAgentLead strong,
-.viewAgentLead span {
-  min-width: 0;
-}
-
-.viewAgentLead strong {
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.viewAgentLead span {
-  color: var(--bi-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
 
 .viewTableScroll {
   min-height: 0;
@@ -531,26 +313,6 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .viewBridgePanel,
-  .viewAgentTaskStrip {
-    grid-template-columns: minmax(0, 1fr);
-    align-items: stretch;
-  }
-
-  .viewBridgeFacts,
-  .viewBridgeSteps {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .viewBridgeActions {
-    justify-content: stretch;
-  }
-
-  .viewBridgeActions button {
-    width: 100%;
-    min-width: 0;
-  }
-
   .viewFooter {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -573,4 +335,15 @@
   .viewStats {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.viewDeferredLoading {
+  min-height: 72px;
+  display: grid;
+  place-items: center;
+  border: 1px dashed var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  color: var(--bi-muted);
+  font-size: 12px;
 }

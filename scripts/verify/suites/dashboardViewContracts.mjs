@@ -58,7 +58,9 @@ export function appendDashboardViewContractChecks(context) {
     stylesSource,
     topBarSource,
     viewAgentTaskStripSource,
+    viewAgentTaskStripStylesSource,
     viewDashboardBridgePanelSource,
+    viewDashboardBridgePanelStylesSource,
     viewSavedListPanelSource,
     viewWorkspaceModelSource,
     viewWorkspaceSource,
@@ -1062,7 +1064,8 @@ export function appendDashboardViewContractChecks(context) {
           appSource.includes("onAsk={handleAgentCommandAsk}") &&
           viewWorkspaceSource.includes('import "./viewWorkspace.css"') &&
           viewWorkspaceStylesSource.includes(".viewWorkspaceGrid {") &&
-          viewWorkspaceStylesSource.includes(".viewAgentTaskStrip {") &&
+          viewAgentTaskStripSource.includes('import "./viewAgentTaskStrip.css"') &&
+          viewAgentTaskStripStylesSource.includes(".viewAgentTaskStrip {") &&
           !globalStylesSource.includes(".viewWorkspaceGrid {") &&
           stylesSource.includes(".viewAgentTaskStrip") &&
           stylesSource.includes(".agentPromptGrid") &&
@@ -1071,7 +1074,9 @@ export function appendDashboardViewContractChecks(context) {
     {
         label: "view-agent-task-strip-component-boundary",
         ok: existsSync(join(root, "src", "components", "ViewAgentTaskStrip.tsx")) &&
-          viewWorkspaceSource.includes('import { ViewAgentTaskStrip } from "./ViewAgentTaskStrip"') &&
+          viewWorkspaceSource.includes('import("./ViewAgentTaskStrip")') &&
+          viewWorkspaceSource.includes("const ViewAgentTaskStrip = lazy(loadViewAgentTaskStrip)") &&
+          viewWorkspaceSource.includes("setAgentTaskMounted(true)") &&
           viewWorkspaceSource.includes("<ViewAgentTaskStrip") &&
           !viewWorkspaceSource.includes('data-testid="view-agent-task-strip"') &&
           viewAgentTaskStripSource.includes("type ViewAgentTaskStripProps") &&
@@ -1137,13 +1142,17 @@ export function appendDashboardViewContractChecks(context) {
     {
         label: "view-dashboard-bridge-panel-component-boundary",
         ok: existsSync(join(root, "src", "components", "ViewDashboardBridgePanel.tsx")) &&
-          viewWorkspaceSource.includes('import { ViewDashboardBridgePanel } from "./ViewDashboardBridgePanel"') &&
+          viewWorkspaceSource.includes('import("./ViewDashboardBridgePanel")') &&
+          viewWorkspaceSource.includes("const ViewDashboardBridgePanel = lazy(loadViewDashboardBridgePanel)") &&
+          viewWorkspaceSource.includes("setDashboardBridgeMounted(true)") &&
           viewWorkspaceSource.includes("<ViewDashboardBridgePanel") &&
           !viewWorkspaceSource.includes('data-testid="view-dashboard-bridge"') &&
           viewDashboardBridgePanelSource.includes("type ViewDashboardBridgePanelProps") &&
           viewDashboardBridgePanelSource.includes("bridgeSteps: ViewBridgeStep[]") &&
           viewDashboardBridgePanelSource.includes("openViewEvidence: () => void") &&
           viewDashboardBridgePanelSource.includes("viewCanFeedDashboard: boolean") &&
+          viewDashboardBridgePanelSource.includes('import "./viewDashboardBridgePanel.css"') &&
+          viewDashboardBridgePanelStylesSource.includes(".viewBridgePanel {") &&
           viewDashboardBridgePanelSource.includes('data-testid="view-bridge-agent-widget"') &&
           implementationStatusSource.includes("View dashboard bridge panel component boundary"),
       },

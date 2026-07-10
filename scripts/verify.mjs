@@ -663,10 +663,14 @@ const {
   dashboardDeferredStylesSource,
   sourceWorkbenchAdvancedStylesSource,
   viewWorkspaceStylesSource,
+  viewAgentTaskStripStylesSource,
+  viewDashboardBridgePanelStylesSource,
+  homeOverviewStylesSource,
+  productActivationStylesSource,
   settingsPanelStylesSource,
   agentEvidenceStylesSource,
 } = sourceCatalog;
-const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${settingsPanelStylesSource}\n${agentEvidenceStylesSource}`;
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${viewAgentTaskStripStylesSource}\n${viewDashboardBridgePanelStylesSource}\n${homeOverviewStylesSource}\n${productActivationStylesSource}\n${settingsPanelStylesSource}\n${agentEvidenceStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 const contractCheckContext = {

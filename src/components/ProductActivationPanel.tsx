@@ -1,3 +1,4 @@
+import "./productActivationPanel.css";
 import type { BusinessPathStepKey } from "../businessPathModel";
 import type { ProductActivationModel, ProductActivationStep } from "../productActivationModel";
 import { Bilingual, biText } from "./Bilingual";
