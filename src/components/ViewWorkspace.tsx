@@ -48,10 +48,11 @@ type ViewWorkspaceProps = {
   onCopyView: (options: { view: string; name?: string; confirm?: boolean }) => Promise<void>;
   onDeleteView: (options: { view: string; confirm?: boolean }) => Promise<void>;
   onOpenEvidence: (focus: EvidenceFocus) => void;
+  onOpenSources: () => void;
   onAsk: (prompt: string) => Promise<void>;
 };
 
-export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectView, onRunTableQuery, onSaveView, onCopyView, onDeleteView, onOpenEvidence, onAsk }: ViewWorkspaceProps) {
+export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectView, onRunTableQuery, onSaveView, onCopyView, onDeleteView, onOpenEvidence, onOpenSources, onAsk }: ViewWorkspaceProps) {
   const savedViews = Array.isArray(workbench.savedViews) ? workbench.savedViews : [];
   const tables = Array.isArray(workbench.tables) ? workbench.tables : [];
   const activeView = savedViews.find((view) => view.view_key === activeViewKey) ?? savedViews[0];
@@ -75,6 +76,8 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
   };
   const columns = Array.isArray(query.columns) ? query.columns : [];
   const rows = Array.isArray(query.rows) ? query.rows : [];
+  const pageCount = Math.max(1, query.pageCount ?? 1);
+  const currentPage = Math.max(1, Math.min(pageCount, query.page ?? 1));
   const [search, setSearch] = useState(viewSearch(activeView));
   const [busy, setBusy] = useState<string | null>(null);
   const [viewOperationReceipt, setViewOperationReceipt] = useState<ViewOperationReceipt | null>(null);
@@ -235,6 +238,40 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
     });
   }
 
+  if (!savedViews.length) {
+    const hasTables = tables.length > 0;
+    return (
+      <section className="mainPanel viewMainPanel" aria-labelledby="view-workbench-title">
+        <div className="panelHeader">
+          <div>
+            <p className="kicker">{biText("明细视图", "Detail views")}</p>
+            <h2 id="view-workbench-title"><Bilingual zh="先保存一个明细口径" en="Save a detail scope first" /></h2>
+            <p className="panelIntro">
+              {hasTables
+                ? biText("已有数据，但还没有保存的明细视图。让 AI 起草一个，再确认保存。", "Data is ready, but no detail view is saved. Let AI draft one for review.")
+                : biText("还没有数据，请先导入一份真实数据。", "No data yet. Import a real dataset first.")}
+            </p>
+          </div>
+        </div>
+        <div className="viewEmptyState" data-testid="view-empty-state">
+          <Icon name={hasTables ? "agent" : "source"} />
+          <strong>{hasTables ? biText("从一个必要视图开始", "Start with one necessary view") : biText("先接入数据", "Connect data first")}</strong>
+          <span>{hasTables ? biText("AI 只选择查询和下钻所需字段。", "AI selects only fields needed for query and drilldown.") : biText("导入完成后再保存明细口径。", "Save a detail scope after import.")}</span>
+          <div className="buttonRow">
+            {hasTables ? <button className="primaryButton" disabled={busy === "empty-draft"} onClick={() => runBusy("empty-draft", () => onAsk(biText("基于当前表起草一个明细视图，只选查询和下钻所需字段，先不写入。", "Draft one detail view using only fields needed for query and drilldown. Do not write yet.")))} type="button">
+              <Icon name="agent" />
+              {biText("让 AI 起草视图", "Ask AI to draft")}
+            </button> : null}
+            <button className={hasTables ? "secondaryButton" : "primaryButton"} onClick={onOpenSources} type="button">
+              <Icon name="source" />
+              {hasTables ? biText("检查数据字段", "Check data fields") : biText("去导入数据", "Import data")}
+            </button>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="mainPanel viewMainPanel" aria-labelledby="view-workbench-title">
       <div className="panelHeader">
@@ -304,7 +341,7 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
           <div className="viewStats">
             <div><strong>{query.filteredRows?.toLocaleString?.() ?? 0}</strong><span>{biText("筛选后", "filtered")}</span></div>
             <div><strong>{query.totalRows?.toLocaleString?.() ?? 0}</strong><span>{biText("总行数", "total")}</span></div>
-            <div><strong>{query.page ?? 1}/{query.pageCount ?? 1}</strong><span>{biText("页", "page")}</span></div>
+            <div><strong>{currentPage}/{pageCount}</strong><span>{biText("页", "page")}</span></div>
             <div><strong>{viewReadinessLabel}</strong><span>{biText("看板来源", "dashboard source")}</span></div>
           </div>
           {viewOperationReceipt ? (
@@ -390,7 +427,7 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
               </button>
               <button
                 className="miniButton"
-                disabled={!activeView || (query.page ?? 1) >= (query.pageCount ?? 1) || busy === "next"}
+                disabled={!activeView || currentPage >= pageCount || busy === "next"}
                 onClick={() => runBusy("next", () => runViewQueryAction(biText("下一页已读取", "Next page loaded"), { ...queryOptions, offset: (query.offset ?? 0) + (query.limit || 50) }))}
                 type="button"
               >

@@ -3364,6 +3364,21 @@ textarea:focus {
   grid-column: 3;
 }
 
+.workbenchGrid > .sourceSecondaryDetails {
+  grid-column: 1 / -1;
+}
+
+.sourceSecondaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+  padding-top: 14px;
+}
+
+.sourceSecondaryGrid > * {
+  min-width: 0;
+}
+
 .sourceBeginnerMode {
   container: source-beginner / inline-size;
 }
@@ -5558,6 +5573,30 @@ th {
   color: var(--bi-text);
 }
 
+.bDashboardEmpty {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 18px;
+  border: 1px dashed var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+}
+
+.bDashboardEmpty strong {
+  color: var(--bi-text);
+}
+
+.bDashboardEmpty span {
+  max-width: 62ch;
+  color: var(--bi-muted);
+  line-height: 1.5;
+}
+
+.bWidgetGuidanceDetails {
+  margin-top: 14px;
+}
+
 .bKitStatus,
 .bEvidenceChips,
 .bWidgetMeta,
@@ -5631,7 +5670,7 @@ th {
 
 .bReadPathSteps {
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 8px;
 }
 

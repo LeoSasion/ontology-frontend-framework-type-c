@@ -358,17 +358,22 @@ export function SourceWorkbench({
         sourceProfileRunning={sourceProfileRunning}
       />
 
-      <ProductActivationPanel
+      {!hasData ? <ProductActivationPanel
         activation={activation}
-        compact={hasData}
         currentStep="data"
         onOpenStep={onOpenBusinessStep}
         testId="source-product-activation"
-        title={hasData ? undefined : biText("先接入一份真实数据", "Connect one real dataset first")}
-      />
+        title={biText("先接入一份真实数据", "Connect one real dataset first")}
+      /> : null}
 
       <div className="workbenchGrid">
-        <SourceWorkbenchDataEntryPanel
+        {!hasData ? <SourceWorkbenchImportPanel
+          {...importController}
+          busy={busy}
+          runBusy={runBusy}
+        /> : null}
+
+        {hasData && !sourceProfileComplete ? <SourceWorkbenchDataEntryPanel
           sourceIntelligenceRuns={sourceIntelligenceRuns}
           sourceProfileInputs={sourceProfileInputs}
           sourceProfileLabel={sourceProfileLabel}
@@ -381,31 +386,9 @@ export function SourceWorkbench({
           sourceProfileOptions={sourceProfileOptions}
           runSourceProfile={runSourceProfile}
           onAsk={onAsk}
-        />
+        /> : null}
 
-        <SourceWorkbenchImportPanel
-          {...importController}
-          busy={busy}
-          runBusy={runBusy}
-        />
-
-        {hasData ? (
-          <SourceWorkbenchDataManagementPanel
-            busy={busy}
-            sourceRuns={sourceRuns}
-            tables={tables}
-            selectedManagedSourceKey={selectedManagedSourceKey}
-            sourceRenameName={sourceRenameName}
-            setSourceRenameName={setSourceRenameName}
-            selectManagedSource={selectManagedSource}
-            runBusy={runBusy}
-            onInspectSource={onInspectSource}
-            onRenameSource={onRenameSource}
-            onDeleteSource={onDeleteSource}
-          />
-        ) : null}
-
-        {hasData ? (
+        {hasData && sourceProfileComplete ? (
           <SourceWorkbenchActionPanel
             busy={busy}
             recommendedPrimaryAction={recommendedPrimaryAction}
@@ -435,6 +418,40 @@ export function SourceWorkbench({
             onAsk={onAsk}
           />
         ) : null}
+
+        {hasData ? <details className="advancedDetails sourceSecondaryDetails" data-testid="source-evidence-details">
+          <summary>{sourceProfileComplete ? biText("查看或更新证据摘要", "Review or refresh evidence") : biText("导入与数据资产管理", "Import and manage data assets")}</summary>
+          <div className="sourceSecondaryGrid">
+            {sourceProfileComplete ? <SourceWorkbenchDataEntryPanel
+              sourceIntelligenceRuns={sourceIntelligenceRuns}
+              sourceProfileInputs={sourceProfileInputs}
+              sourceProfileLabel={sourceProfileLabel}
+              sourceProfileResult={sourceProfileResult}
+              sourceProfileError={sourceProfileError}
+              sourceProfileRunning={sourceProfileRunning}
+              sourceProfileRunningLabel={sourceProfileRunningLabel}
+              setSourceProfileInputs={setSourceProfileInputs}
+              setSourceProfileLabel={setSourceProfileLabel}
+              sourceProfileOptions={sourceProfileOptions}
+              runSourceProfile={runSourceProfile}
+              onAsk={onAsk}
+            /> : null}
+            <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} />
+            <SourceWorkbenchDataManagementPanel
+              busy={busy}
+              sourceRuns={sourceRuns}
+              tables={tables}
+              selectedManagedSourceKey={selectedManagedSourceKey}
+              sourceRenameName={sourceRenameName}
+              setSourceRenameName={setSourceRenameName}
+              selectManagedSource={selectManagedSource}
+              runBusy={runBusy}
+              onInspectSource={onInspectSource}
+              onRenameSource={onRenameSource}
+              onDeleteSource={onDeleteSource}
+            />
+          </div>
+        </details> : null}
 
         {showExpertWorkbench ? (
           <Suspense fallback={<SourceWorkbenchAdvancedLoading />}>

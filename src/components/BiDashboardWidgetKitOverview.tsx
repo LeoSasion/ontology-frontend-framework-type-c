@@ -13,7 +13,7 @@ type BiDashboardWidgetKitOverviewProps = {
 };
 
 export function BiDashboardWidgetKitOverview({ dashboard, evidenceState, latestRun, onOpenEvidence, widgetTypeSet }: BiDashboardWidgetKitOverviewProps) {
-  const catalogTypes = new Set(B_DASHBOARD_WIDGET_CATALOG.map((item) => item.type));
+  const hasWidgets = widgetTypeSet.size > 0;
 
   return (
     <>
@@ -25,19 +25,24 @@ export function BiDashboardWidgetKitOverview({ dashboard, evidenceState, latestR
           </h3>
         </div>
         <div className="bKitStatus">
-          <span>{biText(`${catalogTypes.size} 个结果卡片`, `${catalogTypes.size} result cards`)}</span>
-          <span>{biText("已连接证据", "Evidence linked")}</span>
+          <span>{biText(`${widgetTypeSet.size} 个已确认结果`, `${widgetTypeSet.size} confirmed results`)}</span>
+          <span>{latestRun ? biText("已连接证据", "Evidence linked") : biText("证据待生成", "Evidence pending")}</span>
           <span>{latestRun ? biText(`已更新: ${latestRun.label}`, `Updated: ${latestRun.label}`) : biText("等待证据摘要", "Waiting for evidence summary")}</span>
         </div>
       </div>
 
+      {!hasWidgets ? <div className="bDashboardEmpty" data-testid="b-dashboard-empty">
+        <strong><Bilingual zh="当前看板还没有已确认图表" en="No confirmed charts yet" /></strong>
+        <span><Bilingual zh="先用上方 AI 创建入口起草一个图表，确认后结果才会显示在这里。" en="Use the AI creation entry above to draft one chart. It appears here only after confirmation." /></span>
+      </div> : <details className="advancedDetails bWidgetGuidanceDetails" data-testid="b-widget-guidance-details">
+        <summary>{biText("查看阅读顺序和验收信息", "View reading order and acceptance")}</summary>
       <section className="bReadPath" data-testid="b-dashboard-read-path" aria-label={biText("看板阅读顺序", "Dashboard reading path")}>
         <div className="bReadPathLead">
           <strong><Bilingual zh="按这个顺序读，不用先学组件配置" en="Read in this order; no widget setup knowledge required" /></strong>
           <span>{evidenceState}</span>
         </div>
         <div className="bReadPathSteps">
-          {B_DASHBOARD_WIDGET_CATALOG.map((item, index) => {
+          {B_DASHBOARD_WIDGET_CATALOG.filter((item) => widgetTypeSet.has(item.type)).map((item, index) => {
             const purpose = B_WIDGET_READING_PURPOSES[item.type];
             const ready = widgetTypeSet.has(item.type);
             return (
@@ -110,6 +115,7 @@ export function BiDashboardWidgetKitOverview({ dashboard, evidenceState, latestR
           ))}
         </div>
       </details>
+      </details>}
     </>
   );
 }

@@ -378,7 +378,8 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
           sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm"}') &&
           !sourceWorkbenchActionPanelSource.includes("不可读或未预检时不能确认导入") &&
-          /\{hasData \? \(\s*<SourceWorkbenchActionPanel/.test(sourceWorkbenchSource) &&
+          sourceWorkbenchSource.includes("hasData && sourceProfileComplete ? (") &&
+          sourceWorkbenchSource.includes('data-testid="source-evidence-details"') &&
           stylesSource.includes(".beginnerImportGuard") &&
           stylesSource.includes(".sourceGuideDetails") &&
           sourceWorkbenchImportControllerSource.includes("const previewSummary = buildImportPreviewSummary") &&
@@ -1290,7 +1291,7 @@ export function appendSourceContractChecks(context) {
           dashboardWidgetLocalFilterPanelSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardWidgetLifecyclePanelSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardPageAdminPanelSource.includes('from "../dashboardCanvasContracts"') &&
-          dashboardBusinessTaskStripSource.includes('from "../dashboardCanvasContracts"') &&
+          !dashboardBusinessTaskStripSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardBusinessTemplatePanelSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardFilterWorkbenchSource.includes('from "../dashboardCanvasContracts"') &&
           homeOverviewSource.includes('from "../dashboardCanvasContracts"') &&

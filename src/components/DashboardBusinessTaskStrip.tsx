@@ -1,5 +1,4 @@
 import { useState } from "react";
-import type { BusinessDashboardOptions } from "../dashboardCanvasContracts";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 
@@ -9,7 +8,6 @@ type DashboardBusinessTaskStripProps = {
   busy: string | null;
   onAsk: (label: string, prompt: string) => void;
   onOpenEvidence: () => void;
-  onBusinessTemplate: (label: string, options: BusinessDashboardOptions) => void;
 };
 
 export function DashboardBusinessTaskStrip({
@@ -18,7 +16,6 @@ export function DashboardBusinessTaskStrip({
   busy,
   onAsk,
   onOpenEvidence,
-  onBusinessTemplate,
 }: DashboardBusinessTaskStripProps) {
   const singleChartPrompt = biText(
     `基于「${dashboardName}」和 ${defaultTableKey}，先问我最多一个必要问题，然后起草一个可确认的单图表。优先在折线图、柱状图、指标卡或表格中选择，说明字段、口径和证据，不直接写入。`,
@@ -34,8 +31,8 @@ export function DashboardBusinessTaskStrip({
         <h3><Bilingual zh="先说想看的一个图表" en="Describe one chart first" /></h3>
         <p>
           <Bilingual
-            zh="默认只引导创建一个图表；行业整套看板保留 beta 入口。涉及写入仍先生成草案。"
-            en="The default path creates one guided chart; full industry dashboards remain a beta entry. Writes still become drafts first."
+            zh="默认只引导创建一个图表；整套证据看板保留 Beta 入口。涉及写入仍先生成草案。"
+            en="The default path creates one guided chart; full evidence dashboards remain a beta entry. Writes still become drafts first."
           />
         </p>
       </div>
@@ -71,7 +68,7 @@ export function DashboardBusinessTaskStrip({
           </button>
         </div>
         <details className="advancedDetails compactAdvanced dashboardBetaDetails" data-testid="dashboard-beta-details">
-          <summary><Bilingual zh="高级：优化或行业看板 Beta" en="Advanced: optimize or industry beta" /></summary>
+          <summary><Bilingual zh="高级：优化或整套看板 Beta" en="Advanced: optimize or full dashboard beta" /></summary>
           <div className="dashboardBusinessTasks secondary">
             <button
               data-testid="dashboard-task-improve"
@@ -87,14 +84,14 @@ export function DashboardBusinessTaskStrip({
             </button>
             <button
               data-testid="dashboard-task-template"
-              disabled={busy === "business-template-preview"}
-              onClick={() => onBusinessTemplate("business-template-preview", { op: "draft", table: defaultTableKey, template: "erp-units", limit: 24 })}
+              disabled={busy === "dashboard-task-template"}
+              onClick={() => onAsk("dashboard-task-template", biText(`基于「${dashboardName}」和当前证据中已执行成功的分析，一次起草整套可编辑看板。只使用有字段与查询回执支持的图表，不支持的内容直接省略，先不要写入。`, `Using "${dashboardName}" and analyses successfully executed in current evidence, draft a full editable dashboard. Use only charts supported by fields and query receipts; omit unsupported content and do not write yet.`))}
               type="button"
             >
               <Icon name="check" />
               <span>
-                <strong><Bilingual zh="经营模板 Beta" en="Industry beta" /></strong>
-                <small><Bilingual zh="先预演影响" en="Preview impact" /></small>
+                <strong><Bilingual zh="整套看板 Beta" en="Full dashboard beta" /></strong>
+                <small><Bilingual zh="证据不足就省略" en="Omit unsupported charts" /></small>
               </span>
             </button>
           </div>

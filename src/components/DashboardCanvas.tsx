@@ -223,35 +223,31 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
       </div>
 
       <div className="dashboardGrid">
-        <ProductActivationPanel
-          activation={activation}
-          compact
-          currentStep="chart"
-          onOpenStep={onOpenBusinessStep}
-          testId="dashboard-product-activation"
-        />
-
-        <DashboardOverviewStrip
-          dashboardCreatedBy={dashboardCreatedBy}
-          dashboardEditBoundary={dashboardEditBoundary}
-          dashboardFiltersCount={dashboardFilters.length}
-          dashboardIsAgentManaged={dashboardIsAgentManaged}
-          dashboardSourceLabel={dashboardSourceLabel}
-          dashboardSummary={dashboardSummary}
-          dashboardWidgetsCount={dashboardWidgets.length}
-          onOpenEvidence={openDashboardEvidence}
-        />
-
         <DashboardBusinessTaskStrip
           busy={busy}
           dashboardName={dashboard.name}
           defaultTableKey={dashboard.default_table_key}
           onAsk={runDashboardAsk}
-          onBusinessTemplate={runBusinessTemplate}
           onOpenEvidence={openDashboardEvidence}
         />
 
         <BiDashboardWidgetKit dashboard={dashboard} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
+
+        <details className="progressiveDetails dashboardProgressiveDetails dashboardResultContextDetails" data-testid="dashboard-result-context-details">
+          <summary><Bilingual zh="查看结果来源、口径和验收信息" en="View result source, scope, and acceptance" /></summary>
+          <div className="progressiveDetailsBody single">
+            <DashboardOverviewStrip
+              dashboardCreatedBy={dashboardCreatedBy}
+              dashboardEditBoundary={dashboardEditBoundary}
+              dashboardFiltersCount={dashboardFilters.length}
+              dashboardIsAgentManaged={dashboardIsAgentManaged}
+              dashboardSourceLabel={dashboardSourceLabel}
+              dashboardSummary={dashboardSummary}
+              dashboardWidgetsCount={dashboardWidgets.length}
+              onOpenEvidence={openDashboardEvidence}
+            />
+          </div>
+        </details>
 
         <details
           className="progressiveDetails dashboardProgressiveDetails"

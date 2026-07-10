@@ -9,6 +9,35 @@
   container: view-main / inline-size;
 }
 
+.viewEmptyState {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  width: min(100% - 40px, 680px);
+  margin: 24px auto;
+  padding: 28px;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-surface);
+}
+
+.viewEmptyState > svg {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+.viewEmptyState > strong {
+  color: var(--bi-text);
+  font-size: 20px;
+}
+
+.viewEmptyState > span {
+  max-width: 58ch;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
 .viewListPanel,
 .viewQueryPanel {
   min-width: 0;

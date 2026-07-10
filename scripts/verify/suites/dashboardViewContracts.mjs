@@ -221,7 +221,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasActionsSource.includes("async function runDashboardAsk") &&
           !dashboardCanvasSource.includes("function runDashboardAsk") &&
           dashboardBusinessTaskStripSource.includes("先说想看的一个图表") &&
-          dashboardBusinessTaskStripSource.includes("高级：优化或行业看板 Beta") &&
+          dashboardBusinessTaskStripSource.includes("高级：优化或整套看板 Beta") &&
           dashboardBusinessTaskStripSource.includes('className="advancedDetails compactAdvanced dashboardBetaDetails"') &&
           dashboardCanvasReadinessModelSource.includes("source: \"dashboard-summary\"") &&
           appSource.includes("onAsk={handleAgentCommandAsk}") &&
@@ -237,8 +237,9 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasSource.includes('from "./DashboardBusinessTaskStrip"') &&
           dashboardCanvasSource.includes("<DashboardBusinessTaskStrip") &&
           dashboardCanvasSource.includes("onAsk={runDashboardAsk}") &&
-          dashboardCanvasSource.includes("onBusinessTemplate={runBusinessTemplate}") &&
           dashboardCanvasSource.includes("onOpenEvidence={openDashboardEvidence}") &&
+          dashboardCanvasSource.includes('data-testid="dashboard-result-context-details"') &&
+          dashboardCanvasSource.indexOf("<DashboardBusinessTaskStrip") < dashboardCanvasSource.indexOf("<BiDashboardWidgetKit") &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-explain"') &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-improve"') &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-template"') &&
@@ -246,9 +247,9 @@ export function appendDashboardViewContractChecks(context) {
           dashboardBusinessTaskStripSource.includes("type DashboardBusinessTaskStripProps") &&
           dashboardBusinessTaskStripSource.includes("dashboardName: string") &&
           dashboardBusinessTaskStripSource.includes("defaultTableKey: string") &&
-          dashboardBusinessTaskStripSource.includes("onBusinessTemplate") &&
-          dashboardBusinessTaskStripSource.includes("经营模板") &&
-          dashboardBusinessTaskStripSource.includes("Preview impact") &&
+          !dashboardBusinessTaskStripSource.includes("onBusinessTemplate") &&
+          dashboardBusinessTaskStripSource.includes("整套看板 Beta") &&
+          dashboardBusinessTaskStripSource.includes("Omit unsupported charts") &&
           implementationStatusSource.includes("Dashboard business task strip component boundary"),
       },
     {
@@ -1029,6 +1030,9 @@ export function appendDashboardViewContractChecks(context) {
     {
         label: "frontend-saved-view-evidence-click-path",
         ok: viewWorkspaceSource.includes('data-testid="view-evidence-button"') &&
+          viewWorkspaceSource.includes('data-testid="view-empty-state"') &&
+          viewWorkspaceSource.includes("onOpenSources: () => void") &&
+          viewWorkspaceSource.includes("const pageCount = Math.max(1") &&
           viewWorkspaceSource.includes('source: "saved-view"') &&
           viewWorkspaceSource.includes('"saved-view-config"') &&
           viewWorkspaceSource.includes('"table-query-contract"') &&

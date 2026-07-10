@@ -212,6 +212,7 @@ export function AppMainView({
         onCopyView={handleCopyView}
         onDeleteView={handleDeleteView}
         onOpenEvidence={onOpenEvidence}
+        onOpenSources={() => openSection("sources")}
         onAsk={handleAgentCommandAsk}
         onRunTableQuery={handleTableQuery}
         onSaveView={handleSaveView}
