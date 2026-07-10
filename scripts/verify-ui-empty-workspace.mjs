@@ -9,6 +9,7 @@ import {
   launchChrome,
   navigate,
   setViewport,
+  waitFor,
   waitForAppReady,
 } from "./ui-verify-chrome.mjs";
 import {
@@ -55,10 +56,11 @@ function emptyWorkspaceState() {
     hasErrorBoundary,
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     hasSeededSampleCopy: seededSamplePattern.test(text),
-    importGuidanceText: /导入|接入数据|检查文件|本地文件|还没有可分析的数据表|暂无证据|先接入数据/.test(text),
+    importGuidanceText: /导入|接入数据|检查文件|本地文件|还没有可分析的数据表|暂无证据|先接入数据|import|connect data|local file|no analyzable table|no evidence/i.test(text),
     home: {
       actionDock: isVisible("home-action-dock"),
-      importAction: isVisible("home-action-import"),
+      activationPanel: isVisible("product-activation-panel"),
+      importAction: isVisible("product-activation-step-data"),
       chartActionVisible: isVisible("home-action-cost-monitor"),
       chartActionDisabled: disabled("home-action-cost-monitor"),
     },
@@ -88,7 +90,18 @@ function emptyWorkspaceState() {
 
 async function openSection(client, section) {
   await navigate(client, `${baseUrl}/?section=${section}`);
-  const ready = await waitForAppReady(client, null, 25000);
+  const shellReady = await waitForAppReady(client, null, 25000);
+  const selector = section === "home"
+    ? '[data-testid="product-activation-panel"]'
+    : section === "agent"
+      ? '[data-testid="agent-no-data-route"]'
+      : '[data-testid="import-preview-button"]';
+  const sectionReady = await waitFor(client, (expectedSelector) => {
+    const element = document.querySelector(expectedSelector);
+    const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
+    return { ok: Boolean(element) && !error, selector: expectedSelector, url: location.href };
+  }, selector, { timeoutMs: 30000, intervalMs: 250 });
+  const ready = { ...shellReady, ok: shellReady.ok && sectionReady.ok, sectionReady };
   const state = await evaluate(client, emptyWorkspaceState, null, 10000);
   return { section, ready, state };
 }
@@ -152,7 +165,7 @@ try {
       const dashboardsPage = await openSection(browser.client, "dashboards");
       checks.push(
         check("ui-empty-dashboards-ready", dashboardsPage.ready.ok, { ready: dashboardsPage.ready }),
-        check("ui-empty-dashboards-route-guides-to-data", dashboardsPage.state.sources.importEntry || dashboardsPage.state.importGuidanceText, { state: dashboardsPage.state }),
+        check("ui-empty-dashboards-route-guides-to-data", dashboardsPage.state.sources.importPreviewButton || dashboardsPage.state.importGuidanceText, { state: dashboardsPage.state }),
         check("ui-empty-dashboards-no-chart-workbench", !dashboardsPage.state.dashboards.taskStripVisible && dashboardsPage.state.dashboards.widgetCards === 0, { dashboards: dashboardsPage.state.dashboards }),
         check("ui-empty-dashboards-no-error", !dashboardsPage.state.hasErrorBoundary && !dashboardsPage.state.hasFrameworkOverlay),
         check("ui-empty-dashboards-no-seeded-copy", !dashboardsPage.state.hasSeededSampleCopy),
@@ -162,7 +175,7 @@ try {
       const evidencePage = await openSection(browser.client, "evidence");
       checks.push(
         check("ui-empty-evidence-ready", evidencePage.ready.ok, { ready: evidencePage.ready }),
-        check("ui-empty-evidence-route-guides-to-data", evidencePage.state.sources.importEntry || evidencePage.state.importGuidanceText, { state: evidencePage.state }),
+        check("ui-empty-evidence-route-guides-to-data", evidencePage.state.sources.importPreviewButton || evidencePage.state.importGuidanceText, { state: evidencePage.state }),
         check("ui-empty-evidence-no-proof-panels", !evidencePage.state.evidence.businessSummaryVisible, { evidence: evidencePage.state.evidence }),
         check("ui-empty-evidence-no-error", !evidencePage.state.hasErrorBoundary && !evidencePage.state.hasFrameworkOverlay),
         check("ui-empty-evidence-no-seeded-copy", !evidencePage.state.hasSeededSampleCopy),
