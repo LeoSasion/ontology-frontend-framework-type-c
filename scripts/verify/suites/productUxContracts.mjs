@@ -15,7 +15,8 @@ export function appendProductUxContractChecks(context) {
     agentTaskPacketSource,
     appAgentActionsSource,
     appDataActionsSource,
-    appSource,
+    appSource: appEntrySource,
+    appMainViewSource,
     appWorkspaceModelSource,
     biCliSource,
     bWidgetKitModelSource,
@@ -33,6 +34,7 @@ export function appendProductUxContractChecks(context) {
     globalStylesSource,
     homeOverviewSource,
     implementationStatusSource,
+    inspectorControllerSource,
     inspectorPanelModelSource,
     inspectorPanelSource,
     join,
@@ -52,6 +54,7 @@ export function appendProductUxContractChecks(context) {
     typesAgentSource,
     verifyAAdversarialSource,
   } = context;
+  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   checks.push(
     {
         label: "frontend-inspector-selected-context",
@@ -70,18 +73,22 @@ export function appendProductUxContractChecks(context) {
           appSource.includes("evidenceFocus={evidenceFocus}") &&
           appSource.includes("activeDashboardName={activeDashboardName}") &&
           appSource.includes("activeViewName={activeViewName}") &&
-          appSource.includes("onOpenEvidence={handleInspectorOpenEvidence}") &&
+          appEntrySource.includes("onOpenEvidence={inspector.openEvidence}") &&
+          inspectorControllerSource.includes('openSection("evidence")') &&
           appSource.includes("const activeDashboardName ="),
       },
     {
         label: "frontend-collapsible-inspector",
-        ok: appSource.includes("inspectorPreferenceStorageKey") &&
-          appSource.includes("initialInspectorPreference") &&
-          appSource.includes("data-inspector-state={inspectorExpanded ? \"expanded\" : \"collapsed\"}") &&
-          appSource.includes("inspectorCollapsed={!inspectorExpanded}") &&
-          appSource.includes("onCollapseInspector={handleInspectorCollapse}") &&
-          appSource.includes("onExpandInspector={handleInspectorExpand}") &&
-          appSource.includes("onPinInspectorToggle={handleInspectorPinToggle}") &&
+        ok: inspectorControllerSource.includes("inspectorPreferenceStorageKey") &&
+          inspectorControllerSource.includes("initialInspectorPreference") &&
+          inspectorControllerSource.includes("export function useInspectorController") &&
+          inspectorControllerSource.includes("window.localStorage.setItem") &&
+          appEntrySource.includes("const inspector = useInspectorController(openSection)") &&
+          appEntrySource.includes("data-inspector-state={inspector.expanded ? \"expanded\" : \"collapsed\"}") &&
+          appEntrySource.includes("inspectorCollapsed={!inspector.expanded}") &&
+          appEntrySource.includes("onCollapseInspector={inspector.collapse}") &&
+          appEntrySource.includes("onExpandInspector={inspector.expand}") &&
+          appEntrySource.includes("onPinInspectorToggle={inspector.togglePinned}") &&
           inspectorPanelSource.includes("inspectorCollapsed: boolean") &&
           inspectorPanelSource.includes("inspectorPinned: boolean") &&
           inspectorPanelSource.includes("data-testid=\"inspector-expand\"") &&
@@ -119,8 +126,8 @@ export function appendProductUxContractChecks(context) {
           inspectorPanelSource.includes("getAppSection(latestSummary.targetSection)") &&
           inspectorPanelSource.includes("onOpenSection(latestSummary.targetSection!)") &&
           inspectorPanelSource.includes("visibleActionSafeState") &&
-          appSource.includes("const handleInspectorOpenSection = useCallback") &&
-          appSource.includes("onOpenSection={handleInspectorOpenSection}") &&
+          inspectorControllerSource.includes("const openAndExpand = useCallback") &&
+          appEntrySource.includes("onOpenSection={inspector.openAndExpand}") &&
           inspectorPanelSource.includes("data-testid=\"last-action-technical\"") &&
           inspectorPanelSource.includes("visibleActionSummary ${latestSummary.tone}") &&
           inspectorPanelSource.includes("查看错误原文") &&

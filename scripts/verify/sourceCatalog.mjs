@@ -110,6 +110,8 @@ const textSourceFiles = {
   apiWorkspaceSource: ["src", "apiWorkspace.ts"],
   erpUnitLibraryViewModelSource: ["src", "erpUnitLibraryViewModel.ts"],
   appSource: ["src", "App.tsx"],
+  appMainViewSource: ["src", "components", "AppMainView.tsx"],
+  inspectorControllerSource: ["src", "useInspectorController.ts"],
   appSectionsSource: ["src", "appSections.ts"],
   appLazyModulesSource: ["src", "appLazyModules.tsx"],
   appWorkspaceModelSource: ["src", "appWorkspaceModel.ts"],

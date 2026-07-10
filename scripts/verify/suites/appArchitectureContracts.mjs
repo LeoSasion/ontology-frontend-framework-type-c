@@ -22,7 +22,8 @@ export function appendAppArchitectureContractChecks(context) {
     appRefreshModelSource,
     appSectionsSource,
     appSettingsActionsSource,
-    appSource,
+    appSource: appEntrySource,
+    appMainViewSource,
     appWorkspaceActionsSource,
     appWorkspaceModelSource,
     bCostMonitorComparison,
@@ -49,6 +50,7 @@ export function appendAppArchitectureContractChecks(context) {
     homeScenarioPacksPanelSource,
     homeWorkspaceStartGuideSource,
     implementationStatusSource,
+    inspectorControllerSource,
     join,
     metricRepairModelSource,
     metricSemanticRepairActionsSource,
@@ -96,6 +98,7 @@ export function appendAppArchitectureContractChecks(context) {
     viewWorkspaceSource,
     workspaceFlowModelSource,
   } = context;
+  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   checks.push(
     {
         label: "app-workspace-model-boundary",

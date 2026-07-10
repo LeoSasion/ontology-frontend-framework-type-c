@@ -8,7 +8,8 @@ export function appendCoreContractChecks(context) {
     agentRecommendedCommandsSource,
     apiSourceApiSource,
     appDataActionsSource,
-    appSource,
+    appSource: appEntrySource,
+    appMainViewSource,
     biCliContractDocSource,
     biCliContractsSource,
     biCliCoreSource,
@@ -33,6 +34,7 @@ export function appendCoreContractChecks(context) {
     importJobCommandServiceSource,
     importTableWriterServiceSource,
     indexHtmlSource,
+    inspectorControllerSource,
     join,
     metricFormulaCommandServiceSource,
     packageJson,
@@ -66,6 +68,7 @@ export function appendCoreContractChecks(context) {
     verifyUiRealImportSource,
     workspaceCommandServiceSource,
   } = context;
+  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   checks.push(
     {
         label: "native-bi-cli-agent-contract-boundary",
@@ -575,7 +578,7 @@ export function appendCoreContractChecks(context) {
           biCliSource.includes('source_dashboard_draft = sub.add_parser("source-dashboard-draft")') &&
           serverSourceRoutesSource.includes("/api/source-intelligence/dashboard-draft") &&
           apiSourceApiSource.includes("createSourceDashboardDraft") &&
-          appSource.includes("handleSourceDashboardDraft") &&
+          appMainViewSource.includes("onBusinessDashboardOperation={handleBusinessDashboardOperation}") &&
           appDataActionsSource.includes("const handleSourceDashboardDraft = useCallback") &&
           !homeOverviewSource.includes("onSourceDashboardDraft({") &&
           dashboardWidgetContractsSource.includes('"sourceRunKey"') &&

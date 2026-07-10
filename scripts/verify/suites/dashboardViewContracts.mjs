@@ -2,7 +2,8 @@ export function appendDashboardViewContractChecks(context) {
   const {
     checks,
     agentPromptGridSource,
-    appSource,
+    appSource: appEntrySource,
+    appMainViewSource,
     appWorkspaceModelSource,
     byLabel,
     dashboardAdvancedWidgetWorkbenchSource,
@@ -47,6 +48,7 @@ export function appendDashboardViewContractChecks(context) {
     globalStylesSource,
     hasCssRule,
     implementationStatusSource,
+    inspectorControllerSource,
     join,
     root,
     sourceWorkbenchActionPanelSource,
@@ -62,6 +64,7 @@ export function appendDashboardViewContractChecks(context) {
     viewWorkspaceSource,
     viewWorkspaceStylesSource,
   } = context;
+  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   checks.push(
     {
         label: "frontend-evidence-business-summary-first",

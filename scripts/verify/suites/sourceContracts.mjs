@@ -7,7 +7,8 @@ export function appendSourceContractChecks(context) {
     apiClientSource,
     apiSourceApiSource,
     appDataActionsSource,
-    appSource,
+    appSource: appEntrySource,
+    appMainViewSource,
     bDashboardDrilldownSheetSource,
     bDashboardWidgetCardSource,
     biCliSource,
@@ -55,6 +56,7 @@ export function appendSourceContractChecks(context) {
     homeOverviewSource,
     homeProductIntelligencePanelSource,
     implementationStatusSource,
+    inspectorControllerSource,
     inspectorPanelModelSource,
     join,
     metricSemanticRepairActionsSource,
@@ -96,6 +98,7 @@ export function appendSourceContractChecks(context) {
     sourceWorkbenchSource,
     stylesSource,
   } = context;
+  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   checks.push(
     {
         label: "workbench-surface-complete",
