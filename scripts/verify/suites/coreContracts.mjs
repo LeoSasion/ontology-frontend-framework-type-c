@@ -17,6 +17,7 @@ export function appendCoreContractChecks(context) {
     biCliEvidenceBundlesSource,
     biCliSource,
     businessDashboardServiceSource,
+    bundleBudgetConfigSource,
     byLabel,
     configCommandServiceSource,
     connectorCommandServiceSource,
@@ -55,6 +56,7 @@ export function appendCoreContractChecks(context) {
     sourceReadModelServiceSource,
     themeSource,
     verifyBiCliAgentContractSource,
+    verifyBundleBudgetsSource,
     verifyAgentWorkflowContractsSource,
     verifyAppArchitectureContractsSource,
     verifyCoreContractsSource,
@@ -788,6 +790,14 @@ export function appendCoreContractChecks(context) {
           verifyAppArchitectureContractsSource.includes("export function appendAppArchitectureContractChecks") &&
           verifyProductUxContractsSource.includes("export function appendProductUxContractChecks") &&
           verifyAgentWorkflowContractsSource.includes("export function appendAgentWorkflowContractChecks") &&
+          packageJson.scripts?.build?.includes("vite build && node scripts/verify-bundle-budgets.mjs") &&
+          packageJson.scripts?.["verify:bundle-budgets"] === "node scripts/verify-bundle-budgets.mjs" &&
+          bundleBudgetConfigSource.includes('"schema": "aibi-bundle-budgets/v1"') &&
+          bundleBudgetConfigSource.includes('"label": "global-css"') &&
+          bundleBudgetConfigSource.includes('"label": "main-js"') &&
+          verifyBundleBudgetsSource.includes('generatedBy: "scripts/verify-bundle-budgets.mjs"') &&
+          verifyBundleBudgetsSource.includes("readdirSync(assetsDir)") &&
+          verifyBundleBudgetsSource.includes("if (failedChecks.length) process.exitCode = 1") &&
           !verifySource.includes("read" + "FileSync(") &&
           verifySourceCatalogSource.includes("const textSourceFiles = {") &&
           verifySourceCatalogSource.includes("export function readVerifySourceCatalog(root)") &&

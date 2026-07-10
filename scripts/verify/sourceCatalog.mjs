@@ -187,6 +187,8 @@ const textSourceFiles = {
   verifySource: ["scripts", "verify.mjs"],
   verifyRuntimeSource: ["scripts", "verify", "runtime.mjs"],
   verifySourceCatalogSource: ["scripts", "verify", "sourceCatalog.mjs"],
+  bundleBudgetConfigSource: ["config", "bundle-budgets.json"],
+  verifyBundleBudgetsSource: ["scripts", "verify-bundle-budgets.mjs"],
   verifyCoreContractsSource: ["scripts", "verify", "suites", "coreContracts.mjs"],
   verifySourceContractsSource: ["scripts", "verify", "suites", "sourceContracts.mjs"],
   verifyDashboardViewContractsSource: ["scripts", "verify", "suites", "dashboardViewContracts.mjs"],
