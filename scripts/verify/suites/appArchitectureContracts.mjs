@@ -491,7 +491,7 @@ export function appendAppArchitectureContractChecks(context) {
     {
         label: "frontend-home-overview-model-boundary",
         ok: homeOverviewSource.includes('from "../homeOverviewModel"') &&
-          homeOverviewModelSource.includes("export const starterQuestions") &&
+          homeOverviewModelSource.includes("export function buildStarterQuestions") &&
           homeOverviewModelSource.includes("export type GuideStep") &&
           homeOverviewModelSource.includes("export function buildHomeReadiness") &&
           homeOverviewModelSource.includes("export function buildHomeGuideSteps") &&
@@ -708,7 +708,7 @@ export function appendAppArchitectureContractChecks(context) {
           homeOperatingSummaryPanelSource.includes('className="quickQuestionBox"') &&
           homeOperatingSummaryPanelSource.includes('className="operatingSummaryGrid"') &&
           homeOperatingSummaryPanelSource.includes('className="trustGrid"') &&
-          homeOperatingSummaryPanelSource.includes("starterQuestions") &&
+          homeOperatingSummaryPanelSource.includes("buildStarterQuestions(latestRun)") &&
           !homeOverviewSource.includes('className="quickQuestionBox"') &&
           !homeOverviewSource.includes('className="operatingSummaryGrid"') &&
           homeActionDockSource.includes('data-testid="home-action-dock"') &&
@@ -1097,10 +1097,9 @@ export function appendAppArchitectureContractChecks(context) {
           productIntelligenceModelSource.includes("export function buildObjectInspectorModel") &&
           productIntelligenceModelSource.includes("export function buildEvidenceNarrative") &&
           productIntelligenceModelSource.includes("export function buildSandboxComparison") &&
-          productIntelligenceModelSource.includes("费用监控") &&
-          productIntelligenceModelSource.includes("销售经营") &&
-          productIntelligenceModelSource.includes("退款与异常") &&
-          productIntelligenceModelSource.includes("现金流与动账"),
+          productIntelligenceModelSource.includes('candidate?.status !== "ready"') &&
+          productIntelligenceModelSource.includes('item.status === "executed"') &&
+          productIntelligenceModelSource.includes("return []"),
       },
     {
         label: "frontend-home-scenario-quality-sandbox-panels",

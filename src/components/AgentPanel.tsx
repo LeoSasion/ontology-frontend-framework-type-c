@@ -40,16 +40,16 @@ type AgentPanelProps = {
 
 export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, onAsk, onConfirmDryRun, onConfirmAction, onRejectAction, onOpenSources }: AgentPanelProps) {
   const { resolvedLanguage } = useLanguage();
-  const [prompt, setPrompt] = useState(() => defaultAgentPrompt(resolvedLanguage));
+  const [prompt, setPrompt] = useState(() => defaultAgentPrompt(resolvedLanguage, workbench));
   const [promptTouched, setPromptTouched] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!promptTouched) {
-      setPrompt(defaultAgentPrompt(resolvedLanguage));
+      setPrompt(defaultAgentPrompt(resolvedLanguage, workbench));
     }
-  }, [promptTouched, resolvedLanguage]);
+  }, [promptTouched, resolvedLanguage, workbench]);
 
   async function submit(nextPrompt = prompt) {
     const normalizedPrompt = nextPrompt.trim();

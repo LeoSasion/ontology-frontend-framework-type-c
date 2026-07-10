@@ -11,7 +11,7 @@ export type ProductSignal = {
 };
 
 export type ScenarioPack = {
-  key: "cost-monitor" | "sales-ops" | "refund-risk" | "cashflow" | "policy-ops" | "custom";
+  key: string;
   title: string;
   detail: string;
   prompt: string;
@@ -66,55 +66,21 @@ function latestSourceRun(workbench: WorkbenchPayload) {
 
 export function buildScenarioPacks(status: WorkspaceStatus, workbench: WorkbenchPayload): ScenarioPack[] {
   const run = latestSourceRun(workbench);
-  const hasData = status.counts.tables > 0;
-  const metricCount = status.counts.metrics || countEnabled(workbench.metrics);
-  const relationshipCount = status.counts.relationships || countEnabled(workbench.relationships);
-  const executable = run?.metric_sql_executable_count ?? 0;
-  const baseReadiness: ProductSignalTone = hasData ? (executable > 0 ? "ok" : "info") : "warn";
-  return [
-    {
-      key: "cost-monitor",
-      title: "费用监控",
-      detail: "基于当前字段证据检查服务费、佣金、保费、退款、动账净额和收入缺口。",
-      prompt: "帮我生成费用监控看板草案，说明资金表、保单明细、动账净额、收入、缺口和证据，先不要直接写入。",
-      template: "cost-monitor",
-      readiness: hasData ? "ok" : "warn",
-      facts: ["字段证据驱动", "费用口径预演", "写入前确认"],
-    },
-    {
-      key: "sales-ops",
-      title: "销售经营",
-      detail: "按渠道、时间和订单表现生成老板晨会版看板，先给结论，再追证据。",
-      prompt: "基于当前工作区生成销售经营看板草案，包含渠道排名、趋势、订单数、净销售额和可追溯证据，先不要直接写入。",
-      template: "business",
-      readiness: baseReadiness,
-      facts: [`${metricCount} 个指标`, `${executable} 条可执行问题`, "可编辑看板"],
-    },
-    {
-      key: "refund-risk",
-      title: "退款与异常",
-      detail: "先找退款压力、异常渠道和需要复核的明细，再生成可确认修改。",
-      prompt: "检查当前工作区的退款压力和异常记录，列出证据、影响范围和下一步，涉及看板修改时只生成草案。",
-      readiness: relationshipCount ? "ok" : "info",
-      facts: [`${relationshipCount} 条关系`, "明细下钻", "只读诊断"],
-    },
-    {
-      key: "cashflow",
-      title: "现金流与动账",
-      detail: "围绕入账、出账、净额和缺口组织指标，适合财务负责人先看风险。",
-      prompt: "帮我做现金流和动账净额分析，说明入账、出账、净额、缺口和证据来源；如果要改看板，只起草不写入。",
-      readiness: hasData ? "info" : "warn",
-      facts: ["财务视角", "缺口解释", "证据优先"],
-    },
-    {
-      key: "policy-ops",
-      title: "保单/订单履约",
-      detail: "把订单、保单、渠道和状态字段串起来，找履约、退款和收入问题。",
-      prompt: "基于订单和保单相关字段生成履约分析计划，说明可回答问题、缺字段和推荐看板，不要直接写入。",
-      readiness: relationshipCount ? "ok" : baseReadiness,
-      facts: ["跨表关系", "状态字段", "缺口计划"],
-    },
-  ];
+  const candidate = run?.fileCoverage?.dashboardCandidate;
+  const analyses = candidate?.analyses?.filter((item) => item.status === "executed" && item.label.trim()) ?? [];
+  if (!status.counts.tables || run?.fileCoverage?.complete !== true || candidate?.status !== "ready" || !analyses.length) {
+    return [];
+  }
+  const labels = analyses.slice(0, 3).map((item) => item.label);
+  const blockedCount = Math.max(0, (candidate.plannedMetricCount ?? analyses.length) - analyses.length);
+  return [{
+    key: `evidence-${run.run_key}`,
+    title: candidate.title || "当前字段证据看板",
+    detail: `仅使用 ${analyses.length} 个已执行分析组织整套看板，不支持的图表会自动省略。`,
+    prompt: `基于当前证据中已执行的分析生成一套可编辑看板草案：${labels.join("；")}。只使用有字段和查询回执支持的图表，不支持的内容直接省略，先不要写入。`,
+    readiness: "ok",
+    facts: [`${analyses.length} 个已执行分析`, `${candidate.sourceCount} 个来源`, blockedCount ? `${blockedCount} 个问题已省略` : "无未验证图表"],
+  }];
 }
 
 export function buildDataQualityDoctor(status: WorkspaceStatus, workbench: WorkbenchPayload, preview: ImportPreview): DataQualityDoctor {

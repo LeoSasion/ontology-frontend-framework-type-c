@@ -5,20 +5,26 @@ import { numberValue, objectRecord, recordArray, stringValue } from "./safeValue
 
 export { numberValue, objectRecord, recordArray, stringValue };
 
-export const starterQuestions = [
-  {
-    zh: "本月哪个渠道卖得最好？",
-    en: "Which channel is performing best?",
-  },
-  {
-    zh: "退款压力主要来自哪里？",
-    en: "Where is refund pressure coming from?",
-  },
-  {
-    zh: "帮我生成一个经营看板草案",
-    en: "Draft a business dashboard",
-  },
-];
+export function buildStarterQuestions(latestRun?: SourceIntelligenceRunSummary) {
+  const analyses = latestRun?.fileCoverage?.dashboardCandidate?.analyses
+    ?.filter((item) => item.status === "executed" && item.label.trim())
+    .slice(0, 2) ?? [];
+  const questions = analyses.map((analysis) => ({
+    zh: `解释「${analysis.label}」的变化，并列出证据`,
+    en: `Explain changes in "${analysis.label}" and list the evidence`,
+  }));
+  questions.push({
+    zh: "根据当前字段推荐一个最值得先看的图表",
+    en: "Recommend the most useful first chart from the current fields",
+  });
+  if (questions.length < 3) {
+    questions.push({
+      zh: "当前证据还能可靠回答哪些问题？",
+      en: "What else can the current evidence answer reliably?",
+    });
+  }
+  return questions.slice(0, 3);
+}
 
 export type GuideStep = {
   key: "source" | "profile" | "dashboard" | "ask";

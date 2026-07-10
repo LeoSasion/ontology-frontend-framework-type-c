@@ -45,7 +45,7 @@ export function DashboardOverviewStrip({
 
       <section className="dashboardStoryStrip wide" aria-label={biText("看板摘要", "Dashboard summary")}>
         <div className="storyLead">
-          <span className="storyMode"><Bilingual zh="老板晨会版" en="Executive view" /></span>
+          <span className="storyMode"><Bilingual zh="当前结果" en="Current result" /></span>
           <h3><Bilingual zh="先看结论，再追证据" en="Read the outcome first, then inspect evidence" /></h3>
           <p>
             <Bilingual

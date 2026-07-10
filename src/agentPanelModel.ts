@@ -1,11 +1,26 @@
-import type { ActionDraft, MetricDefinition, SavedView, SourceIntelligenceRunSummary } from "./types";
+import type { ActionDraft, MetricDefinition, SavedView, SourceIntelligenceRunSummary, WorkbenchPayload } from "./types";
 import { biText } from "./components/Bilingual";
 import { objectRecord } from "./safeValue";
 
 export { objectRecord };
 
-export function defaultAgentPrompt(language: "zh" | "en") {
-  return language === "zh" ? "帮我分析销售趋势并生成待确认的看板修改" : "Analyze sales trends and create a pending dashboard change";
+export function defaultAgentPrompt(language: "zh" | "en", workbench?: WorkbenchPayload) {
+  const candidate = workbench?.sourceIntelligenceRuns?.[0]?.fileCoverage?.dashboardCandidate;
+  const analysis = candidate?.analyses?.find((item) => item.status === "executed" && item.label.trim());
+  if (analysis) {
+    return language === "zh"
+      ? `基于当前证据分析「${analysis.label}」，并推荐一个待确认图表`
+      : `Analyze "${analysis.label}" from current evidence and recommend one chart for review`;
+  }
+  const metric = workbench?.metrics?.find((item) => item.enabled !== 0 && item.label.trim());
+  if (metric) {
+    return language === "zh"
+      ? `分析「${metric.label}」的变化并给出证据，涉及写入时只生成草案`
+      : `Analyze changes in "${metric.label}" with evidence; create only a draft for writes`;
+  }
+  return language === "zh"
+    ? "根据当前字段和证据推荐一个最合适的图表，并说明指标与分组依据"
+    : "Recommend one suitable chart from the current fields and evidence, explaining the measure and grouping";
 }
 
 export function actionKindText(kind: string) {

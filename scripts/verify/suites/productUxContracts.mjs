@@ -251,7 +251,7 @@ export function appendProductUxContractChecks(context) {
           agentCommandDockSource.includes("hasEvidenceProfile") &&
           agentCommandDockSource.includes("onOpenSection(\"sources\")") &&
           agentCommandDockSource.includes("onOpenSection(\"evidence\")") &&
-          agentCommandDockSource.includes("生成一个经营看板待确认修改，先不要直接写入") &&
+          agentCommandDockSource.includes("根据当前字段和证据起草一个最合适的图表，先不要直接写入") &&
           stylesSource.includes(".agentCommandDock.floating") &&
           stylesSource.includes(".agentFloatButton") &&
           stylesSource.includes(".agentFloatPanel") &&

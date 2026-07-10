@@ -192,15 +192,15 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
             />
           </details>
 
-          <details className="advancedDetails homeBetaDetails">
-            <summary>{biText("更多：行业看板 Beta", "More: industry dashboard beta")}</summary>
+          {scenarioPacks.length ? <details className="advancedDetails homeBetaDetails">
+            <summary>{biText("更多：整套看板 Beta", "More: full dashboard beta")}</summary>
             <HomeScenarioPacksPanel
               busy={busy}
               onPreviewScenarioTemplate={(pack) => void previewScenarioTemplate(pack)}
               onRunScenarioPrompt={(pack) => void runScenarioPrompt(pack)}
               scenarioPacks={scenarioPacks}
             />
-          </details>
+          </details> : null}
 
           <details className="advancedDetails homeProductIntelligenceDetails">
             <summary>{biText("查看数据质量和语义建议", "Review data quality and semantic suggestions")}</summary>

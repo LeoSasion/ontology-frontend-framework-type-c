@@ -12,15 +12,15 @@ type HomeScenarioPacksPanelProps = {
 export function HomeScenarioPacksPanel({ busy, scenarioPacks, onPreviewScenarioTemplate, onRunScenarioPrompt }: HomeScenarioPacksPanelProps) {
   return (
     <details className="advancedDetails scenarioPackDetails" data-testid="home-scenario-packs">
-      <summary>{biText("行业场景包 Beta", "Industry scenario packs beta")}</summary>
+      <summary>{biText("证据看板 Beta", "Evidence dashboard beta")}</summary>
       <section className="scenarioPackPanel">
         <div className="scenarioPackLead">
           <span className="storyMode"><Bilingual zh="一句话到结果" en="Prompt to result" /></span>
-          <h3><Bilingual zh="选择一个业务场景，系统负责检查、起草和留证" en="Choose a business scenario; the system checks, drafts, and cites" /></h3>
+          <h3><Bilingual zh="用已验证分析一次起草整套看板" en="Draft a full dashboard from verified analyses" /></h3>
           <p>
             <Bilingual
-              zh="场景包把字段、指标、模板和证据要求打包好。用户只选业务目标，写入仍会停在草案确认。"
-              en="Scenario packs bundle fields, metrics, templates, and evidence needs. Users pick the business goal; writes still stop at draft approval."
+              zh="只有查询成功且证据完整的分析才会进入草案；未验证的图表不会默认展示。"
+              en="Only analyses with successful queries and complete evidence enter the draft; unverified charts stay hidden."
             />
           </p>
         </div>
@@ -38,12 +38,12 @@ export function HomeScenarioPacksPanel({ busy, scenarioPacks, onPreviewScenarioT
               <div className="scenarioPackActions">
                 <button className="miniButton" disabled={busy === "ask"} onClick={() => onRunScenarioPrompt(pack)} type="button">
                   <Icon name="agent" />
-                  {biText("起草方案", "Draft plan")}
+                  {biText("起草整套看板", "Draft full dashboard")}
                 </button>
-                <button className="miniButton" disabled={!pack.template || busy === "dashboardDraft"} onClick={() => onPreviewScenarioTemplate(pack)} type="button">
+                {pack.template ? <button className="miniButton" disabled={busy === "dashboardDraft"} onClick={() => onPreviewScenarioTemplate(pack)} type="button">
                   <Icon name="dashboard" />
                   {biText("预演模板", "Preview template")}
-                </button>
+                </button> : null}
               </div>
             </article>
           ))}

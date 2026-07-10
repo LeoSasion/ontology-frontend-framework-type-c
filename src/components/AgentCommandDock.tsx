@@ -16,21 +16,6 @@ type AgentCommandDockProps = {
   onOpenSection: (section: AppSection) => void;
 };
 
-const starterPrompts = [
-  {
-    zh: "先告诉我现在能回答什么",
-    en: "Tell me what this workspace can answer",
-  },
-  {
-    zh: "生成经营看板修改",
-    en: "Create a dashboard change",
-  },
-  {
-    zh: "检查退款压力并给证据",
-    en: "Explain refund pressure with evidence",
-  },
-];
-
 export function AgentCommandDock({ activeSection, status, agent, actionDrafts, onAsk, onOpenAgent, onOpenSection }: AgentCommandDockProps) {
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
@@ -45,6 +30,16 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
   const sourceIntelligenceCount = status.counts.sourceIntelligenceRuns ?? 0;
   const hasTables = status.counts.tables > 0;
   const hasEvidenceProfile = sourceIntelligenceCount > 0 || evidenceCount > 0;
+  const starterPrompts = useMemo(() => {
+    const tableName = matchedTable ? translateName(matchedTable.display_name) : null;
+    const targetZh = tableName?.zh ? `「${tableName.zh}」` : "当前数据";
+    const targetEn = tableName?.en ? `"${tableName.en}"` : "the current data";
+    return [
+      { zh: `先告诉我${targetZh}能可靠回答什么`, en: `Tell me what ${targetEn} can answer reliably` },
+      { zh: `根据${targetZh}推荐一个最合适的图表`, en: `Recommend one suitable chart from ${targetEn}` },
+      { zh: `检查${targetZh}的证据和数据缺口`, en: `Check evidence and data gaps in ${targetEn}` },
+    ];
+  }, [matchedTable]);
   const readiness = useMemo(() => {
     if (pendingDrafts.length > 0) {
       return {
@@ -237,13 +232,13 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
               data-testid="agent-task-dashboard"
               disabled={busy}
               onClick={() => {
-                void submitPrompt(undefined, biText("生成一个经营看板待确认修改，先不要直接写入", "Create a pending business dashboard change without writing directly"));
+                void submitPrompt(undefined, biText("根据当前字段和证据起草一个最合适的图表，先不要直接写入", "Draft one suitable chart from the current fields and evidence without writing directly"));
               }}
-              title={biText("生成看板修改", "Create dashboard change")}
+              title={biText("起草图表修改", "Draft chart change")}
               type="button"
             >
               <Icon name="dashboard" />
-              <span><Bilingual zh={expanded ? "起草看板修改" : "看板"} en={expanded ? "Draft dashboard change" : "Board"} /></span>
+              <span><Bilingual zh={expanded ? "起草一个图表" : "图表"} en={expanded ? "Draft one chart" : "Chart"} /></span>
               <small>{biText(`${status.counts.dashboards} 个看板`, `${status.counts.dashboards} dashboards`)}</small>
             </button>
             <button data-testid="agent-task-evidence" onClick={() => onOpenSection("evidence")} title={biText("查看证据", "View evidence")} type="button">

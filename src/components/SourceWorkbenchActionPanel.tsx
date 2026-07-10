@@ -148,7 +148,7 @@ export function SourceWorkbenchActionPanel({
           <div>
             <span>1</span>
             <strong>{biText("这些文件是什么业务？", "What business do these files describe?")}</strong>
-            <small>{biText("费用、销售、退款、保单或现金流。", "Cost, sales, refunds, policies, or cash flow.")}</small>
+            <small>{biText("只识别当前字段和证据能够支持的业务主题。", "Only identify business topics supported by current fields and evidence.")}</small>
           </div>
           <div>
             <span>2</span>

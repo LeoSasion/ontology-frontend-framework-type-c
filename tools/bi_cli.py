@@ -5698,7 +5698,13 @@ def widget_title_from_prompt(prompt: str, widget_type: str, measure: str, dimens
     return f"{measure or dimension or '分析'} 图表"
 
 
-def widget_candidate_fields(connection: sqlite3.Connection, table_key: str, roles: list[str], limit: int = 5) -> list[str]:
+def widget_candidate_fields(
+    connection: sqlite3.Connection,
+    table_key: str,
+    roles: list[str],
+    limit: int = 5,
+    allow_untyped_fallback: bool = True,
+) -> list[str]:
     candidates: list[str] = []
     for role in roles:
         for field in field_names_by_role(connection, table_key, role):
@@ -5706,6 +5712,8 @@ def widget_candidate_fields(connection: sqlite3.Connection, table_key: str, role
                 candidates.append(field)
             if len(candidates) >= limit:
                 return candidates
+    if candidates or not allow_untyped_fallback:
+        return candidates
     registry = resolve_table_registry(connection, table_key)
     for field in table_columns(connection, registry["physical_table"]):
         if field and not str(field).startswith("__") and field not in candidates:
@@ -5726,8 +5734,8 @@ def build_widget_clarification_action(
     measure_confidence: str,
     dimension_confidence: str,
 ) -> dict[str, Any]:
-    candidate_measures = widget_candidate_fields(connection, table_key, ["measure"], 5)
-    candidate_dimensions = widget_candidate_fields(connection, table_key, ["event_time", "dimension", "status", "identity_key"], 5)
+    candidate_measures = widget_candidate_fields(connection, table_key, ["measure"], 5, allow_untyped_fallback=False)
+    candidate_dimensions = widget_candidate_fields(connection, table_key, ["event_time", "dimension", "status"], 5, allow_untyped_fallback=False)
     return {
         "needsClarification": True,
         "dashboardKey": dashboard_key,

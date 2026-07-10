@@ -1,5 +1,5 @@
 import type { AgentAskResult, SourceIntelligenceRunSummary } from "../types";
-import { starterQuestions } from "../homeOverviewModel";
+import { buildStarterQuestions } from "../homeOverviewModel";
 import { Bilingual, biText } from "./Bilingual";
 import type { AppSection } from "./Sidebar";
 
@@ -26,6 +26,7 @@ export function HomeOperatingSummaryPanel({
   topRow,
   topValue,
 }: HomeOperatingSummaryPanelProps) {
+  const starterQuestions = buildStarterQuestions(latestRun);
   return (
     <details className="advancedDetails homeOperatingDetails">
       <summary>{biText("查看常见问题和运营摘要", "View common questions and operating summary")}</summary>
