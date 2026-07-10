@@ -726,6 +726,7 @@ const {
   evidenceNumberExplainerPanelSource,
   evidenceViewModelSource,
   viewWorkspaceSource,
+  viewWorkspaceStylesSource,
   viewAgentTaskStripSource,
   viewDashboardBridgePanelSource,
   viewSavedListPanelSource,
@@ -876,7 +877,7 @@ const {
   preferencesThemeCommandServiceSource,
   implementationStatusSource,
 } = readVerifySourceCatalog(root);
-const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}`;
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
@@ -4176,6 +4177,10 @@ checks.push(
       viewWorkspaceModelSource.includes("先不要直接写入") &&
       agentPromptGridSource.includes("onAsk(item.prompt)") &&
       appSource.includes("onAsk={handleAgentCommandAsk}") &&
+      viewWorkspaceSource.includes('import "./viewWorkspace.css"') &&
+      viewWorkspaceStylesSource.includes(".viewWorkspaceGrid {") &&
+      viewWorkspaceStylesSource.includes(".viewAgentTaskStrip {") &&
+      !globalStylesSource.includes(".viewWorkspaceGrid {") &&
       stylesSource.includes(".viewAgentTaskStrip") &&
       stylesSource.includes(".agentPromptGrid") &&
       stylesSource.includes(".viewAgentTaskStrip .agentPromptGrid button"),

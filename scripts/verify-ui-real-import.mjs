@@ -289,6 +289,25 @@ try {
       );
       steps.push({ step: "import-confirmed", state: afterImportState });
 
+      await navigate(browser.client, `${baseUrl}/?section=views`);
+      const viewWorkspaceReady = await waitForUi(browser.client, "view workspace styles", () => {
+        const workspaceGrid = document.querySelector(".viewWorkspaceGrid");
+        const queryPanel = document.querySelector(".viewQueryPanel");
+        const agentStrip = document.querySelector('[data-testid="view-agent-task-strip"]');
+        const displays = [workspaceGrid, queryPanel, agentStrip].map((element) => element ? getComputedStyle(element).display : "missing");
+        return {
+          ok: displays.every((display) => display === "grid"),
+          displays,
+          hasWorkspaceGrid: Boolean(workspaceGrid),
+          hasQueryPanel: Boolean(queryPanel),
+          hasAgentStrip: Boolean(agentStrip),
+        };
+      }, 30000);
+      checks.push(check("ui-view-workspace-styles-load-with-route", viewWorkspaceReady.ok, viewWorkspaceReady));
+
+      await navigate(browser.client, `${baseUrl}/?section=sources`);
+      await waitForAppReady(browser.client, null, 25000);
+
       const setSourcePath = await setNativeValue(browser.client, '[data-testid="source-intelligence-folder-entry"] textarea', importTarget.path);
       const setSourceLabel = await setNativeValue(browser.client, '[data-testid="source-intelligence-folder-entry"] input', importTarget.mode === "folder" ? "真实文件夹导入回归" : "真实导入回归");
       checks.push(

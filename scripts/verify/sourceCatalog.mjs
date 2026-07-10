@@ -77,6 +77,7 @@ const textSourceFiles = {
   evidenceNumberExplainerPanelSource: ["src", "components", "EvidenceNumberExplainerPanel.tsx"],
   evidenceViewModelSource: ["src", "evidenceViewModel.ts"],
   viewWorkspaceSource: ["src", "components", "ViewWorkspace.tsx"],
+  viewWorkspaceStylesSource: ["src", "components", "viewWorkspace.css"],
   viewAgentTaskStripSource: ["src", "components", "ViewAgentTaskStrip.tsx"],
   viewDashboardBridgePanelSource: ["src", "components", "ViewDashboardBridgePanel.tsx"],
   viewSavedListPanelSource: ["src", "components", "ViewSavedListPanel.tsx"],

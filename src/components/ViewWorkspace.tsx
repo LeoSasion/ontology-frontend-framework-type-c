@@ -1,3 +1,4 @@
+import "./viewWorkspace.css";
 import { useEffect, useMemo, useState } from "react";
 import type { EvidenceFocus, SavedView, TableQueryPayload, WorkbenchPayload } from "../types";
 import {
