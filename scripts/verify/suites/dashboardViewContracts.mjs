@@ -93,8 +93,7 @@ export function appendDashboardViewContractChecks(context) {
           evidenceBusinessSummaryPanelSource.includes("type EvidenceBusinessSummaryPanelProps") &&
           evidenceBusinessSummaryPanelSource.includes("businessMetrics: EvidenceBusinessMetric[]") &&
           evidenceBusinessSummaryPanelSource.includes("coverageText: string") &&
-          evidenceBusinessSummaryPanelSource.includes("nextEvidenceActions.map") &&
-          implementationStatusSource.includes("Evidence business summary panel component boundary"),
+          evidenceBusinessSummaryPanelSource.includes("nextEvidenceActions.map"),
       },
     {
         label: "frontend-evidence-technical-details-collapsed",
@@ -208,8 +207,7 @@ export function appendDashboardViewContractChecks(context) {
           stylesSource.includes("justify-content: center;") &&
           stylesSource.includes("justify-self: start;") &&
           stylesSource.includes("width: fit-content;") &&
-          stylesSource.includes("white-space: nowrap;") &&
-          implementationStatusSource.includes("Badge fit-content system"),
+          stylesSource.includes("white-space: nowrap;"),
       },
     {
         label: "frontend-dashboard-business-task-strip",
@@ -251,8 +249,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardBusinessTaskStripSource.includes("defaultTableKey: string") &&
           !dashboardBusinessTaskStripSource.includes("onBusinessTemplate") &&
           dashboardBusinessTaskStripSource.includes("整套看板 Beta") &&
-          dashboardBusinessTaskStripSource.includes("Omit unsupported charts") &&
-          implementationStatusSource.includes("Dashboard business task strip component boundary"),
+          dashboardBusinessTaskStripSource.includes("Omit unsupported charts"),
       },
     {
         label: "dashboard-beginner-editor-component-boundary",
@@ -274,8 +271,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardBeginnerEditorSource.includes("healthItems: DashboardHealthItem[]") &&
           dashboardBeginnerEditorSource.includes("onSourceSwitchTableChange") &&
           dashboardBeginnerEditorSource.includes("Make the current dashboard usable first") &&
-          dashboardBeginnerEditorSource.includes("Preview ready; writes still require confirmation") &&
-          implementationStatusSource.includes("Dashboard beginner editor component boundary"),
+          dashboardBeginnerEditorSource.includes("Preview ready; writes still require confirmation"),
       },
     {
         label: "dashboard-advanced-widget-workbench-component-boundary",
@@ -303,8 +299,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardAdvancedWidgetWorkbenchSource.includes("<DashboardRelationshipWidgetPanel") &&
           dashboardAdvancedWidgetWorkbenchSource.includes("<DashboardWidgetManagePanel") &&
           dashboardAdvancedWidgetWorkbenchSource.includes("<DashboardWidgetEditorPanel") &&
-          dashboardAdvancedWidgetWorkbenchSource.includes("buildWidgetToggleOptions(widgetDraft)") &&
-          implementationStatusSource.includes("Dashboard advanced widget workbench component boundary"),
+          dashboardAdvancedWidgetWorkbenchSource.includes("buildWidgetToggleOptions(widgetDraft)"),
       },
     {
         label: "dashboard-module-save-panel-component-boundary",
@@ -324,8 +319,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardModuleSavePanelSource.includes("dashboardModuleSaveReceipt(moduleSaveResult") &&
           dashboardModuleSavePanelSource.includes("onSave(false)") &&
           dashboardModuleSavePanelSource.includes("onSave(true)") &&
-          dashboardModuleSavePanelSource.includes("View module receipt") &&
-          implementationStatusSource.includes("Dashboard module save panel component boundary"),
+          dashboardModuleSavePanelSource.includes("View module receipt"),
       },
     {
         label: "dashboard-business-template-panel-component-boundary",
@@ -363,8 +357,7 @@ export function appendDashboardViewContractChecks(context) {
           erpUnitLibraryViewModelSource.includes("export function buildErpGapUnlocks") &&
           erpUnitLibraryViewModelSource.includes("export function collectNeededFieldsFromErpHints") &&
           dashboardBusinessTemplatePanelSource.includes("summarizeMatchedFields(widget.matchedFields)") &&
-          dashboardBusinessTemplatePanelSource.includes("Business dashboard generated") &&
-          implementationStatusSource.includes("Dashboard business template panel component boundary"),
+          dashboardBusinessTemplatePanelSource.includes("Business dashboard generated"),
       },
     {
         label: "dashboard-widget-recommendation-panel-component-boundary",
@@ -386,8 +379,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetRecommendationPanelSource.includes('data-testid="widget-recommend-button"') &&
           dashboardWidgetRecommendationPanelSource.includes('data-testid="widget-add-recommended-button"') &&
           dashboardWidgetRecommendationPanelSource.includes("plannedWidgets.slice(0, 5).map") &&
-          dashboardWidgetRecommendationPanelSource.includes("Use Recommend to generate widget candidates") &&
-          implementationStatusSource.includes("Dashboard widget recommendation panel component boundary"),
+          dashboardWidgetRecommendationPanelSource.includes("Use Recommend to generate widget candidates"),
       },
     {
         label: "dashboard-saved-view-panel-component-boundary",
@@ -411,8 +403,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardSavedViewPanelSource.includes('data-testid="widget-add-view-button"') &&
           dashboardSavedViewPanelSource.includes("views.map((view)") &&
           dashboardSavedViewPanelSource.includes("views.find((view)") &&
-          dashboardSavedViewPanelSource.includes("Add view to dashboard") &&
-          implementationStatusSource.includes("Dashboard saved view panel component boundary"),
+          dashboardSavedViewPanelSource.includes("Add view to dashboard"),
       },
     {
         label: "dashboard-relationship-recommendation-panel-component-boundary",
@@ -436,8 +427,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardRelationshipRecommendationPanelSource.includes("relationshipRecommendationKey(recommendation)") &&
           dashboardRelationshipRecommendationPanelSource.includes("relationshipMappingLabel(recommendation)") &&
           dashboardRelationshipRecommendationPanelSource.includes("relationship-preview-${index}") &&
-          dashboardRelationshipRecommendationPanelSource.includes("No recommended links yet") &&
-          implementationStatusSource.includes("Dashboard relationship recommendation panel component boundary"),
+          dashboardRelationshipRecommendationPanelSource.includes("No recommended links yet"),
       },
     {
         label: "dashboard-relationship-widget-panel-component-boundary",
@@ -461,8 +451,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardRelationshipWidgetPanelSource.includes('data-testid="widget-add-relationship-button"') &&
           dashboardRelationshipWidgetPanelSource.includes("relationships.map((relationship)") &&
           dashboardRelationshipWidgetPanelSource.includes("onAddRelationshipWidget(selectedRelationship)") &&
-          dashboardRelationshipWidgetPanelSource.includes("Create relation chart") &&
-          implementationStatusSource.includes("Dashboard relationship widget panel component boundary"),
+          dashboardRelationshipWidgetPanelSource.includes("Create relation chart"),
       },
     {
         label: "dashboard-widget-manage-panel-component-boundary",
@@ -487,8 +476,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetManagePanelSource.includes('data-testid={`widget-remove-preview-${widget.widget_key}`}') &&
           dashboardWidgetManagePanelSource.includes("onSelectWidget(widget.widget_key)") &&
           dashboardWidgetManagePanelSource.includes("onCopyPreview(widget)") &&
-          dashboardWidgetManagePanelSource.includes("onRemovePreview(widget)") &&
-          implementationStatusSource.includes("Dashboard widget manage panel component boundary"),
+          dashboardWidgetManagePanelSource.includes("onRemovePreview(widget)"),
       },
     {
         label: "dashboard-widget-editor-panel-component-boundary",
@@ -526,8 +514,7 @@ export function appendDashboardViewContractChecks(context) {
           !dashboardWidgetEditorPanelSource.includes("widgetToggleOptions.map(({ key, label, checked })") &&
           dashboardWidgetEditorPanelSource.includes("onWidgetOperation(\"set-widget-dry\", widgetSettingsPayload(false))") &&
           !dashboardWidgetEditorPanelSource.includes("onWidgetOperation(\"widget-filter-dry\"") &&
-          !dashboardWidgetEditorPanelSource.includes("onWidgetOperation(\"copy-widget-dry\"") &&
-          implementationStatusSource.includes("Dashboard widget editor panel component boundary"),
+          !dashboardWidgetEditorPanelSource.includes("onWidgetOperation(\"copy-widget-dry\""),
       },
     {
         label: "dashboard-widget-basic-form-component-boundary",
@@ -552,8 +539,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetBasicFormSource.includes("draftDimensions.map((field)") &&
           dashboardWidgetBasicFormSource.includes("draftMeasures.map((field)") &&
           dashboardWidgetBasicFormSource.includes("valueFormats.map((format)") &&
-          dashboardWidgetBasicFormSource.includes("widgetDraft.type === \"text\"") &&
-          implementationStatusSource.includes("Dashboard widget basic form component boundary"),
+          dashboardWidgetBasicFormSource.includes("widgetDraft.type === \"text\""),
       },
     {
         label: "dashboard-widget-style-panel-component-boundary",
@@ -575,8 +561,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetStylePanelSource.includes("rankingModes.map((mode)") &&
           dashboardWidgetStylePanelSource.includes("slicerDisplays.map((display)") &&
           dashboardWidgetStylePanelSource.includes("widgetToggleOptions.map(({ key, label, checked })") &&
-          dashboardWidgetStylePanelSource.includes("Appearance and click behavior") &&
-          implementationStatusSource.includes("Dashboard widget style panel component boundary"),
+          dashboardWidgetStylePanelSource.includes("Appearance and click behavior"),
       },
     {
         label: "dashboard-widget-local-filter-panel-component-boundary",
@@ -600,8 +585,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetLocalFilterPanelSource.includes("widgetFilters.length ? widgetFilters.map") &&
           dashboardWidgetLocalFilterPanelSource.includes("filterOperators.map((operator)") &&
           dashboardWidgetLocalFilterPanelSource.includes("onWidgetOperation(\"widget-filter-dry\"") &&
-          dashboardWidgetLocalFilterPanelSource.includes("onWidgetOperation(\"widget-filter-clear\"") &&
-          implementationStatusSource.includes("Dashboard widget local filter panel component boundary"),
+          dashboardWidgetLocalFilterPanelSource.includes("onWidgetOperation(\"widget-filter-clear\""),
       },
     {
         label: "dashboard-widget-lifecycle-panel-component-boundary",
@@ -622,8 +606,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetLifecyclePanelSource.includes('data-testid="widget-remove-confirm-button"') &&
           dashboardWidgetLifecyclePanelSource.includes("onWidgetOperation(\"copy-widget-dry\"") &&
           dashboardWidgetLifecyclePanelSource.includes("onWidgetOperation(\"remove-widget-dry\"") &&
-          dashboardWidgetLifecyclePanelSource.includes("Copy or delete widget") &&
-          implementationStatusSource.includes("Dashboard widget lifecycle panel component boundary"),
+          dashboardWidgetLifecyclePanelSource.includes("Copy or delete widget"),
       },
     {
         label: "dashboard-page-admin-panel-component-boundary",
@@ -659,8 +642,7 @@ export function appendDashboardViewContractChecks(context) {
           hasCssRule(stylesSource, ".erpTemplateStats", "display: grid;", "grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));") &&
           hasCssRule(stylesSource, ".erpOmittedUnitList", "display: grid;", "grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));") &&
           hasCssRule(stylesSource, ".erpUnitPreviewList", "display: grid;") &&
-          hasCssRule(stylesSource, ".erpUnitPreviewList", "grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));") &&
-          implementationStatusSource.includes("Dashboard page admin panel component boundary"),
+          hasCssRule(stylesSource, ".erpUnitPreviewList", "grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));"),
       },
     {
         label: "dashboard-contract-boundary-panel-component-boundary",
@@ -680,8 +662,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardContractBoundaryPanelSource.includes("Action boundary") &&
           dashboardContractBoundaryPanelSource.includes("widgets.map((widget)") &&
           dashboardContractBoundaryPanelSource.includes("Object.entries(widget.config ?? {})") &&
-          dashboardContractBoundaryPanelSource.includes("Import commit, dashboard write, relationship save, index creation, external sync.") &&
-          implementationStatusSource.includes("Dashboard contract boundary panel component boundary"),
+          dashboardContractBoundaryPanelSource.includes("Import commit, dashboard write, relationship save, index creation, external sync."),
       },
     {
         label: "dashboard-overview-strip-component-boundary",
@@ -704,8 +685,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardOverviewStripSource.includes("dashboardAcceptanceItems.map") &&
           dashboardOverviewStripSource.includes("dashboardSummary.topRow") &&
           dashboardOverviewStripSource.includes("dashboardWidgetsCount") &&
-          dashboardOverviewStripSource.includes("dashboardFiltersCount") &&
-          implementationStatusSource.includes("Dashboard overview strip component boundary"),
+          dashboardOverviewStripSource.includes("dashboardFiltersCount"),
       },
     {
         label: "dashboard-filter-workbench-component-boundary",
@@ -735,8 +715,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardFilterWorkbenchSource.includes('data-testid="dashboard-filter-stale-remove"') &&
           dashboardFilterWorkbenchSource.includes("dashboardFilters.length ? dashboardFilters.map") &&
           dashboardFilterWorkbenchSource.includes("filterOperators.map((operator)") &&
-          dashboardFilterWorkbenchSource.includes("onFilterOperation(`remove-${filter.id}`") &&
-          implementationStatusSource.includes("Dashboard filter workbench component boundary"),
+          dashboardFilterWorkbenchSource.includes("onFilterOperation(`remove-${filter.id}`"),
       },
     {
         label: "frontend-dashboard-source-switch-preview",
@@ -780,8 +759,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasSourceSwitchModelSource.includes("export function buildSourceSwitchModulePayload(") &&
           dashboardCanvasSourceSwitchModelSource.includes('["dimension", "group", "measure", "timeField"]') &&
           dashboardCanvasSourceSwitchModelSource.includes("filterCleanup.length + staleWidgetRefs.length") &&
-          dashboardCanvasSourceSwitchModelSource.includes("defaultTableKey: sourceSwitchTableKey") &&
-          implementationStatusSource.includes("Dashboard canvas source switch model boundary"),
+          dashboardCanvasSourceSwitchModelSource.includes("defaultTableKey: sourceSwitchTableKey"),
       },
     {
         label: "dashboard-canvas-source-switch-view-model-boundary",
@@ -811,8 +789,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasSourceSwitchViewModelSource.includes("analysis.filterCleanup.slice(0, 3)") &&
           dashboardCanvasSourceSwitchViewModelSource.includes("analysis.staleWidgetRefs.slice(0, 4)") &&
           dashboardCanvasSourceSwitchViewModelSource.includes("widgets follow default source") &&
-          dashboardCanvasSourceSwitchViewModelSource.includes("全局筛选需清理") &&
-          implementationStatusSource.includes("Dashboard canvas source switch view model boundary"),
+          dashboardCanvasSourceSwitchViewModelSource.includes("全局筛选需清理"),
       },
     {
         label: "dashboard-canvas-readiness-model-boundary",
@@ -831,8 +808,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasReadinessModelSource.includes("export function buildDashboardEvidenceFocus(") &&
           dashboardCanvasReadinessModelSource.includes("Agent 生成") &&
           dashboardOverviewStripSource.includes("Editable asset, not a black-box result") &&
-          dashboardCanvasReadinessModelSource.includes("source-intelligence:") &&
-          implementationStatusSource.includes("Dashboard canvas readiness model boundary"),
+          dashboardCanvasReadinessModelSource.includes("source-intelligence:"),
       },
     {
         label: "dashboard-canvas-plan-model-boundary",
@@ -853,8 +829,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasPlanModelSource.includes("export function dashboardModuleSaveReceipt(") &&
           dashboardCanvasPlanModelSource.includes("savedDashboardModules") &&
           dashboardCanvasPlanModelSource.includes("确认前不会写入") &&
-          dashboardCanvasPlanModelSource.includes("刷新后仍会保留") &&
-          implementationStatusSource.includes("Dashboard canvas plan model boundary"),
+          dashboardCanvasPlanModelSource.includes("刷新后仍会保留"),
       },
     {
         label: "dashboard-canvas-filter-model-boundary",
@@ -881,8 +856,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasFilterModelSource.includes("export function operatorLabel(") &&
           dashboardCanvasFilterModelSource.includes("scope = \"dashboard\"") &&
           dashboardCanvasFilterModelSource.includes("normalizeDashboardFilterList(value, \"widget\")") &&
-          dashboardCanvasSourceSwitchModelSource.includes("normalizeWidgetFilters(config.filters)") &&
-          implementationStatusSource.includes("Dashboard canvas filter model boundary"),
+          dashboardCanvasSourceSwitchModelSource.includes("normalizeWidgetFilters(config.filters)"),
       },
     {
         label: "dashboard-canvas-field-model-boundary",
@@ -910,8 +884,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasFieldModelSource.includes("availableFilterFields = filterableFields.length ? filterableFields : tableFields") &&
           dashboardCanvasFieldModelSource.includes("usableViews = currentTableViews.length ? currentTableViews : savedViews") &&
           dashboardCanvasFieldModelSource.includes("draftFields.filter(isDashboardDimensionField)") &&
-          dashboardCanvasFieldModelSource.includes("draftFields.filter(isDashboardMeasureField)") &&
-          implementationStatusSource.includes("Dashboard canvas field model boundary"),
+          dashboardCanvasFieldModelSource.includes("draftFields.filter(isDashboardMeasureField)"),
       },
     {
         label: "dashboard-canvas-state-hook-boundary",
@@ -939,8 +912,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasStateSource.includes("setSelectedRelationshipKey((current)") &&
           dashboardCanvasStateSource.includes("setSelectedWidgetKey((current)") &&
           dashboardCanvasStateSource.includes("setWidgetDraft(widgetDraftFromWidget(widget))") &&
-          dashboardCanvasStateSource.includes("setWidgetFilterField((current)") &&
-          implementationStatusSource.includes("Dashboard canvas state hook boundary"),
+          dashboardCanvasStateSource.includes("setWidgetFilterField((current)"),
       },
     {
         label: "dashboard-canvas-actions-hook-boundary",
@@ -967,8 +939,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasActionsSource.includes("async function runDashboardAsk(") &&
           dashboardCanvasActionsSource.includes("async function runRelationshipSave(") &&
           dashboardCanvasActionsSource.includes("const widgetSettingsPayload = (confirm: boolean)") &&
-          dashboardCanvasActionsSource.includes("return {") &&
-          implementationStatusSource.includes("Dashboard canvas actions hook boundary"),
+          dashboardCanvasActionsSource.includes("return {"),
       },
     {
         label: "dashboard-canvas-action-runner-boundary",
@@ -997,8 +968,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasActionRunnerSource.includes("async function runVoidAction(") &&
           dashboardCanvasActionRunnerSource.includes("async function runPlanAction(") &&
           dashboardCanvasActionRunnerSource.includes("setWidgetPlan(result)") &&
-          dashboardCanvasActionRunnerSource.includes("setBusy(null)") &&
-          implementationStatusSource.includes("Dashboard canvas action runner boundary"),
+          dashboardCanvasActionRunnerSource.includes("setBusy(null)"),
       },
     {
         label: "dashboard-canvas-relationship-model-boundary",
@@ -1026,8 +996,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasRelationshipModelSource.includes("export function buildRelationshipSavePayload(") &&
           dashboardCanvasRelationshipModelSource.includes("recommendation.fieldMappings?.[0] ?? null") &&
           dashboardCanvasRelationshipModelSource.includes("joinType: recommendation.joinType || \"left\"") &&
-          dashboardCanvasRelationshipModelSource.includes("limit: 20") &&
-          implementationStatusSource.includes("Dashboard canvas relationship model boundary"),
+          dashboardCanvasRelationshipModelSource.includes("limit: 20"),
       },
     {
         label: "frontend-saved-view-evidence-click-path",
@@ -1082,8 +1051,7 @@ export function appendDashboardViewContractChecks(context) {
           viewAgentTaskStripSource.includes("type ViewAgentTaskStripProps") &&
           viewAgentTaskStripSource.includes("viewAgentPrompts: ViewAgentPrompt[]") &&
           viewAgentTaskStripSource.includes("不用导出表格，直接问当前视图") &&
-          viewAgentTaskStripSource.includes('itemTestIdPrefix="view-agent-prompt"') &&
-          implementationStatusSource.includes("View Agent task strip component boundary"),
+          viewAgentTaskStripSource.includes('itemTestIdPrefix="view-agent-prompt"'),
       },
     {
         label: "frontend-saved-view-dashboard-bridge",
@@ -1153,8 +1121,7 @@ export function appendDashboardViewContractChecks(context) {
           viewDashboardBridgePanelSource.includes("viewCanFeedDashboard: boolean") &&
           viewDashboardBridgePanelSource.includes('import "./viewDashboardBridgePanel.css"') &&
           viewDashboardBridgePanelStylesSource.includes(".viewBridgePanel {") &&
-          viewDashboardBridgePanelSource.includes('data-testid="view-bridge-agent-widget"') &&
-          implementationStatusSource.includes("View dashboard bridge panel component boundary"),
+          viewDashboardBridgePanelSource.includes('data-testid="view-bridge-agent-widget"'),
       },
     {
         label: "view-saved-list-panel-component-boundary",
@@ -1166,8 +1133,7 @@ export function appendDashboardViewContractChecks(context) {
           viewSavedListPanelSource.includes('className="viewListPanel"') &&
           viewSavedListPanelSource.includes('className={view.view_key === activeView?.view_key ? "viewRow active" : "viewRow"}') &&
           viewSavedListPanelSource.includes("view.columnCount ?? viewColumns(view).length") &&
-          viewSavedListPanelSource.includes("view.filterCount ?? viewFilters(view).length") &&
-          implementationStatusSource.includes("View saved list panel component boundary"),
+          viewSavedListPanelSource.includes("view.filterCount ?? viewFilters(view).length"),
       },
     {
         label: "frontend-query-workbench-diagnostics-simplified",

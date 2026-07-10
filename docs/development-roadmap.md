@@ -1,35 +1,39 @@
-# AIBI-C Development Roadmap
+# AIBI-C Product Roadmap
 
-This roadmap is the current execution order for getting the product from the present baseline to a tighter beginner-ready release. It is not a historical changelog.
+This roadmap contains future work only. Completed implementation details belong in `implementation-status.md`; durable behavior belongs in the acceptance matrix.
 
-## Development Order
+## Delivered Baseline
 
-| Order | Workstream | Goal | Done Signal |
-| --- | --- | --- | --- |
-| 1 | Production copy and no-demo boundary | Remove user-facing sample-like prompts, temporary labels, and dated shortcuts. | `npm run verify` checks production copy; live UI shows only real-data or import guidance. |
-| 2 | First-success flow hardening | Keep the default path to data import, evidence summary, one chart, evidence review, and confirmation. | Empty-workspace and real-import UI checks pass with future steps collapsed. |
-| 3 | AI one-chart path | Make the stable default one chart per request, with at most one clarification and clickable field candidates when needed. | Agent verification covers empty, vague, explicit bar/line, unknown-field, and missing-dimension requests without domain-specific fallback. |
-| 4 | Evidence and confirmation clarity | Keep read-only actions confirmation-free while write/delete/import actions show impact and receipts. | Acceptance matrix covers confirmation, rejection, delete impact, and evidence receipt states. |
-| 5 | Beta industry dashboard guardrails | Keep full dashboard creation secondary, evidence-matched, and non-faking when fields are missing. | ERP unit verification proves matched, omitted, and previewed units before any write. |
-| 6 | Responsive visual QA | Prevent crowded controls, clipped labels, and overlap across common desktop ratios. | Visual verification passes landscape, portrait, square, and targeted changed screens. |
-| 7 | Local release operations | Keep validation, startup, backup, and recovery to a small command set for maintainers. | `npm run preflight` passes locally; CI verifies loopback security; backup and checksum restore pass in isolation. |
+The current baseline already provides a clean empty workspace, guided import, evidence summaries, AI one-chart drafts, controlled writes, responsive Details, local backup/recovery, and Windows CI browser checks. These are regression constraints, not active roadmap items.
 
-## Current Release Status
+## Current Development Order
 
-| Workstream | Status | Verification |
-| --- | --- | --- |
-| Production copy and no-demo boundary | Complete for this baseline | `npm run verify` includes production-copy regression checks. |
-| First-success flow hardening | Complete for this baseline | Empty-workspace and real-import UI loops pass through `npm run preflight`. |
-| AI one-chart path | Complete for this baseline | Generic overview, ambiguous chart clarification, explicit bar/line fields, unknown fields, missing dimensions, candidate buttons, and real-import single-chart requests are verified. |
-| Evidence and confirmation clarity | Complete for this baseline | Draft, confirmation, rejection, delete, and evidence receipt checks are covered by core verification. |
-| Beta industry dashboard guardrails | Complete for this baseline | ERP unit and business-dashboard draft checks cover matched, omitted, and previewed units. |
-| Responsive visual QA | Complete for this baseline | Landscape, portrait, and square desktop ratios pass live visual verification. |
-| Local release operations | Complete for this baseline | `npm run preflight` covers production readiness, local database recovery, runtime security, and browser acceptance; CI runs the same stable gates. |
+| Order | Priority | Workstream | Product outcome | Done signal |
+| --- | --- | --- | --- | --- |
+| 1 | P0 | Generalization acceptance | Prove that arbitrary imports work beyond the current real-data shape. | At least two additional independent schemas across at least two business domains complete import -> evidence -> one chart -> evidence -> confirmation without code or bundled-data changes. |
+| 2 | P0 | Brand and release identity | Remove the remaining `AIBI Hybrid` runtime name and present one product identity: `AIBI-C`. | UI title, default workspace, CLI metadata, API logs, docs, package metadata, and repository name use the agreed identity; compatibility migration is documented. |
+| 3 | P1 | First trusted chart efficiency | Measure and reduce the work required to reach the first evidence-backed chart. | Empty-workspace acceptance records the path; no advanced panel is required; clarification is at most one turn; a write uses one confirmation surface. |
+| 4 | P1 | Semantic confidence | Improve arbitrary-schema metric, date, status, identity, and relationship selection without domain fallback. | Unknown fields never silently fall back; relationship recommendations pass overlap/cardinality checks; confidence and blockers are visible in business language. |
+| 5 | P1 | Evidence handoff | Make validated answers and charts usable outside the live workspace without exposing raw internals. | A deliberate export/share artifact includes result, source, metric definition, query time, gaps, and workspace identity, with no secret or absolute source-path leak. |
+| 6 | P1 | Local release durability | Make upgrades and recovery predictable for non-developer users. | Versioned local schema migration, pre-upgrade backup, rollback receipt, and clean-install verification are automated. |
+| 7 | P2 | Full-dashboard Beta promotion gate | Decide whether the industry dashboard deserves stable status based on evidence, not feature count. | It passes multiple independent industries, omits unsupported units, explains every selection, meets visual budgets, and does not increase default-screen complexity. |
 
-## Continuous Development Rules
+## Product Metrics
 
-- Work in this order unless a failing verification blocks a higher-priority path.
-- Do not add default data, demo dashboards, bundled examples, or hidden sample shortcuts.
-- Prefer routing to the owning page over copying another page's controls.
-- Add or update verification before treating a UX cleanup as complete.
-- Use `npm run preflight` as the final local acceptance gate; use smaller scripts only while debugging.
+- First trusted chart completion rate in the acceptance workflow.
+- Median user decisions from import start to reviewed chart; maintenance clicks are tracked separately.
+- Percentage of answers and chart drafts with source, metric/query evidence, and explicit gap status.
+- Silent-field-fallback count: target zero.
+- Unnecessary confirmation count for read-only actions: target zero.
+- Confirmed writes with one complete impact summary: target 100%.
+- Visual regressions with overflow, overlap, or clipped text across supported desktop ratios: target zero.
+
+These metrics may be collected in local verification receipts. The product must not add hidden cloud telemetry to satisfy them.
+
+## Promotion Rules
+
+- Stable paths cannot depend on bundled examples, fixtures, or a specific customer's field names.
+- A Beta capability is not promoted because its UI exists; it must pass independent real-data and evidence-quality gates.
+- New advanced controls remain collapsed until user research or acceptance evidence proves they belong in the default path.
+- A new page is justified only when it owns a distinct business object or workflow; otherwise pass context to the existing owner.
+- Use `npm run preflight` as the final local acceptance gate and GitHub Actions as the remote release gate.

@@ -1,8 +1,8 @@
 # AIBI-C
 
-本项目是一个本地优先的 AI BI 工作台。它面向本地表格、业务导出和轻量数据建模场景：导入或扫描文件，生成证据摘要，查看看板，向全局 Agent 提问，并在确认前审阅所有写入草案。
+本项目是一个本地优先的证据型 AI BI 工作台。它面向只有本地表格或业务导出的用户：导入真实数据，用自然语言生成一个可追溯图表或答案，并在真实写入前审阅影响。
 
-核心原则是证据先行、写入受控、运行本地化。代码、文档和运行时数据都以本仓库为边界。
+稳定默认能力是“可信单图”，整套行业看板保持 Beta。产品不是固定模板库，也不是脱离数据证据的聊天机器人。代码、文档和验证契约以本仓库为边界；用户数据可以保存在配置的本地路径，但不会进入版本控制。
 
 ## Run
 
@@ -56,16 +56,19 @@ python tools/bi_cli.py --json business-dashboard --template erp-units --op draft
 
 GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建、核心契约、AI 单图可靠性、备份恢复和生产边界验证；随后启动仅回环监听的本地服务，检查安全响应与浏览器主流程。
 
-`npm run verify:ui` 需要本地 `8686` 前端和 `8787` API 已运行。它包含已有真实数据只读流程、三种 PC 比例视觉检查、空工作区检查，以及一个临时工作区真实导入闭环。真实导入优先读取 `C:\Users\Administrator\Documents\财务报表\真实数据` 并走文件夹合并导入，可用 `AIBI_REAL_IMPORT_FOLDER` 覆盖；目录不存在时回退到 `AIBI_REAL_IMPORT_FILE` 指定的单文件。脚本会恢复原工作区并删除临时工作区。
+`npm run verify:ui` 需要本地 `8686` 前端和 `8787` API 已运行。它包含主流程、三种 PC 比例的真实 Views 面板、空工作区，以及临时工作区真实导入闭环。真实导入通过 `AIBI_REAL_IMPORT_FOLDER` 指定文件夹，或通过 `AIBI_REAL_IMPORT_FILE` 指定单文件；验证结束后会恢复原工作区并删除临时工作区。
 
 `tools/bi_cli.py` 是本地 BI 后端入口。它负责工作区元数据、导入预检、语义字段、公式、关系、查询、看板、Agent 草案和证据回执。`query` 优先使用 DuckDB 分析运行时，必要时回退到 SQLite。
 
 ## Docs
 
-- `PRODUCT.md`: 产品定义、边界和核心运行契约。
+- `PRODUCT.md`: 唯一产品定位、目标用户、价值主张、边界和非目标。
 - `docs/README.md`: 当前文档地图和维护规则。
-- `docs/PRD.md`: 产品需求和用户工作流。
-- `docs/implementation-status.md`: 当前代码边界和验证口径。
+- `docs/PRD.md`: 当前用户故事、功能需求和发布条件。
+- `docs/product-ux-standard.md`: 交互、信息架构、文案和确认标准。
+- `docs/product-acceptance-matrix.md`: 稳定产品行为的验收场景。
+- `docs/development-roadmap.md`: 尚未完成的产品开发顺序和晋级条件。
+- `docs/implementation-status.md`: 当前交付边界、能力状态、限制和验证入口。
 - `docs/bi-cli-contract.md`: 公共 CLI 命令索引。
 - `docs/erp-dashboard-unit-library.md`: ERP 单元库、公开参考和选择规则。
 
@@ -89,6 +92,6 @@ npm run restore:local -- --from <backup-directory> --confirm
 
 备份只包含本地 SQLite 和 DuckDB 数据库，清单记录文件大小与 SHA-256；不会复制 `.env`、源文件或凭据。可用 `AIBI_BACKUP_ROOT` 指定备份根目录。
 
-## Deployment Notes
+## Local Release Notes
 
-正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。服务默认只监听 `127.0.0.1`，不会接受 `0.0.0.0`；需要跨进程前端来源时，只能通过 `AIBI_CORS_ORIGIN` 配置一个明确来源。新环境启动后先执行 `npm ci` 和 `python -m pip install -r requirements.txt`，再运行 `npm run preflight` 做核心与 UI 验收。
+本版本面向单机本地使用，不是远程托管或多租户部署。发布代码时不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。服务默认只监听 `127.0.0.1`，不会接受 `0.0.0.0`；需要跨进程前端来源时，只能通过 `AIBI_CORS_ORIGIN` 配置一个明确来源。新环境启动后先执行 `npm ci` 和 `python -m pip install -r requirements.txt`，再运行 `npm run preflight`。

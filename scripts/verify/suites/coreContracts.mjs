@@ -418,8 +418,7 @@ export function appendCoreContractChecks(context) {
           verifyUiRealImportSource.includes('rowCountsByName["售后单"] === 1393') &&
           verifyUiRealImportSource.includes('rowCountsByName["订单"] === 2351') &&
           verifyUiRealImportSource.includes('rowCountsByName["资金"] === 1376') &&
-          productAcceptanceMatrixDocSource.includes("real local folder when present or a real file as fallback") &&
-          implementationStatusSource.includes("real folder import loop with file fallback"),
+          productAcceptanceMatrixDocSource.includes("real local folder when present or a real file as fallback"),
       },
     {
         label: "relationship-command-service-boundary",

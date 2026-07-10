@@ -1,16 +1,16 @@
-# AI BI Workbench Product UX Standard
+# AIBI-C Product UX Standard
 
 This document owns the interaction and documentation standard for the current product. It is not a historical design note.
 
 ## Product Experience Contract
 
-- The default user path is AI-first: the user states the business question or chart they want, and the workbench turns it into a reviewed chart draft or dashboard draft.
+- The default user path is AI-assisted: the user states the business question or chart they want, and the workbench turns it into a reviewed result without hiding deterministic import, query, evidence, or confirmation behavior.
 - One business capability has one owning surface. Data intake belongs to Sources, chart creation belongs to Dashboards, evidence review belongs to Evidence, and write approval belongs to AI. Other screens should route into that surface instead of repeating the same operation.
 - The conservative default is one conversation to one chart. The assistant may ask at most one necessary clarification before drafting a line chart, bar chart, metric card, table, or text insight.
 - A vague chart request must ask for fields instead of guessing. "图表/chart" means one chart; "看板/仪表盘/dashboard" means a dashboard container or full dashboard draft.
 - Chart clarification should be actionable. When the assistant cannot safely choose a measure or dimension, it should show candidate field buttons that resubmit a more explicit chart request, not ask the user to copy field names manually.
 - Chart candidates and auto metrics must use business fields only. Internal fields such as canonical dates and import source markers may power time windows or evidence lineage, but they must not appear as user-facing measures, default dimensions, or field-choice buttons.
-- The beta path is one conversation to a full industry dashboard. It must be labeled beta, generated from field evidence, and previewed before any write.
+- The beta path is one conversation to a full industry dashboard. It must be labeled Beta, generated from field evidence, and previewed before any write.
 - A fresh workspace must be empty by default. Do not auto-load bundled data, run placeholder queries, create placeholder dashboards, or ask Agent warmup questions before the user imports data.
 - Folder import is a first-class intake path. It should preview how files will be grouped into business tables and write only after confirmation.
 - The first screen of a workflow should expose one primary action, the current result, and the minimum status needed to trust it.
@@ -72,10 +72,12 @@ If a page needs another object, it should navigate with context instead of dupli
 
 ## Documentation Standard
 
-- `PRODUCT.md` owns product definition, boundaries, non-goals, and durable UX contract.
-- `docs/PRD.md` owns user problems, target users, workflows, requirements, and acceptance.
+- `PRODUCT.md` owns positioning, product category, users, value proposition, boundaries, and non-goals.
+- `docs/PRD.md` owns current user stories, workflows, functional requirements, and release acceptance.
 - `docs/product-ux-standard.md` owns interaction, information architecture, and documentation standards.
-- `docs/implementation-status.md` owns current implementation boundaries and verification handles.
+- `docs/product-acceptance-matrix.md` owns durable executable scenarios.
+- `docs/implementation-status.md` owns current release boundaries, capability status, architecture ownership, and known limitations.
+- `docs/development-roadmap.md` contains future work only; completed baseline work is summarized once and removed from the active queue.
 - CLI, ERP references, and implementation receipts stay in their dedicated docs. Do not repeat them in product docs unless the product contract changes.
 
 ## Copy Standard

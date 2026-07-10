@@ -1,177 +1,85 @@
-# AI BI Workbench Implementation Status
+# AIBI-C Implementation Status
 
-Project boundary: this repository is the product boundary.
+Project boundary: this repository owns the product code, documentation, and verification contract. User data may live in configured local paths outside the repository.
 
-This file is the current implementation index. It records the stable module boundaries that `npm run verify` checks, plus the small set of commands used to prove the workbench is still coherent.
+Current stage: local production baseline for a single-user workstation. The stable product path is import -> evidence -> one chart -> evidence review -> confirmed write. Full industry dashboards remain Beta.
 
-## Current Shape
+## Current Release Boundary
 
-| Area | Status | Contract |
+| Layer | Current implementation | Boundary |
 | --- | --- | --- |
-| BI CLI bridge | Active | `tools/bi_cli.py` is the local backend entrypoint for workspace, source, query, dashboard, Agent, config, and evidence commands. |
-| Source evidence profiling | Active | `source-intelligence` produces evidence receipts from local fixture or user-selected inputs; folder import previews group same-type files before confirmed writes, field semantics avoid treating contact/system identifiers as measures, and auto metrics clean stale internal-field metrics without touching manual metrics. |
-| Dashboard widget set | Active | Dashboard pages support metric, bar, line, pie, table, text, slicer, relationship, filters, style, lifecycle, and source-switch flows. |
-| AI-first dashboard creation | Active | Dashboard pages start from a natural-language chart request; vague chart requests ask for fields with clickable business-field candidates, explicit chart requests become one-chart drafts, generic questions stay data overviews instead of silently selecting sales/channel fields, and full industry dashboards remain a beta preview path. |
-| Clean empty runtime | Active | App startup uses empty workspace/query/dashboard/Agent fallbacks and only guides users to import local data when no tables exist. |
-| Global business path | Active | A compact route handoff bar owns the steps: connect data, create chart, review evidence, approve writes. Home actions route into these owners instead of duplicating execution. |
-| ERP unit library | Active | Public ERP references are mapped to selectable units, field aliases, omitted-unit hints, and confirmable dashboard drafts. |
-| Agent confirmation boundary | Active | Agent answers are evidence-aware; write operations become dry-runs or action drafts before confirmation. |
-| Evidence surface | Active | Evidence pages summarize business meaning first, with technical details available on demand. |
-| UI runtime verification | Active | Live-browser checks cover the real-data Home -> Dashboard -> Evidence -> Sources -> Agent path, an isolated imported-and-saved Views query panel at landscape/portrait/square ratios, empty workspace routing, and a temporary-workspace real folder import loop with file fallback. |
-| Local operations and CI | Active | GitHub Actions runs build, core, AI reliability, backup, production, security-runtime, and browser checks on Windows; the API is loopback-only with bounded request bodies and exact-origin CORS, backup/restore is checksum-verified, and `npm run preflight` gives local release validation one command. |
+| Client | React 19 and Vite desktop-first workbench | Progressive disclosure; no server-rendered or mobile-native client |
+| Local API | Node/TypeScript route facade | Loopback only, bounded request bodies, exact-origin optional CORS |
+| BI runtime | Python CLI, SQLite metadata, DuckDB analytics | Whitelisted query parameters; no arbitrary user SQL |
+| Storage | Local database files and user-selected source files | No cloud sync, multi-tenant storage, or repository data seeding |
+| Agent | Deterministic local resolution with optional model configuration | Workspace scoped; read-only answers and confirmed write drafts stay distinct |
+| Evidence | Source runs, query runtime, metric definitions, action and delete receipts | Business summary first; raw diagnostics remain collapsed |
 
-Users should start from business actions. Advanced modeling, query, and command details stay available after the primary workflow is clear.
+## Capability Status
 
-## Verification
+| Capability | Status | Current contract |
+| --- | --- | --- |
+| Clean first run | Stable | New workspaces contain no tables, charts, dashboards, answers, or sample shortcuts. Product activation shows only the current necessary step. |
+| File and folder import | Stable | CSV/XLSX/XLSM preview, same-type grouping, merge impact, key quality, confirmed commit, and receipts. |
+| Source evidence profiling | Stable | Field roles, data quality, metric candidates, relationship evidence, gaps, and source receipts. |
+| AI one-chart flow | Stable | Generic overview does not choose domain fields; vague charts clarify once; explicit charts create one confirmable draft. |
+| Details and saved views | Stable | Whitelisted detail queries, search, filter, sort, save/copy/delete, dashboard and Agent handoff. |
+| Dashboard widget set | Stable advanced capability | Metric, bar, line, pie, table, text, slicer, relationship, filters, styles, lifecycle, and source switching. |
+| Full industry dashboard | Beta | Evidence-matched ERP units, omitted-unit disclosure, preview, then confirmation. |
+| Agent write boundary | Stable | Writes become dry-runs or action drafts; confirmation, rejection, impact, and receipt are explicit. |
+| Evidence experience | Stable | Business meaning and gaps are primary; runtime and raw receipts are secondary. |
+| Local operations | Stable | Loopback startup, health checks, production/security gates, checksum backup, and guarded restore. |
+
+## Known Limitations
+
+- Current release is single-user and local-only; it does not provide authentication, roles, collaboration, remote hosting, or cloud synchronization.
+- The full-dashboard path is Beta and has not met a promotion gate across multiple independent industries.
+- Legacy XLS can be profiled by Source Intelligence but is not yet supported by the confirmed import path; convert it to XLSX or CSV before import.
+- Real-data acceptance currently proves one local multi-table financial/commerce folder shape. A second independent real dataset is still required for stronger generalization evidence.
+- Optional model-provider quality is separate from the deterministic fallback contract; provider availability must never disable local evidence and query behavior.
+- Backup protects local SQLite and DuckDB files, but this is not a remote disaster-recovery service.
+- UI verification is desktop focused at 1440x900, 900x1440, and 1100x1100; mobile is not a release target.
+
+## Architecture Ownership
+
+| Path | Owns |
+| --- | --- |
+| `src/components/` | Page surfaces and presentational workflow components |
+| `src/*Model.ts`, `src/*ViewModel.ts` | Derived UI state, labels, readiness, and safe transformations |
+| `src/api*.ts` | Typed client calls and empty fallbacks |
+| `server/` | Thin local HTTP routing, security boundary, and CLI invocation |
+| `tools/bi_cli.py`, `tools/*_service.py` | BI CLI bridge, deterministic business actions, evidence, and write drafts |
+| `scripts/` | Build, release, browser, backup, security, and regression verification |
+| `docs/` | Current product, UX, acceptance, roadmap, and implementation contracts |
+
+Component-level ownership is enforced by imports and `scripts/verify.mjs`; it is intentionally not duplicated as a manual list in this document.
+
+## Verification Entry Points
+
+Use the smallest relevant command while developing and `npm run preflight` before local delivery.
 
 ```powershell
-npm run preflight
-npm run verify:ci
 npm run build
 npm run verify
-npm run verify:ui
+npm run verify:ai-reliability
+npm run verify:ui-visual
 npm run verify:ui-empty
 npm run verify:ui-import
-npm run verify:bi-cli-contract
-npm run verify:ai-reliability
+npm run verify:backup
 npm run verify:production
 npm run verify:security-runtime
-npm run verify:backup
-npm run verify:erp-units
+npm run preflight
 python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
-python tools/bi_cli.py --json source-intelligence validation-inputs --label "Validation evidence profile"
-python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
-npm run local:start
-npm run local:health
-npm run local:stop
-npm run backup:local
-npm run restore:local -- --from <backup-directory>
 ```
 
-`npm run verify:ui` expects the local API and UI to be running through `npm run dev` or equivalent live services on ports 8787 and 8686. The real-import UI check creates a temporary workspace, imports `AIBI_REAL_IMPORT_FOLDER` when present or `AIBI_REAL_IMPORT_FILE` as fallback, exercises evidence and chart entry points, then restores the original workspace and deletes the temporary workspace.
+`npm run verify:ui-import` uses a temporary workspace, restores the original workspace, and removes its imported runtime state after verification. Real source files remain external and are never committed.
 
-## Verified Boundary Index
+## Release Evidence
 
-These names are intentionally current code ownership markers. They should stay factual and compact.
+- Core verification covers the static/runtime contract suite plus the BI CLI Agent contract; the live receipt owns the exact check count.
+- AI reliability separately covers empty, generic, ambiguous, explicit bar/line, unknown-field, and missing-dimension cases.
+- Views visual verification creates an isolated table and saved view before checking all three desktop ratios; it does not treat an empty-state redirect as a Views pass.
+- GitHub Actions repeats build, production, backup, runtime security, and browser smoke checks on Windows.
 
-- Source workbench data entry panel boundary
-- Source workbench header boundary
-- Source workbench derived model boundary
-- Source workbench guidance model boundary
-- Source workbench receipt model boundary
-- Source workbench command model boundary
-- Source Intelligence run model boundary
-- Source workbench contracts boundary
-- Source workbench draft model boundary
-- Source workbench action panel boundary
-- Source workbench import panel boundary
-- Dashboard value helper boundary
-- Dashboard runtime model boundary
-- Dashboard widget factory boundary
-- Dashboard widget card boundary
-- Relationship auto model view-model boundary
-- Source visual relationship auto-modeling
-- Source workbench operations panel boundary
-- Source workbench connector panel boundary
-- Source workbench field metric panel boundary
-- Source workbench query formula panel boundary
-- Source workbench relationship panel boundary
-- Dashboard canvas widget model boundary
-- Dashboard canvas editor options boundary
-- Dashboard canvas summary model boundary
-- Dashboard canvas view model boundary
-- Dashboard canvas contracts boundary
-- Evidence business summary panel component boundary
-- Badge fit-content system
-- Global business path component boundary
-- Business path model boundary
-- Product activation model and panel boundary
-- Dashboard business task strip component boundary
-- Dashboard AI-first creation strip
-- Dashboard beginner editor component boundary
-- Dashboard advanced widget workbench component boundary
-- Dashboard module save panel component boundary
-- Dashboard business template panel component boundary
-- Dashboard widget recommendation panel component boundary
-- Dashboard saved view panel component boundary
-- Dashboard relationship recommendation panel component boundary
-- Dashboard relationship widget panel component boundary
-- Dashboard widget manage panel component boundary
-- Dashboard widget editor panel component boundary
-- Dashboard widget basic form component boundary
-- Dashboard widget style panel component boundary
-- Dashboard widget local filter panel component boundary
-- Dashboard widget lifecycle panel component boundary
-- Dashboard page admin panel component boundary
-- Dashboard contract boundary panel component boundary
-- Dashboard overview strip component boundary
-- Dashboard filter workbench component boundary
-- Dashboard canvas source switch model boundary
-- Dashboard canvas source switch view model boundary
-- Dashboard canvas readiness model boundary
-- Dashboard canvas plan model boundary
-- Dashboard canvas filter model boundary
-- Dashboard canvas field model boundary
-- Dashboard canvas state hook boundary
-- Dashboard canvas actions hook boundary
-- Dashboard canvas action runner boundary
-- Dashboard canvas relationship model boundary
-- View Agent task strip component boundary
-- View dashboard bridge panel component boundary
-- View saved list panel component boundary
-- App workspace model boundary
-- Empty workspace data boundary
-- Types workspace contract boundary
-- Types dashboard contract boundary
-- Types source contract boundary
-- Types domain contract boundary
-- Types query and Agent contract boundary
-- App data actions hook boundary
-- API workspace, source, dashboard, settings, views, model, and Agent domain boundary
-- Home workspace start guide component boundary
-- Home overview model boundary
-- Safe value helper boundary
-- Server runtime boundary
-- Server static boundary
-- Server dashboard routes boundary
-- Server source routes boundary
-- Server settings routes boundary
-- Server model routes boundary
-- Server query routes boundary
-- Server agent routes boundary
-- Server workspace routes boundary
-- Home action dock component boundary
-- Home detailed path panel boundary
-- Empty workspace data boundary
-- Sidebar workspace card component boundary
-- Sidebar asset sections component boundary
-- App section model boundary
-- Desktop shell fluid width
-- Home scenario packs component boundary
-- Home product intelligence component boundary
-- Evidence number explainer panel component boundary
-- Global floating Agent assistant
-- Settings sandbox boundary panel component
-- Settings theme preference panel component boundary
-- Settings acceptance evidence panel component boundary
-- Source evidence regression harness
-- Agent panel model boundary
-- Agent context plan panel boundary
-- Agent prompt composer component boundary
-- UI Chrome verification harness
-- UI real-data flow regression
-- UI desktop-ratio visual regression
-- UI empty-workspace regression
-- UI temporary real-import regression
-- AI generic-answer and one-chart reliability regression
-- Loopback server security runtime boundary
-- Local database backup and checksum restore boundary
-
-## Ownership Notes
-
-- `src/components/*` owns presentational panels and small workflow components.
-- `src/*Model.ts` files own derived view state, labels, readiness, and UI-safe transformations.
-- `server/*` owns local HTTP routing and should remain a thin facade over CLI commands.
-- `tools/*` owns deterministic business actions, evidence bundles, runtime receipts, and action drafts.
-- `docs/*` owns current project documentation only.
+Exact counts are receipts, not durable product promises. Re-run the commands above instead of copying old totals into planning documents.

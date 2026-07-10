@@ -204,8 +204,7 @@ export function appendProductUxContractChecks(context) {
           evidenceNumberExplainerPanelSource.includes("type EvidenceNumberExplainerPanelProps") &&
           !evidenceNumberExplainerPanelSource.includes("type EvidenceNarrativeStep") &&
           !evidenceNumberExplainerPanelSource.includes("type EvidenceNarrative =") &&
-          evidenceNumberExplainerPanelSource.includes("evidenceNarrative.calculationSteps.map") &&
-          implementationStatusSource.includes("Evidence number explainer panel component boundary"),
+          evidenceNumberExplainerPanelSource.includes("evidenceNarrative.calculationSteps.map"),
       },
     {
         label: "frontend-agent-dock-beginner-task-entry",
@@ -259,8 +258,7 @@ export function appendProductUxContractChecks(context) {
           stylesSource.includes('.appShell[data-inspector-state="expanded"] .agentCommandDock.floating') &&
           stylesSource.includes(".agentDockDecisionLane") &&
           stylesSource.includes(".agentDockShortcuts button") &&
-          stylesSource.includes("min-height: 34px") &&
-          implementationStatusSource.includes("Global floating Agent assistant"),
+          stylesSource.includes("min-height: 34px"),
       },
     {
         label: "frontend-dashboard-readiness-panel",
@@ -314,8 +312,7 @@ export function appendProductUxContractChecks(context) {
           !settingsPanelSource.includes("const settingsSandboxItems") &&
           !settingsPanelSource.includes('data-testid="settings-sandbox-boundary"') &&
           settingsSandboxBoundaryPanelSource.includes("type SettingsSandboxBoundaryPanelProps") &&
-          settingsSandboxBoundaryPanelSource.includes("draftPreferences: UserPreferencesConfig") &&
-          implementationStatusSource.includes("Settings sandbox boundary panel component"),
+          settingsSandboxBoundaryPanelSource.includes("draftPreferences: UserPreferencesConfig"),
       },
     {
         label: "settings-theme-preference-panel-component-boundary",
@@ -333,8 +330,7 @@ export function appendProductUxContractChecks(context) {
           settingsThemePreferencePanelSource.includes('data-testid="settings-theme-palette-panel"') &&
           settingsThemePreferencePanelSource.includes('data-testid="settings-preference-switch-panel"') &&
           settingsThemePreferencePanelSource.includes("onPreferenceToggle(row.key, event.target.checked)") &&
-          settingsThemePreferencePanelSource.includes("themeIsSystem(theme)") &&
-          implementationStatusSource.includes("Settings theme preference panel component boundary"),
+          settingsThemePreferencePanelSource.includes("themeIsSystem(theme)"),
       },
     {
         label: "frontend-settings-friendly-config-result",
@@ -401,8 +397,7 @@ export function appendProductUxContractChecks(context) {
           !settingsPanelSource.includes('className="settingsEvidenceList"') &&
           settingsAcceptanceEvidencePanelSource.includes("export function SettingsAcceptanceEvidencePanel") &&
           settingsAcceptanceEvidencePanelSource.includes('className="settingsEvidenceList"') &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-workbench"') &&
-          implementationStatusSource.includes("Settings acceptance evidence panel component boundary"),
+          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-workbench"'),
       },
     {
         label: "frontend-no-sample-debug-entry",
@@ -438,8 +433,7 @@ export function appendProductUxContractChecks(context) {
           verifyAAdversarialSource.includes("adversarial-gap-boundary") &&
           verifyAAdversarialSource.includes("metricSqlExecutableCount < manifest?.metricSqlPlanCount") &&
           verifyAAdversarialSource.includes("output-stays-outside-project-a") &&
-          readmeSource.includes("npm run verify") &&
-          implementationStatusSource.includes("Source evidence regression harness"),
+          readmeSource.includes("npm run verify"),
       },
     {
         label: "frontend-b-widget-acceptance-gallery",
@@ -475,14 +469,14 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "implementation-status-handoff",
-        ok: implementationStatusSource.includes("# AI BI Workbench Implementation Status") &&
-          implementationStatusSource.includes("Project boundary: this repository is the product boundary.") &&
-          implementationStatusSource.includes("BI CLI bridge") &&
-          implementationStatusSource.includes("Source evidence profiling") &&
-          implementationStatusSource.includes("Dashboard widget set") &&
+        ok: implementationStatusSource.includes("# AIBI-C Implementation Status") &&
+          implementationStatusSource.includes("## Current Release Boundary") &&
+          implementationStatusSource.includes("## Capability Status") &&
+          implementationStatusSource.includes("## Known Limitations") &&
+          implementationStatusSource.includes("## Architecture Ownership") &&
           implementationStatusSource.includes("npm run verify") &&
           implementationStatusSource.includes("python tools/bi_cli.py --json status") &&
-          implementationStatusSource.includes("Users should start from business actions"),
+          implementationStatusSource.includes("single-user and local-only"),
       },
     {
         label: "frontend-agent-panel-action-draft-lifecycle",
@@ -521,7 +515,6 @@ export function appendProductUxContractChecks(context) {
           agentPanelModelSource.includes("Add dashboard filter") &&
           agentPanelModelSource.includes("leftTable") &&
           agentPanelModelSource.includes("Create query index") &&
-          implementationStatusSource.includes("Agent panel model boundary") &&
           appSource.includes("lastActionResult={lastActionResult}"),
       },
     {
@@ -728,8 +721,7 @@ export function appendProductUxContractChecks(context) {
           agentContextPlanPanelSource.includes("type AgentContextPlanPanelProps") &&
           agentContextPlanPanelSource.includes("activeDashboardConfidence: SelectionConfidence | \"draft\"") &&
           agentContextPlanPanelSource.includes("匹配上下文") &&
-          agentContextPlanPanelSource.includes("计划") &&
-          implementationStatusSource.includes("Agent context plan panel boundary"),
+          agentContextPlanPanelSource.includes("计划"),
       },
     {
         label: "agent-prompt-composer-component-boundary",
@@ -742,8 +734,7 @@ export function appendProductUxContractChecks(context) {
           agentPromptComposerSource.includes('data-testid="agent-prompt-composer"') &&
           agentPromptComposerSource.includes('aria-label={biText("Agent 提问", "Agent prompt")}') &&
           agentPromptComposerSource.includes("setPromptTouched(true)") &&
-          agentPromptComposerSource.includes("isAsking ? biText(\"规划中\", \"Planning\") : biText(\"提问\", \"Ask\")") &&
-          implementationStatusSource.includes("Agent prompt composer component boundary"),
+          agentPromptComposerSource.includes("isAsking ? biText(\"规划中\", \"Planning\") : biText(\"提问\", \"Ask\")"),
       },
     {
         label: "write-ops-default-dry-run",

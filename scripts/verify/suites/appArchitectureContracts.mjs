@@ -121,8 +121,7 @@ export function appendAppArchitectureContractChecks(context) {
           !appSource.includes("function normalizeWorkbench(") &&
           !appSource.includes("function normalizeDashboards(") &&
           !appSource.includes("function actionErrorResult(") &&
-          !appSource.includes("const connectingStatus: WorkspaceStatus") &&
-          implementationStatusSource.includes("App workspace model boundary"),
+          !appSource.includes("const connectingStatus: WorkspaceStatus"),
       },
     {
         label: "empty-workspace-data-boundary",
@@ -147,8 +146,7 @@ export function appendAppArchitectureContractChecks(context) {
           apiModelSource.includes('emptyRelationshipPreview') &&
           !appWorkspaceModelSource.includes('from "./sampleData"') &&
           !apiWorkspaceSource.includes('from "./sampleData"') &&
-          !apiAgentSource.includes('sampleActionDrafts') &&
-          implementationStatusSource.includes("Empty workspace data boundary"),
+          !apiAgentSource.includes('sampleActionDrafts'),
       },
     {
         label: "types-workspace-contract-boundary",
@@ -163,8 +161,7 @@ export function appendAppArchitectureContractChecks(context) {
           !typesSource.includes("export interface WorkspaceStatus") &&
           !typesSource.includes("export interface WorkspaceRecord") &&
           !typesSource.includes("export interface QueryRuntimeStatus") &&
-          !typesSource.includes("export interface SourceRunSummary") &&
-          implementationStatusSource.includes("Types workspace contract boundary"),
+          !typesSource.includes("export interface SourceRunSummary"),
       },
     {
         label: "types-dashboard-contract-boundary",
@@ -182,8 +179,7 @@ export function appendAppArchitectureContractChecks(context) {
           !typesSource.includes("export interface DashboardPage") &&
           !typesSource.includes("export interface DashboardPayload") &&
           !typesSource.includes("export interface NavigationModule") &&
-          !typesSource.includes("export interface DashboardFilterPayload") &&
-          implementationStatusSource.includes("Types dashboard contract boundary"),
+          !typesSource.includes("export interface DashboardFilterPayload"),
       },
     {
         label: "types-source-contract-boundary",
@@ -218,8 +214,7 @@ export function appendAppArchitectureContractChecks(context) {
           !typesSource.includes("export interface DomainPackRuntime") &&
           !typesSourceContractsSource.includes("export interface SourceIntelligenceRunSummary") &&
           !typesSourceContractsSource.includes("export interface EvidenceFocus") &&
-          !typesSourceContractsSource.includes("export interface DomainPackRuntime") &&
-          implementationStatusSource.includes("Types source contract boundary"),
+          !typesSourceContractsSource.includes("export interface DomainPackRuntime"),
       },
     {
         label: "types-domain-contract-boundary",
@@ -232,8 +227,7 @@ export function appendAppArchitectureContractChecks(context) {
           typesDomainSource.includes("export interface DomainLinkHint") &&
           typesDomainSource.includes("export interface DomainFunctionHint") &&
           typesDomainSource.includes("export interface DomainActionHint") &&
-          typesDomainSource.includes("export interface DomainPackRuntime") &&
-          implementationStatusSource.includes("Types domain contract boundary"),
+          typesDomainSource.includes("export interface DomainPackRuntime"),
       },
     {
         label: "types-query-agent-facade-boundary",
@@ -250,8 +244,7 @@ export function appendAppArchitectureContractChecks(context) {
           !typesSource.includes("export interface QueryResult") &&
           !typesSource.includes("export interface AgentAskResult") &&
           !typesSource.includes("export interface ActionDraft") &&
-          !typesSource.includes("export interface ActionDraftPayload") &&
-          implementationStatusSource.includes("Types query and Agent contract boundary"),
+          !typesSource.includes("export interface ActionDraftPayload"),
       },
     {
         label: "app-data-actions-hook-boundary",
@@ -281,8 +274,7 @@ export function appendAppArchitectureContractChecks(context) {
           !appSource.includes("const handleSaveConnector = useCallback") &&
           !appSource.includes("const handleSaveView = useCallback") &&
           !appSource.includes("commitImport(options)") &&
-          !appSource.includes("runSourceIntelligence(request)") &&
-          implementationStatusSource.includes("App data actions hook boundary"),
+          !appSource.includes("runSourceIntelligence(request)"),
       },
     {
         label: "frontend-section-lazy-split-boundary",
@@ -439,8 +431,7 @@ export function appendAppArchitectureContractChecks(context) {
           apiWorkspaceSource.includes("export function renameWorkspace") &&
           apiWorkspaceSource.includes('"/api/workspaces"') &&
           apiWorkspaceSource.includes('"/api/dashboards"') &&
-          apiWorkspaceSource.includes('"/api/workbench?limit=12"') &&
-          implementationStatusSource.includes("API workspace, source, dashboard, settings, views, model, and Agent domain boundary"),
+          apiWorkspaceSource.includes('"/api/workbench?limit=12"'),
       },
     {
         label: "frontend-service-diagnostics",
@@ -485,8 +476,7 @@ export function appendAppArchitectureContractChecks(context) {
           homeWorkspaceStartGuideSource.includes("Follow the business path before learning configuration") &&
           homeOverviewSource.includes("buildHomeGuideSteps({") &&
           ["source", "profile", "dashboard", "ask"].every((key) => homeOverviewModelSource.includes(`key: "${key}"`)) &&
-          homeWorkspaceStartGuideSource.includes("Imports, deletes, overwrites, relationship saves, and dashboard writes become drafts or previews before execution.") &&
-          implementationStatusSource.includes("Home workspace start guide component boundary"),
+          homeWorkspaceStartGuideSource.includes("Imports, deletes, overwrites, relationship saves, and dashboard writes become drafts or previews before execution."),
       },
     {
         label: "frontend-home-overview-model-boundary",
@@ -503,8 +493,7 @@ export function appendAppArchitectureContractChecks(context) {
           homeOverviewSource.includes("buildHomeGuideSteps({") &&
           !homeOverviewSource.includes("function sourceDashboardCandidate(") &&
           !homeOverviewSource.includes("const starterQuestions = [") &&
-          !homeOverviewSource.includes("const guideSteps = useMemo<GuideStep[]>") &&
-          implementationStatusSource.includes("Home overview model boundary"),
+          !homeOverviewSource.includes("const guideSteps = useMemo<GuideStep[]>"),
       },
     {
         label: "safe-value-helper-boundary",
@@ -523,8 +512,7 @@ export function appendAppArchitectureContractChecks(context) {
           !agentPanelModelSource.includes("export function objectRecord(value: unknown)") &&
           !metricRepairModelSource.includes("function numberValue(value: unknown)") &&
           !metricRepairModelSource.includes("function objectRecord(value: unknown)") &&
-          !sourceWorkbenchModelSource.includes("export function numberValue(value: unknown)") &&
-          implementationStatusSource.includes("Safe value helper boundary"),
+          !sourceWorkbenchModelSource.includes("export function numberValue(value: unknown)"),
       },
     {
         label: "b-cost-monitor-comparison-artifact",
@@ -565,8 +553,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverRuntimeSource.includes("export function readBody(") &&
           serverRuntimeSource.includes("export function runCli(") &&
           serverRuntimeSource.includes("export function pushDashboardWidgetStyleArgs(") &&
-          serverRuntimeSource.includes("export async function readBCostMonitorValidation(") &&
-          implementationStatusSource.includes("Server runtime boundary"),
+          serverRuntimeSource.includes("export async function readBCostMonitorValidation("),
       },
     {
         label: "server-static-boundary",
@@ -579,8 +566,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverStaticSource.includes('join(root, "dist")') &&
           serverStaticSource.includes('join(dist, "index.html")') &&
           serverStaticSource.includes("readFile(path)") &&
-          serverStaticSource.includes("extname(path)") &&
-          implementationStatusSource.includes("Server static boundary"),
+          serverStaticSource.includes("extname(path)"),
       },
     {
         label: "server-dashboard-routes-boundary",
@@ -594,8 +580,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboard/widget-catalog"') &&
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboard/widgets"') &&
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboards/filters"') &&
-          serverDashboardRoutesSource.includes('url.pathname === "/api/b-cli/capabilities"') &&
-          implementationStatusSource.includes("Server dashboard routes boundary"),
+          serverDashboardRoutesSource.includes('url.pathname === "/api/b-cli/capabilities"'),
       },
     {
         label: "server-source-routes-boundary",
@@ -611,8 +596,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverSourceRoutesSource.includes('url.pathname === "/api/source-intelligence/run"') &&
           serverSourceRoutesSource.includes('url.pathname === "/api/import/commit"') &&
           serverSourceRoutesSource.includes('url.pathname === "/api/connectors"') &&
-          serverSourceRoutesSource.includes('url.pathname.startsWith("/api/source-runs/")') &&
-          implementationStatusSource.includes("Server source routes boundary"),
+          serverSourceRoutesSource.includes('url.pathname.startsWith("/api/source-runs/")'),
       },
     {
         label: "server-settings-routes-boundary",
@@ -626,8 +610,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverSettingsRoutesSource.includes('url.pathname === "/api/preferences"') &&
           serverSettingsRoutesSource.includes('url.pathname === "/api/theme-palettes"') &&
           serverSettingsRoutesSource.includes('url.pathname === "/api/config/validate"') &&
-          serverSettingsRoutesSource.includes('url.pathname === "/api/config/apply"') &&
-          implementationStatusSource.includes("Server settings routes boundary"),
+          serverSettingsRoutesSource.includes('url.pathname === "/api/config/apply"'),
       },
     {
         label: "server-model-routes-boundary",
@@ -644,8 +627,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverModelRoutesSource.includes('url.pathname === "/api/formulas/save"') &&
           serverModelRoutesSource.includes('url.pathname === "/api/indexes/create"') &&
           serverModelRoutesSource.includes('url.pathname === "/api/fields/update"') &&
-          serverModelRoutesSource.includes('url.pathname === "/api/metrics/query"') &&
-          implementationStatusSource.includes("Server model routes boundary"),
+          serverModelRoutesSource.includes('url.pathname === "/api/metrics/query"'),
       },
     {
         label: "server-query-routes-boundary",
@@ -659,8 +641,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverQueryRoutesSource.includes('url.pathname === "/api/query"') &&
           serverQueryRoutesSource.includes('url.pathname === "/api/query-table"') &&
           serverQueryRoutesSource.includes('url.pathname === "/api/views/save"') &&
-          serverQueryRoutesSource.includes('url.pathname === "/api/views/delete"') &&
-          implementationStatusSource.includes("Server query routes boundary"),
+          serverQueryRoutesSource.includes('url.pathname === "/api/views/delete"'),
       },
     {
         label: "server-agent-routes-boundary",
@@ -673,8 +654,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverAgentRoutesSource.includes('url.pathname === "/api/agent/ask"') &&
           serverAgentRoutesSource.includes('url.pathname === "/api/agent/explain"') &&
           serverAgentRoutesSource.includes('url.pathname === "/api/actions/confirm"') &&
-          serverAgentRoutesSource.includes('url.pathname === "/api/actions"') &&
-          implementationStatusSource.includes("Server agent routes boundary"),
+          serverAgentRoutesSource.includes('url.pathname === "/api/actions"'),
       },
     {
         label: "api-health-status-routes",
@@ -696,8 +676,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverWorkspaceRoutesSource.includes('"workspace-delete"') &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/workbench"') &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/navigation"') &&
-          serverWorkspaceRoutesSource.includes('url.pathname === "/api/sources"') &&
-          implementationStatusSource.includes("Server workspace routes boundary"),
+          serverWorkspaceRoutesSource.includes('url.pathname === "/api/sources"'),
       },
     {
         label: "frontend-home-four-action-import-proof",
@@ -725,8 +704,6 @@ export function appendAppArchitectureContractChecks(context) {
           stylesSource.includes(".homeActionDock") &&
           stylesSource.includes(".productActivationPanel") &&
           stylesSource.includes(".homeActionCard.primary") &&
-          implementationStatusSource.includes("Home action dock component boundary") &&
-          implementationStatusSource.includes("Product activation model and panel boundary") &&
           homeOverviewSource.includes("<HomeDetailedPathPanel") &&
           homeDetailedPathPanelSource.includes('data-testid="home-detailed-path"'),
       },
@@ -823,9 +800,9 @@ export function appendAppArchitectureContractChecks(context) {
           productAcceptanceMatrixDocSource.includes("Production no-demo boundary") &&
           productAcceptanceMatrixDocSource.includes("validation-inputs") &&
           docsReadmeSource.includes("product-acceptance-matrix.md") &&
-          prdDocSource.includes("validation-inputs") &&
+          prdDocSource.includes("## Requirement Ownership") &&
           !prdDocSource.includes("source-intelligence fixtures") &&
-          implementationStatusSource.includes("Product activation model and panel boundary"),
+          implementationStatusSource.includes("Product activation shows only the current necessary step"),
       },
     {
         label: "frontend-production-copy-no-example-placeholders",
@@ -844,11 +821,10 @@ export function appendAppArchitectureContractChecks(context) {
           docsReadmeSource.includes("development-roadmap.md") &&
           docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
           prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
-          developmentRoadmapDocSource.includes("## Development Order") &&
-          developmentRoadmapDocSource.includes("## Current Release Status") &&
-          developmentRoadmapDocSource.includes("Production copy and no-demo boundary") &&
-          developmentRoadmapDocSource.includes("AI one-chart path") &&
-          developmentRoadmapDocSource.includes("Complete for this baseline") &&
+          developmentRoadmapDocSource.includes("## Delivered Baseline") &&
+          developmentRoadmapDocSource.includes("## Current Development Order") &&
+          developmentRoadmapDocSource.includes("Generalization acceptance") &&
+          developmentRoadmapDocSource.includes("Brand and release identity") &&
           developmentRoadmapDocSource.includes("Use `npm run preflight` as the final local acceptance gate"),
       },
     {
@@ -862,8 +838,7 @@ export function appendAppArchitectureContractChecks(context) {
           homeDetailedPathPanelSource.includes("onSourceIntelligenceRun: () => Promise<Record<string, unknown> | void>") &&
           homeDetailedPathPanelSource.includes("查看更多数据源、通用看板和 Agent 路径") &&
           homeDetailedPathPanelSource.includes("预览看板草案") &&
-          homeDetailedPathPanelSource.includes("帮我生成经营看板并说明证据") &&
-          implementationStatusSource.includes("Home detailed path panel boundary"),
+          homeDetailedPathPanelSource.includes("帮我生成经营看板并说明证据"),
       },
     {
         label: "frontend-state-driven-landing",
@@ -952,8 +927,7 @@ export function appendAppArchitectureContractChecks(context) {
           !biCliSource.includes('("table", "订单明细"') &&
           productUxStandardDocSource.includes("Creating an empty dashboard creates only the dashboard container") &&
           byLabel["cli-source-intelligence-no-input-blocked"].ok === true &&
-          String(byLabel["cli-source-intelligence-no-input-blocked"].parsed?.error ?? "").includes("requires imported source paths") &&
-          implementationStatusSource.includes("Empty workspace data boundary"),
+          String(byLabel["cli-source-intelligence-no-input-blocked"].parsed?.error ?? "").includes("requires imported source paths"),
       },
     {
         label: "frontend-dashboard-status-refresh-after-writes",
@@ -1014,8 +988,7 @@ export function appendAppArchitectureContractChecks(context) {
           hasCssRule(stylesSource, ".assetSectionTitle strong", "text-overflow: ellipsis;", "white-space: nowrap;") &&
           verifyUiRealImportSource.includes("ui-real-import-no-asset-panel-x-overflow") &&
           verifyUiRealImportSource.includes("ui-evidence-${evidenceViewport.key}-narrow-grid-collapses") &&
-          verifyUiRealImportSource.includes("real-import-evidence-${evidenceViewport.key}.png") &&
-          implementationStatusSource.includes("Sidebar workspace card component boundary"),
+          verifyUiRealImportSource.includes("real-import-evidence-${evidenceViewport.key}.png"),
       },
     {
         label: "sidebar-asset-sections-component-boundary",
@@ -1033,8 +1006,7 @@ export function appendAppArchitectureContractChecks(context) {
           sidebarAssetSectionsSource.includes("右下角都可以直接提问") &&
           !sidebarAssetSectionsSource.includes("promptStack") &&
           !sidebarAssetSectionsSource.includes("用自然语言改看板") &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="settings-assets-title"') &&
-          implementationStatusSource.includes("Sidebar asset sections component boundary"),
+          sidebarAssetSectionsSource.includes('aria-labelledby="settings-assets-title"'),
       },
     {
         label: "frontend-app-section-model-boundary",
@@ -1049,8 +1021,7 @@ export function appendAppArchitectureContractChecks(context) {
           sidebarSource.includes("utilityAppSections.map") &&
           topBarSource.includes("getAppSection(activeSection)") &&
           appLazyModulesSource.includes("getAppSection(section)") &&
-          appSource.includes("isAppSection(section) ? section : null") &&
-          implementationStatusSource.includes("App section model boundary"),
+          appSource.includes("isAppSection(section) ? section : null"),
       },
     {
         label: "frontend-desktop-shell-fluid-width",
@@ -1062,8 +1033,7 @@ export function appendAppArchitectureContractChecks(context) {
           stylesSource.includes("overflow: hidden") &&
           !stylesSource.includes("--desktop-width") &&
           !stylesSource.includes("min-width: var(--desktop-width)") &&
-          !stylesSource.includes("width: max(100vw") &&
-          implementationStatusSource.includes("Desktop shell fluid width"),
+          !stylesSource.includes("width: max(100vw"),
       },
     {
         label: "frontend-sidebar-dashboard-asset-typing",
@@ -1127,8 +1097,6 @@ export function appendAppArchitectureContractChecks(context) {
           homeProductIntelligencePanelSource.includes('data-testid="home-sandbox-compare"') &&
           homeOverviewSource.includes("runScenarioPrompt") &&
           homeOverviewSource.includes("previewScenarioTemplate") &&
-          implementationStatusSource.includes("Home scenario packs component boundary") &&
-          implementationStatusSource.includes("Home product intelligence component boundary") &&
           stylesSource.includes(".scenarioPackPanel") &&
           stylesSource.includes(".qualityDoctorPanel") &&
           stylesSource.includes(".qualityDoctorMetricSql") &&

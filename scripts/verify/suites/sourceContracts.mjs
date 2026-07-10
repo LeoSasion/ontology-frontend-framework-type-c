@@ -195,8 +195,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchDataEntryPanelSource.includes("onAsk: (prompt: string) => Promise<void>") &&
           sourceWorkbenchDataEntryPanelSource.includes("SourceIntelligenceRunSummary") &&
           sourceWorkbenchDataEntryPanelSource.includes("sourceProfileRecovery(sourceProfileError, sourceProfileInputs)") &&
-          sourceWorkbenchDataEntryPanelSource.includes("sourceIntelligenceRuns.slice(0, 4)") &&
-          implementationStatusSource.includes("Source workbench data entry panel boundary"),
+          sourceWorkbenchDataEntryPanelSource.includes("sourceIntelligenceRuns.slice(0, 4)"),
       },
     {
         label: "source-workbench-header-boundary",
@@ -215,8 +214,7 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchHeaderSource.includes('data-testid="source-intelligence-run-button"') &&
           !sourceWorkbenchHeaderSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA_COMMAND") &&
           !sourceWorkbenchHeaderSource.includes("aTestdata0305SourceIntelligenceOptions()") &&
-          sourceWorkbenchHeaderSource.includes("先导入或选择本地数据路径") &&
-          implementationStatusSource.includes("Source workbench header boundary"),
+          sourceWorkbenchHeaderSource.includes("先导入或选择本地数据路径"),
       },
     {
         label: "source-workbench-model-boundary",
@@ -251,8 +249,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchModelSource.includes("export function buildSourceWorkbenchCollections(") &&
           sourceWorkbenchModelSource.includes("export function buildSourceWorkbenchSelection(") &&
           sourceWorkbenchModelSource.includes("export function buildSourceWorkbenchRuntimeSummary(") &&
-          sourceWorkbenchModelSource.includes("export function buildImportPreviewSummary(") &&
-          implementationStatusSource.includes("Source workbench derived model boundary"),
+          sourceWorkbenchModelSource.includes("export function buildImportPreviewSummary("),
       },
     {
         label: "frontend-business-first-copy-boundary",
@@ -290,9 +287,7 @@ export function appendSourceContractChecks(context) {
           agentPanelModelSource.includes("查询回执") &&
           agentPanelModelSource.includes("看板匹配") &&
           !agentPanelSource.includes("Query runtime") &&
-          !agentPanelSource.includes("Ontology function") &&
-          implementationStatusSource.includes("Global business path component boundary") &&
-          implementationStatusSource.includes("Business path model boundary"),
+          !agentPanelSource.includes("Ontology function"),
       },
     {
         label: "source-workbench-dashboard-next-action",
@@ -409,8 +404,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchGuidanceModelSource.includes("sourceProfileRunningLabel") &&
           sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeCards") &&
           sourceWorkbenchGuidanceModelSource.includes("beginnerPlan") &&
-          sourceWorkbenchGuidanceModelSource.includes("sourceAgentPrompts") &&
-          implementationStatusSource.includes("Source workbench guidance model boundary"),
+          sourceWorkbenchGuidanceModelSource.includes("sourceAgentPrompts"),
       },
     {
         label: "source-workbench-receipt-model-boundary",
@@ -435,8 +429,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchReceiptModelSource.includes("export function buildConnectorSaveReceipt(") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildConnectorSyncReceipt(") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildConnectorRemoveReceipt(") &&
-          sourceWorkbenchReceiptModelSource.includes("外部源目录") &&
-          implementationStatusSource.includes("Source workbench receipt model boundary"),
+          sourceWorkbenchReceiptModelSource.includes("外部源目录"),
       },
     {
         label: "source-workbench-command-model-boundary",
@@ -465,8 +458,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchCommandModelSource.includes("splitCsv(uniqueFields)") &&
           sourceWorkbenchCommandModelSource.includes("splitCsv(connectorUniqueFields)") &&
           sourceWorkbenchCommandModelSource.includes("inputs: splitInputPaths(sourceProfileInputs)") &&
-          sourceWorkbenchCommandModelSource.includes('label: sourceProfileLabel.trim() || "Source profile"') &&
-          implementationStatusSource.includes("Source workbench command model boundary"),
+          sourceWorkbenchCommandModelSource.includes('label: sourceProfileLabel.trim() || "Source profile"'),
       },
     {
         label: "source-intelligence-run-model-boundary",
@@ -487,8 +479,7 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchGuidanceModelSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA_COMMAND") &&
           !sourceWorkbenchActionPanelSource.includes("type SourceIntelligenceRunOptions =") &&
           !sourceWorkbenchDataEntryPanelSource.includes("type SourceIntelligenceRunOptions =") &&
-          !metricSemanticRepairActionsSource.includes("type SourceIntelligenceOptions =") &&
-          implementationStatusSource.includes("Source Intelligence run model boundary"),
+          !metricSemanticRepairActionsSource.includes("type SourceIntelligenceOptions ="),
       },
     {
         label: "source-workbench-contracts-boundary",
@@ -504,8 +495,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchContractsSource.includes("export type SemanticInferOptions") &&
           sourceWorkbenchContractsSource.includes("export type SemanticSetOptions") &&
           sourceWorkbenchContractsSource.includes("export type MetricQueryOptions") &&
-          sourceWorkbenchContractsSource.includes("onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions)") &&
-          implementationStatusSource.includes("Source workbench contracts boundary"),
+          sourceWorkbenchContractsSource.includes("onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions)"),
       },
     {
         label: "source-workbench-draft-model-boundary",
@@ -529,8 +519,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchDraftModelSource.includes("export function managedSourceDisplayName(") &&
           sourceWorkbenchDraftModelSource.includes("export function buildNavigationOperationOptions(") &&
           sourceWorkbenchDraftModelSource.includes("activeNavigationModule?.moduleKey ?? navigationModuleKey") &&
-          sourceWorkbenchDraftModelSource.includes("Number(navigationSort || activeNavigationModule?.sort || 0)") &&
-          implementationStatusSource.includes("Source workbench draft model boundary"),
+          sourceWorkbenchDraftModelSource.includes("Number(navigationSort || activeNavigationModule?.sort || 0)"),
       },
     {
         label: "source-workbench-action-panel-boundary",
@@ -549,8 +538,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchActionPanelSource.includes("runSourceProfile: (label: string, options: SourceIntelligenceRunOptions) => Promise<void>") &&
           sourceWorkbenchActionPanelSource.includes("<SourceWorkbenchAgentStarter") &&
           sourceWorkbenchActionPanelSource.includes("dashboardRecipeCards.map((card)") &&
-          sourceWorkbenchActionPanelSource.includes("setShowAdvanced((current) => !current)") &&
-          implementationStatusSource.includes("Source workbench action panel boundary"),
+          sourceWorkbenchActionPanelSource.includes("setShowAdvanced((current) => !current)"),
       },
     {
         label: "source-workbench-import-panel-boundary",
@@ -570,8 +558,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes("确认后才写入工作区") &&
           sourceWorkbenchImportPanelSource.includes("当前只做检查，不写入") &&
           sourceWorkbenchImportPanelSource.includes("View import policy and receipt") &&
-          sourceWorkbenchImportPanelSource.includes("countText(importInsertRows)") &&
-          implementationStatusSource.includes("Source workbench import panel boundary"),
+          sourceWorkbenchImportPanelSource.includes("countText(importInsertRows)"),
       },
     {
         label: "b-navigation-module-workflow",
@@ -827,9 +814,6 @@ export function appendSourceContractChecks(context) {
           !biDashboardModelSource.includes("export function calculateWidgetMetricValue") &&
           !biDashboardModelSource.includes("export function applyBiDashboardFilters") &&
           !biDashboardModelSource.includes("export function rowsFromQuery") &&
-          implementationStatusSource.includes("Dashboard value helper boundary") &&
-          implementationStatusSource.includes("Dashboard runtime model boundary") &&
-          implementationStatusSource.includes("Dashboard widget factory boundary") &&
           bWidgetKitSource.includes("data-testid=\"b-slicer-selection-bar\"") &&
           dashboardBusinessTemplatePanelSource.includes("data-testid=\"business-template-panel\"") &&
           dashboardRelationshipRecommendationPanelSource.includes("data-testid=\"relationship-recommendation-panel\"") &&
@@ -841,8 +825,7 @@ export function appendSourceContractChecks(context) {
           stylesSource.includes(".bReadPathSteps") &&
           stylesSource.includes(".bReadPathStep.ready") &&
           stylesSource.includes(".bPieLegend button") &&
-          stylesSource.includes("min-height: 30px") &&
-          implementationStatusSource.includes("Dashboard widget card boundary"),
+          stylesSource.includes("min-height: 30px"),
       },
     {
         label: "frontend-relationship-impact-panel",
@@ -908,9 +891,7 @@ export function appendSourceContractChecks(context) {
           stylesSource.includes(".relationshipGraphEdgeRow") &&
           stylesSource.includes(".relationshipGraphConnector") &&
           stylesSource.includes("container-name: relationship-model") &&
-          stylesSource.includes("@container relationship-model (max-width: 820px)") &&
-          implementationStatusSource.includes("Relationship auto model view-model boundary") &&
-          implementationStatusSource.includes("Source visual relationship auto-modeling"),
+          stylesSource.includes("@container relationship-model (max-width: 820px)"),
       },
     {
         label: "frontend-source-operations-business-controls",
@@ -998,8 +979,7 @@ export function appendSourceContractChecks(context) {
           serverSourceRoutesSource.includes('url.pathname === "/api/sources/delete"') &&
           serverSourceRoutesSource.includes('url.pathname === "/api/sources/rename"') &&
           stylesSource.includes(".sourceLifecyclePanel") &&
-          stylesSource.includes(".sourceDangerZone") &&
-          implementationStatusSource.includes("Source workbench operations panel boundary"),
+          stylesSource.includes(".sourceDangerZone"),
       },
     {
         label: "source-workbench-connector-panel-boundary",
@@ -1022,8 +1002,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchConnectorPanelSource.includes('data-testid={`connector-remove-${connector.connectorKey}`}') &&
           sourceWorkbenchConnectorPanelSource.includes('data-testid={`import-job-dry-remove-${job.job_key}`}') &&
           sourceWorkbenchConnectorPanelSource.includes("onRemoveImportJob({ jobKey: job.job_key, confirm: false })") &&
-          sourceWorkbenchConnectorPanelSource.includes("This manages import receipts and records, not source business files") &&
-          implementationStatusSource.includes("Source workbench connector panel boundary"),
+          sourceWorkbenchConnectorPanelSource.includes("This manages import receipts and records, not source business files"),
       },
     {
         label: "source-workbench-field-metric-panel-boundary",
@@ -1051,8 +1030,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchFieldSemanticPanelSource.includes('data-testid="infer-semantics-dry-run-button"') &&
           sourceWorkbenchMetricDefinitionPanelSource.includes('data-testid="infer-metrics-dry-run-button"') &&
           sourceWorkbenchMetricDefinitionPanelSource.includes('data-testid="add-metric-confirm-button"') &&
-          sourceWorkbenchMetricDefinitionPanelSource.includes('data-testid="semantic-metric-result"') &&
-          implementationStatusSource.includes("Source workbench field metric panel boundary"),
+          sourceWorkbenchMetricDefinitionPanelSource.includes('data-testid="semantic-metric-result"'),
       },
     {
         label: "source-workbench-query-formula-panel-boundary",
@@ -1072,8 +1050,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchQueryFormulaPanelSource.includes('data-testid="query-run-button"') &&
           sourceWorkbenchQueryFormulaPanelSource.includes('data-testid="source-query-runtime-technical"') &&
           sourceWorkbenchQueryFormulaPanelSource.includes('data-testid="formula-save-confirm-button"') &&
-          sourceWorkbenchQueryFormulaPanelSource.includes('data-testid="formula-asset-list"') &&
-          implementationStatusSource.includes("Source workbench query formula panel boundary"),
+          sourceWorkbenchQueryFormulaPanelSource.includes('data-testid="formula-asset-list"'),
       },
     {
         label: "source-workbench-relationship-panel-boundary",
@@ -1095,8 +1072,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchRelationshipPanelSource.includes('data-testid="relationship-preview-button"') &&
           sourceWorkbenchRelationshipPanelSource.includes('data-testid="relationship-confirm-button"') &&
           sourceWorkbenchRelationshipPanelSource.includes('data-testid="relationship-impact-panel"') &&
-          sourceWorkbenchRelationshipPanelSource.includes("已保存关系") &&
-          implementationStatusSource.includes("Source workbench relationship panel boundary"),
+          sourceWorkbenchRelationshipPanelSource.includes("已保存关系"),
       },
     {
         label: "frontend-b-widget-drilldown-workflow",
@@ -1189,8 +1165,7 @@ export function appendSourceContractChecks(context) {
           dashboardCanvasSourceSwitchModelSource.includes("moduleLayoutForWidget(widget, index)") &&
           dashboardCanvasWidgetModelSource.includes("topN: boundedInteger(widgetDraft.topN, 12, 1, 500)") &&
           dashboardCanvasWidgetModelSource.includes("decimalPlaces: boundedInteger(widgetDraft.decimalPlaces, 0, 0, 4)") &&
-          dashboardCanvasWidgetModelSource.includes("tableColumnLimit: boundedInteger(widgetDraft.tableColumnLimit, 6, 2, 24)") &&
-          implementationStatusSource.includes("Dashboard canvas widget model boundary"),
+          dashboardCanvasWidgetModelSource.includes("tableColumnLimit: boundedInteger(widgetDraft.tableColumnLimit, 6, 2, 24)"),
       },
     {
         label: "dashboard-canvas-editor-options-boundary",
@@ -1220,8 +1195,7 @@ export function appendSourceContractChecks(context) {
           dashboardCanvasEditorOptionsSource.includes("export function buildWidgetToggleOptions(") &&
           dashboardCanvasEditorOptionsSource.includes('key: "showLegend"') &&
           dashboardCanvasEditorOptionsSource.includes("多选切片") &&
-          dashboardCanvasEditorOptionsSource.includes('key: "copy-delete"') &&
-          implementationStatusSource.includes("Dashboard canvas editor options boundary"),
+          dashboardCanvasEditorOptionsSource.includes('key: "copy-delete"'),
       },
     {
         label: "dashboard-canvas-summary-model-boundary",
@@ -1244,8 +1218,7 @@ export function appendSourceContractChecks(context) {
           dashboardCanvasSummaryModelSource.includes("const rankedRows = queryRows") &&
           dashboardCanvasSummaryModelSource.includes(".map((row)") &&
           dashboardCanvasSummaryModelSource.includes("recommended group") &&
-          dashboardCanvasSummaryModelSource.includes("evidenceCoverageDetail") &&
-          implementationStatusSource.includes("Dashboard canvas summary model boundary"),
+          dashboardCanvasSummaryModelSource.includes("evidenceCoverageDetail"),
       },
     {
         label: "dashboard-canvas-view-model-boundary",
@@ -1269,8 +1242,7 @@ export function appendSourceContractChecks(context) {
           dashboardCanvasViewModelSource.includes("const sourceSwitchView = buildDashboardSourceSwitchViewModel(sourceSwitchAnalysis)") &&
           dashboardCanvasViewModelSource.includes("const nextWidgetFilters = buildNextWidgetFilters({") &&
           dashboardCanvasViewModelSource.includes("const dashboardReadiness = buildDashboardReadinessModel({") &&
-          dashboardCanvasViewModelSource.includes("const dashboardEvidenceFocus = buildDashboardEvidenceFocus({") &&
-          implementationStatusSource.includes("Dashboard canvas view model boundary"),
+          dashboardCanvasViewModelSource.includes("const dashboardEvidenceFocus = buildDashboardEvidenceFocus({"),
       },
     {
         label: "dashboard-canvas-contracts-boundary",
@@ -1313,8 +1285,7 @@ export function appendSourceContractChecks(context) {
           !homeOverviewSource.includes('onBusinessDashboardOperation: (options: { op: "draft" | "create" | "overwrite"') &&
           !sourceWorkbenchSource.includes("type RelationshipOptions =") &&
           !sourceWorkbenchSource.includes('onBusinessDashboardOperation: (options: { op: "draft" | "create" | "overwrite"') &&
-          !sourceWorkbenchRelationshipPanelSource.includes("type RelationshipOptions =") &&
-          implementationStatusSource.includes("Dashboard canvas contracts boundary"),
+          !sourceWorkbenchRelationshipPanelSource.includes("type RelationshipOptions ="),
       },
     {
         label: "frontend-dashboard-evidence-click-path",

@@ -1,4 +1,4 @@
-# Product Acceptance Matrix
+# AIBI-C Product Acceptance Matrix
 
 This matrix defines the minimum product behavior for a clean, extensible AIBI workspace.
 
