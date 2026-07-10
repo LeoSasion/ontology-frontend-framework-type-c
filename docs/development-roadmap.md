@@ -1,39 +1,43 @@
-# AIBI-C Product Roadmap
+# AIBI-C 下一步开发路线
 
-This roadmap contains future work only. Completed implementation details belong in `implementation-status.md`; durable behavior belongs in the acceptance matrix.
+这份路线图只回答三件事：下一步做什么、为什么现在做、做到什么算完成。已经交付的功能记录在 `implementation-status.md`，长期验收要求记录在产品验收矩阵中。
 
-## Delivered Baseline
+## 已完成的基础闭环
 
-The current baseline already provides a clean empty workspace, guided import, evidence summaries, AI one-chart drafts, controlled writes, responsive Details, local backup/recovery, and Windows CI browser checks. These are regression constraints, not active roadmap items.
+当前产品已经能从空工作区开始，完成：
 
-## Current Development Order
+`导入数据 -> 查看证据摘要 -> 让 AI 生成一个图表 -> 核对图表证据 -> 确认写入`
 
-| Order | Priority | Workstream | Product outcome | Done signal |
-| --- | --- | --- | --- | --- |
-| 1 | P0 | Generalization acceptance | Prove that arbitrary imports work beyond the current real-data shape. | At least two additional independent schemas across at least two business domains complete import -> evidence -> one chart -> evidence -> confirmation without code or bundled-data changes. |
-| 2 | P0 | Brand and release identity | Remove the remaining `AIBI Hybrid` runtime name and present one product identity: `AIBI-C`. | UI title, default workspace, CLI metadata, API logs, docs, package metadata, and repository name use the agreed identity; compatibility migration is documented. |
-| 3 | P1 | First trusted chart efficiency | Measure and reduce the work required to reach the first evidence-backed chart. | Empty-workspace acceptance records the path; no advanced panel is required; clarification is at most one turn; a write uses one confirmation surface. |
-| 4 | P1 | Semantic confidence | Improve arbitrary-schema metric, date, status, identity, and relationship selection without domain fallback. | Unknown fields never silently fall back; relationship recommendations pass overlap/cardinality checks; confidence and blockers are visible in business language. |
-| 5 | P1 | Evidence handoff | Make validated answers and charts usable outside the live workspace without exposing raw internals. | A deliberate export/share artifact includes result, source, metric definition, query time, gaps, and workspace identity, with no secret or absolute source-path leak. |
-| 6 | P1 | Local release durability | Make upgrades and recovery predictable for non-developer users. | Versioned local schema migration, pre-upgrade backup, rollback receipt, and clean-install verification are automated. |
-| 7 | P2 | Full-dashboard Beta promotion gate | Decide whether the industry dashboard deserves stable status based on evidence, not feature count. | It passes multiple independent industries, omits unsupported units, explains every selection, meets visual budgets, and does not increase default-screen complexity. |
+空状态、写入确认、证据追溯、本地备份恢复和常用 PC 比例下的响应式布局都已具备。后续开发不能破坏这条基础流程。
 
-## Product Metrics
+## 接下来按三阶段开发
 
-- First trusted chart completion rate in the acceptance workflow.
-- Median user decisions from import start to reviewed chart; maintenance clicks are tracked separately.
-- Percentage of answers and chart drafts with source, metric/query evidence, and explicit gap status.
-- Silent-field-fallback count: target zero.
-- Unnecessary confirmation count for read-only actions: target zero.
-- Confirmed writes with one complete impact summary: target 100%.
-- Visual regressions with overflow, overlap, or clipped text across supported desktop ratios: target zero.
+| 阶段 | 这阶段做什么 | 为什么现在做 | 做到什么算完成 |
+| --- | --- | --- | --- |
+| 1. 先验证通用性 | 验证更多真实数据，不修改代码、不内置样例。 | 先证明系统不是只适配当前财务表格。 | 至少再选择两个不同业务领域、结构互不相同的数据集，都能走通“导入 -> 证据 -> 单图 -> 核对 -> 确认”。 |
+| 2. 再把首次使用做顺 | 统一产品名称为 `AIBI-C`，减少首次生成可信图表所需的判断和操作，并改善陌生字段、日期、关系的识别提示。 | 通用性成立后，优先解决新手是否看得懂、走得顺。 | 默认流程不要求展开高级面板；AI 最多追问一次；写入只出现一次完整确认；系统不静默猜测无法确认的字段。 |
+| 3. 最后补齐交付能力 | 增加带证据的结果导出，完善升级、备份和回滚，再评估“整套行业看板 Beta”是否转为稳定能力。 | 只有单图主流程稳定后，才值得扩大交付范围。 | 导出内容包含结果、来源、指标口径、查询时间和缺口；升级可恢复；整套看板通过多个行业验证且不增加默认页面复杂度。 |
 
-These metrics may be collected in local verification receipts. The product must not add hidden cloud telemetry to satisfy them.
+三个阶段必须按顺序推进。前一阶段未通过，不用后续功能掩盖问题。
 
-## Promotion Rules
+## 当前只需要关注的三件事
 
-- Stable paths cannot depend on bundled examples, fixtures, or a specific customer's field names.
-- A Beta capability is not promoted because its UI exists; it must pass independent real-data and evidence-quality gates.
-- New advanced controls remain collapsed until user research or acceptance evidence proves they belong in the default path.
-- A new page is justified only when it owns a distinct business object or workflow; otherwise pass context to the existing owner.
-- Use `npm run preflight` as the final local acceptance gate and GitHub Actions as the remote release gate.
+1. 找到第二批、第三批不同结构的真实数据，验证完整闭环。
+2. 清理运行时仍存在的 `AIBI Hybrid` 名称，统一为 `AIBI-C`。
+3. 记录新手从导入到第一个可信图表的操作过程，继续减少无必要的选择、点击和确认。
+
+## 暂时不做
+
+- 不做云端账号、多人协作和隐藏遥测。
+- 不把“整套行业看板 Beta”提前设为默认入口。
+- 不新增默认展开的高级设置、技术参数或证据内部结构。
+- 不因为已有页面或按钮就认定功能已经完成。
+
+## 每轮开发都要守住的要求
+
+- 不依赖内置样例、测试数据或特定客户字段名。
+- 无法确认的字段和关系必须说明不确定性，不能静默兜底。
+- 只读操作不要求确认；一次写入只使用一个完整确认界面。
+- 页面跳转负责传递上下文，不在多个页面复制同一套操作。
+- 支持的 PC 长宽比中，文字和控件不能溢出、重叠或被裁切。
+- 本地交付前运行 `npm run preflight`，远程发布以 GitHub Actions 通过为准。

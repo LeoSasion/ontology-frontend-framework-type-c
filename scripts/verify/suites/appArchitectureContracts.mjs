@@ -821,11 +821,12 @@ export function appendAppArchitectureContractChecks(context) {
           docsReadmeSource.includes("development-roadmap.md") &&
           docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
           prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
-          developmentRoadmapDocSource.includes("## Delivered Baseline") &&
-          developmentRoadmapDocSource.includes("## Current Development Order") &&
-          developmentRoadmapDocSource.includes("Generalization acceptance") &&
-          developmentRoadmapDocSource.includes("Brand and release identity") &&
-          developmentRoadmapDocSource.includes("Use `npm run preflight` as the final local acceptance gate"),
+          developmentRoadmapDocSource.includes("## 已完成的基础闭环") &&
+          developmentRoadmapDocSource.includes("## 接下来按三阶段开发") &&
+          developmentRoadmapDocSource.includes("验证更多真实数据") &&
+          developmentRoadmapDocSource.includes("统一产品名称为 `AIBI-C`") &&
+          developmentRoadmapDocSource.includes("## 暂时不做") &&
+          developmentRoadmapDocSource.includes("本地交付前运行 `npm run preflight`"),
       },
     {
         label: "home-detailed-path-panel-boundary",
