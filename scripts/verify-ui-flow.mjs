@@ -48,6 +48,7 @@ function assertPageState() {
     },
     sources: {
       entry: Boolean(get("source-intelligence-folder-entry")),
+      importPreview: Boolean(get("import-preview-button")),
       coverageItems: document.querySelectorAll('[data-testid="source-coverage-item"]').length,
       dashboardNextAction: Boolean(get("source-dashboard-next-action")),
       sourceError: Boolean(get("source-intelligence-error")),
@@ -116,26 +117,26 @@ try {
   await setViewport(browser.client, viewport);
 
   if (!hasData) {
-    const sourcesPage = await waitForSection(browser.client, "sources", "source-intelligence-folder-entry");
+    const sourcesPage = await waitForSection(browser.client, "sources", "import-preview-button");
     checks.push(
       check("ui-empty-sources-ready", sourcesPage.ready.ok, { ready: sourcesPage.ready }),
-      check("ui-empty-sources-import-entry-visible", sourcesPage.state.sources.entry),
+      check("ui-empty-sources-import-only", sourcesPage.state.sources.importPreview && !sourcesPage.state.sources.entry),
       check("ui-empty-sources-no-inline-source-error", !sourcesPage.state.sources.sourceError),
       check("ui-empty-sources-no-error", !sourcesPage.state.hasErrorBoundary && !sourcesPage.state.hasFrameworkOverlay),
       check("ui-empty-sources-no-sample-copy", sourcesPage.state.noSampleCopy),
     );
     steps.push({ section: "empty-sources", state: sourcesPage.state });
 
-    const dashboardLocked = await waitForSection(browser.client, "dashboards", "source-intelligence-folder-entry");
+    const dashboardLocked = await waitForSection(browser.client, "dashboards", "import-preview-button");
     checks.push(
-      check("ui-empty-dashboard-routes-to-import", dashboardLocked.ready.ok && dashboardLocked.state.sources.entry, { ready: dashboardLocked.ready, url: dashboardLocked.state.url }),
+      check("ui-empty-dashboard-routes-to-import", dashboardLocked.ready.ok && dashboardLocked.state.sources.importPreview && !dashboardLocked.state.sources.entry, { ready: dashboardLocked.ready, url: dashboardLocked.state.url }),
       check("ui-empty-dashboard-no-error", !dashboardLocked.state.hasErrorBoundary && !dashboardLocked.state.hasFrameworkOverlay),
     );
     steps.push({ section: "empty-dashboard-locked", state: dashboardLocked.state });
 
-    const evidenceLocked = await waitForSection(browser.client, "evidence", "source-intelligence-folder-entry");
+    const evidenceLocked = await waitForSection(browser.client, "evidence", "import-preview-button");
     checks.push(
-      check("ui-empty-evidence-routes-to-import", evidenceLocked.ready.ok && evidenceLocked.state.sources.entry, { ready: evidenceLocked.ready, url: evidenceLocked.state.url }),
+      check("ui-empty-evidence-routes-to-import", evidenceLocked.ready.ok && evidenceLocked.state.sources.importPreview && !evidenceLocked.state.sources.entry, { ready: evidenceLocked.ready, url: evidenceLocked.state.url }),
       check("ui-empty-evidence-no-error", !evidenceLocked.state.hasErrorBoundary && !evidenceLocked.state.hasFrameworkOverlay),
     );
     steps.push({ section: "empty-evidence-locked", state: evidenceLocked.state });
@@ -208,11 +209,11 @@ try {
     );
     steps.push({ section: "evidence", state: evidencePage.state });
 
-    const sourcesPage = await waitForSection(browser.client, "sources", "source-intelligence-folder-entry");
+    const sourcesPage = await waitForSection(browser.client, "sources", "source-dashboard-next-action");
     checks.push(
       check("ui-sources-ready", sourcesPage.ready.ok, { ready: sourcesPage.ready }),
-      check("ui-sources-evidence-entry-visible", sourcesPage.state.sources.entry),
-      check("ui-sources-real-coverage-listed", sourcesPage.state.sources.coverageItems > 0, { coverageItems: sourcesPage.state.sources.coverageItems }),
+      check("ui-sources-profile-entry-hidden-after-profile", !sourcesPage.state.sources.entry),
+      check("ui-sources-raw-coverage-hidden-after-profile", sourcesPage.state.sources.coverageItems === 0, { coverageItems: sourcesPage.state.sources.coverageItems }),
       check("ui-sources-dashboard-next-action-visible", sourcesPage.state.sources.dashboardNextAction),
       check("ui-sources-no-inline-source-error", !sourcesPage.state.sources.sourceError),
       check("ui-sources-no-error", !sourcesPage.state.hasErrorBoundary && !sourcesPage.state.hasFrameworkOverlay),

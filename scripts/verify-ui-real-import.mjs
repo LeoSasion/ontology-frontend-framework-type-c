@@ -24,8 +24,12 @@ import {
 } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8686";
-const importFile = process.env.AIBI_REAL_IMPORT_FILE ?? "C:\\Users\\Administrator\\Documents\\财务报表\\真实数据\\源数据-05月\\保单明细-5月.csv";
-const importFolder = process.env.AIBI_REAL_IMPORT_FOLDER ?? "C:\\Users\\Administrator\\Documents\\财务报表\\真实数据";
+const knownRealDataFolders = [
+  "C:\\Users\\Administrator\\Documents\\财务报表\\真实数据",
+  "C:\\Users\\Administrator\\Documents\\财务报表_bak\\真实数据",
+];
+const importFolder = process.env.AIBI_REAL_IMPORT_FOLDER ?? knownRealDataFolders.find((folder) => existsSync(folder)) ?? knownRealDataFolders[0];
+const importFile = process.env.AIBI_REAL_IMPORT_FILE ?? join(importFolder, "源数据-05月", "保单明细-5月.csv");
 const importTarget = existsSync(importFolder)
   ? { mode: "folder", path: importFolder }
   : { mode: "file", path: importFile };
@@ -197,7 +201,7 @@ try {
         const sourceEntry = document.querySelector('[data-testid="source-intelligence-folder-entry"]');
         const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
         return {
-          ok: Boolean(importInput && importButton && folderButton && sourceEntry) && !error,
+          ok: Boolean(importInput && importButton && folderButton) && !sourceEntry && !error,
           hasImportInput: Boolean(importInput),
           hasImportButton: Boolean(importButton),
           hasFolderButton: Boolean(folderButton),
@@ -210,7 +214,7 @@ try {
       const sourcesReady = await pageState(browser.client);
       checks.push(
         check("ui-import-sources-ready", sourcesReady.ready.ok, { ready: sourcesReady.ready }),
-        check("ui-import-sources-entry-visible", sourcesReady.state.sources.sourceEntry && sourcesReady.state.sources.importPreviewButton && sourcesReady.state.sources.folderPreviewButton, { sources: sourcesReady.state.sources }),
+        check("ui-import-sources-import-only", !sourcesReady.state.sources.sourceEntry && sourcesReady.state.sources.importPreviewButton && sourcesReady.state.sources.folderPreviewButton, { sources: sourcesReady.state.sources }),
         check("ui-import-sources-no-error-before", !sourcesReady.state.hasErrorBoundary && !sourcesReady.state.hasFrameworkOverlay && !sourcesReady.state.sources.sourceError),
       );
       steps.push({ step: "sources-open", state: sourcesReady.state });
@@ -290,29 +294,45 @@ try {
       await navigate(browser.client, `${baseUrl}/?section=sources`);
       await waitForAppReady(browser.client, null, 25000);
       const afterImportState = await evaluate(browser.client, realFlowState, null, 10000);
+      const importNextStepText = await evaluate(browser.client, () => document.querySelector('[data-testid="import-success-next-step"]')?.textContent ?? "", null, 10000);
+      const expectedConnectedRows = importedTables.reduce((total, table) => total + Number(table.row_count ?? 0), 0);
+      const expectedConnectedFields = importedTables.reduce((total, table) => total + Number(table.column_count ?? 0), 0);
       checks.push(
         check("ui-import-success-next-step-visible", afterImportState.sources.importSuccessNextStep, { sources: afterImportState.sources }),
-        check("ui-import-receipt-visible", afterImportState.sources.importReceipt || afterImportState.sources.importSuccessNextStep, { sources: afterImportState.sources }),
+        check("ui-import-next-step-receipt-visible", afterImportState.sources.importReceipt || afterImportState.sources.importSuccessNextStep, { sources: afterImportState.sources }),
+        check("ui-import-next-step-uses-workspace-totals", importNextStepText.includes(expectedConnectedRows.toLocaleString()) && importNextStepText.includes(expectedConnectedFields.toLocaleString()), { importNextStepText, expectedConnectedRows, expectedConnectedFields }),
         check("ui-import-no-error-after-confirm", !afterImportState.hasErrorBoundary && !afterImportState.hasFrameworkOverlay && !afterImportState.sources.sourceError),
         check("ui-import-no-seeded-copy", !afterImportState.hasSeededSampleCopy),
       );
       steps.push({ step: "import-confirmed", state: afterImportState });
 
-      await navigate(browser.client, `${baseUrl}/?section=views`);
-      const viewWorkspaceReady = await waitForUi(browser.client, "view workspace styles", () => {
-        const workspaceGrid = document.querySelector(".viewWorkspaceGrid");
-        const queryPanel = document.querySelector(".viewQueryPanel");
-        const agentStrip = document.querySelector('[data-testid="view-agent-task-strip"]');
-        const displays = [workspaceGrid, queryPanel, agentStrip].map((element) => element ? getComputedStyle(element).display : "missing");
-        return {
-          ok: displays.every((display) => display === "grid"),
-          displays,
-          hasWorkspaceGrid: Boolean(workspaceGrid),
-          hasQueryPanel: Boolean(queryPanel),
-          hasAgentStrip: Boolean(agentStrip),
-        };
-      }, 30000);
-      checks.push(check("ui-view-workspace-styles-load-with-route", viewWorkspaceReady.ok, viewWorkspaceReady));
+      for (const viewViewport of evidenceViewports) {
+        await setViewport(browser.client, viewViewport);
+        await navigate(browser.client, `${baseUrl}/?section=views`);
+        const viewWorkspaceReady = await waitForUi(browser.client, `view empty state ${viewViewport.key}`, () => {
+          const emptyState = document.querySelector('[data-testid="view-empty-state"]');
+          const aiDraft = document.querySelector('[data-testid="view-empty-ai-draft"]');
+          const workspaceGrid = document.querySelector(".viewWorkspaceGrid");
+          const queryPanel = document.querySelector(".viewQueryPanel");
+          const rect = emptyState?.getBoundingClientRect();
+          return {
+            ok: Boolean(emptyState && aiDraft && rect && rect.width > 280 && rect.right <= window.innerWidth && !workspaceGrid && !queryPanel),
+            emptyRect: rect ? { left: Math.round(rect.left), right: Math.round(rect.right), width: Math.round(rect.width) } : null,
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            hasWorkspaceGrid: Boolean(workspaceGrid),
+            hasQueryPanel: Boolean(queryPanel),
+            hasAiDraft: Boolean(aiDraft),
+            documentOverflowX: Math.max(0, document.documentElement.scrollWidth - window.innerWidth),
+          };
+        }, 30000);
+        const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `real-import-views-${viewViewport.key}.png`));
+        checks.push(
+          check(`ui-view-empty-${viewViewport.key}-responsive`, viewWorkspaceReady.ok, viewWorkspaceReady),
+          check(`ui-view-empty-${viewViewport.key}-no-x-overflow`, viewWorkspaceReady.documentOverflowX === 0, viewWorkspaceReady),
+        );
+        steps.push({ step: `views-empty-${viewViewport.key}`, viewport: viewViewport, state: viewWorkspaceReady, screenshot });
+      }
+      await setViewport(browser.client, viewport);
 
       await navigate(browser.client, `${baseUrl}/?section=sources`);
       await waitForAppReady(browser.client, null, 25000);
@@ -397,18 +417,20 @@ try {
 
       await navigate(browser.client, `${baseUrl}/?section=dashboards`);
       const dashboardPage = await waitForUi(browser.client, "dashboard single-chart strip", () => {
+        const text = document.body?.innerText || "";
         const strip = document.querySelector('[data-testid="dashboard-business-task-strip"]');
         const prompt = document.querySelector('[data-testid="dashboard-ai-chart-prompt"]');
         const chartButton = document.querySelector('[data-testid="dashboard-task-explain"]');
         const evidenceButton = document.querySelector('[data-testid="dashboard-task-evidence"]');
         const error = document.querySelector(".appFallback, .fallbackPanel");
         return {
-          ok: Boolean(strip && prompt && chartButton && evidenceButton) && !error,
+          ok: Boolean(strip && prompt && chartButton && evidenceButton) && text.includes("codex_import_") && !error,
           hasStrip: Boolean(strip),
           hasPrompt: Boolean(prompt),
           hasChartButton: Boolean(chartButton),
           chartDisabled: Boolean(chartButton?.disabled),
           hasEvidenceButton: Boolean(evidenceButton),
+          workspaceSynced: text.includes("codex_import_"),
           hasError: Boolean(error),
         };
       }, 45000);

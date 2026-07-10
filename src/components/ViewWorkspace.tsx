@@ -258,11 +258,11 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
           <strong>{hasTables ? biText("从一个必要视图开始", "Start with one necessary view") : biText("先接入数据", "Connect data first")}</strong>
           <span>{hasTables ? biText("AI 只选择查询和下钻所需字段。", "AI selects only fields needed for query and drilldown.") : biText("导入完成后再保存明细口径。", "Save a detail scope after import.")}</span>
           <div className="buttonRow">
-            {hasTables ? <button className="primaryButton" disabled={busy === "empty-draft"} onClick={() => runBusy("empty-draft", () => onAsk(biText("基于当前表起草一个明细视图，只选查询和下钻所需字段，先不写入。", "Draft one detail view using only fields needed for query and drilldown. Do not write yet.")))} type="button">
+            {hasTables ? <button className="primaryButton" data-testid="view-empty-ai-draft" disabled={busy === "empty-draft"} onClick={() => runBusy("empty-draft", () => onAsk(biText("基于当前表起草一个明细视图，只选查询和下钻所需字段，先不写入。", "Draft one detail view using only fields needed for query and drilldown. Do not write yet.")))} type="button">
               <Icon name="agent" />
               {biText("让 AI 起草视图", "Ask AI to draft")}
             </button> : null}
-            <button className={hasTables ? "secondaryButton" : "primaryButton"} onClick={onOpenSources} type="button">
+            <button className={hasTables ? "secondaryButton" : "primaryButton"} data-testid="view-empty-open-sources" onClick={onOpenSources} type="button">
               <Icon name="source" />
               {hasTables ? biText("检查数据字段", "Check data fields") : biText("去导入数据", "Import data")}
             </button>

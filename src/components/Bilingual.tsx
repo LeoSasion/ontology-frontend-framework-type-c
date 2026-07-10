@@ -66,8 +66,7 @@ const nameTranslations: Record<string, { zh: string; en: string }> = {
   "证据合同检查": { zh: "证据合同检查", en: "Evidence Contract Check" },
   "生成看板草案": { zh: "生成看板草案", en: "Draft dashboard" },
   "生成分析计划": { zh: "生成分析计划", en: "Draft analysis plan" },
-  "Retail General": { zh: "零售通用", en: "Retail General" },
-  "Retail General / 通用零售经营": { zh: "通用零售经营", en: "Retail General" },
+  "Generic tabular data / 通用表格数据": { zh: "通用表格数据", en: "Generic tabular data" },
 };
 
 const roleTranslations: Record<string, { zh: string; en: string }> = {

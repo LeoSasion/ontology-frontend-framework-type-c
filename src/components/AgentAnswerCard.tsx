@@ -1,5 +1,5 @@
 import type { AgentAskResult } from "../types";
-import { evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
+import { confidenceText, evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
 import { Bilingual, biText } from "./Bilingual";
 
 type AgentAnswerCardProps = {
@@ -56,7 +56,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
           <h3>{pairText(answerCard.title)}</h3>
           <p>{pairText(answerCard.summary)}</p>
         </div>
-        <span className="statusPill compact">{answerCard.confidence}</span>
+        <span className="statusPill compact">{confidenceText(answerCard.confidence)}</span>
       </div>
       <div className="agentAnswerMetrics">
         {answerCard.metrics.map((metric, index) => (

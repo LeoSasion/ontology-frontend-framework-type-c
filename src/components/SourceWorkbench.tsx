@@ -38,6 +38,7 @@ import {
 import { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { useSourceWorkbenchImportController } from "../useSourceWorkbenchImportController";
 import { Bilingual, biText } from "./Bilingual";
+import { Icon } from "./Icons";
 import { ProductActivationPanel } from "./ProductActivationPanel";
 import { SourceWorkbenchActionPanel } from "./SourceWorkbenchActionPanel";
 import { SourceWorkbenchDataManagementPanel } from "./SourceWorkbenchDataManagementPanel";
@@ -311,7 +312,8 @@ export function SourceWorkbench({
   const effectiveMetricDimension = groupFields.some((field) => field.field_name === metricDimension) ? metricDimension : groupFields[0]?.field_name ?? "";
   const metricResultRows = resultRows(semanticMetricResult).slice(0, 5);
   const latestSourceProfile = sourceIntelligenceRuns[0];
-  const latestImportedSource = sourceRuns[0];
+  const connectedRowCount = tables.reduce((total, table) => total + table.row_count, 0);
+  const connectedFieldCount = tables.reduce((total, table) => total + table.column_count, 0);
   const {
     sourceProfileComplete,
     sourceProfileRunning,
@@ -373,6 +375,15 @@ export function SourceWorkbench({
           runBusy={runBusy}
         /> : null}
 
+        {hasData && !sourceProfileComplete ? <div className="importSuccessNextStep" data-testid="import-success-next-step">
+          <Icon name="check" />
+          <div>
+            <strong>{biText(`已接入 ${tables.length} 张数据表`, `${tables.length} data tables connected`)}</strong>
+            <span>{connectedRowCount.toLocaleString()} {biText("行", "rows")} · {connectedFieldCount.toLocaleString()} {biText("字段", "fields")}</span>
+            <small>{biText("下一步生成证据摘要，再创建图表。", "Next, create the evidence summary, then create a chart.")}</small>
+          </div>
+        </div> : null}
+
         {hasData && !sourceProfileComplete ? <SourceWorkbenchDataEntryPanel
           sourceIntelligenceRuns={sourceIntelligenceRuns}
           sourceProfileInputs={sourceProfileInputs}
@@ -395,7 +406,6 @@ export function SourceWorkbench({
             beginnerPlan={beginnerPlan}
             sourceProfileRunning={sourceProfileRunning}
             sourceProfileComplete={sourceProfileComplete}
-            latestImportedSource={latestImportedSource}
             latestSourceProfile={latestSourceProfile}
             relationshipsCount={relationships.length}
             selectedMetricsCount={selectedMetrics.length}

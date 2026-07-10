@@ -11,6 +11,7 @@ import {
   draftDashboardLabel,
   metricPrompt,
   objectRecord,
+  llmModeText,
   resultActionKey,
   sourceRunPrompt,
   viewPrompt,
@@ -142,14 +143,8 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     {
       key: "provider",
       label: biText("回答方式", "Answer mode"),
-      value: result.llm.configured ? biText("模型回答", "Model answer") : biText("本地规则回答", "Local rule answer"),
+      value: llmModeText(result.llm.configured),
       tone: result.llm.configured ? "ok" : "neutral",
-    },
-    {
-      key: "mode",
-      label: biText("运行模式", "Mode"),
-      value: String(llmAudit?.mode ?? result.llm.mode),
-      tone: result.llm.mode === "provider" ? "ok" : "neutral",
     },
     {
       key: "boundary",
@@ -386,7 +381,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         </div>
         <div className="statusPill">
           <span className="dot ok" />
-          <span>{result.llm.mode}</span>
+          <span>{llmModeText(result.llm.configured)}</span>
         </div>
       </div>
 

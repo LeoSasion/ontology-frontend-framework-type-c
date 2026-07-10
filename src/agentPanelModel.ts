@@ -112,6 +112,10 @@ export function confidenceText(value?: string) {
   return value || biText("未知", "Unknown");
 }
 
+export function llmModeText(configured: boolean) {
+  return configured ? biText("模型回答", "Model answer") : biText("本地规则回答", "Local rule answer");
+}
+
 export function confidenceClass(value?: string) {
   if (value === "explicit" || value === "draft") return "ok";
   if (value === "missing" || value === "ambiguous") return "warn";

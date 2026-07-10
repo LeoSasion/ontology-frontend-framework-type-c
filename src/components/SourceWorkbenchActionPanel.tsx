@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { SourceIntelligenceRunSummary, SourceRunSummary } from "../types";
+import type { SourceIntelligenceRunSummary } from "../types";
 import type { SourceIntelligenceRunOptions } from "../sourceIntelligenceRunModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
@@ -27,7 +27,6 @@ type SourceWorkbenchActionPanelProps = {
   beginnerPlan: BeginnerPlanItem[];
   sourceProfileRunning: boolean;
   sourceProfileComplete: boolean;
-  latestImportedSource?: SourceRunSummary;
   latestSourceProfile?: SourceIntelligenceRunSummary;
   relationshipsCount: number;
   selectedMetricsCount: number;
@@ -56,7 +55,6 @@ export function SourceWorkbenchActionPanel({
   beginnerPlan,
   sourceProfileRunning,
   sourceProfileComplete,
-  latestImportedSource,
   latestSourceProfile,
   relationshipsCount,
   selectedMetricsCount,
@@ -98,16 +96,6 @@ export function SourceWorkbenchActionPanel({
           {biText("系统会把字段、关系、指标和公式放到后台推荐；你只需要按当前步骤继续。", "Fields, relationships, metrics, and formulas stay behind the recommendation layer; follow the current step.")}
         </span>
       </div>
-      {latestImportedSource && !sourceProfileComplete ? (
-        <div className="importSuccessNextStep" data-testid="import-success-next-step">
-          <Icon name="check" />
-          <div>
-            <strong>{biText(`已导入 ${latestImportedSource.name}`, `${latestImportedSource.name} imported`)}</strong>
-            <span>{latestImportedSource.row_count.toLocaleString()} {biText("行", "rows")} · {latestImportedSource.column_count.toLocaleString()} {biText("字段", "fields")}</span>
-            <small>{biText("下一步生成证据摘要；确认字段和指标后再进入看板。", "Next, create the evidence summary; confirm fields and metrics before dashboarding.")}</small>
-          </div>
-        </div>
-      ) : null}
       <div className="beginnerPlanList">
         {beginnerPlan.map((item) => (
           <div className="beginnerPlanItem" data-testid={`beginner-plan-${item.key}`} key={item.key}>

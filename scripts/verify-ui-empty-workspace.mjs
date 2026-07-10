@@ -141,7 +141,7 @@ try {
       const sources = await openSection(browser.client, "sources");
       checks.push(
         check("ui-empty-sources-ready", sources.ready.ok, { ready: sources.ready }),
-        check("ui-empty-sources-import-entry-visible", sources.state.sources.importEntry && sources.state.sources.importPreviewButton),
+        check("ui-empty-sources-import-only", !sources.state.sources.importEntry && sources.state.sources.importPreviewButton),
         check("ui-empty-sources-no-coverage-list", sources.state.sources.coverageItems === 0, { sources: sources.state.sources }),
         check("ui-empty-sources-next-action-collapsed", !sources.state.sources.dashboardNextVisible && !sources.state.sources.guideDetailsOpen, { sources: sources.state.sources }),
         check("ui-empty-sources-no-error", !sources.state.hasErrorBoundary && !sources.state.hasFrameworkOverlay && !sources.state.sources.sourceError),

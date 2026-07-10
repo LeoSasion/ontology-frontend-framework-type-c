@@ -8,8 +8,9 @@ from evidence_profile_runtime.semantic_text import SEMANTIC_ALIASES
 
 DEFAULT_DOMAIN_PACK_RUNTIME: dict[str, Any] = {
     "version": 2,
-    "domainPackId": "aibi-hybrid-generic-commerce",
-    "ontologyDomain": "generic-commerce",
+    "domainPackId": "aibi-generic-tabular",
+    "ontologyDomain": "generic-tabular",
+    "label": "Generic tabular data / 通用表格数据",
     "generatedBy": "tools/evidence_profile_runtime/domain_pack_runtime.py",
     "loadStatus": "fallback_static",
     "semanticHints": [

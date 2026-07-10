@@ -1882,7 +1882,8 @@ button:disabled {
 .languageOption:focus-visible {
   background: var(--bi-panel);
   color: var(--bi-accent-strong);
-  outline: 0;
+  outline: 2px solid color-mix(in srgb, var(--bi-accent) 52%, transparent);
+  outline-offset: -2px;
 }
 
 .languageOption.active {
@@ -5553,6 +5554,7 @@ th {
 .bDashboardKit {
   grid-column: 1 / -1;
   min-width: 0;
+  container-type: inline-size;
   border: 1px solid var(--bi-border);
   border-radius: 8px;
   background: var(--bi-surface);
@@ -5571,6 +5573,11 @@ th {
 .bKitHeader h3 {
   margin: 0;
   color: var(--bi-text);
+}
+
+.workbenchGrid > .importSuccessNextStep {
+  grid-column: 1 / -1;
+  margin: 0;
 }
 
 .bDashboardEmpty {
@@ -6823,6 +6830,38 @@ code {
 .bWidgetCard.text-widget,
 .bWidgetCard.slicer-widget {
   grid-column: span 4;
+}
+
+@container (max-width: 900px) {
+  .bWidgetCard.metric-widget,
+  .bWidgetCard.bar-widget,
+  .bWidgetCard.line-widget,
+  .bWidgetCard.pie-widget,
+  .bWidgetCard.text-widget,
+  .bWidgetCard.slicer-widget {
+    grid-column: span 6;
+  }
+
+  .bWidgetHead {
+    flex-direction: column;
+  }
+
+  .bWidgetMeta {
+    justify-content: flex-start;
+  }
+}
+
+@container (max-width: 560px) {
+  .bWidgetCard,
+  .bWidgetCard.metric-widget,
+  .bWidgetCard.bar-widget,
+  .bWidgetCard.line-widget,
+  .bWidgetCard.pie-widget,
+  .bWidgetCard.table-widget,
+  .bWidgetCard.text-widget,
+  .bWidgetCard.slicer-widget {
+    grid-column: 1 / -1;
+  }
 }
 
 .inspectorDetails section + section {
