@@ -31,6 +31,11 @@ const importTarget = existsSync(importFolder)
   : { mode: "file", path: importFile };
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-import-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
+const evidenceViewports = [
+  { key: "landscape", width: 1440, height: 900 },
+  { key: "portrait", width: 900, height: 1440 },
+  { key: "square", width: 1100, height: 1100 },
+];
 
 function realFlowState() {
   const text = document.body?.innerText || "";
@@ -495,8 +500,55 @@ try {
         check("ui-evidence-source-summary-visible", evidenceReady.ok && evidenceReady.hasSource, evidenceReady),
         check("ui-evidence-receipts-collapsed", evidenceReady.receiptsCollapsed, evidenceReady),
       );
+      const evidenceExplanationOpen = await openDetails(browser.client, '[data-testid="evidence-explanation-details"]');
+      checks.push(check("ui-evidence-explanation-opens-for-layout-check", evidenceExplanationOpen.ok, evidenceExplanationOpen));
+      const evidenceRatioResults = [];
+      for (const evidenceViewport of evidenceViewports) {
+        await setViewport(browser.client, evidenceViewport);
+        const ratioState = await waitFor(browser.client, () => {
+          const main = document.querySelector(".mainPanel");
+          const business = document.querySelector('[data-testid="evidence-business-summary"]');
+          const narrative = document.querySelector(".evidenceNarrativeSteps");
+          const trust = document.querySelector(".evidenceTrustChecks");
+          const gapStats = document.querySelector(".evidenceGapStats");
+          const gapItems = document.querySelector(".evidenceGapItems");
+          const columnCount = (element) => {
+            if (!element) return 0;
+            const columns = getComputedStyle(element).gridTemplateColumns.trim();
+            return !columns || columns === "none" ? 0 : columns.split(/\s+/).length;
+          };
+          const mainWidth = main?.getBoundingClientRect().width ?? 0;
+          const state = {
+            ok: Boolean(main && business && narrative && trust && gapStats && gapItems),
+            mainWidth,
+            documentXOverflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+            mainXOverflow: main ? Math.max(0, main.scrollWidth - main.clientWidth) : 0,
+            narrativeColumns: columnCount(narrative),
+            trustColumns: columnCount(trust),
+            gapStatsColumns: columnCount(gapStats),
+            gapItemsColumns: columnCount(gapItems),
+          };
+          return state;
+        }, null, { timeoutMs: 10000, intervalMs: 150 });
+        const expectedMaxColumns = ratioState.mainWidth <= 520 ? 1 : ratioState.mainWidth <= 760 ? 2 : 99;
+        const narrowGridCollapsed = [
+          ratioState.narrativeColumns,
+          ratioState.trustColumns,
+          ratioState.gapStatsColumns,
+          ratioState.gapItemsColumns,
+        ].every((columnCount) => columnCount > 0 && columnCount <= expectedMaxColumns);
+        const ratioScreenshot = await captureScreenshot(browser.client, join(screenshotDir, `real-import-evidence-${evidenceViewport.key}.png`));
+        const ratioResult = { viewport: evidenceViewport, state: ratioState, expectedMaxColumns, screenshot: ratioScreenshot };
+        evidenceRatioResults.push(ratioResult);
+        checks.push(
+          check(`ui-evidence-${evidenceViewport.key}-layout-ready`, ratioState.ok, ratioResult),
+          check(`ui-evidence-${evidenceViewport.key}-no-x-overflow`, ratioState.documentXOverflow === 0 && ratioState.mainXOverflow === 0, ratioResult),
+          check(`ui-evidence-${evidenceViewport.key}-narrow-grid-collapses`, narrowGridCollapsed, ratioResult),
+        );
+      }
+      await setViewport(browser.client, viewport);
       const evidenceScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "real-import-evidence.png"));
-      steps.push({ step: "evidence-ready", screenshot: evidenceScreenshot });
+      steps.push({ step: "evidence-ready", screenshot: evidenceScreenshot, ratios: evidenceRatioResults });
 
       const finalState = await evaluate(browser.client, realFlowState, null, 10000);
       checks.push(

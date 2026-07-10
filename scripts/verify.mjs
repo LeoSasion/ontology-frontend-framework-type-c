@@ -4514,8 +4514,16 @@ checks.push(
       evidenceViewSource.includes('import "./agentEvidenceWorkspace.css"') &&
       agentEvidenceStylesSource.includes(".agentComposer {") &&
       agentEvidenceStylesSource.includes(".evidenceBusinessSummary {") &&
+      agentEvidenceStylesSource.includes(".evidenceNarrativeCard {") &&
+      agentEvidenceStylesSource.includes(".evidenceGapPanel {") &&
+      agentEvidenceStylesSource.includes(".evidenceTrustChecks {") &&
+      globalStylesSource.includes("container: main-panel / inline-size;") &&
+      agentEvidenceStylesSource.includes("@container main-panel (max-width: 760px)") &&
+      agentEvidenceStylesSource.includes("@container main-panel (max-width: 520px)") &&
       !globalStylesSource.includes(".agentComposer {") &&
       !globalStylesSource.includes(".evidenceBusinessSummary {") &&
+      !globalStylesSource.includes(".evidenceNarrativeCard {") &&
+      !globalStylesSource.includes(".evidenceGapPanel {") &&
       globalStylesSource.includes(".statusPill.compact {") &&
       globalStylesSource.includes(".taskEvidenceRow summary {") &&
       appLazyModulesSource.includes("export function ModuleLoadingPanel") &&
@@ -5207,6 +5215,8 @@ checks.push(
       hasCssRule(stylesSource, ".assetPanel", "overflow-x: hidden;", "overflow-y: auto;") &&
       hasCssRule(stylesSource, ".assetSectionTitle strong", "text-overflow: ellipsis;", "white-space: nowrap;") &&
       verifyUiRealImportSource.includes("ui-real-import-no-asset-panel-x-overflow") &&
+      verifyUiRealImportSource.includes("ui-evidence-${evidenceViewport.key}-narrow-grid-collapses") &&
+      verifyUiRealImportSource.includes("real-import-evidence-${evidenceViewport.key}.png") &&
       implementationStatusSource.includes("Sidebar workspace card component boundary"),
   },
   {
