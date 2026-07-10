@@ -12,7 +12,7 @@ on:
 jobs:
   verify:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -39,3 +39,22 @@ jobs:
 
       - name: Verify
         run: npm run verify:ci
+
+      - name: Start local services
+        run: npm run local:start
+
+      - name: Verify local health
+        run: npm run local:health
+
+      - name: Verify server security runtime
+        run: npm run verify:security-runtime
+
+      - name: Verify browser smoke paths
+        run: |
+          npm run verify:ui-flow
+          npm run verify:ui-visual
+          npm run verify:ui-empty
+
+      - name: Stop local services
+        if: always()
+        run: npm run local:stop

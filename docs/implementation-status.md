@@ -11,14 +11,14 @@ This file is the current implementation index. It records the stable module boun
 | BI CLI bridge | Active | `tools/bi_cli.py` is the local backend entrypoint for workspace, source, query, dashboard, Agent, config, and evidence commands. |
 | Source evidence profiling | Active | `source-intelligence` produces evidence receipts from local fixture or user-selected inputs; folder import previews group same-type files before confirmed writes, field semantics avoid treating contact/system identifiers as measures, and auto metrics clean stale internal-field metrics without touching manual metrics. |
 | Dashboard widget set | Active | Dashboard pages support metric, bar, line, pie, table, text, slicer, relationship, filters, style, lifecycle, and source-switch flows. |
-| AI-first dashboard creation | Active | Dashboard pages start from a natural-language chart request; vague chart requests ask for fields with clickable business-field candidates, explicit chart requests become one-chart drafts, and full industry dashboards remain a beta preview path. |
+| AI-first dashboard creation | Active | Dashboard pages start from a natural-language chart request; vague chart requests ask for fields with clickable business-field candidates, explicit chart requests become one-chart drafts, generic questions stay data overviews instead of silently selecting sales/channel fields, and full industry dashboards remain a beta preview path. |
 | Clean empty runtime | Active | App startup uses empty workspace/query/dashboard/Agent fallbacks and only guides users to import local data when no tables exist. |
 | Global business path | Active | A compact route handoff bar owns the steps: connect data, create chart, review evidence, approve writes. Home actions route into these owners instead of duplicating execution. |
 | ERP unit library | Active | Public ERP references are mapped to selectable units, field aliases, omitted-unit hints, and confirmable dashboard drafts. |
 | Agent confirmation boundary | Active | Agent answers are evidence-aware; write operations become dry-runs or action drafts before confirmation. |
 | Evidence surface | Active | Evidence pages summarize business meaning first, with technical details available on demand. |
-| UI runtime verification | Active | Live-browser checks cover the real-data Home -> Dashboard -> Evidence -> Sources -> Agent path, Views layout at landscape/portrait/square ratios, empty workspace routing, and a temporary-workspace real folder import loop with file fallback. |
-| Local operations and CI | Active | GitHub Actions runs the build plus core verification on Windows; local PowerShell scripts start, stop, and health-check the API/UI without touching workspace data, and `npm run preflight` gives local release validation one command. |
+| UI runtime verification | Active | Live-browser checks cover the real-data Home -> Dashboard -> Evidence -> Sources -> Agent path, an isolated imported-and-saved Views query panel at landscape/portrait/square ratios, empty workspace routing, and a temporary-workspace real folder import loop with file fallback. |
+| Local operations and CI | Active | GitHub Actions runs build, core, AI reliability, backup, production, security-runtime, and browser checks on Windows; the API is loopback-only with bounded request bodies and exact-origin CORS, backup/restore is checksum-verified, and `npm run preflight` gives local release validation one command. |
 
 Users should start from business actions. Advanced modeling, query, and command details stay available after the primary workflow is clear.
 
@@ -33,6 +33,10 @@ npm run verify:ui
 npm run verify:ui-empty
 npm run verify:ui-import
 npm run verify:bi-cli-contract
+npm run verify:ai-reliability
+npm run verify:production
+npm run verify:security-runtime
+npm run verify:backup
 npm run verify:erp-units
 python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
@@ -41,6 +45,8 @@ python tools/bi_cli.py --json business-dashboard --template erp-units --op draft
 npm run local:start
 npm run local:health
 npm run local:stop
+npm run backup:local
+npm run restore:local -- --from <backup-directory>
 ```
 
 `npm run verify:ui` expects the local API and UI to be running through `npm run dev` or equivalent live services on ports 8787 and 8686. The real-import UI check creates a temporary workspace, imports `AIBI_REAL_IMPORT_FOLDER` when present or `AIBI_REAL_IMPORT_FILE` as fallback, exercises evidence and chart entry points, then restores the original workspace and deletes the temporary workspace.
@@ -158,6 +164,9 @@ These names are intentionally current code ownership markers. They should stay f
 - UI desktop-ratio visual regression
 - UI empty-workspace regression
 - UI temporary real-import regression
+- AI generic-answer and one-chart reliability regression
+- Loopback server security runtime boundary
+- Local database backup and checksum restore boundary
 
 ## Ownership Notes
 

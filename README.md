@@ -12,7 +12,7 @@ python -m pip install -r requirements.txt
 npm run dev
 ```
 
-打开 `http://localhost:8686`。
+打开 `http://127.0.0.1:8686`。
 
 `npm run dev` 会启动本地 API `8787` 和前端 `8686`。API 会读取仓库根目录的 `.env`，可从 `.env.example` 复制后填写本机路径和密钥；不要提交 `.env`。需要单独调试时使用：
 
@@ -42,6 +42,10 @@ npm run verify:ui
 npm run verify:ui-empty
 npm run verify:ui-import
 npm run verify:bi-cli-contract
+npm run verify:ai-reliability
+npm run verify:production
+npm run verify:security-runtime
+npm run verify:backup
 npm run verify:erp-units
 python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
@@ -50,7 +54,7 @@ python tools/bi_cli.py --json business-dashboard --template erp-units --op draft
 
 `npm run preflight` 是本地交付前的单入口：先跑核心构建和契约验证，再启动本地服务、检查健康状态，并执行完整 UI 闭环。只想快速检查核心契约时使用 `npm run preflight -- --skip-ui`；希望验收后自动停服务时追加 `--stop-after`。
 
-GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建和核心契约验证。`npm run verify:ui` 仍保留为本机浏览器验收，因为它需要正在运行的本地 API/UI、浏览器和可选真实导入目录。
+GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建、核心契约、AI 单图可靠性、备份恢复和生产边界验证；随后启动仅回环监听的本地服务，检查安全响应与浏览器主流程。
 
 `npm run verify:ui` 需要本地 `8686` 前端和 `8787` API 已运行。它包含已有真实数据只读流程、三种 PC 比例视觉检查、空工作区检查，以及一个临时工作区真实导入闭环。真实导入优先读取 `C:\Users\Administrator\Documents\财务报表\真实数据` 并走文件夹合并导入，可用 `AIBI_REAL_IMPORT_FOLDER` 覆盖；目录不存在时回退到 `AIBI_REAL_IMPORT_FILE` 指定的单文件。脚本会恢复原工作区并删除临时工作区。
 
@@ -69,6 +73,22 @@ GitHub Actions 执行 `npm run verify:ci`，覆盖安装、构建和核心契约
 
 运行数据保存在本地并被 git 忽略。用户数据通过界面或 CLI 明确导入；不要把真实数据库、业务导出、日志、凭据或个人工作文件提交进仓库。
 
+备份前先停止本项目服务，避免复制写入中的数据库：
+
+```powershell
+npm run local:stop
+npm run backup:local
+```
+
+恢复默认只展示影响，不写入。确认备份目录和校验结果后再执行：
+
+```powershell
+npm run restore:local -- --from <backup-directory>
+npm run restore:local -- --from <backup-directory> --confirm
+```
+
+备份只包含本地 SQLite 和 DuckDB 数据库，清单记录文件大小与 SHA-256；不会复制 `.env`、源文件或凭据。可用 `AIBI_BACKUP_ROOT` 指定备份根目录。
+
 ## Deployment Notes
 
-正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。新环境启动后先执行 `npm ci` 和 `python -m pip install -r requirements.txt`，再运行 `npm run preflight` 做核心与 UI 验收。
+正式部署前只需要提交代码、文档和配置模板。不要提交 `data/local`、真实导出文件、`.env`、浏览器截图或验证输出。服务默认只监听 `127.0.0.1`，不会接受 `0.0.0.0`；需要跨进程前端来源时，只能通过 `AIBI_CORS_ORIGIN` 配置一个明确来源。新环境启动后先执行 `npm ci` 和 `python -m pip install -r requirements.txt`，再运行 `npm run preflight` 做核心与 UI 验收。

@@ -6,6 +6,14 @@ import { buildActionRecovery } from "../src/actionRecoveryModel";
 
 export type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 
+export class RequestBodyTooLargeError extends Error {}
+export class InvalidJsonBodyError extends Error {}
+
+function configuredMaxRequestBodyBytes() {
+  const value = Number(process.env.AIBI_MAX_BODY_BYTES ?? 1_048_576);
+  return Number.isInteger(value) && value >= 16_384 && value <= 10_485_760 ? value : 1_048_576;
+}
+
 function enrichedErrorBody(body: JsonValue): JsonValue {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return body;
@@ -33,20 +41,40 @@ function enrichedErrorBody(body: JsonValue): JsonValue {
 }
 
 export function sendJson(response: ServerResponse, status: number, body: JsonValue) {
-  response.writeHead(status, {
+  const allowedCorsOrigin = String(process.env.AIBI_CORS_ORIGIN ?? "").trim();
+  const headers: Record<string, string> = {
     "content-type": "application/json; charset=utf-8",
-    "access-control-allow-origin": "*",
     "access-control-allow-methods": "GET,POST,OPTIONS",
     "access-control-allow-headers": "content-type",
-  });
+    "cache-control": "no-store",
+  };
+  if (allowedCorsOrigin) headers["access-control-allow-origin"] = allowedCorsOrigin;
+  response.writeHead(status, headers);
   response.end(JSON.stringify(enrichedErrorBody(body), null, 2));
 }
 
 export function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolveBody, reject) => {
+    const maxRequestBodyBytes = configuredMaxRequestBodyBytes();
     const chunks: Buffer[] = [];
-    request.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+    let bodyBytes = 0;
+    let settled = false;
+    request.on("data", (chunk) => {
+      if (settled) return;
+      const buffer = Buffer.from(chunk);
+      bodyBytes += buffer.byteLength;
+      if (bodyBytes > maxRequestBodyBytes) {
+        settled = true;
+        chunks.length = 0;
+        request.resume();
+        reject(new RequestBodyTooLargeError(`Request body exceeds ${maxRequestBodyBytes} bytes`));
+        return;
+      }
+      chunks.push(buffer);
+    });
     request.on("end", () => {
+      if (settled) return;
+      settled = true;
       const text = Buffer.concat(chunks).toString("utf8").trim();
       if (!text) {
         resolveBody({});
@@ -54,11 +82,15 @@ export function readBody(request: IncomingMessage): Promise<Record<string, unkno
       }
       try {
         resolveBody(JSON.parse(text));
-      } catch (error) {
-        reject(error);
+      } catch {
+        reject(new InvalidJsonBodyError("Request body must contain valid JSON"));
       }
     });
-    request.on("error", reject);
+    request.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
   });
 }
 

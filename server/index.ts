@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -6,7 +7,7 @@ import { handleAgentApi } from "./agentRoutes";
 import { handleDashboardApi } from "./dashboardRoutes";
 import { handleModelApi } from "./modelRoutes";
 import { handleQueryApi } from "./queryRoutes";
-import { runCli, sendJson } from "./serverRuntime";
+import { InvalidJsonBodyError, RequestBodyTooLargeError, runCli, sendJson } from "./serverRuntime";
 import { handleSourceApi } from "./sourceRoutes";
 import { handleSettingsApi } from "./settingsRoutes";
 import { handleStatic } from "./staticServer";
@@ -43,7 +44,16 @@ function loadLocalEnv(projectRoot: string) {
 }
 
 loadLocalEnv(root);
-const port = Number(process.env.AIBI_API_PORT ?? 8787);
+const configuredPort = Number(process.env.AIBI_API_PORT ?? 8787);
+if (!Number.isInteger(configuredPort) || configuredPort < 1 || configuredPort > 65_535) {
+  throw new Error("AIBI_API_PORT must be an integer between 1 and 65535");
+}
+const port = configuredPort;
+const host = String(process.env.AIBI_API_HOST ?? "127.0.0.1").trim().toLowerCase();
+const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
+if (!loopbackHosts.has(host)) {
+  throw new Error("AIBI-C is local-first and only accepts a loopback AIBI_API_HOST in this release");
+}
 const cli = (args: string[]) => runCli(root, args);
 
 function actionForApiPath(url: URL) {
@@ -96,7 +106,24 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
 }
 
 const server = createServer(async (request, response) => {
-  const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
+  const startedAt = Date.now();
+  const incomingRequestId = String(request.headers["x-request-id"] ?? "");
+  const requestId = /^[A-Za-z0-9._-]{1,100}$/.test(incomingRequestId) ? incomingRequestId : randomUUID();
+  response.setHeader("x-request-id", requestId);
+  response.setHeader("x-content-type-options", "nosniff");
+  response.setHeader("x-frame-options", "DENY");
+  response.setHeader("referrer-policy", "no-referrer");
+  const url = new URL(request.url ?? "/", "http://127.0.0.1");
+  response.once("finish", () => {
+    console.log(JSON.stringify({
+      event: "http_request",
+      requestId,
+      method: request.method ?? "GET",
+      path: url.pathname,
+      status: response.statusCode,
+      durationMs: Date.now() - startedAt,
+    }));
+  });
   try {
     if (url.pathname.startsWith("/api/")) {
       await handleApi(request, response, url);
@@ -104,7 +131,8 @@ const server = createServer(async (request, response) => {
     }
     await handleStatic(response, url.pathname, root);
   } catch (error) {
-    sendJson(response, 500, {
+    const status = error instanceof RequestBodyTooLargeError ? 413 : error instanceof InvalidJsonBodyError ? 400 : 500;
+    sendJson(response, status, {
       ok: false,
       action: url.pathname.startsWith("/api/") ? actionForApiPath(url) : "static",
       error: error instanceof Error ? error.message : String(error),
@@ -112,6 +140,6 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(port, "0.0.0.0", () => {
-  console.log(`AIBI Hybrid API listening on http://127.0.0.1:${port}`);
+server.listen(port, host, () => {
+  console.log(`AIBI Hybrid API listening on http://${host}:${port}`);
 });

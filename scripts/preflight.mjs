@@ -38,8 +38,12 @@ runNode("TypeScript build", "node_modules/typescript/bin/tsc", ["-p", "tsconfig.
 runNode("Vite production build", "node_modules/vite/bin/vite.js", ["build"]);
 runNode("core verification", "scripts/verify.mjs");
 runNode("BI CLI Agent contract", "scripts/verify-bi-cli-agent-contract.mjs");
+runNode("AI one-chart reliability", "scripts/verify-ai-chart-reliability.mjs");
+runNode("local backup and restore", "scripts/verify-local-backup.mjs");
+runNode("production readiness", "scripts/verify-production-readiness.mjs");
 runPowerShell("start local services", "scripts/start-local.ps1");
 runPowerShell("health check", "scripts/local-health.ps1");
+runNode("server security runtime", "scripts/verify-server-runtime-security.mjs");
 
 if (skipUi) {
   console.log("\n[preflight] UI verification skipped by --skip-ui.");

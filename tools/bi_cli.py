@@ -5597,8 +5597,6 @@ def select_metric_dimension_from_prompt(connection: sqlite3.Connection, table_ke
             continue
         if normalize_match_text(column) in normalized_prompt and semantic_roles.get(column) in {"dimension", "status", "identity_key", "event_time"}:
             return column, "explicit"
-    if "channel" in columns and (dimension_intent or any(token in prompt for token in ["渠道", "channel"])):
-        return "channel", "recommended"
     for row in semantic_rows:
         field = str(row.get("field_name") or "")
         if field and field != measure and row.get("role") in {"dimension", "status", "identity_key"} and field in columns:
@@ -5784,8 +5782,6 @@ def resolve_prompt_widget_action(
     widget_type, widget_type_confidence = widget_type_from_prompt(prompt)
     measure, measure_confidence = select_metric_field_from_prompt(connection, table_key, prompt)
     dimension, dimension_confidence = select_metric_dimension_from_prompt(connection, table_key, prompt, measure)
-    if widget_type in {"bar", "pie", "slicer"} and not dimension:
-        dimension, dimension_confidence = select_metric_dimension_from_prompt(connection, table_key, f"{prompt} 按 channel", measure)
     if widget_type == "line" and not dimension:
         date_fields = [field for field in field_names_by_role(connection, table_key, "event_time")]
         if date_fields:
@@ -6261,6 +6257,7 @@ def build_agent_answer_card(
     connection: sqlite3.Connection,
     prompt: str,
     selected_table: dict[str, Any] | None,
+    widget_action: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not selected_table:
         return {
@@ -6273,11 +6270,8 @@ def build_agent_answer_card(
             "evidenceRefs": [],
             "nextActions": [localized_value("导入本地文件或文件夹", "Import a local file or folder")],
         }
-    lower = prompt.lower()
-    prompt_wants_refund = any(token in lower for token in ["refund", "return", "after sale"]) or any(token in prompt for token in ["退款", "售后", "退货"])
-    prompt_wants_channel = any(token in lower for token in ["channel", "best", "performing", "contributed"]) or any(token in prompt for token in ["渠道", "最好", "贡献", "来源"])
     table_key = selected_table["table_key"]
-    registry, columns = answer_table_columns(connection, table_key)
+    registry, _columns = answer_table_columns(connection, table_key)
     if not registry:
         return {
             "kind": "gap",
@@ -6290,26 +6284,42 @@ def build_agent_answer_card(
             "nextActions": [localized_value("导入本地文件或文件夹", "Import a local file or folder")],
         }
 
-    if prompt_wants_refund and "refund_amount" in columns:
-        measure = "refund_amount"
-        dimension = "channel" if "channel" in columns else None
-        title = localized_value("退款压力来自哪里", "Where refund pressure comes from")
-        summary_metric_label = localized_value("退款金额", "Refund amount")
-        intent = "refund_pressure"
-    elif ("net_sales" in columns or selected_table) and ("net_sales" in columns):
-        measure = "net_sales"
-        dimension = "channel" if prompt_wants_channel and "channel" in columns else ("channel" if "channel" in columns else None)
-        title = localized_value("渠道销售表现", "Channel sales performance")
-        summary_metric_label = localized_value("净销售额", "Net sales")
-        intent = "sales_by_channel" if dimension else "sales_total"
+    options = widget_action.get("options") if isinstance(widget_action, dict) else None
+    if isinstance(options, dict):
+        measure = str(options.get("measure") or "*")
+        dimension = str(options.get("dimension") or "") or None
+        aggregation = str(options.get("aggregation") or ("count" if measure == "*" else "sum"))
+        title = localized_value("图表草案数据预览", "Chart draft data preview")
+        intent = "chart_preview"
     else:
-        measure = "*"
-        dimension = "channel" if prompt_wants_channel and "channel" in columns else None
-        title = localized_value("当前数据概览", "Current data overview")
-        summary_metric_label = localized_value("记录数", "Rows")
-        intent = "table_overview"
+        selected_measure, measure_confidence = select_metric_field_from_prompt(connection, table_key, prompt)
+        selected_dimension, dimension_confidence = select_metric_dimension_from_prompt(connection, table_key, prompt, selected_measure)
+        requested_aggregation = aggregation_from_metric_prompt(prompt, selected_measure)
+        if measure_confidence in {"explicit", "recommended"}:
+            measure = selected_measure
+            aggregation = requested_aggregation
+            dimension = selected_dimension if dimension_confidence in {"explicit", "recommended"} else None
+            intent = "field_analysis"
+        elif selected_dimension and dimension_confidence == "explicit":
+            measure = "*"
+            aggregation = "count"
+            dimension = selected_dimension
+            intent = "dimension_overview"
+        else:
+            measure = "*"
+            aggregation = "count"
+            dimension = None
+            intent = "data_overview"
+        if measure != "*" and dimension:
+            title = localized_value(f"{measure} 按 {dimension} 分析", f"{measure} by {dimension}")
+        elif measure != "*":
+            title = localized_value(f"{measure} 概览", f"{measure} overview")
+        elif dimension:
+            title = localized_value(f"按 {dimension} 查看记录", f"Rows by {dimension}")
+        else:
+            title = localized_value("当前数据概览", "Current data overview")
 
-    aggregation = "count" if measure == "*" else "sum"
+    summary_metric_label = localized_value("记录数", "Rows") if measure == "*" else localized_value(measure, measure)
     runtime, rows, fallback_reason = safe_answer_aggregate(
         connection,
         table_key,
@@ -6361,11 +6371,11 @@ def build_agent_answer_card(
         evidence_refs.insert(1, {"type": "metricDefinition", **metric})
 
     next_actions = [
-        localized_value("打开看板查看图表和筛选", "Open the dashboard to inspect charts and filters"),
-        localized_value("需要写入时先生成草案再确认", "For writes, create a draft first and confirm it"),
+        localized_value("审阅图表草案后再确认写入", "Review the chart draft before confirming the write")
+        if widget_action
+        else localized_value("指定业务字段后继续下钻", "Specify business fields to continue the analysis"),
+        localized_value("打开证据查看查询口径", "Open evidence to inspect the query definition"),
     ]
-    if prompt_wants_refund:
-        next_actions.insert(0, localized_value("按渠道或 SKU 下钻退款压力", "Drill into refund pressure by channel or SKU"))
 
     return {
         "kind": intent,
@@ -6377,7 +6387,7 @@ def build_agent_answer_card(
                 "label": summary_metric_label,
                 "value": format_answer_number(top_value),
                 "rawValue": top_value,
-                "unit": "rows" if measure == "*" else "amount",
+                "unit": "rows" if measure == "*" else "value",
             },
             {
                 "label": localized_value("样本行数", "Source rows"),
@@ -6546,7 +6556,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 created_at=now_iso(),
             )
             connection.commit()
-        answer_card = build_agent_answer_card(connection, prompt, selected_table)
+        answer_card = build_agent_answer_card(connection, prompt, selected_table, actionable_widget_action)
         if widget_clarification and isinstance(widget_action, dict):
             answer_card = build_widget_clarification_answer_card(widget_action)
         ontology = ontology_snapshot(connection)

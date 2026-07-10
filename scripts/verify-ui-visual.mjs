@@ -11,8 +11,10 @@ import {
   setViewport,
   waitForAppReady,
 } from "./ui-verify-chrome.mjs";
+import { postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
-const url = process.env.AIBI_UI_URL ?? "http://127.0.0.1:8686/?section=views";
+const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8686";
+const url = process.env.AIBI_UI_URL ?? `${baseUrl}/?section=views`;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-visual-"));
 const viewports = [
   { key: "landscape", label: "landscape", width: 1440, height: 900 },
@@ -102,6 +104,9 @@ function visualMetrics() {
     title: document.title,
     url: location.href,
     connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+    isViewsRoute: new URL(location.href).searchParams.get("section") === "views",
+    hasViewWorkspace: Boolean(document.querySelector(".viewWorkspaceGrid")),
+    hasViewQueryPanel: Boolean(document.querySelector(".viewQueryPanel")),
     hasErrorBoundary,
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     samplesVisible: /样例|示例|demo data|test data|fallback source|mock data|lorem/i.test(text),
@@ -128,44 +133,73 @@ const checks = [];
 const viewportResults = [];
 let browserInfo = null;
 const browserIssues = [];
+let lifecycle = null;
+let bootstrap = null;
 
 try {
-  for (const viewport of viewports) {
-    let browser = null;
-    try {
-      browser = await launchChrome();
-      browserInfo ??= { chromePath: browser.chromePath, chromeName: browser.chromeName };
-      await setViewport(browser.client, viewport);
-      await navigate(browser.client, url);
-      const ready = await waitForAppReady(browser.client, null, 25000);
-      const metrics = await evaluate(browser.client, visualMetrics, null, 10000);
-      const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `${viewport.key}-${viewport.width}x${viewport.height}.png`));
-      const prefix = `visual-${viewport.key}`;
-      checks.push(
-        check(`${prefix}-ready`, ready.ok, { ready }),
-        check(`${prefix}-no-error-boundary`, !metrics.hasErrorBoundary, { metrics: { hasErrorBoundary: metrics.hasErrorBoundary } }),
-        check(`${prefix}-no-framework-overlay`, !metrics.hasFrameworkOverlay),
-        check(`${prefix}-no-global-x-overflow`, metrics.overflow.documentX === 0 && metrics.overflow.bodyX === 0, { overflow: metrics.overflow }),
-        check(`${prefix}-no-panel-x-overflow`, !metrics.overflow.mainPanelX && !metrics.overflow.contentShellX, { overflow: metrics.overflow }),
-        check(`${prefix}-no-empty-table-horizontal-scroll`, !metrics.tableScroll?.hasHorizontalScroll, { tableScroll: metrics.tableScroll }),
-        check(`${prefix}-no-visible-overlap`, metrics.overlapPairs.length === 0, { overlapPairs: metrics.overlapPairs }),
-        check(`${prefix}-no-clipped-text`, metrics.clippingText.length === 0, { clippingText: metrics.clippingText }),
-        check(`${prefix}-no-user-facing-sample-copy`, !metrics.samplesVisible),
-      );
-      viewportResults.push({
-        viewport,
-        ready,
-        metrics,
-        screenshot,
-      });
-    } finally {
-      if (browser) {
-        browserIssues.push({ viewport: viewport.key, issues: browser.client.consoleIssues() });
-        await browser.close();
+  const run = await withTemporaryWorkspace("v", async () => {
+    const imported = await postJson("/api/import/commit", {
+      filePath: join(process.cwd(), "validation-inputs", "orders.csv"),
+      table: "visual_records",
+      name: "Visual Records",
+      mode: "create",
+      confirm: true,
+    });
+    const savedView = await postJson("/api/views/save", {
+      table: "visual_records",
+      view: "responsive_view",
+      name: "Responsive View",
+      columns: ["order_date", "channel", "net_sales"],
+      confirm: true,
+    });
+    bootstrap = { imported: imported.ok === true, savedView: savedView.ok === true };
+    checks.push(check("visual-workspace-bootstrap", bootstrap.imported && bootstrap.savedView, bootstrap));
+
+    for (const viewport of viewports) {
+      let browser = null;
+      try {
+        browser = await launchChrome();
+        browserInfo ??= { chromePath: browser.chromePath, chromeName: browser.chromeName };
+        await setViewport(browser.client, viewport);
+        await navigate(browser.client, url);
+        const ready = await waitForAppReady(browser.client, null, 25000);
+        const metrics = await evaluate(browser.client, visualMetrics, null, 10000);
+        const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `${viewport.key}-${viewport.width}x${viewport.height}.png`));
+        const prefix = `visual-${viewport.key}`;
+        checks.push(
+          check(`${prefix}-ready`, ready.ok, { ready }),
+          check(`${prefix}-views-route`, metrics.isViewsRoute && metrics.hasViewWorkspace && metrics.hasViewQueryPanel, {
+            url: metrics.url,
+            hasViewWorkspace: metrics.hasViewWorkspace,
+            hasViewQueryPanel: metrics.hasViewQueryPanel,
+          }),
+          check(`${prefix}-no-error-boundary`, !metrics.hasErrorBoundary, { metrics: { hasErrorBoundary: metrics.hasErrorBoundary } }),
+          check(`${prefix}-no-framework-overlay`, !metrics.hasFrameworkOverlay),
+          check(`${prefix}-no-global-x-overflow`, metrics.overflow.documentX === 0 && metrics.overflow.bodyX === 0, { overflow: metrics.overflow }),
+          check(`${prefix}-no-panel-x-overflow`, !metrics.overflow.mainPanelX && !metrics.overflow.contentShellX, { overflow: metrics.overflow }),
+          check(`${prefix}-no-table-horizontal-scroll`, !metrics.tableScroll?.hasHorizontalScroll, { tableScroll: metrics.tableScroll }),
+          check(`${prefix}-no-visible-overlap`, metrics.overlapPairs.length === 0, { overlapPairs: metrics.overlapPairs }),
+          check(`${prefix}-no-clipped-text`, metrics.clippingText.length === 0, { clippingText: metrics.clippingText }),
+          check(`${prefix}-no-user-facing-sample-copy`, !metrics.samplesVisible),
+        );
+        viewportResults.push({
+          viewport,
+          ready,
+          metrics,
+          screenshot,
+        });
+      } finally {
+        if (browser) {
+          browserIssues.push({ viewport: viewport.key, issues: browser.client.consoleIssues() });
+          await browser.close();
+        }
       }
     }
-  }
+    return {};
+  });
+  lifecycle = run.lifecycle;
 } catch (error) {
+  lifecycle = error?.lifecycle ?? lifecycle;
   checks.push(check("ui-visual-runtime", false, { error: error instanceof Error ? error.message : String(error) }));
 }
 
@@ -174,6 +208,8 @@ const receipt = finishReceipt({
   generatedBy: "scripts/verify-ui-visual.mjs",
   url,
   browser: browserInfo,
+  bootstrap,
+  lifecycle,
   screenshotDir,
   browserIssues,
   viewportResults: viewportResults.map((result) => ({
@@ -182,6 +218,9 @@ const receipt = finishReceipt({
     ready: result.ready,
     metrics: {
       connected: result.metrics.connected,
+      isViewsRoute: result.metrics.isViewsRoute,
+      hasViewWorkspace: result.metrics.hasViewWorkspace,
+      hasViewQueryPanel: result.metrics.hasViewQueryPanel,
       overflow: result.metrics.overflow,
       tableScroll: result.metrics.tableScroll,
       skinnyTextCount: result.metrics.skinnyText.length,
