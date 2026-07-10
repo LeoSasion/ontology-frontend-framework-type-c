@@ -13,6 +13,8 @@ const textSourceFiles = {
   biDashboardWidgetFactorySource: ["src", "biDashboardWidgetFactory.ts"],
   bWidgetKitModelSource: ["src", "biDashboardWidgetKitModel.ts"],
   dashboardCanvasSource: ["src", "components", "DashboardCanvas.tsx"],
+  dashboardDeferredModulesSource: ["src", "dashboardDeferredModules.tsx"],
+  dashboardDeferredPanelsSource: ["src", "components", "DashboardDeferredPanels.ts"],
   dashboardCanvasWidgetModelSource: ["src", "dashboardCanvasWidgetModel.ts"],
   dashboardCanvasSourceSwitchModelSource: ["src", "dashboardCanvasSourceSwitchModel.ts"],
   dashboardCanvasReadinessModelSource: ["src", "dashboardCanvasReadinessModel.ts"],

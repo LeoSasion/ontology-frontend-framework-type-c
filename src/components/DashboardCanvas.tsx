@@ -13,13 +13,16 @@ import { buildDashboardCanvasViewModel } from "../dashboardCanvasViewModel";
 import { buildProductActivation } from "../productActivationModel";
 import { useDashboardCanvasActions } from "../useDashboardCanvasActions";
 import { useDashboardCanvasState } from "../useDashboardCanvasState";
-import { DashboardAdvancedWidgetWorkbench } from "./DashboardAdvancedWidgetWorkbench";
-import { DashboardBeginnerEditor } from "./DashboardBeginnerEditor";
+import {
+  DashboardAdvancedWidgetWorkbench,
+  DashboardBeginnerEditor,
+  DashboardContractBoundaryPanel,
+  DashboardDeferredBoundary,
+  DashboardFilterWorkbench,
+  DashboardPageAdminPanel,
+} from "../dashboardDeferredModules";
 import { DashboardBusinessTaskStrip } from "./DashboardBusinessTaskStrip";
-import { DashboardContractBoundaryPanel } from "./DashboardContractBoundaryPanel";
-import { DashboardFilterWorkbench } from "./DashboardFilterWorkbench";
 import { DashboardOverviewStrip } from "./DashboardOverviewStrip";
-import { DashboardPageAdminPanel } from "./DashboardPageAdminPanel";
 import { BiDashboardWidgetKit } from "./BiDashboardWidgetKit";
 import { Bilingual, biText, translateName } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
@@ -62,8 +65,10 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
   const relationshipRecommendations = Array.isArray(workbench.relationshipRecommendations) ? workbench.relationshipRecommendations : [];
   const editableTables = Array.isArray(workbench.tables) ? workbench.tables : [];
   const {
+    advancedEditorMounted,
     availableFilterFields,
     canvasWidthMode,
+    contractPanelMounted,
     draftFields,
     draftMeasures,
     draftDimensions,
@@ -72,15 +77,19 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
     filterField,
     filterOperator,
     filterValue,
+    guidedEditorMounted,
     selectedRelationship,
     selectedRelationshipKey,
     selectedViewKey,
     selectedWidget,
     setCanvasWidthMode,
+    setAdvancedEditorMounted,
+    setContractPanelMounted,
     setDraftName,
     setFilterField,
     setFilterOperator,
     setFilterValue,
+    setGuidedEditorMounted,
     setSelectedRelationshipKey,
     setSelectedViewKey,
     setSelectedWidgetKey,
@@ -244,9 +253,17 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
 
         <BiDashboardWidgetKit dashboard={dashboard} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
 
-        <details className="progressiveDetails dashboardProgressiveDetails" data-testid="dashboard-guided-edit-details">
+        <details
+          className="progressiveDetails dashboardProgressiveDetails"
+          data-testid="dashboard-guided-edit-details"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setGuidedEditorMounted(true);
+          }}
+        >
           <summary><Bilingual zh="调整图表、筛选和数据来源" en="Adjust charts, filters, and data source" /></summary>
-          <div className="progressiveDetailsBody dashboardProgressiveGrid">
+          {guidedEditorMounted ? (
+          <DashboardDeferredBoundary>
+            <div className="progressiveDetailsBody dashboardProgressiveGrid">
             <DashboardFilterWorkbench
               availableFilterFields={availableFilterFields}
               busy={busy}
@@ -289,12 +306,22 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
               sourceSwitchView={sourceSwitchView}
               widgets={dashboardWidgets}
             />
-          </div>
+            </div>
+          </DashboardDeferredBoundary>
+          ) : null}
         </details>
 
-        <details className="progressiveDetails dashboardProgressiveDetails" data-testid="dashboard-advanced-edit-details">
+        <details
+          className="progressiveDetails dashboardProgressiveDetails"
+          data-testid="dashboard-advanced-edit-details"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setAdvancedEditorMounted(true);
+          }}
+        >
           <summary><Bilingual zh="高级组件和页面管理" en="Advanced widgets and page management" /></summary>
-          <div className="progressiveDetailsBody dashboardProgressiveGrid">
+          {advancedEditorMounted ? (
+          <DashboardDeferredBoundary>
+            <div className="progressiveDetailsBody dashboardProgressiveGrid">
             <DashboardAdvancedWidgetWorkbench
               busy={busy}
               businessCategories={businessCategories}
@@ -356,14 +383,26 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
               onDashboardSelect={onDashboardSelect}
               setDraftName={setDraftName}
             />
-          </div>
+            </div>
+          </DashboardDeferredBoundary>
+          ) : null}
         </details>
 
-        <details className="progressiveDetails dashboardProgressiveDetails" data-testid="dashboard-contract-details">
+        <details
+          className="progressiveDetails dashboardProgressiveDetails"
+          data-testid="dashboard-contract-details"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setContractPanelMounted(true);
+          }}
+        >
           <summary><Bilingual zh="查看动作边界和组件合同" en="View action boundaries and widget contracts" /></summary>
-          <div className="progressiveDetailsBody single">
-            <DashboardContractBoundaryPanel widgets={dashboardWidgets} />
-          </div>
+          {contractPanelMounted ? (
+            <DashboardDeferredBoundary>
+              <div className="progressiveDetailsBody single">
+                <DashboardContractBoundaryPanel widgets={dashboardWidgets} />
+              </div>
+            </DashboardDeferredBoundary>
+          ) : null}
         </details>
       </div>
     </section>

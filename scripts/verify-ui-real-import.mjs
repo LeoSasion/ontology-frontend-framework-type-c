@@ -364,8 +364,46 @@ try {
         };
       }, 45000);
       checks.push(check("ui-dashboard-single-chart-strip-visible", dashboardPage.ok, dashboardPage));
+
+      const deferredPanelsBeforeOpen = await evaluate(browser.client, () => ({
+        guided: Boolean(document.querySelector('[data-testid="dashboard-beginner-editor"]')),
+        advanced: Boolean(document.querySelector('[data-testid="dashboard-advanced-widget-workbench"]')),
+        contract: Boolean(document.querySelector('[data-testid="dashboard-contract-boundary-panel"]')),
+      }));
+      checks.push(check(
+        "ui-dashboard-deferred-panels-not-mounted-before-open",
+        !deferredPanelsBeforeOpen.guided && !deferredPanelsBeforeOpen.advanced && !deferredPanelsBeforeOpen.contract,
+        deferredPanelsBeforeOpen,
+      ));
+
+      await openDetails(browser.client, '[data-testid="dashboard-guided-edit-details"]');
+      const guidedEditorReady = await waitForUi(browser.client, "guided dashboard editor", () => ({
+        ok: Boolean(document.querySelector('[data-testid="dashboard-beginner-editor"]')),
+      }), 30000);
+      checks.push(check("ui-dashboard-guided-editor-loads-on-open", guidedEditorReady.ok, guidedEditorReady));
+
+      await openDetails(browser.client, '[data-testid="dashboard-advanced-edit-details"]');
+      const advancedEditorReady = await waitForUi(browser.client, "advanced dashboard editor", () => ({
+        ok: Boolean(document.querySelector('[data-testid="dashboard-advanced-widget-workbench"]')) &&
+          Boolean(document.querySelector('[data-testid="dashboard-page-admin-panel"]')),
+      }), 30000);
+      checks.push(check("ui-dashboard-advanced-editor-loads-on-open", advancedEditorReady.ok, advancedEditorReady));
+
+      await openDetails(browser.client, '[data-testid="dashboard-contract-details"]');
+      const contractPanelReady = await waitForUi(browser.client, "dashboard contract panel", () => ({
+        ok: Boolean(document.querySelector('[data-testid="dashboard-contract-boundary-panel"]')),
+      }), 30000);
+      checks.push(check("ui-dashboard-contract-panel-loads-on-open", contractPanelReady.ok, contractPanelReady));
+
       const dashboardScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "real-import-dashboard.png"));
-      steps.push({ step: "dashboard-ready", screenshot: dashboardScreenshot });
+      steps.push({
+        step: "dashboard-ready",
+        deferredPanelsBeforeOpen,
+        guidedEditorReady,
+        advancedEditorReady,
+        contractPanelReady,
+        screenshot: dashboardScreenshot,
+      });
 
       const chartClick = await click(browser.client, '[data-testid="dashboard-task-explain"]');
       checks.push(check("ui-dashboard-single-chart-click-fired", chartClick.ok, chartClick));

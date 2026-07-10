@@ -663,6 +663,8 @@ const {
   biDashboardWidgetFactorySource,
   bWidgetKitModelSource,
   dashboardCanvasSource,
+  dashboardDeferredModulesSource,
+  dashboardDeferredPanelsSource,
   dashboardCanvasWidgetModelSource,
   dashboardCanvasSourceSwitchModelSource,
   dashboardCanvasReadinessModelSource,
@@ -3364,7 +3366,8 @@ checks.push(
   {
     label: "dashboard-beginner-editor-component-boundary",
     ok: existsSync(join(root, "src", "components", "DashboardBeginnerEditor.tsx")) &&
-      dashboardCanvasSource.includes('from "./DashboardBeginnerEditor"') &&
+      dashboardDeferredModulesSource.includes("export const DashboardBeginnerEditor = lazy") &&
+      dashboardDeferredPanelsSource.includes('from "./DashboardBeginnerEditor"') &&
       dashboardCanvasSource.includes("<DashboardBeginnerEditor") &&
       dashboardCanvasSource.includes("healthItems={dashboardHealthItems}") &&
       dashboardCanvasSource.includes("sourceSwitchView={sourceSwitchView}") &&
@@ -3386,7 +3389,8 @@ checks.push(
   {
     label: "dashboard-advanced-widget-workbench-component-boundary",
     ok: existsSync(join(root, "src", "components", "DashboardAdvancedWidgetWorkbench.tsx")) &&
-      dashboardCanvasSource.includes('from "./DashboardAdvancedWidgetWorkbench"') &&
+      dashboardDeferredModulesSource.includes("export const DashboardAdvancedWidgetWorkbench = lazy") &&
+      dashboardDeferredPanelsSource.includes('from "./DashboardAdvancedWidgetWorkbench"') &&
       dashboardCanvasSource.includes("<DashboardAdvancedWidgetWorkbench") &&
       dashboardCanvasSource.includes("dashboardWidgets={dashboardWidgets}") &&
       dashboardCanvasSource.includes("onWidgetOperation={runWidgetOperation}") &&
@@ -3733,7 +3737,8 @@ checks.push(
   {
     label: "dashboard-page-admin-panel-component-boundary",
     ok: existsSync(join(root, "src", "components", "DashboardPageAdminPanel.tsx")) &&
-      dashboardCanvasSource.includes('from "./DashboardPageAdminPanel"') &&
+      dashboardDeferredModulesSource.includes("export const DashboardPageAdminPanel = lazy") &&
+      dashboardDeferredPanelsSource.includes('from "./DashboardPageAdminPanel"') &&
       dashboardCanvasSource.includes("<DashboardPageAdminPanel") &&
       dashboardCanvasSource.includes("dashboardPages={dashboardPages}") &&
       dashboardCanvasSource.includes("draftName={draftName}") &&
@@ -3769,7 +3774,8 @@ checks.push(
   {
     label: "dashboard-contract-boundary-panel-component-boundary",
     ok: existsSync(join(root, "src", "components", "DashboardContractBoundaryPanel.tsx")) &&
-      dashboardCanvasSource.includes('from "./DashboardContractBoundaryPanel"') &&
+      dashboardDeferredModulesSource.includes("export const DashboardContractBoundaryPanel = lazy") &&
+      dashboardDeferredPanelsSource.includes('from "./DashboardContractBoundaryPanel"') &&
       dashboardCanvasSource.includes("<DashboardContractBoundaryPanel") &&
       dashboardCanvasSource.includes("widgets={dashboardWidgets}") &&
       !dashboardCanvasSource.includes('data-testid="dashboard-contract-boundary-panel"') &&
@@ -3813,7 +3819,8 @@ checks.push(
   {
     label: "dashboard-filter-workbench-component-boundary",
     ok: existsSync(join(root, "src", "components", "DashboardFilterWorkbench.tsx")) &&
-      dashboardCanvasSource.includes('from "./DashboardFilterWorkbench"') &&
+      dashboardDeferredModulesSource.includes("export const DashboardFilterWorkbench = lazy") &&
+      dashboardDeferredPanelsSource.includes('from "./DashboardFilterWorkbench"') &&
       dashboardCanvasSource.includes("<DashboardFilterWorkbench") &&
       dashboardCanvasSource.includes("dashboardFilters={dashboardFilters}") &&
       dashboardCanvasSource.includes("availableFilterFields={availableFilterFields}") &&

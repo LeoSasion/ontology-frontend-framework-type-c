@@ -46,6 +46,9 @@ export function useDashboardCanvasState({
   const [widgetFilterOperator, setWidgetFilterOperator] = useState("equals");
   const [widgetFilterValue, setWidgetFilterValue] = useState("");
   const [widgetDraft, setWidgetDraft] = useState<WidgetDraft>(() => defaultWidgetDraft());
+  const [guidedEditorMounted, setGuidedEditorMounted] = useState(false);
+  const [advancedEditorMounted, setAdvancedEditorMounted] = useState(false);
+  const [contractPanelMounted, setContractPanelMounted] = useState(false);
 
   const selectedWidget = useMemo(
     () => dashboardWidgets.find((widget) => widget.widget_key === selectedWidgetKey) ?? dashboardWidgets[0],
@@ -109,21 +112,27 @@ export function useDashboardCanvasState({
   }, [fieldModel.draftDimensions, fieldModel.draftFields, selectedWidget?.widget_key]);
 
   return {
+    advancedEditorMounted,
+    contractPanelMounted,
     ...fieldModel,
     canvasWidthMode,
     draftName,
     filterField,
     filterOperator,
     filterValue,
+    guidedEditorMounted,
     selectedRelationship,
     selectedRelationshipKey,
     selectedViewKey,
     selectedWidget,
     setCanvasWidthMode,
+    setAdvancedEditorMounted,
+    setContractPanelMounted,
     setDraftName,
     setFilterField,
     setFilterOperator,
     setFilterValue,
+    setGuidedEditorMounted,
     setSelectedRelationshipKey,
     setSelectedViewKey,
     setSelectedWidgetKey,
