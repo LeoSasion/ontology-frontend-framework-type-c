@@ -64,6 +64,7 @@ const textSourceFiles = {
   agentPromptRoutingSource: ["src", "agentPromptRouting.ts"],
   agentCommandDockSource: ["src", "components", "AgentCommandDock.tsx"],
   agentPanelSource: ["src", "components", "AgentPanel.tsx"],
+  agentEvidenceStylesSource: ["src", "components", "agentEvidenceWorkspace.css"],
   agentPanelModelSource: ["src", "agentPanelModel.ts"],
   agentAnswerCardSource: ["src", "components", "AgentAnswerCard.tsx"],
   agentCanAnswerPanelSource: ["src", "components", "AgentCanAnswerPanel.tsx"],

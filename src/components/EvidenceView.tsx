@@ -1,3 +1,4 @@
+import "./agentEvidenceWorkspace.css";
 import { useMemo } from "react";
 import type { AgentAskResult, EvidenceFocus, WorkbenchPayload } from "../types";
 import type { BusinessPathStepKey } from "../businessPathModel";

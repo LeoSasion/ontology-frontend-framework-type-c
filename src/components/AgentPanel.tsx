@@ -1,3 +1,4 @@
+import "./agentEvidenceWorkspace.css";
 import { useEffect, useState } from "react";
 import type { ActionDraft, AgentAskResult, WorkbenchPayload } from "../types";
 import {

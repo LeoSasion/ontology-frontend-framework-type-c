@@ -713,6 +713,7 @@ const {
   agentPromptRoutingSource,
   agentCommandDockSource,
   agentPanelSource,
+  agentEvidenceStylesSource,
   agentPanelModelSource,
   agentAnswerCardSource,
   agentCanAnswerPanelSource,
@@ -878,7 +879,7 @@ const {
   preferencesThemeCommandServiceSource,
   implementationStatusSource,
 } = readVerifySourceCatalog(root);
-const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${settingsPanelStylesSource}`;
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${settingsPanelStylesSource}\n${agentEvidenceStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
@@ -4509,6 +4510,14 @@ checks.push(
       appLazyModulesSource.includes("export const sectionPreloaders: Record<AppSection") &&
       appLazyModulesSource.includes("export function scheduleIdlePreload") &&
       appLazyModulesSource.includes("requestIdleCallback") &&
+      agentPanelSource.includes('import "./agentEvidenceWorkspace.css"') &&
+      evidenceViewSource.includes('import "./agentEvidenceWorkspace.css"') &&
+      agentEvidenceStylesSource.includes(".agentComposer {") &&
+      agentEvidenceStylesSource.includes(".evidenceBusinessSummary {") &&
+      !globalStylesSource.includes(".agentComposer {") &&
+      !globalStylesSource.includes(".evidenceBusinessSummary {") &&
+      globalStylesSource.includes(".statusPill.compact {") &&
+      globalStylesSource.includes(".taskEvidenceRow summary {") &&
       appLazyModulesSource.includes("export function ModuleLoadingPanel") &&
       appLazyModulesSource.includes("export function InspectorLoadingPanel") &&
       appSource.includes("preloadModules(sectionPreloaders[section])") &&
