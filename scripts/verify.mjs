@@ -783,6 +783,7 @@ const {
   sourceWorkbenchSource,
   sourceWorkbenchAdvancedModulesSource,
   sourceWorkbenchAdvancedPanelsSource,
+  sourceWorkbenchAdvancedStylesSource,
   sourceWorkbenchConnectorControllerSource,
   sourceWorkbenchImportControllerSource,
   agentPromptGridSource,
@@ -875,7 +876,7 @@ const {
   preferencesThemeCommandServiceSource,
   implementationStatusSource,
 } = readVerifySourceCatalog(root);
-const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}`;
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
@@ -2748,6 +2749,11 @@ checks.push(
       relationshipAutoModelGraphSource.includes("手动选字段放在高级编辑里") &&
       relationshipAutoModelGraphSource.includes("runBusy(label, () => onRelationshipPreview(options))") &&
       relationshipAutoModelGraphSource.includes("runBusy(label, () => onRelationshipSave({ ...options, confirm }))") &&
+      sourceWorkbenchAdvancedPanelsSource.includes('import "./sourceWorkbenchAdvanced.css"') &&
+      sourceWorkbenchAdvancedStylesSource.includes(".relationshipAutoGraph {") &&
+      sourceWorkbenchAdvancedStylesSource.includes(".fieldSemanticReadiness {") &&
+      !globalStylesSource.includes(".relationshipAutoGraph {") &&
+      !globalStylesSource.includes(".fieldSemanticReadiness {") &&
       stylesSource.includes(".relationshipAutoGraph") &&
       stylesSource.includes(".relationshipGraphEdgeRow") &&
       stylesSource.includes(".relationshipGraphConnector") &&

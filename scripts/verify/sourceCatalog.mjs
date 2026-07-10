@@ -133,6 +133,7 @@ const textSourceFiles = {
   sourceWorkbenchSource: ["src", "components", "SourceWorkbench.tsx"],
   sourceWorkbenchAdvancedModulesSource: ["src", "sourceWorkbenchAdvancedModules.tsx"],
   sourceWorkbenchAdvancedPanelsSource: ["src", "components", "SourceWorkbenchAdvancedPanels.ts"],
+  sourceWorkbenchAdvancedStylesSource: ["src", "components", "sourceWorkbenchAdvanced.css"],
   sourceWorkbenchConnectorControllerSource: ["src", "useSourceWorkbenchConnectorController.ts"],
   sourceWorkbenchImportControllerSource: ["src", "useSourceWorkbenchImportController.ts"],
   agentPromptGridSource: ["src", "components", "AgentPromptGrid.tsx"],

@@ -317,6 +317,27 @@ try {
       counts = profileStatus.status.counts;
       checks.push(check("api-source-intelligence-recorded", Number(counts.sourceIntelligenceRuns ?? 0) > 0, { counts }));
 
+      const sourceExpertDetails = await openDetails(browser.client, '[data-testid="source-expert-details"]');
+      checks.push(check("ui-source-advanced-entry-opens", sourceExpertDetails.ok, sourceExpertDetails));
+      const sourceAdvancedClick = await click(browser.client, '[data-testid="source-expert-details"] button');
+      checks.push(check("ui-source-advanced-workbench-click-fired", sourceAdvancedClick.ok, sourceAdvancedClick));
+      const sourceAdvancedReady = await waitForUi(browser.client, "source advanced workbench", () => {
+        const navigation = document.querySelector('[data-testid="navigation-action-grid"]');
+        const semantics = document.querySelector('[data-testid="field-semantic-readiness"]');
+        const connector = document.querySelector('[data-testid="connector-business-lead"]');
+        const relationship = document.querySelector('[data-testid="relationship-auto-graph"]');
+        const displays = [navigation, semantics, connector, relationship].map((element) => element ? getComputedStyle(element).display : "missing");
+        return {
+          ok: displays.every((display) => display === "grid"),
+          displays,
+          hasNavigation: Boolean(navigation),
+          hasSemantics: Boolean(semantics),
+          hasConnector: Boolean(connector),
+          hasRelationship: Boolean(relationship),
+        };
+      }, 30000);
+      checks.push(check("ui-source-advanced-styles-load-on-open", sourceAdvancedReady.ok, sourceAdvancedReady));
+
       await openDetails(browser.client, '[data-testid="source-guide-details"]');
       const dashboardCreateReady = await waitForUi(browser.client, "source dashboard create", () => {
         const details = document.querySelector('[data-testid="source-guide-details"]');
