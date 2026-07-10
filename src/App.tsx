@@ -1,5 +1,4 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { createWorkspace, deleteWorkspace, renameWorkspace, selectWorkspace } from "./api";
 import { AgentCommandDock } from "./components/AgentCommandDock";
 import { Sidebar, type AppSection } from "./components/Sidebar";
 import { TopBar } from "./components/TopBar";
@@ -16,6 +15,7 @@ import { useAppAgentActions } from "./useAppAgentActions";
 import { useAppDataActions } from "./useAppDataActions";
 import { useAppDashboardActions } from "./useAppDashboardActions";
 import { useAppSettingsActions } from "./useAppSettingsActions";
+import { useAppWorkspaceActions } from "./useAppWorkspaceActions";
 import type { ActionDraft, AgentAskResult, DashboardPayload, EvidenceFocus, FormulaPreviewPayload, ImportPreview, QueryResult, RelationshipPreviewPayload, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import { buildWorkspaceFlow, resolveSectionForFlow } from "./workspaceFlowModel";
 
@@ -68,6 +68,23 @@ export default function App() {
   const [actionDrafts, setActionDrafts] = useState<ActionDraft[]>([]);
   const [lastActionResult, setLastActionResult] = useState<Record<string, unknown> | null>(null);
   const [evidenceFocus, setEvidenceFocus] = useState<EvidenceFocus | null>(null);
+  const {
+    handleWorkspaceCreate,
+    handleWorkspaceDelete,
+    handleWorkspaceRename,
+    handleWorkspaceSelect,
+  } = useAppWorkspaceActions({
+    activeWorkspaceId: status.workspace.id,
+    setActionDrafts,
+    setActiveDashboardKey,
+    setActiveViewKey,
+    setAgent,
+    setDashboards,
+    setLastActionResult,
+    setSection,
+    setStatus,
+    setWorkbench,
+  });
 
   const refresh = useCallback(async () => {
     setLoadState("loading");
@@ -121,75 +138,6 @@ export default function App() {
       // The inspector still works when storage is unavailable.
     }
   }, [inspectorPreference]);
-
-  const reloadWorkspaceSurface = useCallback(async () => {
-    const surface = await refreshStatusDashboardsWorkbenchDrafts();
-    setStatus(surface.status);
-    setWorkbench(surface.workbench);
-    setDashboards(surface.dashboards);
-    setAgent(emptyAgentResult);
-    setActionDrafts(surface.actionDrafts);
-    setActiveDashboardKey(surface.dashboards.dashboards[0]?.dashboard_key ?? "default");
-    setActiveViewKey(surface.workbench.savedViews[0]?.view_key ?? "");
-    return surface;
-  }, []);
-
-  const handleWorkspaceCreate = useCallback(async (name: string) => {
-    const previewResult = await createWorkspace(name, false);
-    if (previewResult.requiresConfirmation !== true) {
-      setLastActionResult(previewResult);
-      return previewResult;
-    }
-    const result = await createWorkspace(name, true);
-    setLastActionResult(result);
-    if (result.ok !== false) {
-      const surface = await reloadWorkspaceSurface();
-      if (surface) setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards));
-    }
-    return result;
-  }, [reloadWorkspaceSurface]);
-
-  const handleWorkspaceSelect = useCallback(async (workspaceId: string) => {
-    if (!workspaceId || workspaceId === status.workspace.id) return;
-    const result = await selectWorkspace(workspaceId, true);
-    setLastActionResult(result);
-    if (result.ok !== false) {
-      const surface = await reloadWorkspaceSurface();
-      if (surface) setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards));
-    }
-  }, [reloadWorkspaceSurface, status.workspace.id]);
-
-  const handleWorkspaceDelete = useCallback(async (workspaceId: string) => {
-    if (!workspaceId || workspaceId === "default" || workspaceId === status.workspace.id) return;
-    const previewResult = await deleteWorkspace(workspaceId, false);
-    if (previewResult.requiresConfirmation !== true) {
-      setLastActionResult(previewResult);
-      return previewResult;
-    }
-    const result = await deleteWorkspace(workspaceId, true);
-    setLastActionResult(result);
-    if (result.ok !== false) {
-      const surface = await reloadWorkspaceSurface();
-      if (surface) setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards));
-    }
-    return result;
-  }, [reloadWorkspaceSurface, status.workspace.id]);
-
-  const handleWorkspaceRename = useCallback(async (workspaceId: string, name: string) => {
-    const nextName = name.trim();
-    if (!workspaceId || !nextName) return;
-    const previewResult = await renameWorkspace(workspaceId, nextName, false);
-    if (previewResult.requiresConfirmation !== true) {
-      setLastActionResult(previewResult);
-      return previewResult;
-    }
-    const result = await renameWorkspace(workspaceId, nextName, true);
-    setLastActionResult(result);
-    if (result.ok !== false) {
-      await reloadWorkspaceSurface();
-    }
-    return result;
-  }, [reloadWorkspaceSurface]);
 
   useEffect(() => {
     if (!status.database && hasStoredThemeSnapshot()) {

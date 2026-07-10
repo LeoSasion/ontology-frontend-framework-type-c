@@ -114,6 +114,7 @@ const textSourceFiles = {
   appDataActionsSource: ["src", "useAppDataActions.ts"],
   appDashboardActionsSource: ["src", "useAppDashboardActions.ts"],
   appSettingsActionsSource: ["src", "useAppSettingsActions.ts"],
+  appWorkspaceActionsSource: ["src", "useAppWorkspaceActions.ts"],
   appRefreshModelSource: ["src", "appRefreshModel.ts"],
   defaultThemeDataSource: ["src", "defaultThemeData.ts"],
   productIntelligenceModelSource: ["src", "productIntelligenceModel.ts"],

@@ -764,6 +764,7 @@ const {
   appDataActionsSource,
   appDashboardActionsSource,
   appSettingsActionsSource,
+  appWorkspaceActionsSource,
   appRefreshModelSource,
   defaultThemeDataSource,
   productIntelligenceModelSource,
@@ -5144,11 +5145,14 @@ checks.push(
       sidebarSource.includes("selectWorkspaceFromInput") &&
       sidebarSource.includes("createWorkspaceFromInput") &&
       sidebarSource.includes("deleteWorkspaceFromInput") &&
-      appSource.includes("createWorkspace(name, false)") &&
-      appSource.includes("selectWorkspace(workspaceId, true)") &&
-      appSource.includes("deleteWorkspace(workspaceId, false)") &&
-      appSource.includes("const handleWorkspaceDelete = useCallback") &&
-      appSource.includes("reloadWorkspaceSurface"),
+      appSource.includes('from "./useAppWorkspaceActions"') &&
+      appSource.includes("useAppWorkspaceActions({") &&
+      appWorkspaceActionsSource.includes("createWorkspace(name, false)") &&
+      appWorkspaceActionsSource.includes("selectWorkspace(workspaceId, true)") &&
+      appWorkspaceActionsSource.includes("deleteWorkspace(workspaceId, false)") &&
+      appWorkspaceActionsSource.includes("renameWorkspace(workspaceId, nextName, false)") &&
+      appWorkspaceActionsSource.includes("const handleWorkspaceDelete = useCallback") &&
+      appWorkspaceActionsSource.includes("reloadWorkspaceSurface"),
   },
   {
     label: "sidebar-workspace-card-component-boundary",
