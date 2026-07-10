@@ -53,6 +53,7 @@ function realFlowState() {
   const disabled = (testId) => Boolean(get(testId)?.disabled);
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
   const seededSamplePattern = /样例订单|示例订单|demo|test|fallback source|临时看板|mock data|lorem/i;
+  const assetPanel = document.querySelector(".assetPanel");
   return {
     title: document.title,
     url: location.href,
@@ -62,6 +63,9 @@ function realFlowState() {
     errorDetail: document.querySelector(".appFallback pre, .fallbackPanel pre")?.textContent?.trim() || "",
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     hasSeededSampleCopy: seededSamplePattern.test(text),
+    layout: {
+      assetPanelXOverflow: assetPanel ? Math.max(0, assetPanel.scrollWidth - assetPanel.clientWidth) : 0,
+    },
     sources: {
       importInputValue: document.querySelector(".sourceImportPanel input")?.value ?? "",
       importPreviewButton: isVisible("import-preview-button"),
@@ -498,6 +502,7 @@ try {
       checks.push(
         check("ui-real-import-no-error-final", !finalState.hasErrorBoundary && !finalState.hasFrameworkOverlay),
         check("ui-real-import-no-seeded-copy-final", !finalState.hasSeededSampleCopy),
+        check("ui-real-import-no-asset-panel-x-overflow", finalState.layout.assetPanelXOverflow === 0, finalState.layout),
       );
       steps.push({ step: "final", state: finalState });
     } finally {

@@ -53,7 +53,7 @@ export function SidebarWorkspaceCard({
     <section className="assetWorkspaceCard" aria-labelledby="workspace-sandbox-title">
       <div className="assetSectionTitle">
         <span className="eyebrow">{biText("工作区沙盒", "Workspace sandbox")}</span>
-        <strong id="workspace-sandbox-title"><Bilingual {...translateName(currentWorkspace.name)} /></strong>
+        <strong id="workspace-sandbox-title" title={currentWorkspace.name}><Bilingual {...translateName(currentWorkspace.name)} /></strong>
       </div>
       <p>
         <Bilingual

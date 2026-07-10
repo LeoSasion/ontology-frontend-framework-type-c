@@ -5203,6 +5203,10 @@ checks.push(
       sidebarWorkspaceCardSource.includes("window.confirm") &&
       sidebarWorkspaceCardSource.includes("工作区沙盒") &&
       sidebarWorkspaceCardSource.includes("写入类动作仍必须先生成草案并确认") &&
+      sidebarWorkspaceCardSource.includes('title={currentWorkspace.name}') &&
+      hasCssRule(stylesSource, ".assetPanel", "overflow-x: hidden;", "overflow-y: auto;") &&
+      hasCssRule(stylesSource, ".assetSectionTitle strong", "text-overflow: ellipsis;", "white-space: nowrap;") &&
+      verifyUiRealImportSource.includes("ui-real-import-no-asset-panel-x-overflow") &&
       implementationStatusSource.includes("Sidebar workspace card component boundary"),
   },
   {
