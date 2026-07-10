@@ -35,8 +35,11 @@ export function appendProductUxContractChecks(context) {
     homeOverviewSource,
     implementationStatusSource,
     inspectorControllerSource,
+    inspectorContextPanelSource,
+    inspectorEvidenceDetailsSource,
     inspectorPanelModelSource,
     inspectorPanelSource,
+    inspectorTaskQueuePanelSource,
     join,
     metricSemanticRepairActionsSource,
     packageJson,
@@ -55,18 +58,21 @@ export function appendProductUxContractChecks(context) {
     verifyAAdversarialSource,
   } = context;
   const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const inspectorFeatureSource = `${inspectorPanelSource}\n${inspectorContextPanelSource}\n${inspectorTaskQueuePanelSource}\n${inspectorEvidenceDetailsSource}`;
   checks.push(
     {
         label: "frontend-inspector-selected-context",
         ok: inspectorPanelSource.includes("activeSection: AppSection") &&
           inspectorPanelSource.includes("evidenceFocus?: EvidenceFocus | null") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-selected-context\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-selected-context-chips\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-open-evidence\"") &&
-          inspectorPanelSource.includes("sectionContext(activeSection") &&
+          inspectorPanelSource.includes('import { InspectorContextPanel } from "./InspectorContextPanel"') &&
+          inspectorPanelSource.includes("<InspectorContextPanel") &&
+          inspectorContextPanelSource.includes("data-testid=\"inspector-selected-context\"") &&
+          inspectorContextPanelSource.includes("data-testid=\"inspector-selected-context-chips\"") &&
+          inspectorContextPanelSource.includes("data-testid=\"inspector-open-evidence\"") &&
+          inspectorContextPanelSource.includes("sectionContext(activeSection") &&
           inspectorPanelModelSource.includes("export function drawerActionsForSection") &&
           inspectorPanelModelSource.includes("export function sectionContext") &&
-          inspectorPanelSource.includes("drawerActionsForSection(activeSection)") &&
+          inspectorContextPanelSource.includes("drawerActionsForSection(activeSection)") &&
           inspectorPanelModelSource.includes("检查摘要") &&
           inspectorPanelModelSource.includes("改看板") &&
           appSource.includes("activeSection={section}") &&
@@ -103,8 +109,10 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "frontend-inspector-friendly-action-error",
-        ok: inspectorPanelSource.includes("actionResultSummary(lastActionResult)") &&
-          inspectorPanelSource.includes("import { actionKindLabel, actionNextStep, actionResultSummary, drawerActionsForSection, payloadTarget, sectionContext }") &&
+        ok: inspectorPanelSource.includes('import { InspectorTaskQueuePanel } from "./InspectorTaskQueuePanel"') &&
+          inspectorPanelSource.includes("<InspectorTaskQueuePanel") &&
+          inspectorTaskQueuePanelSource.includes("actionResultSummary(lastActionResult)") &&
+          inspectorTaskQueuePanelSource.includes("import { actionKindLabel, actionNextStep, actionResultSummary, payloadTarget }") &&
           actionRecoveryModelSource.includes("export function buildActionRecovery") &&
           actionRecoveryModelSource.includes("query-table") &&
           actionRecoveryModelSource.includes("dashboard-recovery") &&
@@ -121,16 +129,16 @@ export function appendProductUxContractChecks(context) {
           inspectorPanelModelSource.includes("function friendlyActionError") &&
           inspectorPanelModelSource.includes("No analyzable CSV/XLSX spreadsheet was found") &&
           inspectorPanelModelSource.includes("证据摘要没有完成") &&
-          inspectorPanelSource.includes('data-testid="last-action-recovery-steps"') &&
-          inspectorPanelSource.includes('data-testid="last-action-recovery-open-section"') &&
-          inspectorPanelSource.includes("getAppSection(latestSummary.targetSection)") &&
-          inspectorPanelSource.includes("onOpenSection(latestSummary.targetSection!)") &&
-          inspectorPanelSource.includes("visibleActionSafeState") &&
+          inspectorTaskQueuePanelSource.includes('data-testid="last-action-recovery-steps"') &&
+          inspectorTaskQueuePanelSource.includes('data-testid="last-action-recovery-open-section"') &&
+          inspectorTaskQueuePanelSource.includes("getAppSection(latestSummary.targetSection)") &&
+          inspectorTaskQueuePanelSource.includes("onOpenSection(latestSummary.targetSection!)") &&
+          inspectorTaskQueuePanelSource.includes("visibleActionSafeState") &&
           inspectorControllerSource.includes("const openAndExpand = useCallback") &&
           appEntrySource.includes("onOpenSection={inspector.openAndExpand}") &&
-          inspectorPanelSource.includes("data-testid=\"last-action-technical\"") &&
-          inspectorPanelSource.includes("visibleActionSummary ${latestSummary.tone}") &&
-          inspectorPanelSource.includes("查看错误原文") &&
+          inspectorTaskQueuePanelSource.includes("data-testid=\"last-action-technical\"") &&
+          inspectorTaskQueuePanelSource.includes("visibleActionSummary ${latestSummary.tone}") &&
+          inspectorTaskQueuePanelSource.includes("查看错误原文") &&
           appDataActionsSource.includes('action: "source-intelligence"') &&
           appDataActionsSource.includes("throw error") &&
           stylesSource.includes(".visibleActionSummary.failed") &&
@@ -145,27 +153,30 @@ export function appendProductUxContractChecks(context) {
         ok: inspectorPanelModelSource.includes("export function actionNextStep") &&
           inspectorPanelModelSource.includes("export function payloadTarget") &&
           inspectorPanelModelSource.includes("export function actionKindLabel") &&
-          inspectorPanelSource.includes("actionNextStep(draft)") &&
-          inspectorPanelSource.includes("payloadTarget(draft)") &&
-          inspectorPanelSource.includes("actionKindLabel(draft.kind)") &&
-          inspectorPanelSource.includes('data-testid="action-queue-next-step"') &&
-          inspectorPanelSource.includes('data-testid={`action-queue-technical-${draft.action_key}`}') &&
-          inspectorPanelSource.includes("查看证据和编号") &&
-          inspectorPanelSource.includes("查看错误原文") &&
-          inspectorPanelSource.includes("证据线索") &&
-          !inspectorPanelSource.includes("evidence refs`)") &&
+          inspectorTaskQueuePanelSource.includes("actionNextStep(draft)") &&
+          inspectorTaskQueuePanelSource.includes("payloadTarget(draft)") &&
+          inspectorTaskQueuePanelSource.includes("actionKindLabel(draft.kind)") &&
+          inspectorTaskQueuePanelSource.includes('data-testid="action-queue-next-step"') &&
+          inspectorTaskQueuePanelSource.includes('data-testid={`action-queue-technical-${draft.action_key}`}') &&
+          inspectorTaskQueuePanelSource.includes("查看证据和编号") &&
+          inspectorTaskQueuePanelSource.includes("查看错误原文") &&
+          inspectorTaskQueuePanelSource.includes("证据线索") &&
+          !inspectorTaskQueuePanelSource.includes("evidence refs`)") &&
           stylesSource.includes(".taskNextStep") &&
           stylesSource.includes(".taskEvidenceRow summary"),
       },
     {
         label: "frontend-object-inspector-v2",
-        ok: inspectorPanelSource.includes("buildObjectInspectorModel({ activeSection") &&
-          inspectorPanelSource.includes('data-testid="object-inspector-lens"') &&
-          inspectorPanelSource.includes('data-testid="object-inspector-facts"') &&
-          inspectorPanelSource.includes('data-testid="object-inspector-editor-slots"') &&
-          inspectorPanelSource.includes("objectModel.primaryAction") &&
-          inspectorPanelSource.includes('<details className="contextReservePanel">') &&
-          inspectorPanelSource.includes("扩展能力") &&
+        ok: inspectorContextPanelSource.includes("buildObjectInspectorModel({ activeSection") &&
+          inspectorContextPanelSource.includes('data-testid="object-inspector-lens"') &&
+          inspectorContextPanelSource.includes('data-testid="object-inspector-facts"') &&
+          inspectorContextPanelSource.includes('data-testid="object-inspector-editor-slots"') &&
+          inspectorContextPanelSource.includes("objectModel.primaryAction") &&
+          inspectorPanelSource.includes('import { InspectorEvidenceDetails } from "./InspectorEvidenceDetails"') &&
+          inspectorPanelSource.includes("<InspectorEvidenceDetails") &&
+          inspectorEvidenceDetailsSource.includes('<details className="contextReservePanel">') &&
+          inspectorEvidenceDetailsSource.includes("扩展能力") &&
+          inspectorFeatureSource.includes('data-testid="action-queue"') &&
           stylesSource.includes(".objectInspectorLens") &&
           stylesSource.includes(".objectInspectorFacts") &&
           stylesSource.includes(".objectInspectorSlots") &&
