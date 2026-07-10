@@ -214,7 +214,6 @@ export default function App() {
         dashboards={dashboards}
         onDashboardSelect={setActiveDashboardKey}
         onSectionChange={openSection}
-        onSourceIntelligenceRun={dataActions.handleSourceIntelligenceRun}
         onWorkspaceCreate={workspaceActions.handleWorkspaceCreate}
         onWorkspaceDelete={workspaceActions.handleWorkspaceDelete}
         onWorkspaceRename={workspaceActions.handleWorkspaceRename}
@@ -284,9 +283,6 @@ export default function App() {
           actionQueueDisabled={loadState === "loading" || apiMode !== "live"}
           inspectorCollapsed={!inspector.expanded}
           inspectorPinned={inspector.pinned}
-          onConfirmDryRun={agentActions.handleConfirmDryRun}
-          onConfirmAction={agentActions.handleConfirmAction}
-          onRejectAction={agentActions.handleRejectAction}
           onCollapseInspector={inspector.collapse}
           onExpandInspector={inspector.expand}
           onPinInspectorToggle={inspector.togglePinned}

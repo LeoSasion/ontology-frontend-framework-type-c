@@ -1,8 +1,7 @@
-import { useState } from "react";
 import { getAppSection } from "../appSections";
 import type { ActionDraft } from "../types";
 import { actionKindLabel, actionNextStep, actionResultSummary, payloadTarget } from "../inspectorPanelModel";
-import { Bilingual, biText, translateName, translateStatus } from "./Bilingual";
+import { Bilingual, biText, translateName } from "./Bilingual";
 import { Icon } from "./Icons";
 import type { AppSection } from "./Sidebar";
 
@@ -11,11 +10,8 @@ type InspectorTaskQueuePanelProps = {
   actionQueueDisabled: boolean;
   activeSection: AppSection;
   lastActionResult: Record<string, unknown> | null;
-  onConfirmAction: (actionKey: string) => Promise<void>;
-  onConfirmDryRun: (actionKey: string) => Promise<void>;
   onOpenAgent: () => void;
   onOpenSection: (section: AppSection) => void;
-  onRejectAction: (actionKey: string) => Promise<void>;
 };
 
 export function InspectorTaskQueuePanel({
@@ -23,25 +19,12 @@ export function InspectorTaskQueuePanel({
   actionQueueDisabled,
   activeSection,
   lastActionResult,
-  onConfirmAction,
-  onConfirmDryRun,
   onOpenAgent,
   onOpenSection,
-  onRejectAction,
 }: InspectorTaskQueuePanelProps) {
-  const [busyAction, setBusyAction] = useState("");
   const pendingDrafts = actionQueueDisabled ? [] : actionDrafts.filter((draft) => draft.status === "draft");
   const latestSummary = actionResultSummary(lastActionResult);
   const recoverySection = latestSummary?.targetSection ? getAppSection(latestSummary.targetSection) : null;
-
-  async function runAction(actionKey: string, task: () => Promise<void>) {
-    setBusyAction(actionKey);
-    try {
-      await task();
-    } finally {
-      setBusyAction("");
-    }
-  }
 
   return (
     <section className="actionQueue" data-testid="action-queue">
@@ -58,19 +41,18 @@ export function InspectorTaskQueuePanel({
       {actionQueueDisabled ? (
         <div className="emptyTaskQueue">
           <strong><Bilingual zh="正在连接本地服务" en="Connecting to local service" /></strong>
-          <p><Bilingual zh="确认、拒绝和预演只会在真实 API 连接后启用，避免误操作未同步的草案。" en="Preview, confirm, and reject are enabled only after the live API is connected, so unsynced drafts cannot be acted on." /></p>
+          <p><Bilingual zh="连接完成后可在 AI 助手中统一预演、确认或拒绝草案。" en="Once connected, preview, confirm, or reject drafts in the AI assistant." /></p>
         </div>
       ) : pendingDrafts.length ? (
         <ul className="draftList taskQueueList">
           {pendingDrafts.slice(0, 4).map((draft) => {
             const target = payloadTarget(draft);
             const actionLabel = actionKindLabel(draft.kind);
-            const isBusy = busyAction === draft.action_key;
             return (
               <li className="taskQueueItem" data-testid="action-queue-item" key={draft.action_key}>
                 <div className="taskQueueTopline">
                   <span className="taskKind"><Bilingual {...actionLabel} /></span>
-                  <span>{biText(translateStatus(draft.status).zh, translateStatus(draft.status).en)}</span>
+                  <span>{biText("等待 AI 处理", "Review in AI")}</span>
                 </div>
                 <strong><Bilingual {...translateName(draft.label)} /></strong>
                 <p><Bilingual {...target} /></p>
@@ -81,20 +63,6 @@ export function InspectorTaskQueuePanel({
                   <span>{actionLabel.en}: {draft.kind}</span>
                   <span>{draft.action_key}</span>
                 </details>
-                <div className="taskQueueActions">
-                  <button className="miniButton" data-testid={`action-preview-${draft.action_key}`} disabled={isBusy || actionQueueDisabled} onClick={() => runAction(draft.action_key, () => onConfirmDryRun(draft.action_key))} type="button">
-                    <Icon name="evidence" />
-                    {biText("预演", "Preview")}
-                  </button>
-                  <button className="primaryButton compactAction" data-testid={`action-confirm-${draft.action_key}`} disabled={isBusy || actionQueueDisabled} onClick={() => runAction(draft.action_key, () => onConfirmAction(draft.action_key))} type="button">
-                    <Icon name="check" />
-                    {biText("确认", "Confirm")}
-                  </button>
-                  <button className="miniButton dangerButton" data-testid={`action-reject-${draft.action_key}`} disabled={isBusy || actionQueueDisabled} onClick={() => runAction(draft.action_key, () => onRejectAction(draft.action_key))} type="button">
-                    <Icon name="close" />
-                    {biText("拒绝", "Reject")}
-                  </button>
-                </div>
               </li>
             );
           })}

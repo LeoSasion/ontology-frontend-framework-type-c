@@ -1,4 +1,3 @@
-import { biText } from "./components/Bilingual";
 import {
   B_DASHBOARD_COLOR_PALETTES,
   B_DASHBOARD_DATA_MODES,
@@ -14,7 +13,6 @@ import {
   type BiDashboardWidgetRelationshipQuery,
   type BiDashboardWidgetType,
 } from "./biDashboardModel";
-import { safeQueryInfo } from "./biDashboardRuntime";
 import { toStringValue } from "./biDashboardValueModel";
 import type { DashboardPage, DashboardPayload, QueryResult, WorkbenchPayload } from "./types";
 
@@ -59,21 +57,6 @@ function latestRunEvidence(workbench: WorkbenchPayload): string[] {
     `source-count:${latestRun.source_count}`,
     `metric-sql:${latestRun.metric_sql_executable_count}/${latestRun.metric_sql_plan_count}`,
   ];
-}
-
-function relationshipForWidget(workbench: WorkbenchPayload): BiDashboardWidgetRelationshipQuery | undefined {
-  const relation = Array.isArray(workbench.relationships) ? workbench.relationships[0] : undefined;
-  if (!relation) return undefined;
-  return {
-    relationKey: relation.relation_key,
-    leftTableKey: relation.left_table_key,
-    rightTableKey: relation.right_table_key,
-    fieldMappings: [{ leftField: relation.left_field, rightField: relation.right_field }],
-    joinType: relation.join_type,
-    groupFields: [{ side: "left", field: relation.left_field }],
-    measure: null,
-    aggregation: "count",
-  };
 }
 
 function normalizeRelationship(value: unknown): BiDashboardWidgetRelationshipQuery | undefined {
@@ -217,105 +200,6 @@ export function buildBiDashboardWidgets(args: {
   workbench: WorkbenchPayload;
 }): BiDashboardWidget[] {
   const evidence = latestRunEvidence(args.workbench);
-  const queryInfo = safeQueryInfo(args.query);
-  const tables = Array.isArray(args.workbench.tables) ? args.workbench.tables : [];
-  const metrics = Array.isArray(args.workbench.metrics) ? args.workbench.metrics : [];
-  const sourceIntelligenceRuns = Array.isArray(args.workbench.sourceIntelligenceRuns) ? args.workbench.sourceIntelligenceRuns : [];
-  const tableKey = args.dashboard.default_table_key || queryInfo.table || tables[0]?.table_key || "unknown_table";
-  const relation = relationshipForWidget(args.workbench);
-  const latestRun = sourceIntelligenceRuns[0];
   const stored = Array.isArray(args.dashboard.widgets) ? args.dashboard.widgets.map((widget) => hydrateStoredWidget(widget, evidence)) : [];
-  const types = new Set(stored.map((widget) => widget.type));
-  const queryMeasure = queryInfo.measure || metrics[0]?.measure || "value";
-  const queryGroup = queryInfo.group || metrics[0]?.dimension || "label";
-  const defaults: Record<BiDashboardWidgetType, BiDashboardWidget> = {
-    metric: baseWidget({
-      id: "b-widget-metric-default",
-      type: "metric",
-      title: biText("净销售指标", "Net sales metric"),
-      subtitle: biText("当前汇总", "Current total"),
-      tableKey,
-      evidence,
-      overrides: { measure: queryMeasure, aggregation: "sum", valueFormat: "compact" },
-    }),
-    bar: baseWidget({
-      id: "b-widget-bar-default",
-      type: "bar",
-      title: biText("分类排行", "Category ranking"),
-      subtitle: queryGroup,
-      tableKey,
-      evidence,
-      overrides: { dimension: queryGroup, measure: queryMeasure, aggregation: "sum", barOrientation: "horizontal", rankingMode: "ranked" },
-    }),
-    line: baseWidget({
-      id: "b-widget-line-default",
-      type: "line",
-      title: biText("趋势检查", "Trend check"),
-      subtitle: biText("按当前结果顺序", "Current result order"),
-      tableKey,
-      evidence,
-      overrides: { dimension: queryGroup, measure: queryMeasure, lineSmooth: true, areaFill: true, colorPalette: "fresh" },
-    }),
-    pie: baseWidget({
-      id: "b-widget-pie-default",
-      type: "pie",
-      title: biText("构成占比", "Composition share"),
-      subtitle: queryGroup,
-      tableKey,
-      evidence,
-      overrides: { dimension: queryGroup, measure: queryMeasure, pieShape: "donut", colorPalette: "contrast", showDataLabel: true },
-    }),
-    table: baseWidget({
-      id: "b-widget-table-default",
-      type: "table",
-      title: biText("明细表", "Detail table"),
-      subtitle: tableKey,
-      tableKey,
-      evidence,
-      overrides: { tableColumnLimit: 6, drillDown: true },
-    }),
-    text: baseWidget({
-      id: "b-widget-text-default",
-      type: "text",
-      title: biText("证据摘要", "Evidence summary"),
-      subtitle: latestRun ? latestRun.label : biText("等待数据画像", "Waiting for profiling"),
-      tableKey,
-      evidence,
-      overrides: {
-        textContent: latestRun
-          ? biText(
-            `已读取 ${latestRun.source_count} 个文件，识别 ${latestRun.table_count} 张表，并验证 ${latestRun.metric_sql_executable_count}/${latestRun.metric_sql_plan_count} 个指标计划可执行。`,
-            `${latestRun.source_count} files read, ${latestRun.table_count} tables detected, and ${latestRun.metric_sql_executable_count}/${latestRun.metric_sql_plan_count} metric plans verified as executable.`,
-          )
-          : biText("更新数据画像后，这里会显示本次分析的证据摘要。", "Refresh the data profile to show the evidence summary for this analysis."),
-        crossFilter: false,
-        drillDown: false,
-      },
-    }),
-    slicer: baseWidget({
-      id: "b-widget-slicer-default",
-      type: "slicer",
-      title: biText("局部筛选", "Local filter"),
-      subtitle: queryGroup,
-      tableKey,
-      evidence,
-      overrides: { dimension: "label", slicerDisplay: "list", slicerMultiSelect: true, globalFilterTarget: true, drillDown: false },
-    }),
-  };
-  if (relation && !stored.some((widget) => widget.dataMode === "relationship")) {
-    defaults.bar = {
-      ...defaults.bar,
-      id: "b-widget-relationship-default",
-      title: "关系预览排行",
-      subtitle: `${relation.leftTableKey} -> ${relation.rightTableKey}`,
-      dataMode: "relationship",
-      relationship: relation,
-      evidence: [...evidence, `relationship:${relation.leftTableKey}:${relation.rightTableKey}`],
-    };
-  }
-  const completed = [...stored];
-  for (const type of B_DASHBOARD_WIDGET_TYPES) {
-    if (!types.has(type)) completed.push(defaults[type]);
-  }
-  return completed.sort((left, right) => B_DASHBOARD_WIDGET_TYPES.indexOf(left.type) - B_DASHBOARD_WIDGET_TYPES.indexOf(right.type));
+  return stored.sort((left, right) => B_DASHBOARD_WIDGET_TYPES.indexOf(left.type) - B_DASHBOARD_WIDGET_TYPES.indexOf(right.type));
 }

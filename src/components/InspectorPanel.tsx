@@ -20,9 +20,6 @@ type InspectorPanelProps = {
   actionQueueDisabled: boolean;
   inspectorCollapsed: boolean;
   inspectorPinned: boolean;
-  onConfirmDryRun: (actionKey: string) => Promise<void>;
-  onConfirmAction: (actionKey: string) => Promise<void>;
-  onRejectAction: (actionKey: string) => Promise<void>;
   onCollapseInspector: () => void;
   onExpandInspector: () => void;
   onPinInspectorToggle: () => void;
@@ -45,9 +42,6 @@ export function InspectorPanel({
   actionQueueDisabled,
   inspectorCollapsed,
   inspectorPinned,
-  onConfirmDryRun,
-  onConfirmAction,
-  onRejectAction,
   onCollapseInspector,
   onExpandInspector,
   onPinInspectorToggle,
@@ -120,11 +114,8 @@ export function InspectorPanel({
         actionQueueDisabled={actionQueueDisabled}
         activeSection={activeSection}
         lastActionResult={lastActionResult}
-        onConfirmAction={onConfirmAction}
-        onConfirmDryRun={onConfirmDryRun}
         onOpenAgent={onOpenAgent}
         onOpenSection={onOpenSection}
-        onRejectAction={onRejectAction}
       />
       <InspectorEvidenceDetails agent={agent} lastActionResult={lastActionResult} preview={preview} />
     </aside>

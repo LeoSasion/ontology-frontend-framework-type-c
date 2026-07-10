@@ -20,7 +20,6 @@ type SidebarProps = {
   flow: WorkspaceFlowModel;
   agent: AgentAskResult;
   actionDrafts: ActionDraft[];
-  onSourceIntelligenceRun: () => Promise<Record<string, unknown> | void>;
   onWorkspaceCreate: (name: string) => Promise<Record<string, unknown> | void>;
   onWorkspaceDelete: (workspaceId: string) => Promise<Record<string, unknown> | void>;
   onWorkspaceRename: (workspaceId: string, name: string) => Promise<Record<string, unknown> | void>;
@@ -38,14 +37,12 @@ export function Sidebar({
   flow,
   agent,
   actionDrafts,
-  onSourceIntelligenceRun,
   onWorkspaceCreate,
   onWorkspaceDelete,
   onWorkspaceRename,
   onWorkspaceSelect,
 }: SidebarProps) {
   const activeRailSection = activeSection;
-  const [assetBusy, setAssetBusy] = useState(false);
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const currentWorkspace = status.workspace ?? {
@@ -72,15 +69,6 @@ export function Sidebar({
   useEffect(() => {
     setWorkspaceRenameName(currentWorkspace.name);
   }, [currentWorkspace.id, currentWorkspace.name]);
-
-  async function runSourceRefresh() {
-    setAssetBusy(true);
-    try {
-      await onSourceIntelligenceRun();
-    } finally {
-      setAssetBusy(false);
-    }
-  }
 
   async function createWorkspaceFromInput() {
     const name = workspaceName.trim();
@@ -207,11 +195,9 @@ export function Sidebar({
           activeRailSection={activeRailSection}
           actionDrafts={actionDrafts}
           agent={agent}
-          assetBusy={assetBusy}
           dashboards={dashboards}
           onDashboardSelect={onDashboardSelect}
           onSectionChange={onSectionChange}
-          runSourceRefresh={runSourceRefresh}
           status={status}
           workbench={workbench}
         />

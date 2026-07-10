@@ -10,11 +10,9 @@ type SidebarAssetSectionsProps = {
   activeDashboardKey: string;
   actionDrafts: ActionDraft[];
   agent: AgentAskResult;
-  assetBusy: boolean;
   dashboards: DashboardPayload;
   onDashboardSelect: (dashboardKey: string) => void;
   onSectionChange: (section: AppSection) => void;
-  runSourceRefresh: () => Promise<void>;
   status: WorkspaceStatus;
   workbench: WorkbenchPayload;
 };
@@ -49,11 +47,9 @@ export function SidebarAssetSections({
   activeDashboardKey,
   actionDrafts,
   agent,
-  assetBusy,
   dashboards,
   onDashboardSelect,
   onSectionChange,
-  runSourceRefresh,
   status,
   workbench,
 }: SidebarAssetSectionsProps) {
@@ -109,10 +105,6 @@ export function SidebarAssetSections({
             <strong>{biText(`继续：${homeNextMeta.zh}`, `Continue: ${homeNextMeta.en}`)}</strong>
             <span>{homeNextDetail}</span>
           </button>
-          <button className="assetAction" disabled={assetBusy} onClick={runSourceRefresh} type="button">
-            <Icon name="evidence" />
-            <span><Bilingual zh="生成证据摘要" en="Create evidence summary" /></span>
-          </button>
         </section>
       ) : null}
 
@@ -144,10 +136,6 @@ export function SidebarAssetSections({
               })}
             </div>
           </details>
-          <button className="assetAction" disabled={assetBusy} onClick={runSourceRefresh} type="button">
-            <Icon name="agent" />
-            <span><Bilingual zh="生成证据摘要" en="Create evidence summary" /></span>
-          </button>
         </section>
       ) : null}
 

@@ -279,8 +279,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchDataEntryPanelSource.includes("证据摘要") &&
           !sourceWorkbenchDataEntryPanelSource.includes("生成样例摘要") &&
           sourceWorkbenchActionPanelSource.includes("展开字段、公式和关系设置") &&
-          sidebarAssetSectionsSource.includes("生成证据摘要") &&
-          sidebarAssetSectionsSource.includes("生成证据摘要") &&
+          !sidebarAssetSectionsSource.includes("生成证据摘要") &&
           inspectorPanelModelSource.includes("生成摘要、创建看板") &&
           bWidgetKitSource.includes("sourceIntelligenceRuns") &&
           biDashboardWidgetFactorySource.includes("sourceIntelligenceRuns") &&
@@ -770,6 +769,7 @@ export function appendSourceContractChecks(context) {
     {
         label: "frontend-slicer-cross-filter-routing",
         ok: byLabel["frontend-slicer-cross-filter-model"].parsed?.ok === true &&
+          byLabel["frontend-slicer-cross-filter-model"].parsed?.emptyCount === 0 &&
           byLabel["frontend-slicer-cross-filter-model"].parsed?.slicer?.drillDown === false &&
           byLabel["frontend-slicer-cross-filter-model"].parsed?.slicer?.globalFilterTarget === true &&
           byLabel["frontend-slicer-cross-filter-model"].parsed?.filtered?.[0]?.label === "JD",
@@ -810,9 +810,10 @@ export function appendSourceContractChecks(context) {
           biDashboardModelSource.includes('export { buildBiDashboardWidgets } from "./biDashboardWidgetFactory"') &&
           biDashboardWidgetFactorySource.includes("export function buildBiDashboardWidgets") &&
           biDashboardWidgetFactorySource.includes("function hydrateStoredWidget") &&
-          biDashboardWidgetFactorySource.includes("function relationshipForWidget") &&
           biDashboardWidgetFactorySource.includes("function baseWidget") &&
-          biDashboardWidgetFactorySource.includes('import { safeQueryInfo } from "./biDashboardRuntime"') &&
+          biDashboardWidgetFactorySource.includes("function latestRunEvidence") &&
+          biDashboardWidgetFactorySource.includes("return stored.sort") &&
+          !biDashboardWidgetFactorySource.includes("b-widget-metric-default") &&
           !biDashboardModelSource.includes('import { safeQueryInfo } from "./biDashboardRuntime"') &&
           !biDashboardModelSource.includes("function hydrateStoredWidget") &&
           !biDashboardModelSource.includes("function relationshipForWidget") &&
