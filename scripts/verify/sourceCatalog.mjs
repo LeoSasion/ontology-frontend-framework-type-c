@@ -15,6 +15,7 @@ const textSourceFiles = {
   dashboardCanvasSource: ["src", "components", "DashboardCanvas.tsx"],
   dashboardDeferredModulesSource: ["src", "dashboardDeferredModules.tsx"],
   dashboardDeferredPanelsSource: ["src", "components", "DashboardDeferredPanels.ts"],
+  dashboardDeferredStylesSource: ["src", "components", "dashboardDeferred.css"],
   dashboardCanvasWidgetModelSource: ["src", "dashboardCanvasWidgetModel.ts"],
   dashboardCanvasSourceSwitchModelSource: ["src", "dashboardCanvasSourceSwitchModel.ts"],
   dashboardCanvasReadinessModelSource: ["src", "dashboardCanvasReadinessModel.ts"],

@@ -1,3 +1,5 @@
+import "./dashboardDeferred.css";
+
 export { DashboardAdvancedWidgetWorkbench } from "./DashboardAdvancedWidgetWorkbench";
 export { DashboardBeginnerEditor } from "./DashboardBeginnerEditor";
 export { DashboardContractBoundaryPanel } from "./DashboardContractBoundaryPanel";

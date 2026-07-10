@@ -817,7 +817,8 @@ const {
   settingsConfigPortabilityPanelSource,
   settingsSandboxBoundaryPanelSource,
   settingsThemePreferencePanelSource,
-  stylesSource,
+  stylesSource: globalStylesSource,
+  dashboardDeferredStylesSource,
   typesSource,
   typesAgentSource,
   typesDashboardSource,
@@ -874,6 +875,7 @@ const {
   preferencesThemeCommandServiceSource,
   implementationStatusSource,
 } = readVerifySourceCatalog(root);
+const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}`;
 const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
 const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
 checks.push(
@@ -3821,6 +3823,10 @@ checks.push(
     ok: existsSync(join(root, "src", "components", "DashboardFilterWorkbench.tsx")) &&
       dashboardDeferredModulesSource.includes("export const DashboardFilterWorkbench = lazy") &&
       dashboardDeferredPanelsSource.includes('from "./DashboardFilterWorkbench"') &&
+      dashboardDeferredPanelsSource.includes('import "./dashboardDeferred.css"') &&
+      dashboardDeferredStylesSource.includes(".dashboardFilterWorkbench {") &&
+      dashboardDeferredStylesSource.includes(".widgetFilterActions {") &&
+      !globalStylesSource.includes(".dashboardFilterWorkbench {") &&
       dashboardCanvasSource.includes("<DashboardFilterWorkbench") &&
       dashboardCanvasSource.includes("dashboardFilters={dashboardFilters}") &&
       dashboardCanvasSource.includes("availableFilterFields={availableFilterFields}") &&
