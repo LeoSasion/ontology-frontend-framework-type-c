@@ -778,6 +778,7 @@ const {
   indexHtmlSource,
   topBarSource,
   sourceWorkbenchSource,
+  sourceWorkbenchConnectorControllerSource,
   sourceWorkbenchImportControllerSource,
   agentPromptGridSource,
   sourceWorkbenchAgentStarterSource,
@@ -2262,10 +2263,10 @@ checks.push(
       sourceWorkbenchImportControllerSource.includes("buildImportPreviewReceipt({") &&
       sourceWorkbenchImportControllerSource.includes("buildImportCommitReceipt({") &&
       sourceWorkbenchImportControllerSource.includes("buildImportPolicyReceipt({") &&
-      sourceWorkbenchSource.includes('from "../sourceWorkbenchReceiptModel"') &&
-      sourceWorkbenchSource.includes("buildConnectorSaveReceipt({") &&
-      sourceWorkbenchSource.includes("buildConnectorSyncReceipt(connector, confirm)") &&
-      sourceWorkbenchSource.includes("buildConnectorRemoveReceipt(connector)") &&
+      sourceWorkbenchConnectorControllerSource.includes('from "./sourceWorkbenchReceiptModel"') &&
+      sourceWorkbenchConnectorControllerSource.includes("buildConnectorSaveReceipt({") &&
+      sourceWorkbenchConnectorControllerSource.includes("buildConnectorSyncReceipt(connector, confirm)") &&
+      sourceWorkbenchConnectorControllerSource.includes("buildConnectorRemoveReceipt(connector)") &&
       !sourceWorkbenchSource.includes('title: biText("文件检查已完成"') &&
       !sourceWorkbenchSource.includes('title: confirm ? biText("导入已确认"') &&
       !sourceWorkbenchSource.includes('title: confirm ? biText("连接配置已保存"') &&
@@ -2289,7 +2290,7 @@ checks.push(
       sourceWorkbenchImportControllerSource.includes("buildImportPolicyOptions({") &&
       sourceWorkbenchSource.includes('from "../sourceWorkbenchCommandModel"') &&
       sourceWorkbenchSource.includes("buildSourceProfileOptions({") &&
-      sourceWorkbenchSource.includes("buildConnectorOptions({") &&
+      sourceWorkbenchConnectorControllerSource.includes("buildConnectorOptions({") &&
       sourceWorkbenchSource.includes("buildMetricDraft({") &&
       !sourceWorkbenchSource.includes("uniqueFields: splitCsv(uniqueFields)") &&
       !sourceWorkbenchSource.includes("inputs: splitInputPaths(sourceProfileInputs)") &&
@@ -2761,7 +2762,7 @@ checks.push(
       sourceWorkbenchConnectorPanelSource.includes("清理导入记录") &&
       sourceWorkbenchConnectorPanelSource.includes("预览清理") &&
       sourceWorkbenchImportPanelSource.includes("Current state is preview") &&
-      sourceWorkbenchSource.includes("WorkbenchOperationReceipt") &&
+      sourceWorkbenchConnectorControllerSource.includes("WorkbenchOperationReceipt") &&
       sourceWorkbenchImportControllerSource.includes("runImportPreviewAction") &&
       sourceWorkbenchImportControllerSource.includes("runImportCommitAction") &&
       sourceWorkbenchImportControllerSource.includes("runImportPolicyAction") &&
@@ -2770,9 +2771,9 @@ checks.push(
       sourceWorkbenchImportPanelSource.includes("确认后才写入工作区") &&
       sourceWorkbenchImportPanelSource.includes("当前只做检查，不写入") &&
       sourceWorkbenchImportPanelSource.includes("View import policy and receipt") &&
-      sourceWorkbenchSource.includes("runConnectorSaveAction") &&
-      sourceWorkbenchSource.includes("runConnectorSyncAction") &&
-      sourceWorkbenchSource.includes("runConnectorRemoveAction") &&
+      sourceWorkbenchConnectorControllerSource.includes("runConnectorSaveAction") &&
+      sourceWorkbenchConnectorControllerSource.includes("runConnectorSyncAction") &&
+      sourceWorkbenchConnectorControllerSource.includes("runConnectorRemoveAction") &&
       sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-receipt"') &&
       sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-technical-details"') &&
       sourceWorkbenchConnectorPanelSource.includes("同步数据仍然需要先预览，再确认") &&
@@ -2847,9 +2848,10 @@ checks.push(
       sourceWorkbenchConnectorPanelSource.includes("type SourceWorkbenchConnectorPanelProps") &&
       sourceWorkbenchConnectorPanelSource.includes("DataConnectorConfig") &&
       sourceWorkbenchConnectorPanelSource.includes("ImportJob") &&
-      sourceWorkbenchConnectorPanelSource.includes("runConnectorSaveAction: (confirm: boolean) => Promise<void>") &&
-      sourceWorkbenchConnectorPanelSource.includes("runConnectorSyncAction: (connector: DataConnectorConfig, confirm: boolean) => Promise<void>") &&
-      sourceWorkbenchConnectorPanelSource.includes("runConnectorRemoveAction: (connector: DataConnectorConfig) => Promise<void>") &&
+      sourceWorkbenchConnectorPanelSource.includes("ReturnType<typeof useSourceWorkbenchConnectorController>") &&
+      sourceWorkbenchConnectorControllerSource.includes("async function runConnectorSaveAction(confirm: boolean)") &&
+      sourceWorkbenchConnectorControllerSource.includes("async function runConnectorSyncAction(connector: DataConnectorConfig, confirm: boolean)") &&
+      sourceWorkbenchConnectorControllerSource.includes("async function runConnectorRemoveAction(connector: DataConnectorConfig)") &&
       sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-save-dry-run-button"') &&
       sourceWorkbenchConnectorPanelSource.includes('data-testid={`connector-sync-dry-${connector.connectorKey}`}') &&
       sourceWorkbenchConnectorPanelSource.includes('data-testid={`connector-remove-${connector.connectorKey}`}') &&

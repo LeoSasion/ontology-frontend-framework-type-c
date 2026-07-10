@@ -1,48 +1,13 @@
-import type { Dispatch, SetStateAction } from "react";
 import type { DataConnectorConfig, ImportJob } from "../types";
+import type { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { Bilingual, biText } from "./Bilingual";
 
-type WorkbenchOperationReceipt = {
-  title: string;
-  detail: string;
-  nextStep: string;
-  technical: string;
-  tone: "ok" | "warn";
-};
-
-type SourceWorkbenchConnectorPanelProps = {
+type SourceWorkbenchConnectorPanelProps = ReturnType<typeof useSourceWorkbenchConnectorController> & {
   showAdvanced: boolean;
   busy: string | null;
   connectors: DataConnectorConfig[];
   importJobs: ImportJob[];
-  connectorEditingKey: string;
-  connectorName: string;
-  connectorType: string;
-  connectorProvider: string;
-  connectorStatus: string;
-  connectorEndpoint: string;
-  connectorImportMode: string;
-  connectorTargetTable: string;
-  connectorUniqueFields: string;
-  connectorConflictRule: string;
-  connectorNotes: string;
-  connectorOperationReceipt: WorkbenchOperationReceipt | null;
-  setConnectorName: Dispatch<SetStateAction<string>>;
-  setConnectorType: Dispatch<SetStateAction<string>>;
-  setConnectorProvider: Dispatch<SetStateAction<string>>;
-  setConnectorStatus: Dispatch<SetStateAction<string>>;
-  setConnectorEndpoint: Dispatch<SetStateAction<string>>;
-  setConnectorImportMode: Dispatch<SetStateAction<string>>;
-  setConnectorTargetTable: Dispatch<SetStateAction<string>>;
-  setConnectorUniqueFields: Dispatch<SetStateAction<string>>;
-  setConnectorConflictRule: Dispatch<SetStateAction<string>>;
-  setConnectorNotes: Dispatch<SetStateAction<string>>;
-  resetConnectorDraft: () => void;
-  loadConnector: (connector: DataConnectorConfig) => void;
   runBusy: (label: string, action: () => Promise<void>) => Promise<void>;
-  runConnectorSaveAction: (confirm: boolean) => Promise<void>;
-  runConnectorSyncAction: (connector: DataConnectorConfig, confirm: boolean) => Promise<void>;
-  runConnectorRemoveAction: (connector: DataConnectorConfig) => Promise<void>;
   onRemoveImportJob: (options: { jobKey: string; confirm?: boolean }) => Promise<void>;
 };
 

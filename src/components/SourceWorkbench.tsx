@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { DataConnectorConfig, FieldConfig, FormulaMutationPayload } from "../types";
+import type { FieldConfig, FormulaMutationPayload } from "../types";
 import type { RelationshipSaveOptions } from "../dashboardCanvasContracts";
 import type { QueryOptions, SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import {
@@ -11,10 +11,8 @@ import {
   sourceProfileErrorMessage,
 } from "../sourceWorkbenchModel";
 import {
-  buildConnectorOptions,
   buildMetricDraft,
   buildSourceProfileOptions,
-  type ConnectorOptions,
   type MetricMutationOptions,
   type SourceIntelligenceRunOptions,
 } from "../sourceWorkbenchCommandModel";
@@ -28,8 +26,8 @@ import {
   type NavigationOperation,
 } from "../sourceWorkbenchDraftModel";
 import { buildSourceWorkbenchGuidance } from "../sourceWorkbenchGuidanceModel";
-import { buildConnectorRemoveReceipt, buildConnectorSaveReceipt, buildConnectorSyncReceipt, type WorkbenchOperationReceipt } from "../sourceWorkbenchReceiptModel";
 import { buildProductActivation } from "../productActivationModel";
+import { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { useSourceWorkbenchImportController } from "../useSourceWorkbenchImportController";
 import { Bilingual, biText } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
@@ -165,18 +163,6 @@ export function SourceWorkbench({
   const [metricAggregation, setMetricAggregation] = useState("count");
   const [metricDimension, setMetricDimension] = useState(groupFields[0]?.field_name ?? "");
   const [semanticMetricResult, setSemanticMetricResult] = useState<Record<string, unknown> | null>(null);
-  const [connectorEditingKey, setConnectorEditingKey] = useState("");
-  const [connectorName, setConnectorName] = useState("文件同步");
-  const [connectorType, setConnectorType] = useState("file");
-  const [connectorProvider, setConnectorProvider] = useState("local-file");
-  const [connectorStatus, setConnectorStatus] = useState("draft");
-  const [connectorEndpoint, setConnectorEndpoint] = useState("");
-  const [connectorImportMode, setConnectorImportMode] = useState("auto");
-  const [connectorTargetTable, setConnectorTargetTable] = useState(firstTableKey);
-  const [connectorUniqueFields, setConnectorUniqueFields] = useState("");
-  const [connectorConflictRule, setConnectorConflictRule] = useState("overwrite");
-  const [connectorNotes, setConnectorNotes] = useState("");
-  const [connectorOperationReceipt, setConnectorOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
   const [sourceProfileInputs, setSourceProfileInputs] = useState("");
   const [sourceProfileLabel, setSourceProfileLabel] = useState(biText("证据摘要", "Source profile"));
   const [sourceProfileResult, setSourceProfileResult] = useState<Record<string, unknown> | null>(null);
@@ -193,6 +179,13 @@ export function SourceWorkbench({
     onCommitFolderImport,
     onImportPolicy,
   });
+  const connectorController = useSourceWorkbenchConnectorController({
+    firstTableKey,
+    tableKeySet,
+    onSaveConnector,
+    onSyncConnector,
+    onRemoveConnector,
+  });
 
   useEffect(() => {
     if (!activeNavigationModule) return;
@@ -206,7 +199,6 @@ export function SourceWorkbench({
     setActiveTableKey((current) => tableKeySet.has(current) ? current : firstTableKey);
     setManagedSourceKey((current) => tableKeySet.has(current) ? current : firstTableKey);
     setSourceRenameName((current) => current || firstTableName);
-    setConnectorTargetTable((current) => tableKeySet.has(current) ? current : firstTableKey);
   }, [firstTableKey, tableKeySet, tables]);
 
   useEffect(() => {
@@ -270,51 +262,6 @@ export function SourceWorkbench({
     setNavigationResult(result);
   }
 
-  function connectorOptions(confirm = false): ConnectorOptions {
-    return buildConnectorOptions({
-      connectorEditingKey,
-      connectorName,
-      connectorType,
-      connectorProvider,
-      connectorStatus,
-      connectorEndpoint,
-      connectorImportMode,
-      connectorTargetTable,
-      connectorUniqueFields,
-      connectorConflictRule,
-      connectorNotes,
-      confirm,
-    });
-  }
-
-  function loadConnector(connector: DataConnectorConfig) {
-    setConnectorEditingKey(connector.connectorKey);
-    setConnectorName(connector.name);
-    setConnectorType(connector.type || "file");
-    setConnectorProvider(connector.provider || "");
-    setConnectorStatus(connector.status || "draft");
-    setConnectorEndpoint(String(connector.config?.endpoint ?? ""));
-    setConnectorImportMode(String(connector.config?.importMode ?? "auto"));
-    setConnectorTargetTable(String(connector.config?.targetTableKey ?? ""));
-    setConnectorUniqueFields((connector.config?.uniqueFields ?? []).join(", "));
-    setConnectorConflictRule(String(connector.config?.conflictRule ?? "overwrite"));
-    setConnectorNotes(String(connector.config?.notes ?? ""));
-  }
-
-  function resetConnectorDraft() {
-    setConnectorEditingKey("");
-    setConnectorName("文件同步");
-    setConnectorType("file");
-    setConnectorProvider("local-file");
-    setConnectorStatus("draft");
-    setConnectorEndpoint("");
-    setConnectorImportMode("auto");
-    setConnectorTargetTable(firstTableKey);
-    setConnectorUniqueFields("");
-    setConnectorConflictRule("overwrite");
-    setConnectorNotes("");
-  }
-
   function selectManagedSource(tableKey: string) {
     setManagedSourceKey(tableKey);
     setSourceRenameName(managedSourceDisplayName(tables, tableKey));
@@ -327,29 +274,6 @@ export function SourceWorkbench({
     } finally {
       setBusy(null);
     }
-  }
-
-  async function runConnectorSaveAction(confirm: boolean) {
-    await onSaveConnector(connectorOptions(confirm));
-    setConnectorOperationReceipt(buildConnectorSaveReceipt({
-      confirm,
-      connectorName,
-      connectorTargetTable,
-      connectorEndpoint,
-      connectorImportMode,
-      connectorUniqueFields,
-      connectorConflictRule,
-    }));
-  }
-
-  async function runConnectorSyncAction(connector: DataConnectorConfig, confirm: boolean) {
-    await onSyncConnector({ connector: connector.connectorKey, confirm });
-    setConnectorOperationReceipt(buildConnectorSyncReceipt(connector, confirm));
-  }
-
-  async function runConnectorRemoveAction(connector: DataConnectorConfig) {
-    await onRemoveConnector({ connector: connector.connectorKey, confirm: true });
-    setConnectorOperationReceipt(buildConnectorRemoveReceipt(connector));
   }
 
   async function runSourceProfile(label: string, options: SourceIntelligenceRunOptions) {
@@ -611,38 +535,12 @@ export function SourceWorkbench({
             />
 
             <SourceWorkbenchConnectorPanel
+              {...connectorController}
               showAdvanced={showAdvanced}
               busy={busy}
               connectors={connectors}
               importJobs={importJobs}
-              connectorEditingKey={connectorEditingKey}
-              connectorName={connectorName}
-              connectorType={connectorType}
-              connectorProvider={connectorProvider}
-              connectorStatus={connectorStatus}
-              connectorEndpoint={connectorEndpoint}
-              connectorImportMode={connectorImportMode}
-              connectorTargetTable={connectorTargetTable}
-              connectorUniqueFields={connectorUniqueFields}
-              connectorConflictRule={connectorConflictRule}
-              connectorNotes={connectorNotes}
-              connectorOperationReceipt={connectorOperationReceipt}
-              setConnectorName={setConnectorName}
-              setConnectorType={setConnectorType}
-              setConnectorProvider={setConnectorProvider}
-              setConnectorStatus={setConnectorStatus}
-              setConnectorEndpoint={setConnectorEndpoint}
-              setConnectorImportMode={setConnectorImportMode}
-              setConnectorTargetTable={setConnectorTargetTable}
-              setConnectorUniqueFields={setConnectorUniqueFields}
-              setConnectorConflictRule={setConnectorConflictRule}
-              setConnectorNotes={setConnectorNotes}
-              resetConnectorDraft={resetConnectorDraft}
-              loadConnector={loadConnector}
               runBusy={runBusy}
-              runConnectorSaveAction={runConnectorSaveAction}
-              runConnectorSyncAction={runConnectorSyncAction}
-              runConnectorRemoveAction={runConnectorRemoveAction}
               onRemoveImportJob={onRemoveImportJob}
             />
           </>
