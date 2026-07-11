@@ -4,7 +4,7 @@ import { Icon } from "./Icons";
 
 type DashboardBusinessTaskStripProps = {
   dashboardName: string;
-  defaultTableKey: string;
+  hasDashboard: boolean;
   busy: string | null;
   onAsk: (label: string, prompt: string) => void;
   onOpenEvidence: () => void;
@@ -12,17 +12,14 @@ type DashboardBusinessTaskStripProps = {
 
 export function DashboardBusinessTaskStrip({
   dashboardName,
-  defaultTableKey,
+  hasDashboard,
   busy,
   onAsk,
   onOpenEvidence,
 }: DashboardBusinessTaskStripProps) {
-  const singleChartPrompt = biText(
-    `基于「${dashboardName}」和 ${defaultTableKey}，先问我最多一个必要问题，然后起草一个可确认的单图表。优先在折线图、柱状图、指标卡或表格中选择，说明字段、口径和证据，不直接写入。`,
-    `Using "${dashboardName}" and ${defaultTableKey}, ask at most one needed question, then draft one confirmable chart. Prefer line, bar, metric card, or table; explain fields, metric definition, and evidence. Do not write directly.`,
-  );
-  const [prompt, setPrompt] = useState(singleChartPrompt);
-  const resolvedPrompt = prompt.trim() || singleChartPrompt;
+  const [prompt, setPrompt] = useState("");
+  const resolvedPrompt = prompt.trim();
+  const promptReady = Boolean(resolvedPrompt);
 
   return (
     <section className="dashboardBusinessTaskStrip dashboardAICreatePanel wide" data-testid="dashboard-business-task-strip" aria-label={biText("看板业务任务", "Dashboard business tasks")}>
@@ -31,8 +28,12 @@ export function DashboardBusinessTaskStrip({
         <h3><Bilingual zh="先说想看的一个图表" en="Describe one chart first" /></h3>
         <p>
           <Bilingual
-            zh="默认只引导创建一个图表；整套证据看板保留 Beta 入口。涉及写入仍先生成草案。"
-            en="The default path creates one guided chart; full evidence dashboards remain a beta entry. Writes still become drafts first."
+            zh={hasDashboard
+              ? "默认只引导创建一个图表；整套证据看板保留 Beta 入口。涉及写入仍先生成草案。"
+              : "当前还没有看板；确认后只创建一个图表。整套证据看板仍保留在 Beta 入口。"}
+            en={hasDashboard
+              ? "The default path creates one guided chart; full evidence dashboards remain a beta entry. Writes still become drafts first."
+              : "There is no dashboard yet. Approval creates one chart only; full evidence dashboards remain a beta entry."}
           />
         </p>
       </div>
@@ -49,14 +50,14 @@ export function DashboardBusinessTaskStrip({
         <div className="dashboardBusinessTasks">
           <button
             data-testid="dashboard-task-explain"
-            disabled={busy === "dashboard-task-explain"}
+            disabled={busy === "dashboard-task-explain" || !promptReady}
             onClick={() => onAsk("dashboard-task-explain", resolvedPrompt)}
             type="button"
           >
             <Icon name="agent" />
             <span>
               <strong><Bilingual zh="生成一个图表" en="Create one chart" /></strong>
-              <small><Bilingual zh="单次对话给草案" en="Guided draft" /></small>
+              <small><Bilingual zh={promptReady ? "单次对话给草案" : "先描述目标"} en={promptReady ? "Guided draft" : "Describe the goal first"} /></small>
             </span>
           </button>
           <button data-testid="dashboard-task-evidence" onClick={onOpenEvidence} type="button">

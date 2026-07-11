@@ -1,0 +1,558 @@
+.agentCommandDock {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 330px minmax(520px, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 14px;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 12px;
+  box-shadow: 0 8px 22px rgb(15 23 42 / 4%);
+}
+
+.agentCommandDock.compact {
+  grid-template-columns: minmax(170px, 0.36fr) minmax(420px, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  box-shadow: none;
+}
+
+.agentCommandDock.active {
+  border-color: var(--bi-accent-border, #8bd8e6);
+  background: linear-gradient(180deg, var(--bi-surface) 0%, var(--bi-accent-soft) 100%);
+}
+
+.agentDockContext {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.agentDockMark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--bi-accent-soft);
+  color: var(--bi-accent-strong);
+}
+
+.agentDockContext span {
+  margin-top: 3px;
+  color: var(--bi-muted);
+  font-size: 12px;
+}
+
+.agentDockStatusRow {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  color: var(--bi-muted);
+  font-size: 11px;
+}
+
+.agentDockStatusRow > span {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 999px;
+  background: var(--bi-panel);
+  padding: 0 8px;
+}
+
+.agentDockState.ok {
+  border-color: #87c9a2;
+  background: #edf8f1;
+  color: #17633a;
+}
+
+.agentDockState.warn {
+  border-color: #e1b466;
+  background: #fff5df;
+  color: #7a4b05;
+}
+
+.agentDockForm {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto;
+  gap: 8px;
+}
+
+.agentDockForm input {
+  min-height: 38px;
+  font-size: 13px;
+}
+
+.agentDockShortcuts {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.agentCommandDock.compact .agentDockShortcuts,
+.agentCommandDock.compact .agentDockDecisionLane,
+.agentCommandDock.compact .agentDockStatusRow {
+  display: none;
+}
+
+.agentCommandDock.compact .agentDockMain,
+.agentCommandDock.compact .agentDockInputArea {
+  gap: 0;
+}
+
+.agentCommandDock.compact .agentDockContext {
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.agentCommandDock.compact .agentDockMark {
+  width: 28px;
+  height: 28px;
+}
+
+.agentCommandDock.compact .agentDockContext strong {
+  font-size: 12px;
+}
+
+.agentCommandDock.compact .agentDockContext span {
+  display: none;
+}
+
+.agentDockShortcuts button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  min-height: 34px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 999px;
+  background: var(--bi-panel);
+  color: var(--bi-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  padding: 0 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentDockDecisionLane {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.agentDockDecisionLane button {
+  display: grid;
+  grid-template-columns: minmax(92px, max-content) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  min-height: 36px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  color: var(--bi-text);
+  padding: 7px 10px;
+  text-align: left;
+}
+
+.agentDockDecisionLane button.ok {
+  border-color: #8fcda8;
+  background: #eef8f2;
+}
+
+.agentDockDecisionLane button.warn {
+  border-color: #e5ba70;
+  background: #fff6e4;
+}
+
+.agentDockDecisionLane button.muted {
+  color: var(--muted);
+}
+
+.agentDockTaskStrip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.agentCommandDock.compact .agentDockTaskStrip {
+  display: none;
+}
+
+.agentDockTaskStrip button {
+  min-width: 0;
+  min-height: 56px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  color: var(--bi-text);
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.agentCommandDock.compact .agentDockTaskStrip button {
+  min-height: 34px;
+  grid-template-columns: 17px minmax(0, 1fr);
+  grid-template-rows: auto;
+  gap: 4px;
+  padding: 5px 6px;
+}
+
+.agentCommandDock.compact .agentDockTaskStrip .icon {
+  width: 16px;
+  height: 16px;
+}
+
+.agentDockTaskStrip .icon {
+  grid-row: 1 / 3;
+  color: currentColor;
+}
+
+.agentCommandDock.compact .agentDockTaskStrip .icon {
+  grid-row: auto;
+}
+
+.agentDockTaskStrip span {
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.agentCommandDock.compact .agentDockTaskStrip small {
+  display: none;
+}
+
+.agentCommandDock.compact .agentDockForm {
+  grid-template-columns: minmax(200px, 1fr) auto;
+  gap: 6px;
+}
+
+.agentCommandDock.compact .agentDockForm input,
+.agentCommandDock.compact .primaryButton {
+  min-height: 34px;
+}
+
+.agentCommandDock.compact .primaryButton {
+  padding-inline: 12px;
+}
+
+.agentCommandDock.floating {
+  position: fixed;
+  right: calc(var(--shell-inspector-collapsed-width) + 24px);
+  bottom: 24px;
+  z-index: 70;
+  display: block;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.appShell[data-inspector-state="expanded"] .agentCommandDock.floating {
+  right: calc(var(--shell-inspector-width) + 24px);
+}
+
+.agentCommandDock.floating > * {
+  pointer-events: auto;
+}
+
+.agentCommandDock.floating.open {
+  width: min(440px, calc(100vw - 48px));
+}
+
+.agentCommandDock.floating.closed {
+  width: auto;
+}
+
+.agentCommandDock.floating.closed,
+.appShell[data-inspector-state="expanded"] .agentCommandDock.floating.closed {
+  right: 8px;
+}
+
+.agentCommandDock.floating.closed .agentFloatButton {
+  min-width: 48px;
+  width: 48px;
+  min-height: 48px;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-radius: 14px;
+  padding: 4px;
+}
+
+.agentCommandDock.floating.closed .agentFloatButtonText {
+  display: none;
+}
+
+.agentCommandDock.floating.closed .agentFloatStatusDot {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+}
+
+.agentCommandDock.onboardingMinimized {
+  right: 18px;
+  bottom: 18px;
+}
+
+.appShell[data-inspector-state="expanded"] .agentCommandDock.onboardingMinimized {
+  right: 18px;
+}
+
+.agentFloatButton {
+  min-width: 190px;
+  max-width: min(300px, calc(100vw - 48px));
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid var(--bi-accent-border, var(--bi-border));
+  border-radius: 999px;
+  background: var(--bi-panel);
+  color: var(--bi-text);
+  padding: 8px 10px;
+  text-align: left;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 18%);
+}
+
+.agentCommandDock.onboardingMinimized .agentFloatButton {
+  min-width: 48px;
+  width: 48px;
+  min-height: 48px;
+  grid-template-columns: 1fr;
+  gap: 0;
+  border-radius: 14px;
+  padding: 4px;
+}
+
+.agentCommandDock.onboardingMinimized .agentFloatButtonText {
+  display: none;
+}
+
+.agentCommandDock.onboardingMinimized .agentFloatStatusDot {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+}
+
+.agentFloatButton .agentDockMark {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+}
+
+.agentFloatButtonText strong {
+  color: var(--bi-text);
+  font-size: 13px;
+  line-height: 1.15;
+}
+
+.agentFloatButtonText small {
+  color: var(--bi-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.agentFloatBadge,
+.agentFloatStatusDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.agentFloatBadge {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #ffbf66;
+  color: #2b1a04;
+  font-size: 11px;
+  font-weight: 900;
+  padding: 0 6px;
+}
+
+.agentFloatStatusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--bi-accent);
+  box-shadow: 0 0 0 4px var(--bi-accent-soft);
+}
+
+.agentFloatStatusDot.ok {
+  background: #5fc58a;
+  box-shadow: 0 0 0 4px rgb(95 197 138 / 18%);
+}
+
+.agentFloatStatusDot.warn {
+  background: #ffbf66;
+  box-shadow: 0 0 0 4px rgb(255 191 102 / 18%);
+}
+
+.agentFloatStatusDot.info {
+  background: var(--bi-accent);
+}
+
+.agentFloatPanel {
+  display: grid;
+  gap: 12px;
+  max-height: calc(100vh - 96px);
+  overflow: auto;
+  border: 1px solid var(--bi-accent-border, var(--bi-border));
+  border-radius: 12px;
+  background: var(--bi-panel);
+  padding: 14px;
+  box-shadow: 0 18px 42px rgb(0 0 0 / 24%);
+}
+
+.agentFloatHeader {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  gap: 10px;
+  align-items: center;
+}
+
+.agentFloatClose {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  color: var(--bi-muted);
+  padding: 0;
+}
+
+.agentCommandDock.floating .agentDockMain,
+.agentCommandDock.floating .agentDockInputArea {
+  gap: 8px;
+}
+
+.agentCommandDock.floating .agentDockContext {
+  grid-template-columns: 38px minmax(0, 1fr);
+}
+
+.agentCommandDock.floating .agentDockStatusRow {
+  display: flex;
+  gap: 6px;
+}
+
+.agentCommandDock.floating .agentDockStatusRow > span {
+  max-width: 100%;
+}
+
+.agentCommandDock.floating .agentDockForm {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.agentCommandDock.floating .agentDockForm input,
+.agentCommandDock.floating .primaryButton {
+  min-height: 36px;
+}
+
+.agentCommandDock.floating .agentDockShortcuts {
+  gap: 6px;
+}
+
+.agentCommandDock.floating .agentDockShortcuts button {
+  flex: 1 1 126px;
+  min-height: 34px;
+  padding: 0 10px;
+}
+
+.agentRouteHint {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 7px;
+  align-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  color: var(--bi-muted);
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.3;
+  padding: 7px 8px;
+}
+
+.agentRouteHint svg {
+  color: var(--bi-accent-strong);
+}
+
+.agentCommandDock.floating .agentDockDecisionLane {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.agentCommandDock.floating .agentDockDecisionLane button {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-height: 58px;
+  padding: 8px;
+}
+
+.agentCommandDock.floating .agentDockTaskStrip {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.agentCommandDock.floating .agentDockTaskStrip button {
+  min-height: 54px;
+  padding: 8px;
+}
+
+@media (max-width: 1180px) {
+  .agentCommandDock.floating,
+  .appShell[data-inspector-state="expanded"] .agentCommandDock.floating {
+    right: 18px;
+    bottom: 18px;
+  }
+
+  .agentCommandDock.floating.open {
+    width: min(420px, calc(100vw - 36px));
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .agentFloatButton,
+  .agentFloatPanel {
+    transition: border-color 160ms ease, background-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  }
+
+  .agentFloatButton:hover,
+  .agentFloatPanel:focus-within {
+    transform: translateY(-1px);
+  }
+}

@@ -47,6 +47,7 @@ type SourceWorkbenchActionPanelProps = {
   runSourceProfile: (label: string, options: SourceIntelligenceRunOptions) => Promise<void>;
   runBusinessDashboard: (confirm: boolean) => Promise<void>;
   onAsk: (prompt: string) => Promise<void>;
+  onOpenDashboard: () => void;
 };
 
 export function SourceWorkbenchActionPanel({
@@ -75,6 +76,7 @@ export function SourceWorkbenchActionPanel({
   runSourceProfile,
   runBusinessDashboard,
   onAsk,
+  onOpenDashboard,
 }: SourceWorkbenchActionPanelProps) {
   return (
     <article className="workbenchPanel simpleGuide" data-testid="beginner-import-plan">
@@ -124,6 +126,12 @@ export function SourceWorkbenchActionPanel({
             ? biText("证据摘要已就绪，可以继续生成图表或看板草案。", "Evidence is ready; continue to chart or dashboard drafts.")
             : biText("先生成证据摘要；字段、关系和指标缺口确认后再进入看板。", "Create the evidence summary first; review fields, links, and metric gaps before dashboarding.")}
         </span>
+        {sourceProfileComplete ? (
+          <button className="primaryButton compactAction" data-testid="source-next-dashboard" onClick={onOpenDashboard} type="button">
+            <Icon name="dashboard" />
+            <Bilingual zh="去生成图表" en="Create a chart" />
+          </button>
+        ) : null}
       </div>
       <details className="sourceGuideDetails" data-testid="source-guide-details">
         <summary>{biText("更多引导和高级建议", "More guidance and advanced suggestions")}</summary>
@@ -189,7 +197,7 @@ export function SourceWorkbenchActionPanel({
           <div className="sourceDashboardRecipeFacts" data-testid="source-dashboard-recipe-facts">
             <span>{latestSourceProfile ? `${latestSourceProfile.source_count} ${biText("文件", "files")}` : biText("等待画像", "waiting profile")}</span>
             <span>{latestSourceProfile ? `${latestSourceProfile.relationship_count} ${biText("关系", "relations")}` : `${relationshipsCount} ${biText("已存关系", "saved relations")}`}</span>
-            <span>{latestSourceProfile ? `${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} SQL` : `${selectedMetricsCount} ${biText("指标", "metrics")}`}</span>
+            <span>{latestSourceProfile ? `${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} ${biText("可执行问题", "answerable questions")}` : `${selectedMetricsCount} ${biText("指标", "metrics")}`}</span>
             <span>{dashboardRecipeEvidenceCount} {biText("证据", "evidence")}</span>
           </div>
           <div className="sourceDashboardRecipeCards" data-testid="source-dashboard-recipe-cards">

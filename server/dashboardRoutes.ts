@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { appendCliFilters } from "./cliArgBuilders";
 import {
   pushDashboardWidgetStyleArgs,
   readBCostMonitorValidation,
@@ -113,14 +114,7 @@ export async function handleDashboardApi(options: DashboardRoutesOptions) {
       if (body.valueFormat) args.push("--value-format", String(body.valueFormat));
       if (body.textContent) args.push("--text-content", String(body.textContent));
       pushDashboardWidgetStyleArgs(args, body);
-      if (Array.isArray(body.filters)) {
-        for (const filter of body.filters) {
-          if (filter && typeof filter === "object") {
-            const item = filter as Record<string, unknown>;
-            args.push("--filter", `${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-          }
-        }
-      }
+      appendCliFilters(args, body.filters);
       if (body.clearFilters === true) args.push("--clear-filters");
       if (op === "add" && body.widgetKey) args.push("--widget", String(body.widgetKey));
       if (op === "set" && body.type) args.push("--type", String(body.type));

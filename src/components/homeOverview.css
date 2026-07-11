@@ -182,12 +182,6 @@
   line-height: 1.2;
 }
 
-.workspaceGuideSteps {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .workspaceGuideStep {
   min-width: 0;
   display: grid;
@@ -207,12 +201,6 @@
 .workspaceGuideStep.done {
   border-color: var(--bi-border);
   background: var(--surface);
-}
-
-.workspaceGuideStep.current {
-  border-color: var(--bi-accent);
-  background: var(--bi-accent-soft);
-  color: var(--bi-accent-strong);
 }
 
 .workspaceGuideStep.pending {
@@ -331,11 +319,6 @@
   padding: 0 12px;
 }
 
-.questionChip:hover {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
-
 .nextStepGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -377,13 +360,6 @@
   color: var(--accent-strong);
 }
 
-.stepActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
 .operatingSummaryGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -397,12 +373,6 @@
   border-radius: 8px;
   background: var(--surface-2);
   padding: 14px;
-}
-
-.operatingSummaryGrid strong,
-.operatingSummaryGrid p {
-  display: block;
-  min-width: 0;
 }
 
 .operatingSummaryGrid strong {

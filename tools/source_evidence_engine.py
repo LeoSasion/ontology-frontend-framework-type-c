@@ -700,7 +700,7 @@ def source_intelligence(input_paths: list[Path], output_dir: Path, domain_pack_r
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Profile CSV/XLSX sources and write AIBI Hybrid evidence receipts.")
+    parser = argparse.ArgumentParser(description="Profile CSV/XLSX sources and write AIBI-C evidence receipts.")
     parser.add_argument("inputs", nargs="*", type=Path)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--domain-pack-runtime", type=Path)

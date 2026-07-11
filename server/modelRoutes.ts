@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { appendCliFilters } from "./cliArgBuilders";
 import { readBody, sendJson } from "./serverRuntime";
 
 type ModelRoutesOptions = {
@@ -71,15 +72,7 @@ export async function handleModelApi(options: ModelRoutesOptions) {
     if (body.limit) args.push("--limit", String(body.limit));
     if (body.sortBy) args.push("--sort-by", String(body.sortBy));
     if (body.sortDirection) args.push("--sort-direction", String(body.sortDirection));
-    if (Array.isArray(body.filters)) {
-      for (const filter of body.filters) {
-        if (filter && typeof filter === "object") {
-          const item = filter as Record<string, unknown>;
-          const side = item.side ? `${String(item.side)}:` : "";
-          args.push("--filter", `${side}${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-        }
-      }
-    }
+    appendCliFilters(args, body.filters, { includeSide: true });
     const result = await cli(args);
     sendJson(response, result.ok === false ? 400 : 200, result);
     return true;
@@ -277,14 +270,7 @@ export async function handleModelApi(options: ModelRoutesOptions) {
     if (body.aggregation || body.agg) args.push("--agg", String(body.aggregation ?? body.agg));
     if (body.dimension) args.push("--dimension", String(body.dimension));
     if (body.timeField) args.push("--time-field", String(body.timeField));
-    if (Array.isArray(body.filters)) {
-      for (const filter of body.filters) {
-        if (filter && typeof filter === "object") {
-          const item = filter as Record<string, unknown>;
-          args.push("--filter", `${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-        }
-      }
-    }
+    appendCliFilters(args, body.filters);
     if (body.valueFormat) args.push("--value-format", String(body.valueFormat));
     if (body.description) args.push("--description", String(body.description));
     if (body.confirm === true) args.push("--yes");
@@ -298,14 +284,7 @@ export async function handleModelApi(options: ModelRoutesOptions) {
     const args = ["query-metric", String(body.metric ?? body.metricKey ?? "")];
     if (Array.isArray(body.group)) body.group.map(String).forEach((group) => args.push("--group", group));
     if (Array.isArray(body.groups)) body.groups.map(String).forEach((group) => args.push("--group", group));
-    if (Array.isArray(body.filters)) {
-      for (const filter of body.filters) {
-        if (filter && typeof filter === "object") {
-          const item = filter as Record<string, unknown>;
-          args.push("--filter", `${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-        }
-      }
-    }
+    appendCliFilters(args, body.filters);
     if (body.sort) args.push("--sort", String(body.sort));
     if (body.limit) args.push("--limit", String(body.limit));
     const result = await cli(args);

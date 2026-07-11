@@ -59,7 +59,7 @@ def prompt_mentions_dashboard_create(prompt: str) -> bool:
     has_dashboard = any(token in prompt for token in ["看板", "仪表盘"]) or "dashboard" in lower
     if not has_dashboard:
         return False
-    if any(token in prompt for token in ["看板组件", "仪表盘组件", "指标卡"]) or "dashboard widget" in lower:
+    if any(token in prompt for token in ["看板组件", "仪表盘组件"]) or "dashboard widget" in lower:
         return False
     zh_create = bool(re.search(r"(生成|创建|新建|起草|搭建|制作).{0,20}(看板|仪表盘)", prompt)) or bool(
         re.search(r"(做一张|做一个|做个).{0,20}(看板|仪表盘)", prompt)

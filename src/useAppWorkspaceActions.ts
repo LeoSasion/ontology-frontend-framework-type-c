@@ -47,7 +47,7 @@ export function useAppWorkspaceActions({
 
   const openWorkspaceLanding = useCallback(async () => {
     const surface = await reloadWorkspaceSurface();
-    setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards));
+    setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards, surface.actionDrafts.length));
     return surface;
   }, [reloadWorkspaceSurface, setSection]);
 

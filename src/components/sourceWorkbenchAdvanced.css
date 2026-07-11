@@ -25,12 +25,6 @@
   padding: 10px 12px;
 }
 
-.connectorBusinessLead strong {
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-}
-
 .connectorBusinessLead span {
   color: var(--bi-muted);
   font-size: 12px;
@@ -133,12 +127,6 @@
   justify-self: center;
 }
 
-.relationshipGraphCanvas {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-
 .relationshipGraphEdgeRow {
   position: relative;
   display: grid;
@@ -171,10 +159,6 @@
   cursor: default;
 }
 
-.relationshipGraphEdgeRow.saved {
-  border-color: color-mix(in srgb, var(--success) 36%, var(--bi-border));
-}
-
 .relationshipGraphEdgeRow.recommended {
   border-color: color-mix(in srgb, var(--bi-accent) 38%, var(--bi-border));
 }
@@ -188,14 +172,6 @@
   border-radius: 7px;
   background: var(--surface-2);
   padding: 8px;
-}
-
-.relationshipGraphNode strong,
-.relationshipGraphNode small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .relationshipGraphNode strong {
@@ -289,15 +265,6 @@
   padding: 8px;
 }
 
-.relationshipGraphScore strong,
-.relationshipGraphScore span,
-.relationshipGraphScore small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .relationshipGraphScore strong {
   color: var(--text);
   font-size: 15px;
@@ -340,11 +307,6 @@
   padding: 14px;
 }
 
-.relationshipGraphEmpty strong {
-  color: var(--text);
-  font-size: 13px;
-}
-
 .relationshipGraphEmpty span,
 .relationshipGraphFooter {
   color: var(--muted);
@@ -359,13 +321,6 @@
   justify-content: space-between;
   min-width: 0;
   flex-wrap: wrap;
-}
-
-.relationshipGraphFooter span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 @container relationship-model (max-width: 820px) {
@@ -401,24 +356,6 @@
   align-items: center;
 }
 
-.relationshipImpactHeader strong {
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.relationshipImpactHeader span {
-  color: var(--bi-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.relationshipImpactFacts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
 .relationshipImpactFacts span {
   min-width: 0;
   overflow: hidden;
@@ -445,32 +382,6 @@
   padding: 10px;
 }
 
-.relationshipRecommendationCard div {
-  display: grid;
-  gap: 4px;
-  min-width: 0;
-}
-
-.relationshipRecommendationCard strong,
-.relationshipRecommendationCard span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.relationshipRecommendationCard strong {
-  color: var(--bi-text);
-  font-size: 12px;
-  line-height: 1.25;
-}
-
-.relationshipRecommendationCard span {
-  color: var(--bi-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
 .relationshipDiagnosticsTechnical,
 .relationshipWarningDetails {
   margin-top: 2px;
@@ -492,12 +403,6 @@
   font-weight: 760;
 }
 
-.relationshipDiagnosticsTechnical span {
-  color: var(--bi-muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
 .fieldSemanticReadiness {
   display: grid;
   gap: 12px;
@@ -513,10 +418,6 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  min-width: 0;
-}
-
-.fieldSemanticReadinessLead > div {
   min-width: 0;
 }
 
@@ -580,24 +481,11 @@
   line-height: 1;
 }
 
-.fieldSemanticCard span,
-.fieldSemanticCard small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .fieldSemanticCard span {
   color: var(--text);
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.fieldSemanticCard small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
 }
 
 .fieldSemanticTechnical,

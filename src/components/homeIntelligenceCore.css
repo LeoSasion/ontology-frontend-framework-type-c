@@ -1,0 +1,960 @@
+
+.scenarioPackPanel {
+  display: grid;
+  gap: 12px;
+  margin: 18px 20px 0;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 14px;
+}
+
+.scenarioPackLead h3,
+.qualityDoctorHeader h3,
+.sandboxComparePanel h3 {
+  color: var(--bi-text);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.scenarioPackGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scenarioPackCard {
+  min-width: 0;
+  display: grid;
+  grid-template-rows: minmax(128px, 1fr) auto auto;
+  gap: 10px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 12px;
+}
+
+.scenarioPackCard > div:first-child {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.scenarioPackCard h4 {
+  color: var(--bi-text);
+  font-size: 14px;
+  line-height: 1.22;
+}
+
+.scenarioPackCard p {
+  color: var(--bi-muted);
+  font-size: 11.5px;
+  line-height: 1.42;
+}
+
+.scenarioPackCard > div:first-child > span {
+  color: var(--bi-accent-strong);
+  font-size: 11px;
+  font-weight: 780;
+}
+
+.scenarioPackFacts small {
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--bi-panel);
+  color: var(--bi-muted);
+  font-size: 10.5px;
+  font-weight: 720;
+  padding: 0 7px;
+}
+
+.scenarioPackActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scenarioPackActions .miniButton {
+  justify-content: center;
+  min-width: 0;
+  width: 100%;
+}
+
+.homeIntelligenceGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  gap: 14px;
+  margin: 18px 20px 0;
+}
+
+.qualityDoctorPanel,
+.sandboxComparePanel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 14px;
+}
+
+.qualityDoctorHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.qualityDoctorHeader h3 {
+  max-width: 72ch;
+  margin: 3px 0 0;
+}
+
+.qualityDoctorHeader small {
+  display: block;
+  margin-top: 4px;
+  color: var(--bi-muted);
+  font-size: 11px;
+}
+
+.qualityDoctorHeader > strong {
+  min-width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  color: var(--bi-accent-strong);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.qualityDoctorIssues > div,
+.objectInspectorFacts > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 10px;
+}
+
+.qualityDoctorIssues span,
+.objectInspectorFacts strong {
+  color: var(--bi-text);
+  font-size: 18px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.qualityDoctorIssues small,
+.objectInspectorFacts small {
+  color: var(--bi-muted);
+  font-size: 10.5px;
+  line-height: 1.32;
+}
+
+.qualityDoctorMetricSql {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bi-surface) 86%, var(--bi-panel));
+  padding: 12px;
+}
+
+.qualityDoctorMetricSql > div:first-child {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  column-gap: 12px;
+  row-gap: 3px;
+  align-items: center;
+}
+
+.qualityDoctorMetricSql > div:first-child span {
+  grid-row: span 2;
+  min-height: 42px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-bg);
+  color: var(--bi-text);
+  font-size: 18px;
+  font-weight: 850;
+}
+
+.qualityDoctorMetricSql > div:first-child span.warn {
+  border-color: color-mix(in srgb, var(--warning) 46%, var(--bi-border));
+  color: var(--warning);
+}
+
+.qualityDoctorMetricSql > div:first-child span.ok {
+  border-color: color-mix(in srgb, var(--success) 38%, var(--bi-border));
+  color: var(--success);
+}
+
+.metricSemanticChips span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 999px;
+  background: var(--bi-bg);
+  padding: 3px 8px;
+}
+
+.metricSemanticChips strong,
+.metricSemanticChips small {
+  font-size: 11px;
+  line-height: 1;
+}
+
+.metricSemanticChips small {
+  color: var(--bi-muted);
+}
+
+.metricRepairDraft {
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-bg);
+  padding: 9px 10px;
+}
+
+.metricRepairDraft summary {
+  cursor: pointer;
+  color: var(--bi-text);
+  font-weight: 760;
+}
+
+.metricRepairDraft p {
+  margin: 8px 0;
+  color: var(--bi-muted);
+  font-size: 12px;
+}
+
+.metricRepairDraft ol {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--bi-muted);
+  font-size: 12px;
+}
+
+.metricRepairWizard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, var(--bi-border-soft));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 7%, var(--bi-bg));
+  padding: 10px;
+}
+
+.metricRepairWizard > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.metricRepairWizard strong {
+  min-width: 0;
+  color: var(--bi-text);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.semanticBindingDrafts span,
+.semanticBindingCard {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 8px;
+}
+
+.semanticBindingDrafts span.warn,
+.semanticBindingCard.warn {
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--bi-border-soft));
+}
+
+.semanticBindingDrafts span.ok,
+.semanticBindingCard.ok {
+  border-color: color-mix(in srgb, var(--success) 32%, var(--bi-border-soft));
+}
+
+.semanticBindingRisk {
+  min-width: 0;
+  border-radius: 6px;
+  padding: 5px 7px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--bi-bg));
+  color: var(--bi-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.semanticBindingRisk.high {
+  color: var(--warning);
+}
+
+.metricRepairSteps {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.metricRepairActions.single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.semanticBindingActions,
+.semanticRepairFooter {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.semanticRepairBenefit,
+.semanticRepairComparison {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 9px;
+}
+
+.semanticRepairComparison.improved {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--bi-border-soft));
+  background: color-mix(in srgb, var(--success) 7%, var(--bi-surface));
+}
+
+.semanticRepairComparison.declined {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--bi-border-soft));
+  background: color-mix(in srgb, var(--warning) 7%, var(--bi-surface));
+}
+
+.semanticBindingActions .miniButton,
+.semanticRepairFooter .miniButton {
+  min-height: 30px;
+  justify-content: center;
+}
+
+.miniButton.primary {
+  border-color: color-mix(in srgb, var(--bi-accent) 46%, var(--bi-border-soft));
+  background: var(--bi-accent);
+  color: var(--bi-on-accent);
+}
+
+.semanticRepairResult {
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-bg);
+  color: var(--bi-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  padding: 8px;
+}
+
+.metricFailureSamples span {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-bg);
+  padding: 8px;
+}
+
+.metricFailureSamples small {
+  color: var(--bi-muted);
+  font-size: 10.5px;
+  line-height: 1.32;
+}
+
+.sandboxCompareFacts span,
+.sandboxVersionHints span,
+.objectInspectorSlots span {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 9px;
+}
+
+.sandboxCompareFacts strong {
+  color: var(--bi-text);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.sandboxCompareFacts small,
+.sandboxVersionHints small,
+.objectInspectorSlots small {
+  color: var(--bi-muted);
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+.sandboxVersionHints {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.objectInspectorLens {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 12px;
+}
+
+.objectInspectorLensHeader strong {
+  color: var(--bi-text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  .homeIntelligenceGrid,
+  .sandboxCompareFacts,
+  .sandboxVersionHints {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .homeProductIntelligenceDetails .homeIntelligenceGrid,
+  .homeSecondaryDetails .workspaceStartGuide,
+  .homeSecondaryDetails .quickQuestionBox,
+  .homeSecondaryDetails .operatingSummaryGrid {
+    margin: 10px;
+  }
+}
+
+.importToDashboardWizard {
+  display: grid;
+  gap: 10px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 12px;
+}
+
+.wizardQuestionGrid > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: start;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 9px;
+}
+
+.wizardQuestionGrid span {
+  grid-row: 1 / 3;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--bi-accent-soft);
+  color: var(--bi-accent-strong);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.wizardQuestionGrid strong {
+  min-width: 0;
+  color: var(--bi-text);
+  font-size: 12px;
+  line-height: 1.25;
+}
+
+.wizardQuestionGrid small {
+  min-width: 0;
+  color: var(--bi-muted);
+  font-size: 10.5px;
+  line-height: 1.3;
+}
+
+[data-load-state="loading"] .mainPanel {
+  transition: opacity 160ms ease;
+}
+
+.dashboardComponentAcceptanceStrip {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--dashboard-lead-column) minmax(0, 1fr) auto;
+  gap: var(--dashboard-grid-gap);
+  align-items: center;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 12px;
+}
+
+.dashboardComponentAcceptanceStrip.compactAcceptance {
+  padding: 10px 12px;
+}
+
+.dashboardComponentAcceptanceLead {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+}
+
+.dashboardComponentAcceptanceLead p {
+  display: none;
+  margin: 0;
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.dashboardComponentAcceptanceDetails summary {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  color: var(--bi-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+  padding: 0 10px;
+}
+
+.dashboardComponentAcceptanceDetails[open] summary {
+  border-color: var(--bi-border-strong);
+  background: var(--bi-accent-soft);
+  color: var(--bi-accent-strong);
+}
+
+.dashboardComponentAcceptanceDetails:not([open]) .dashboardComponentAcceptanceItems {
+  display: none;
+}
+
+.dashboardComponentAcceptanceItems {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.dashboardComponentAcceptanceItems span {
+  min-height: 23px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 999px;
+  background: var(--bi-surface);
+  color: var(--bi-text);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
+.dashboardGrid > *,
+.dashboardGrid .wide,
+.bWidgetCard,
+.bTextBlock,
+.bEvidenceChips,
+.dashboardReadinessPanel,
+.dashboardComponentAcceptanceStrip,
+.dashboardAssetSourceStrip,
+.dashboardStoryStrip {
+  max-width: 100%;
+}
+
+.bTextBlock,
+.bTextBlock p,
+.bEvidenceChips,
+.bEvidenceChips span,
+.bWidgetCard h4,
+.bWidgetCard p,
+.dashboardComponentAcceptanceLead p,
+.dashboardReadinessLead strong,
+.dashboardReadinessLead small {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.bWidgetAcceptanceGallery {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 14px;
+}
+
+.bWidgetAcceptanceLead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.bWidgetAcceptanceLead h4 {
+  margin-top: 4px;
+  color: var(--bi-text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.bWidgetAcceptanceLead p {
+  margin-top: 5px;
+  max-width: 86ch;
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bWidgetAcceptanceGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bWidgetAcceptanceItem {
+  min-width: 0;
+  min-height: 88px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 10px;
+}
+
+.bWidgetAcceptanceItem.ready {
+  border-color: color-mix(in srgb, var(--bi-accent) 24%, var(--bi-border));
+}
+
+.bWidgetAcceptanceItem em {
+  align-self: end;
+  color: var(--bi-accent-strong);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.bWidgetAcceptanceTechnical {
+  margin-top: 5px;
+  border-top: 1px solid var(--bi-border-soft);
+  padding-top: 7px;
+}
+
+.bWidgetAcceptanceTechnical summary {
+  cursor: pointer;
+  color: var(--bi-text);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.bWidgetAcceptanceTechnical small,
+.bWidgetAcceptanceTechnical code,
+.bPaletteItem small {
+  display: block;
+  margin-top: 6px;
+  color: var(--bi-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.bWidgetAcceptanceTechnical code {
+  width: fit-content;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 6px;
+  background: var(--bi-panel);
+  color: var(--bi-accent-strong);
+  padding: 3px 6px;
+}
+
+span.assetModeChip,
+span.storyMode,
+span.assetSourceBadge,
+span.statusBadge,
+span.settingsSandboxBadge,
+span.widgetCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+@media (min-width: 761px) and (max-width: 1040px) {
+  .appShell,
+  .appShell[data-inspector-state="expanded"] {
+    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-width);
+  }
+
+  .appShell[data-inspector-state="collapsed"] {
+    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-collapsed-width);
+  }
+
+  .biSidebarShell {
+    grid-column: 1;
+    grid-row: 1;
+    grid-template-columns: var(--shell-rail-width);
+    width: var(--shell-rail-width);
+    min-width: var(--shell-rail-width);
+    overflow: hidden;
+  }
+
+  .assetPanel {
+    display: none;
+  }
+
+  .contentShell {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    padding: 12px;
+  }
+
+  .inspector {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .appShell,
+  .appShell[data-inspector-state="expanded"],
+  .appShell[data-inspector-state="collapsed"] {
+    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+  }
+
+  .biSidebarShell {
+    grid-column: 1 !important;
+    grid-row: 1 !important;
+    grid-template-columns: var(--shell-rail-width) !important;
+    width: var(--shell-rail-width);
+    min-width: var(--shell-rail-width);
+    overflow: hidden;
+  }
+
+  .assetPanel,
+  .inspector {
+    display: none !important;
+  }
+
+  .contentShell {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    width: auto;
+    min-width: 0;
+    overflow: auto;
+    padding: 10px;
+  }
+
+  .topBarStack {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .topBar {
+    gap: 8px;
+  }
+
+  .topBar h1 {
+    font-size: 20px;
+    line-height: 1.14;
+  }
+
+  .topBarMeta {
+    gap: 6px;
+  }
+
+  .serviceDiagnostics {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    padding: 9px;
+  }
+
+  .serviceDiagnosticsLead {
+    grid-template-columns: 28px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .serviceDiagnosticsIcon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .serviceDiagnosticsLead strong,
+  .serviceDiagnosticsLead p,
+  .serviceDiagnosticsCommands span,
+  .serviceDiagnosticsNotes span {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+
+  .serviceDiagnosticsTechnical {
+    justify-self: start;
+    width: 100%;
+  }
+
+  .serviceDiagnosticsTechnical summary {
+    width: fit-content;
+    max-width: 100%;
+    min-height: 32px;
+    line-height: 1.2;
+    white-space: normal;
+  }
+
+  .serviceDiagnosticsTechnical[open] {
+    justify-items: start;
+  }
+
+  .serviceDiagnosticsCommands {
+    justify-content: flex-start;
+  }
+
+  .serviceDiagnosticsCommands code {
+    white-space: normal;
+  }
+
+  .biRail {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .overviewHero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .overviewHero h2 {
+    font-size: 21px;
+    line-height: 1.14;
+  }
+
+  .overviewHero p {
+    margin-top: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .productActivationPanel {
+    margin: 10px;
+    padding: 10px;
+  }
+
+  .productActivationPanel.firstRun {
+    margin-top: 8px;
+  }
+
+  .productActivationStep {
+    align-items: center;
+    grid-template-columns: 28px minmax(0, 1fr);
+    min-height: auto;
+  }
+
+  .productActivationStep strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .productActivationStep small,
+  .productActivationStep em {
+    display: none;
+  }
+
+  .productActivationPanel.firstRun .productActivationStep {
+    grid-template-columns: 28px minmax(0, 1fr) auto;
+  }
+
+  .productActivationPanel.firstRun .productActivationStep em {
+    display: block;
+    grid-column: 3;
+    white-space: nowrap;
+  }
+
+  .panelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+  }
+
+  .panelHeader .buttonRow,
+  .panelHeader .quietText {
+    width: 100%;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formGrid .wideField {
+    grid-column: 1;
+  }
+
+  .sourceProfileForm,
+  .sourceProfileActions {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sourceProfileForm .wideField {
+    grid-column: 1;
+  }
+
+  .sourceProfileActions .buttonRow.tight {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sourceProfileActions .buttonRow.tight > * {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .policyActionStrip {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .agentCommandDock.floating {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .agentCommandDock.floating.open {
+    width: min(320px, calc(100vw - var(--shell-rail-width) - 20px));
+  }
+}

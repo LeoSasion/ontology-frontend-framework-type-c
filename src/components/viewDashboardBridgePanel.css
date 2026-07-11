@@ -10,19 +10,6 @@
   padding: 12px;
 }
 
-.viewBridgeLead {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.viewBridgeLead strong,
-.viewBridgeLead p {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .viewBridgeLead strong {
   color: var(--bi-text);
   font-size: 13px;
@@ -35,13 +22,6 @@
   color: var(--bi-muted);
   font-size: 12px;
   line-height: 1.4;
-}
-
-.viewBridgeFacts {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
 }
 
 .viewBridgeFacts div {
@@ -58,15 +38,6 @@
 
 .viewBridgeFacts div.warn {
   border-color: var(--amber);
-}
-
-.viewBridgeFacts strong,
-.viewBridgeFacts span {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .viewBridgeFacts strong {
@@ -169,13 +140,6 @@
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.viewBridgeActions button:hover:not(:disabled),
-.viewBridgeActions button:focus-visible {
-  border-color: var(--bi-accent);
-  background: var(--bi-accent-soft);
-  color: var(--bi-accent-strong);
 }
 
 .viewBridgeActions svg {

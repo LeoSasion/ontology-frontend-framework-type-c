@@ -163,7 +163,7 @@ function hydrateStoredWidget(widget: DashboardPage["widgets"][number], evidence:
       subtitle: toStringValue(config.subtitle),
       viewKey: toStringValue(config.viewKey),
       textContent: toStringValue(config.textContent),
-      dimension: toStringValue(config.dimension, toStringValue(config.group, "label")),
+      dimension: toStringValue(config.dimension, toStringValue(config.group)),
       measure: toStringValue(config.measure, "value"),
       aggregation: normalizeAggregation(config.aggregation ?? config.agg),
       topN: clampInteger(config.topN, 12, 1, 500),

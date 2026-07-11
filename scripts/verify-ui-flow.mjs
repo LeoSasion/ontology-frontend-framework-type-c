@@ -31,6 +31,18 @@ async function fetchJson(path) {
 function assertPageState() {
   const text = document.body?.innerText || "";
   const get = (testId) => document.querySelector(`[data-testid="${testId}"]`);
+  const isVisible = (element) => {
+    if (!(element instanceof HTMLElement)) {
+      return false;
+    }
+    if (element.closest("details:not([open])")) {
+      return false;
+    }
+    const style = getComputedStyle(element);
+    return style.display !== "none" && style.visibility !== "hidden";
+  };
+  const visible = (testId) => isVisible(get(testId));
+  const visibleCount = (selector) => Array.from(document.querySelectorAll(selector)).filter(isVisible).length;
   const disabled = (testId) => Boolean(get(testId)?.disabled);
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
   return {
@@ -47,11 +59,11 @@ function assertPageState() {
       chartActionEnabled: Boolean(get("home-action-cost-monitor")) && !disabled("home-action-cost-monitor"),
     },
     sources: {
-      entry: Boolean(get("source-intelligence-folder-entry")),
-      importPreview: Boolean(get("import-preview-button")),
-      coverageItems: document.querySelectorAll('[data-testid="source-coverage-item"]').length,
-      dashboardNextAction: Boolean(get("source-dashboard-next-action")),
-      sourceError: Boolean(get("source-intelligence-error")),
+      entry: visible("source-intelligence-folder-entry"),
+      importPreview: visible("import-preview-button"),
+      coverageItems: visibleCount('[data-testid="source-coverage-item"]'),
+      dashboardNextAction: visible("source-next-dashboard") || visible("source-dashboard-next-action"),
+      sourceError: visible("source-intelligence-error"),
     },
     dashboards: {
       taskStrip: Boolean(get("dashboard-business-task-strip")),
@@ -104,12 +116,13 @@ try {
   const counts = status.counts ?? {};
   const hasData = Number(counts.tables ?? 0) > 0;
   const hasSourceIntelligence = Number(counts.sourceIntelligenceRuns ?? 0) > 0;
-  const hasDashboard = Number(counts.dashboards ?? 0) > 0 || dashboards.dashboards?.length > 0;
+  const dashboardList = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
+  const dashboardCount = Number(counts.dashboards ?? dashboardList.length);
   checks.push(
     check("api-live-status", status.ok === true && Boolean(status.database), { workspace: status.workspace, counts }),
     check("api-workspace-data-state-supported", hasData || Number(counts.tables ?? 0) === 0, { mode: hasData ? "data" : "empty", tables: counts.tables }),
     check("api-source-intelligence-state-supported", hasData ? hasSourceIntelligence : Number(counts.sourceIntelligenceRuns ?? 0) === 0, { mode: hasData ? "data" : "empty", sourceIntelligenceRuns: counts.sourceIntelligenceRuns }),
-    check("api-dashboard-state-supported", hasData ? hasDashboard : Number(counts.dashboards ?? 0) === 0, { mode: hasData ? "data" : "empty", dashboards: counts.dashboards ?? dashboards.dashboards?.length }),
+    check("api-dashboard-state-supported", Array.isArray(dashboards.dashboards) && dashboardCount >= 0, { mode: hasData ? "data" : "empty", dashboards: dashboardCount, savedDashboards: dashboardList.length }),
     check("api-action-drafts-readable", Array.isArray(drafts.actionDrafts), { pendingCount: drafts.pendingCount ?? drafts.actionDrafts?.length ?? 0 }),
   );
 

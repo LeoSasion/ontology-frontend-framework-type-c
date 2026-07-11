@@ -6,13 +6,25 @@ import type { DashboardPayload, QueryResult, WorkbenchPayload, WorkspaceStatus }
 export type LoadState = "loading" | "ready";
 export type ApiMode = "loading" | "live" | "fallback";
 
-export function preferredLandingSection(status: WorkspaceStatus, workbench: WorkbenchPayload, dashboards: DashboardPayload): AppSection {
+export function preferredLandingSection(
+  status: WorkspaceStatus,
+  workbench: WorkbenchPayload,
+  dashboards: DashboardPayload,
+  pendingDraftCount?: number,
+): AppSection {
   const dashboardCount = status.counts?.dashboards ?? 0;
   const tableCount = status.counts?.tables ?? 0;
   const sourceRunCount = status.sourceRuns?.length ?? 0;
+  const sourceProfileCount = workbench.sourceIntelligenceRuns?.length ?? 0;
+  const resolvedPendingDraftCount = Number.isFinite(Number(pendingDraftCount))
+    ? Number(pendingDraftCount)
+    : status.counts?.actionDrafts ?? 0;
   const hasDashboard = dashboardCount > 0 || dashboards.dashboards.length > 0;
+  const hasProfile = sourceProfileCount > 0 || (status.counts?.sourceIntelligenceRuns ?? 0) > 0;
   const hasSource = tableCount > 0 || sourceRunCount > 0 || workbench.tables.length > 0;
+  if (resolvedPendingDraftCount > 0) return "agent";
   if (hasDashboard) return "dashboards";
+  if (hasProfile) return "dashboards";
   if (hasSource) return "sources";
   return "home";
 }
@@ -38,7 +50,7 @@ export const connectingStatus: WorkspaceStatus = {
   ...emptyWorkspaceStatus,
   workspace: {
     id: "default",
-    name: "AIBI 工作区",
+    name: "AIBI-C 工作区",
     current_source_run_id: null,
   },
   counts: {

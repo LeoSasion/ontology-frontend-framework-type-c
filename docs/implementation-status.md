@@ -19,10 +19,10 @@ Current stage: local production baseline for a single-user workstation. The stab
 
 | Capability | Status | Current contract |
 | --- | --- | --- |
-| Clean first run | Stable | New workspaces contain no tables, charts, dashboards, answers, or sample shortcuts. Product activation shows only the current necessary step. |
+| Clean first run | Stable | New workspaces contain no tables, charts, dashboards, answers, or sample shortcuts. Product activation shows only the current necessary step, and reload resumes the next unfinished step. |
 | File and folder import | Stable | CSV/XLSX/XLSM preview, same-type grouping, merge impact, key quality, confirmed commit, and receipts. |
 | Source evidence profiling | Stable | Field roles, data quality, metric candidates, relationship evidence, gaps, and source receipts. |
-| AI one-chart flow | Stable | Generic overview does not choose domain fields; vague charts clarify once; explicit charts create one confirmable draft. |
+| AI one-chart flow | Stable | Generic overview does not choose domain fields; vague charts clarify once; explicit charts create one confirmable draft; dashboard widgets query their bound source on first render and show loading/error states instead of default numbers. |
 | Details and saved views | Stable | Whitelisted detail queries, search, filter, sort, save/copy/delete, dashboard and Agent handoff. |
 | Dashboard widget set | Stable advanced capability | Metric, bar, line, pie, table, text, slicer, relationship, filters, styles, lifecycle, and source switching. |
 | Full industry dashboard | Beta | Evidence-matched ERP units, omitted-unit disclosure, preview, then confirmation. |

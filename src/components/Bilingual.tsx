@@ -56,7 +56,7 @@ const LanguageContext = createContext<LanguageContextValue>({
 });
 
 const nameTranslations: Record<string, { zh: string; en: string }> = {
-  "AIBI Hybrid Workspace": { zh: "AIBI Hybrid 工作区", en: "AIBI Hybrid Workspace" },
+  "AIBI-C 工作区": { zh: "AIBI-C 工作区", en: "AIBI-C Workspace" },
   "经营证据看板": { zh: "经营证据看板", en: "Evidence Dashboard" },
   "Agent 经营复盘": { zh: "Agent 经营复盘", en: "Agent Business Review" },
   "渠道净销售": { zh: "渠道净销售", en: "Net Sales by Channel" },

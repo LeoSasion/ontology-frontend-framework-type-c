@@ -17,14 +17,14 @@ export const emptyWorkspaceStatus: WorkspaceStatus = {
   ok: true,
   workspace: {
     id: "default",
-    name: "AIBI 工作区",
+    name: "AIBI-C 工作区",
     current_source_run_id: null,
     isActive: true,
   },
   workspaces: [
     {
       id: "default",
-      name: "AIBI 工作区",
+      name: "AIBI-C 工作区",
       current_source_run_id: null,
       isActive: true,
     },

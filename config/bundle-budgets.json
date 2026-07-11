@@ -2,9 +2,9 @@
   "schema": "aibi-bundle-budgets/v1",
   "budgets": [
     { "label": "global-css", "pattern": "^index-[^.]+\\.css$", "maxBytes": 122000 },
-    { "label": "main-js", "pattern": "^index-[^.]+\\.js$", "maxBytes": 310000 },
-    { "label": "dashboard-route-js", "pattern": "^DashboardCanvas-[^.]+\\.js$", "maxBytes": 80000 },
-    { "label": "source-route-js", "pattern": "^SourceWorkbench-[^.]+\\.js$", "maxBytes": 75000 },
+    { "label": "main-js", "pattern": "^index-[^.]+\\.js$", "maxBytes": 280000 },
+    { "label": "dashboard-route-js", "pattern": "^DashboardCanvas-[^.]+\\.js$", "maxBytes": 70000 },
+    { "label": "source-route-js", "pattern": "^SourceWorkbench-[^.]+\\.js$", "maxBytes": 65000 },
     { "label": "agent-route-js", "pattern": "^AgentPanel-[^.]+\\.js$", "maxBytes": 48000 },
     { "label": "evidence-route-js", "pattern": "^EvidenceView-[^.]+\\.js$", "maxBytes": 24000 },
     { "label": "view-route-js", "pattern": "^ViewWorkspace-[^.]+\\.js$", "maxBytes": 20500 },

@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { getAppSection, primaryAppSections, utilityAppSections, type AppSection } from "../appSections";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "../types";
 import { isSectionLockedByFlow, resolveSectionForFlow, type WorkspaceFlowModel } from "../workspaceFlowModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
-import { SidebarAssetSections } from "./SidebarAssetSections";
+import { SidebarAssetSections } from "../sidebarAssetModules";
 import { SidebarWorkspaceCard } from "./SidebarWorkspaceCard";
 
 export type { AppSection } from "../appSections";
@@ -44,10 +44,11 @@ export function Sidebar({
 }: SidebarProps) {
   const activeRailSection = activeSection;
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
+  const [assetSectionsMounted, setAssetSectionsMounted] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const currentWorkspace = status.workspace ?? {
     id: "default",
-    name: biText("AIBI 工作区", "AIBI workspace"),
+    name: biText("AIBI-C 工作区", "AIBI-C workspace"),
     current_source_run_id: null,
     isActive: true,
   };
@@ -69,6 +70,10 @@ export function Sidebar({
   useEffect(() => {
     setWorkspaceRenameName(currentWorkspace.name);
   }, [currentWorkspace.id, currentWorkspace.name]);
+
+  useEffect(() => {
+    setAssetSectionsMounted(true);
+  }, []);
 
   async function createWorkspaceFromInput() {
     const name = workspaceName.trim();
@@ -190,17 +195,19 @@ export function Sidebar({
           workspaces={workspaces}
         />
 
-        <SidebarAssetSections
-          activeDashboardKey={activeDashboardKey}
-          activeRailSection={activeRailSection}
-          actionDrafts={actionDrafts}
-          agent={agent}
-          dashboards={dashboards}
-          onDashboardSelect={onDashboardSelect}
-          onSectionChange={onSectionChange}
-          status={status}
-          workbench={workbench}
-        />
+        {assetSectionsMounted ? <Suspense fallback={null}>
+          <SidebarAssetSections
+            activeDashboardKey={activeDashboardKey}
+            activeRailSection={activeRailSection}
+            actionDrafts={actionDrafts}
+            agent={agent}
+            dashboards={dashboards}
+            onDashboardSelect={onDashboardSelect}
+            onSectionChange={onSectionChange}
+            status={status}
+            workbench={workbench}
+          />
+        </Suspense> : null}
       </div>
     </aside>
   );

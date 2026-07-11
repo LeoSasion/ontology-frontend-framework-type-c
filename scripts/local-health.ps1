@@ -94,7 +94,7 @@ try {
   if ($titleMatch.Success) {
     $ui.title = $titleMatch.Groups[1].Value
   }
-  $ui.ok = ($uiResponse.StatusCode -ge 200 -and $uiResponse.StatusCode -lt 400 -and $uiResponse.Content.Contains("<title>AIBI Hybrid</title>"))
+  $ui.ok = ($uiResponse.StatusCode -ge 200 -and $uiResponse.StatusCode -lt 400 -and $uiResponse.Content.Contains("<title>AIBI-C</title>"))
 } catch {
   $ui.error = $_.Exception.Message
 }

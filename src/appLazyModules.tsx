@@ -2,6 +2,10 @@ import { lazy } from "react";
 import { getAppSection } from "./appSections";
 import type { AppSection } from "./components/Sidebar";
 
+const loadAgentCommandDock = () => import("./components/AgentCommandDock").then((module) => ({ default: module.AgentCommandDock }));
+const loadAppMainView = () => import("./components/AppMainView").then((module) => ({ default: module.AppMainView }));
+const loadBusinessPathBar = () => import("./components/BusinessPathBar").then((module) => ({ default: module.BusinessPathBar }));
+const loadTopBar = () => import("./components/TopBar").then((module) => ({ default: module.TopBar }));
 const loadAgentPanel = () => import("./components/AgentPanel").then((module) => ({ default: module.AgentPanel }));
 const loadDashboardCanvas = () => import("./components/DashboardCanvas").then((module) => ({ default: module.DashboardCanvas }));
 const loadEvidenceView = () => import("./components/EvidenceView").then((module) => ({ default: module.EvidenceView }));
@@ -11,6 +15,10 @@ const loadSettingsPanel = () => import("./components/SettingsPanel").then((modul
 const loadSourceWorkbench = () => import("./components/SourceWorkbench").then((module) => ({ default: module.SourceWorkbench }));
 const loadViewWorkspace = () => import("./components/ViewWorkspace").then((module) => ({ default: module.ViewWorkspace }));
 
+export const AgentCommandDock = lazy(loadAgentCommandDock);
+export const AppMainView = lazy(loadAppMainView);
+export const BusinessPathBar = lazy(loadBusinessPathBar);
+export const TopBar = lazy(loadTopBar);
 export const AgentPanel = lazy(loadAgentPanel);
 export const DashboardCanvas = lazy(loadDashboardCanvas);
 export const EvidenceView = lazy(loadEvidenceView);
@@ -32,6 +40,8 @@ export const sectionPreloaders: Record<AppSection, Array<() => Promise<unknown>>
 
 export const allSectionPreloaders = Array.from(new Set(Object.values(sectionPreloaders).flat()));
 export const inspectorPreloader = loadInspectorPanel;
+export const agentCommandDockPreloader = loadAgentCommandDock;
+export const businessPathBarPreloader = loadBusinessPathBar;
 
 export function preloadModules(loaders: Array<() => Promise<unknown>>) {
   void Promise.allSettled(loaders.map((loader) => loader()));

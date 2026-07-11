@@ -42,6 +42,17 @@ type DashboardCanvasActionsOptions = {
   widgets: DashboardWidget[];
 };
 
+function singleChartAgentPrompt(userPrompt: string, dashboard: DashboardPage, fields: FieldConfig[]) {
+  const normalizedPrompt = userPrompt.toLocaleLowerCase();
+  const matchedField = fields.find((field) => {
+    const fieldName = field.field_name.trim().toLocaleLowerCase();
+    return fieldName.length > 1 && normalizedPrompt.includes(fieldName);
+  });
+  const tableKey = matchedField?.table_key || dashboard.default_table_key;
+  const tableScope = tableKey ? `基于 ${tableKey}，` : "基于当前数据，";
+  return `${tableScope}用户想看「${userPrompt}」。起草一个仅包含一个图表的可确认看板；优先选择最符合字段证据的指标卡、折线图、柱状图或表格，说明字段、口径和证据，确认前不要写入。`;
+}
+
 export function useDashboardCanvasActions({
   canvasWidthMode,
   dashboard,
@@ -115,7 +126,10 @@ export function useDashboardCanvasActions({
   }
 
   async function runDashboardAsk(label: string, prompt: string) {
-    await runVoidAction(label, () => onAsk(prompt));
+    const routedPrompt = label === "dashboard-task-explain"
+      ? singleChartAgentPrompt(prompt, dashboard, fields)
+      : prompt;
+    await runVoidAction(label, () => onAsk(routedPrompt));
   }
 
   async function runRelationshipSave(label: string, recommendation: RelationshipRecommendation, confirm: boolean) {

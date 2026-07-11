@@ -5,9 +5,9 @@ import sqlite3
 from typing import Any
 
 from formula_engine import ast_to_sql, parse_and_validate_formula
+from query_runtime import SAFE_AGGREGATIONS
 
 
-SAFE_AGGREGATIONS = {"count", "count-distinct", "sum", "avg", "min", "max"}
 FILTER_OPERATORS = {"contains", "equals", "notEquals", "in", "between", "gt", "gte", "lt", "lte", "empty", "notEmpty"}
 
 

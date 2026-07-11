@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from bi_cli_core import DB_PATH, DEFAULT_DATA_DIR, ROOT, now_iso, quote_identifier
+from bi_cli_schema import table_exists
 from preferences_theme_command_service import list_theme_palettes, load_user_preferences
 
 
@@ -29,14 +30,6 @@ CONFIG_TABLES = [
 ]
 
 CONFIG_KIND = "aibi-hybrid-local-bi-config"
-
-
-def table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
-    row = connection.execute(
-        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
-        (table_name,),
-    ).fetchone()
-    return row is not None
 
 
 def table_columns(connection: sqlite3.Connection, physical_table: str) -> list[str]:

@@ -13,6 +13,7 @@ import { buildDashboardCanvasViewModel } from "../dashboardCanvasViewModel";
 import { buildProductActivation } from "../productActivationModel";
 import { useDashboardCanvasActions } from "../useDashboardCanvasActions";
 import { useDashboardCanvasState } from "../useDashboardCanvasState";
+import { BiDashboardWidgetKit } from "../dashboardWidgetModules";
 import {
   DashboardAdvancedWidgetWorkbench,
   DashboardBeginnerEditor,
@@ -23,7 +24,6 @@ import {
 } from "../dashboardDeferredModules";
 import { DashboardBusinessTaskStrip } from "./DashboardBusinessTaskStrip";
 import { DashboardOverviewStrip } from "./DashboardOverviewStrip";
-import { BiDashboardWidgetKit } from "./BiDashboardWidgetKit";
 import { Bilingual, biText, translateName } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
 
@@ -226,12 +226,21 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
         <DashboardBusinessTaskStrip
           busy={busy}
           dashboardName={dashboard.name}
-          defaultTableKey={dashboard.default_table_key}
+          hasDashboard={dashboardPages.length > 0}
           onAsk={runDashboardAsk}
           onOpenEvidence={openDashboardEvidence}
         />
 
-        <BiDashboardWidgetKit dashboard={dashboard} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
+        {dashboardWidgets.length ? (
+          <DashboardDeferredBoundary>
+            <BiDashboardWidgetKit dashboard={dashboard} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
+          </DashboardDeferredBoundary>
+        ) : (
+          <section className="bDashboardKit wide dashboardWidgetEmptyState" data-testid="dashboard-widget-empty-state">
+            <strong><Bilingual zh="还没有图表" en="No charts yet" /></strong>
+            <span><Bilingual zh="描述一个业务问题，AI 会先起草带口径和证据的单图。" en="Describe a business question and AI will draft one chart with scope and evidence." /></span>
+          </section>
+        )}
 
         <details className="progressiveDetails dashboardProgressiveDetails dashboardResultContextDetails" data-testid="dashboard-result-context-details">
           <summary><Bilingual zh="查看结果来源、口径和验收信息" en="View result source, scope, and acceptance" /></summary>

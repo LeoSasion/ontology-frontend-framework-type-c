@@ -54,11 +54,6 @@
   justify-items: end;
 }
 
-.productActivationState span {
-  color: var(--bi-muted);
-  font-size: 12px;
-}
-
 .productActivationState strong {
   color: var(--bi-text);
   font-size: 22px;
@@ -118,15 +113,6 @@
   border-radius: 8px;
   background: var(--bi-surface);
   color: var(--bi-accent-strong);
-}
-
-.productActivationStep strong,
-.productActivationStep small,
-.productActivationStep em {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .productActivationStep strong {

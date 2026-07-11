@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { queryRelationship } from "../api";
+import { queryRelationship, runTableQuery } from "../api";
 import {
   type BiDashboardDatum,
   type BiDashboardFilterRule,
@@ -7,7 +7,7 @@ import {
 } from "../biDashboardModel";
 import { catalogByType, formatWidgetValue, paletteColors } from "../biDashboardPresentation";
 import { aggregateWidgetRows, calculateWidgetMetricValue } from "../biDashboardRuntime";
-import type { QueryResult } from "../types";
+import type { QueryResult, TableQueryPayload } from "../types";
 import { Bilingual, biText } from "./Bilingual";
 import type { DrilldownPointFilter } from "./BiDashboardDrilldownSheet";
 
@@ -33,10 +33,34 @@ export function BiDashboardWidgetCard({
   onSlicerChange,
 }: BiDashboardWidgetCardProps) {
   const [relationshipQuery, setRelationshipQuery] = useState<QueryResult | null>(null);
+  const [widgetQuery, setWidgetQuery] = useState<QueryResult | null>(null);
+  const [widgetQueryState, setWidgetQueryState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const slicerField = widget.dimension || "label";
   const filtersForWidget = useMemo(() => widget.type === "slicer"
     ? dashboardFilters.filter((filter) => filter.field !== slicerField)
     : dashboardFilters, [dashboardFilters, slicerField, widget.type]);
+  const widgetQueryRequest = useMemo(() => {
+    if (widget.dataMode === "relationship" || (!widget.tableKey && !widget.viewKey)) return null;
+    const groupFields = widget.dimension && widget.dimension !== "label" ? [widget.dimension] : [];
+    const filters = [...filtersForWidget, ...widget.filters].map((filter) => ({
+      field: filter.field,
+      operator: filter.operator,
+      value: filter.value,
+    }));
+    return {
+      table: widget.viewKey ? undefined : widget.tableKey,
+      view: widget.viewKey || undefined,
+      mode: "aggregate" as const,
+      groupFields,
+      measure: widget.aggregation === "count" ? undefined : widget.measure || undefined,
+      aggregation: widget.aggregation,
+      filters,
+      sort: widget.sortBy === "dimension" && groupFields.length
+        ? [{ field: groupFields[0], direction: widget.sortDirection }]
+        : undefined,
+      limit: Math.max(widget.topN, 50),
+    };
+  }, [filtersForWidget, widget.aggregation, widget.dataMode, widget.dimension, widget.filters, widget.measure, widget.sortBy, widget.sortDirection, widget.tableKey, widget.topN, widget.viewKey]);
 
   useEffect(() => {
     if (widget.dataMode !== "relationship" || !widget.relationship) {
@@ -72,8 +96,34 @@ export function BiDashboardWidgetCard({
     };
   }, [filtersForWidget, widget]);
 
-  const sourceQuery = widget.dataMode === "relationship" && relationshipQuery?.ok ? relationshipQuery : query;
-  const rows = aggregateWidgetRows(widget, sourceQuery, widget.dataMode === "relationship" ? [] : filtersForWidget);
+  useEffect(() => {
+    if (!widgetQueryRequest) {
+      setWidgetQuery(null);
+      setWidgetQueryState("idle");
+      return;
+    }
+    let cancelled = false;
+    setWidgetQueryState("loading");
+    setWidgetQuery(null);
+    void runTableQuery(widgetQueryRequest).then((result) => {
+      if (cancelled) return;
+      setWidgetQuery(tableQueryToQueryResult(result, widget));
+      setWidgetQueryState(result.ok ? "ready" : "error");
+    }).catch(() => {
+      if (!cancelled) setWidgetQueryState("error");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [widget, widgetQueryRequest]);
+
+  const sourceQuery = widget.dataMode === "relationship" && relationshipQuery?.ok
+    ? relationshipQuery
+    : widgetQueryRequest
+      ? widgetQuery ?? emptyWidgetQuery(widget)
+      : query;
+  const renderWidget = widgetQueryRequest ? { ...widget, filters: [] } : widget;
+  const rows = aggregateWidgetRows(renderWidget, sourceQuery, widget.dataMode === "relationship" || widgetQueryRequest ? [] : filtersForWidget);
   const className = `bWidgetCard ${widget.type}-widget`;
   const pointField = widget.dimension || sourceQuery.query?.group || "label";
   const handlePoint = (row: BiDashboardDatum) => onDrillDown(widget, { field: pointField, value: row.label });
@@ -81,22 +131,81 @@ export function BiDashboardWidgetCard({
   return (
     <section className={className} data-testid={`b-widget-${widget.type}`}>
       <WidgetHeader onDrillDown={() => onDrillDown(widget)} onOpenEvidence={() => onOpenEvidence(widget)} widget={widget} />
-      {widget.type === "metric" ? <MetricWidget dashboardFilters={widget.dataMode === "relationship" ? [] : filtersForWidget} query={sourceQuery} widget={widget} /> : null}
-      {widget.type === "bar" ? <BarWidget onPointClick={handlePoint} rows={rows} widget={widget} /> : null}
-      {widget.type === "line" ? <LineWidget rows={rows} widget={widget} /> : null}
-      {widget.type === "pie" ? <PieWidget onPointClick={handlePoint} rows={rows} widget={widget} /> : null}
-      {widget.type === "table" ? <TableWidget rows={rows} widget={widget} /> : null}
-      {widget.type === "text" ? <TextWidget widget={widget} /> : null}
-      {widget.type === "slicer" ? (
-        <SlicerWidget
-          onPointClick={handlePoint}
-          onSlicerChange={onSlicerChange}
-          rows={rows}
-          selectedValues={slicerSelections[slicerField] ?? []}
-          widget={widget}
-        />
-      ) : null}
+      {widgetQueryRequest && widgetQueryState !== "ready" ? (
+        <WidgetDataState state={widgetQueryState} />
+      ) : (
+        <>
+          {widget.type === "metric" ? <MetricWidget dashboardFilters={widget.dataMode === "relationship" || widgetQueryRequest ? [] : filtersForWidget} query={sourceQuery} widget={renderWidget} /> : null}
+          {widget.type === "bar" ? <BarWidget onPointClick={handlePoint} rows={rows} widget={renderWidget} /> : null}
+          {widget.type === "line" ? <LineWidget rows={rows} widget={renderWidget} /> : null}
+          {widget.type === "pie" ? <PieWidget onPointClick={handlePoint} rows={rows} widget={renderWidget} /> : null}
+          {widget.type === "table" ? <TableWidget rows={rows} widget={renderWidget} /> : null}
+          {widget.type === "text" ? <TextWidget widget={widget} /> : null}
+          {widget.type === "slicer" ? (
+            <SlicerWidget
+              onPointClick={handlePoint}
+              onSlicerChange={onSlicerChange}
+              rows={rows}
+              selectedValues={slicerSelections[slicerField] ?? []}
+              widget={renderWidget}
+            />
+          ) : null}
+        </>
+      )}
     </section>
+  );
+}
+
+function emptyWidgetQuery(widget: BiDashboardWidget): QueryResult {
+  return {
+    ok: true,
+    query: {
+      table: widget.tableKey ?? "",
+      mode: "aggregate",
+      group: widget.dimension,
+      measure: widget.measure ?? "value",
+      aggregation: widget.aggregation,
+      sqlIntent: "Waiting for widget query runtime",
+    },
+    rows: [],
+  };
+}
+
+function tableQueryToQueryResult(result: TableQueryPayload, widget: BiDashboardWidget): QueryResult {
+  const tableQuery = result.tableQuery;
+  const columns = Array.isArray(tableQuery?.columns) ? tableQuery.columns : [];
+  const groupField = widget.dimension && widget.dimension !== "label" && columns.includes(widget.dimension) ? widget.dimension : "";
+  const valueColumn = columns.find((column) => column.startsWith(`${widget.aggregation}_`)) ?? columns[columns.length - 1] ?? "";
+  return {
+    ok: result.ok,
+    query: {
+      table: tableQuery?.tableKey ?? widget.tableKey ?? "",
+      mode: "aggregate",
+      group: groupField || undefined,
+      measure: (widget.measure ?? valueColumn) || "value",
+      aggregation: widget.aggregation,
+      sqlIntent: tableQuery?.sqlIntent ?? "Widget aggregate query",
+      runtime: tableQuery?.runtime ? {
+        engine: tableQuery.runtime.engine,
+        database: "",
+        compiledSql: tableQuery.runtime.compiledSql,
+      } : undefined,
+    },
+    rows: (Array.isArray(tableQuery?.rows) ? tableQuery.rows : []).map((raw, index) => {
+      const fallbackValue = Object.values(raw)[Object.values(raw).length - 1] ?? 0;
+      const rawValue = valueColumn ? raw[valueColumn] ?? fallbackValue : fallbackValue;
+      const rawLabel = groupField ? raw[groupField] : (widget.measure ?? valueColumn) || `Result ${index + 1}`;
+      return { label: String(rawLabel ?? `Result ${index + 1}`), value: rawValue as number | string | null };
+    }),
+  };
+}
+
+function WidgetDataState({ state }: { state: "idle" | "loading" | "ready" | "error" }) {
+  return (
+    <div className="bWidgetDataState" data-testid={`b-widget-data-${state}`}>
+      <strong>{state === "error" ? biText("结果暂不可用", "Result unavailable") : biText("正在读取真实数据", "Reading live data")}</strong>
+      <span>{state === "error" ? biText("请检查字段口径或重新生成证据摘要。", "Check field bindings or regenerate the evidence summary.") : biText("不会用默认数字替代查询结果。", "No default number is shown before the query returns.")}</span>
+    </div>
   );
 }
 

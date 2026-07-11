@@ -95,7 +95,7 @@ def build_dashboard_widget_catalog_payload(
             ],
         },
         "integration": {
-            "project": "AIBI Hybrid",
+            "project": "AIBI-C",
             "metadataStore": str(metadata_store),
             "queryRuntime": "DuckDB whitelist aggregate runtime with SQLite fallback",
             "agentPolicy": "ask returns plans and action drafts; writes require explicit confirmation",

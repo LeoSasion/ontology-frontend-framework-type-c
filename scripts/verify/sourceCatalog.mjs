@@ -14,8 +14,10 @@ const textSourceFiles = {
   bWidgetKitModelSource: ["src", "biDashboardWidgetKitModel.ts"],
   dashboardCanvasSource: ["src", "components", "DashboardCanvas.tsx"],
   dashboardDeferredModulesSource: ["src", "dashboardDeferredModules.tsx"],
+  dashboardWidgetModulesSource: ["src", "dashboardWidgetModules.tsx"],
   dashboardDeferredPanelsSource: ["src", "components", "DashboardDeferredPanels.ts"],
   dashboardDeferredStylesSource: ["src", "components", "dashboardDeferred.css"],
+  dashboardWidgetEditorStylesSource: ["src", "components", "dashboardWidgetEditor.css"],
   dashboardCanvasWidgetModelSource: ["src", "dashboardCanvasWidgetModel.ts"],
   dashboardCanvasSourceSwitchModelSource: ["src", "dashboardCanvasSourceSwitchModel.ts"],
   dashboardCanvasReadinessModelSource: ["src", "dashboardCanvasReadinessModel.ts"],
@@ -60,11 +62,14 @@ const textSourceFiles = {
   serverSettingsRoutesSource: ["server", "settingsRoutes.ts"],
   serverModelRoutesSource: ["server", "modelRoutes.ts"],
   serverQueryRoutesSource: ["server", "queryRoutes.ts"],
+  serverCliArgBuildersSource: ["server", "cliArgBuilders.ts"],
   serverAgentRoutesSource: ["server", "agentRoutes.ts"],
   agentPromptRoutingSource: ["src", "agentPromptRouting.ts"],
   agentCommandDockSource: ["src", "components", "AgentCommandDock.tsx"],
+  agentCommandDockStylesSource: ["src", "components", "agentCommandDock.css"],
   agentPanelSource: ["src", "components", "AgentPanel.tsx"],
   agentEvidenceStylesSource: ["src", "components", "agentEvidenceWorkspace.css"],
+  agentEvidenceDraftsStylesSource: ["src", "components", "agentEvidenceDrafts.css"],
   agentPanelModelSource: ["src", "agentPanelModel.ts"],
   agentAnswerCardSource: ["src", "components", "AgentAnswerCard.tsx"],
   agentCanAnswerPanelSource: ["src", "components", "AgentCanAnswerPanel.tsx"],
@@ -137,12 +142,16 @@ const textSourceFiles = {
   metricRepairModelSource: ["src", "metricRepairModel.ts"],
   readmeSource: ["README.md"],
   devScriptSource: ["scripts", "dev.mjs"],
+  verifyUiFlowSource: ["scripts", "verify-ui-flow.mjs"],
   verifyUiRealImportSource: ["scripts", "verify-ui-real-import.mjs"],
   verifyAAdversarialSource: ["scripts", "verify-a-adversarial-source-intelligence.mjs"],
   indexHtmlSource: ["index.html"],
   topBarSource: ["src", "components", "TopBar.tsx"],
   sourceWorkbenchSource: ["src", "components", "SourceWorkbench.tsx"],
+  sourceWorkbenchViewSource: ["src", "components", "SourceWorkbenchView.tsx"],
+  sourceWorkbenchStateSource: ["src", "useSourceWorkbenchState.ts"],
   sourceWorkbenchAdvancedModulesSource: ["src", "sourceWorkbenchAdvancedModules.tsx"],
+  sourceWorkbenchDeferredModulesSource: ["src", "sourceWorkbenchDeferredModules.tsx"],
   sourceWorkbenchAdvancedPanelsSource: ["src", "components", "SourceWorkbenchAdvancedPanels.ts"],
   sourceWorkbenchAdvancedStylesSource: ["src", "components", "sourceWorkbenchAdvanced.css"],
   sourceWorkbenchConnectorControllerSource: ["src", "useSourceWorkbenchConnectorController.ts"],
@@ -173,6 +182,7 @@ const textSourceFiles = {
   sourceWorkbenchDraftModelSource: ["src", "sourceWorkbenchDraftModel.ts"],
   sidebarSource: ["src", "components", "Sidebar.tsx"],
   sidebarAssetSectionsSource: ["src", "components", "SidebarAssetSections.tsx"],
+  sidebarAssetModulesSource: ["src", "sidebarAssetModules.tsx"],
   sidebarWorkspaceCardSource: ["src", "components", "SidebarWorkspaceCard.tsx"],
   settingsPanelSource: ["src", "components", "SettingsPanel.tsx"],
   settingsPanelStylesSource: ["src", "components", "settingsPanel.css"],
@@ -181,6 +191,12 @@ const textSourceFiles = {
   settingsSandboxBoundaryPanelSource: ["src", "components", "SettingsSandboxBoundaryPanel.tsx"],
   settingsThemePreferencePanelSource: ["src", "components", "SettingsThemePreferencePanel.tsx"],
   stylesSource: ["src", "styles.css"],
+  reusablePatternStylesSource: ["src", "components", "reusablePatterns.css"],
+  workspaceSharedStylesSource: ["src", "components", "workspaceShared.css"],
+  sourceWorkbenchCoreStylesSource: ["src", "components", "sourceWorkbenchCore.css"],
+  dashboardCanvasCoreStylesSource: ["src", "components", "dashboardCanvasCore.css"],
+  inspectorCoreStylesSource: ["src", "components", "inspectorCore.css"],
+  homeIntelligenceCoreStylesSource: ["src", "components", "homeIntelligenceCore.css"],
   typesSource: ["src", "types.ts"],
   typesAgentSource: ["src", "typesAgent.ts"],
   typesDashboardSource: ["src", "typesDashboard.ts"],
@@ -219,7 +235,20 @@ const textSourceFiles = {
   agentPromptResolutionSource: ["tools", "agent_prompt_resolution.py"],
   agentRecommendedCommandsSource: ["tools", "agent_recommended_commands.py"],
   biCliCoreSource: ["tools", "bi_cli_core.py"],
+  biCliParserSource: ["tools", "bi_cli_parser.py"],
+  biCliSchemaSource: ["tools", "bi_cli_schema.py"],
+  biCliIoServicesSource: ["tools", "bi_cli_io_services.py"],
+  biCliSystemCommandsSource: ["tools", "bi_cli_system_commands.py"],
+  biCliSourceCommandsSource: ["tools", "bi_cli_source_commands.py"],
+  biCliQueryViewCommandsSource: ["tools", "bi_cli_query_view_commands.py"],
+  biCliDashboardCommandsSource: ["tools", "bi_cli_dashboard_commands.py"],
+  biCliWidgetCommandsSource: ["tools", "bi_cli_widget_commands.py"],
+  biCliSemanticMetricCommandsSource: ["tools", "bi_cli_semantic_metric_commands.py"],
+  biCliRelationshipFormulaCommandsSource: ["tools", "bi_cli_relationship_formula_commands.py"],
+  biCliCapabilitiesSource: ["tools", "bi_cli_capabilities.py"],
+  biCliMiscCommandsSource: ["tools", "bi_cli_misc_commands.py"],
   businessDashboardServiceSource: ["tools", "business_dashboard_service.py"],
+  businessDashboardTemplatesSource: ["tools", "business_dashboard_templates.py"],
   erpDashboardUnitLibrarySource: ["tools", "erp_dashboard_unit_library.py"],
   configCommandServiceSource: ["tools", "config_command_service.py"],
   connectorCommandServiceSource: ["tools", "connector_command_service.py"],
@@ -263,6 +292,33 @@ export function readVerifySourceCatalog(root) {
   for (const [key, pathSegments] of Object.entries(jsonSourceFiles)) {
     catalog[key] = JSON.parse(readProjectText(root, pathSegments));
   }
+  catalog.sourceWorkbenchComponentSource = catalog.sourceWorkbenchSource;
+  catalog.sourceWorkbenchSource = [
+    catalog.sourceWorkbenchSource,
+    catalog.sourceWorkbenchViewSource,
+    catalog.sourceWorkbenchStateSource,
+  ].join("\n");
+  catalog.rootStylesSource = catalog.stylesSource;
+  catalog.stylesSource = [
+    catalog.stylesSource,
+    catalog.reusablePatternStylesSource,
+    catalog.agentCommandDockStylesSource,
+    catalog.workspaceSharedStylesSource,
+    catalog.sourceWorkbenchCoreStylesSource,
+    catalog.dashboardCanvasCoreStylesSource,
+    catalog.inspectorCoreStylesSource,
+    catalog.homeIntelligenceCoreStylesSource,
+  ].join("\n");
+  catalog.agentEvidenceStylesSource = [
+    catalog.reusablePatternStylesSource,
+    catalog.agentEvidenceStylesSource,
+    catalog.agentEvidenceDraftsStylesSource,
+  ].join("\n");
+  catalog.dashboardDeferredStylesSource = [
+    catalog.reusablePatternStylesSource,
+    catalog.dashboardDeferredStylesSource,
+    catalog.dashboardWidgetEditorStylesSource,
+  ].join("\n");
   return catalog;
 }
 

@@ -32,7 +32,12 @@ const results = [];
 try {
   results.push(run("empty-chart", ["ask", "创建一个图表"]));
   results.push(run("import", ["import-commit", "validation-inputs/orders.csv", "--table", "records", "--name", "Records", "--mode", "create", "--yes"]));
-  results.push(run("dashboard", ["business-dashboard", "--op", "create", "--table", "records", "--limit", "3", "--yes"]));
+  const firstChartDraft = run("first-chart-draft", ["ask", "基于 records，先问我最多一个必要问题，然后起草一个仅包含一个图表的看板。优先在折线图、柱状图、指标卡或表格中选择，说明字段、口径和证据，不直接写入。"]);
+  results.push(firstChartDraft);
+  const firstChartKey = firstChartDraft.parsed?.actionDraft?.actionKey ?? "missing-first-chart-draft";
+  results.push(run("first-chart-actions", ["action-drafts", "--limit", "10"]));
+  results.push(run("first-chart-confirm", ["confirm-action", firstChartKey, "--yes"]));
+  results.push(run("dashboards-after-first-chart", ["dashboards"]));
   results.push(run("generic-overview", ["ask", "--read-only", "概览当前数据"]));
   results.push(run("ambiguous-chart", ["ask", "创建一个图表"]));
   results.push(run("explicit-bar", ["ask", "用 records 的 net_sales 按 channel 创建柱状图"]));
@@ -49,9 +54,23 @@ try {
         byLabel["empty-chart"].parsed?.actionDraft?.status === "read-only",
     },
     {
-      label: "isolated-bootstrap-ready",
+      label: "first-chart-from-import-creates-one-widget-draft",
       ok: byLabel.import.status === 0 && byLabel.import.parsed?.ok === true &&
-        byLabel.dashboard.status === 0 && byLabel.dashboard.parsed?.ok === true,
+        byLabel["first-chart-draft"].parsed?.requiresConfirmation === true &&
+        byLabel["first-chart-draft"].parsed?.actionDraft?.kind === "dashboard.create" &&
+        byLabel["first-chart-actions"].parsed?.actionDrafts?.some((draft) =>
+          draft.action_key === firstChartKey &&
+          draft.label === "生成单图表草案" &&
+          draft.payload?.dashboardDraft?.source === "single-chart" &&
+          draft.payload?.dashboardDraft?.widgetCount === 1 &&
+          draft.payload?.dashboardDraft?.widgets?.length === 1 &&
+          ["metric", "line", "bar", "pie", "table"].includes(draft.payload.dashboardDraft.widgets[0]?.type)
+        ) &&
+        byLabel["first-chart-confirm"].parsed?.confirmed === true &&
+        byLabel["dashboards-after-first-chart"].parsed?.dashboards?.some((dashboard) =>
+          dashboard.dashboard_key === byLabel["first-chart-confirm"].parsed?.createdDashboardKey &&
+          dashboard.widgets?.length === 1
+        ),
     },
     {
       label: "generic-overview-does-not-default-to-sales",

@@ -50,7 +50,7 @@ async function uiIsCompatible() {
     const response = await fetch("http://127.0.0.1:8686/");
     if (!response.ok) return false;
     const html = await response.text();
-    return html.includes("<title>AIBI Hybrid</title>");
+    return html.includes("<title>AIBI-C</title>");
   } catch {
     return false;
   }

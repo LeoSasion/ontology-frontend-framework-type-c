@@ -1,7 +1,5 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AgentCommandDock } from "./components/AgentCommandDock";
 import { Sidebar, type AppSection } from "./components/Sidebar";
-import { TopBar } from "./components/TopBar";
 import { useLanguage } from "./components/Bilingual";
 import { emptyAgentResult, emptyDashboardPayload, emptyFormulaPreview, emptyImportPreview, emptyQueryResult, emptyRelationshipPreview, emptyTableQuery, emptyWorkbenchPayload, emptyWorkspaceStatus } from "./emptyWorkspaceData";
 import { applyThemePalette, getUserPreferences, hasStoredThemeSnapshot, resolveThemePalette } from "./theme";
@@ -9,9 +7,7 @@ import { isAppSection } from "./appSections";
 import { businessSectionForStep, type BusinessPathStepKey } from "./businessPathModel";
 import { actionErrorResult, connectingStatus, preferredLandingSection, type ApiMode, type LoadState } from "./appWorkspaceModel";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
-import { InspectorLoadingPanel, InspectorPanel, ModuleLoadingPanel, allSectionPreloaders, inspectorPreloader, preloadModules, scheduleIdlePreload, sectionPreloaders } from "./appLazyModules";
-import { BusinessPathBar } from "./components/BusinessPathBar";
-import { AppMainView } from "./components/AppMainView";
+import { AgentCommandDock, AppMainView, BusinessPathBar, InspectorLoadingPanel, InspectorPanel, ModuleLoadingPanel, TopBar, agentCommandDockPreloader, allSectionPreloaders, businessPathBarPreloader, inspectorPreloader, preloadModules, scheduleIdlePreload, sectionPreloaders } from "./appLazyModules";
 import { useAppAgentActions } from "./useAppAgentActions";
 import { useAppDataActions } from "./useAppDataActions";
 import { useAppDashboardActions } from "./useAppDashboardActions";
@@ -78,7 +74,7 @@ export default function App() {
       setActionDrafts(surface.actionDrafts);
       setAgent(emptyAgentResult);
       if (!explicitInitialSectionRef.current && !autoLandingAppliedRef.current) {
-        setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards));
+        setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards, surface.actionDrafts.length));
         autoLandingAppliedRef.current = true;
       }
     } catch (error) {
@@ -96,7 +92,7 @@ export default function App() {
   }, [section]);
 
   useEffect(() => scheduleIdlePreload(() => {
-    preloadModules([...allSectionPreloaders, inspectorPreloader]);
+    preloadModules([...allSectionPreloaders, inspectorPreloader, agentCommandDockPreloader, businessPathBarPreloader]);
   }), []);
 
   useEffect(() => {
@@ -223,12 +219,18 @@ export default function App() {
         flow={workspaceFlow}
       />
       <main className="contentShell">
-        <TopBar activeSection={section} status={displayStatus} apiMode={apiMode} />
-        <BusinessPathBar
-          activeSection={section}
-          flow={workspaceFlow}
-          onOpenStep={handleOpenBusinessStep}
-        />
+        <Suspense fallback={null}>
+          <TopBar activeSection={section} status={displayStatus} apiMode={apiMode} />
+        </Suspense>
+        {loadState === "ready" ? (
+          <Suspense fallback={null}>
+            <BusinessPathBar
+              activeSection={section}
+              flow={workspaceFlow}
+              onOpenStep={handleOpenBusinessStep}
+            />
+          </Suspense>
+        ) : null}
         <Suspense fallback={<ModuleLoadingPanel section={section} language={resolvedLanguage} />}>
           <AppMainView
             actionDrafts={actionDrafts}
@@ -259,15 +261,17 @@ export default function App() {
           />
         </Suspense>
       </main>
-      <AgentCommandDock
-        activeSection={section}
-        actionDrafts={actionDrafts}
-        agent={agent}
-        onAsk={agentActions.handleAgentCommandAsk}
-        onOpenAgent={() => openSection("agent")}
-        onOpenSection={openSection}
-        status={displayStatus}
-      />
+      {loadState === "ready" ? <Suspense fallback={null}>
+        <AgentCommandDock
+          activeSection={section}
+          actionDrafts={actionDrafts}
+          agent={agent}
+          onAsk={agentActions.handleAgentCommandAsk}
+          onOpenAgent={() => openSection("agent")}
+          onOpenSection={openSection}
+          status={displayStatus}
+        />
+      </Suspense> : null}
       <Suspense fallback={<InspectorLoadingPanel language={resolvedLanguage} />}>
         <InspectorPanel
           activeSection={section}

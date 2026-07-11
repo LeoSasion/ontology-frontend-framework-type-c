@@ -43,6 +43,7 @@ npm run verify:ui-empty
 npm run verify:ui-import
 npm run verify:bi-cli-contract
 npm run verify:ai-reliability
+npm run verify:workspace-flow
 npm run verify:production
 npm run verify:security-runtime
 npm run verify:backup

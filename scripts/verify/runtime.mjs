@@ -6,10 +6,13 @@ import { spawnSync } from "node:child_process";
 const defaultIgnoredDirs = new Set([".git", "node_modules", "dist", "data", "tmp", "logs"]);
 
 export function hasCssRule(source, selector, ...declarations) {
-  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const rulePattern = new RegExp(`${escapedSelector}\\s*\\{([\\s\\S]*?)\\}`, "g");
+  const rulePattern = /([^{}]+)\{([^{}]*)\}/g;
   return Array.from(source.matchAll(rulePattern)).some((match) =>
-    declarations.every((declaration) => match[1].includes(declaration)),
+    match[1]
+      .split(",")
+      .map((item) => item.trim())
+      .includes(selector) &&
+    declarations.every((declaration) => match[2].includes(declaration)),
   );
 }
 

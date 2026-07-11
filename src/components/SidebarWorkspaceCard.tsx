@@ -32,7 +32,7 @@ export function SidebarWorkspaceCard({
 }: SidebarWorkspaceCardProps) {
   const currentWorkspace = status.workspace ?? workspaces[0] ?? {
     id: "default",
-    name: biText("AIBI 工作区", "AIBI workspace"),
+    name: biText("AIBI-C 工作区", "AIBI-C workspace"),
     current_source_run_id: null,
     isActive: true,
   };

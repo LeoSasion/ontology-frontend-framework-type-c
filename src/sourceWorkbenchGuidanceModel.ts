@@ -117,7 +117,7 @@ export function buildSourceWorkbenchGuidance({
       state: sourceProfileComplete ? biText("证据完整", "Evidence ready") : biText("建议更新", "Refresh suggested"),
       title: biText("证据摘要", "Evidence profile"),
       detail: latestSourceProfile
-        ? `${latestSourceProfile.source_count} ${biText("文件", "files")} · ${latestSourceProfile.relationship_count} ${biText("关系", "relations")} · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} SQL`
+        ? `${latestSourceProfile.source_count} ${biText("文件", "files")} · ${latestSourceProfile.relationship_count} ${biText("关系", "relations")} · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} ${biText("可执行问题", "answerable questions")}`
         : biText("导入或选择本地路径后生成真实证据摘要。", "Import or choose local paths to build a real evidence summary."),
     },
   ];

@@ -1,0 +1,429 @@
+import { useEffect, useMemo, useState } from "react";
+import type { FieldConfig, FormulaMutationPayload } from "./types";
+import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
+import type { QueryOptions, SourceWorkbenchProps } from "./sourceWorkbenchContracts";
+import {
+  buildFieldSemanticReadiness,
+  buildSourceWorkbenchCollections,
+  buildSourceWorkbenchRuntimeSummary,
+  buildSourceWorkbenchSelection,
+  resultRows,
+  sourceProfileErrorMessage,
+} from "./sourceWorkbenchModel";
+import {
+  buildMetricDraft,
+  buildSourceProfileOptions,
+  type MetricMutationOptions,
+  type SourceIntelligenceRunOptions,
+} from "./sourceWorkbenchCommandModel";
+import {
+  applyFieldDraftPatch,
+  buildNavigationOperationOptions,
+  managedSourceDisplayName,
+  readFieldDraft,
+  type FieldDraft,
+  type FieldDrafts,
+  type NavigationOperation,
+} from "./sourceWorkbenchDraftModel";
+import { buildSourceWorkbenchGuidance } from "./sourceWorkbenchGuidanceModel";
+import { useSourceWorkbenchConnectorController } from "./useSourceWorkbenchConnectorController";
+import { useSourceWorkbenchImportController } from "./useSourceWorkbenchImportController";
+import { biText } from "./components/Bilingual";
+
+export function useSourceWorkbenchState({
+  status,
+  preview,
+  query,
+  workbench,
+  onPreview,
+  onCommitImport,
+  onPreviewFolderImport,
+  onCommitFolderImport,
+  onImportPolicy,
+  onRemoveImportJob,
+  onInspectSource,
+  onRenameSource,
+  onDeleteSource,
+  onNavigationOperation,
+  onSaveConnector,
+  onSyncConnector,
+  onRemoveConnector,
+  onQuery,
+  onInferSemantics,
+  onSetSemantic,
+  onInferMetrics,
+  onAddMetric,
+  onQueryMetric,
+  onRelationshipPreview,
+  onRelationshipSave,
+  onFormulaPreview,
+  onFormulaSave,
+  onFormulaDelete,
+  onSourceIntelligenceRun,
+  onBusinessDashboardOperation,
+  onAsk,
+  onOpenDashboard,
+}: SourceWorkbenchProps) {
+  void onRemoveImportJob;
+  void onInspectSource;
+  void onRenameSource;
+  void onDeleteSource;
+  void onQuery;
+  void onInferSemantics;
+  void onSetSemantic;
+  void onInferMetrics;
+  void onAddMetric;
+  void onQueryMetric;
+  void onRelationshipPreview;
+  void onRelationshipSave;
+  void onFormulaPreview;
+  void onFormulaSave;
+  void onFormulaDelete;
+  void onAsk;
+
+  const {
+    tables,
+    fields,
+    metrics,
+    relationships,
+    relationshipRecommendations,
+    importJobs,
+    importPolicies,
+    connectors,
+    rowFormulas,
+    navigationModules,
+    sourceIntelligenceRuns,
+    fieldRoles,
+    fieldUsages,
+    safeAggregations,
+    sourceRuns,
+    queryRows,
+    firstTableKey,
+  } = useMemo(() => buildSourceWorkbenchCollections(workbench, status, query), [workbench, status, query]);
+  const tableKeySet = useMemo(() => new Set(tables.map((table) => table.table_key)), [tables]);
+  const fieldsByTable = useMemo(() => {
+    const indexed = new Map<string, FieldConfig[]>();
+    for (const field of fields) {
+      const tableFields = indexed.get(field.table_key);
+      if (tableFields) {
+        tableFields.push(field);
+      } else {
+        indexed.set(field.table_key, [field]);
+      }
+    }
+    return indexed;
+  }, [fields]);
+  const [activeTableKey, setActiveTableKey] = useState(firstTableKey);
+  const [managedSourceKey, setManagedSourceKey] = useState(firstTableKey);
+  const [sourceRenameName, setSourceRenameName] = useState(tables[0]?.display_name ?? "");
+  const [navigationModuleKey, setNavigationModuleKey] = useState(navigationModules[0]?.moduleKey ?? "");
+  const activeNavigationModule = navigationModules.find((module) => module.moduleKey === navigationModuleKey) ?? navigationModules[0];
+  const [navigationName, setNavigationName] = useState(activeNavigationModule?.name ?? "");
+  const [navigationSort, setNavigationSort] = useState(String(activeNavigationModule?.sort ?? 110));
+  const [navigationResult, setNavigationResult] = useState<Record<string, unknown> | null>(null);
+  const selectedManagedSourceKey = tableKeySet.has(managedSourceKey) ? managedSourceKey : firstTableKey;
+  const {
+    selectedTableKey,
+    selectedFields,
+    selectedMetrics,
+    measureFields,
+    groupFields,
+    indexCandidateName,
+    selectedFormulaAssets,
+  } = useMemo(() => buildSourceWorkbenchSelection({
+    tables,
+    fields,
+    metrics,
+    rowFormulas,
+    activeTableKey,
+    firstTableKey,
+  }), [activeTableKey, fields, firstTableKey, metrics, rowFormulas, tables]);
+  const fieldSemanticReadiness = useMemo(() => buildFieldSemanticReadiness(selectedFields), [selectedFields]);
+  const [queryForm, setQueryForm] = useState<QueryOptions>({
+    table: selectedTableKey,
+    group: groupFields[0]?.field_name ?? "",
+    measure: measureFields[0]?.field_name ?? "",
+    aggregation: "count",
+    limit: 10,
+  });
+  const [relationshipForm, setRelationshipForm] = useState<RelationshipSaveOptions>({
+    leftTable: tables[0]?.table_key ?? "",
+    rightTable: tables[1]?.table_key ?? "",
+    leftField: "",
+    rightField: "",
+    joinType: "left",
+    limit: 10,
+  });
+  const [formulaName, setFormulaName] = useState("");
+  const [formulaExpression, setFormulaExpression] = useState("");
+  const [formulaMode, setFormulaMode] = useState("aggregate");
+  const [formulaMutation, setFormulaMutation] = useState<FormulaMutationPayload | null>(null);
+  const [fieldDrafts, setFieldDrafts] = useState<FieldDrafts>({});
+  const [metricName, setMetricName] = useState("");
+  const [metricField, setMetricField] = useState(measureFields[0]?.field_name ?? "");
+  const [metricAggregation, setMetricAggregation] = useState("count");
+  const [metricDimension, setMetricDimension] = useState(groupFields[0]?.field_name ?? "");
+  const [semanticMetricResult, setSemanticMetricResult] = useState<Record<string, unknown> | null>(null);
+  const [sourceProfileInputs, setSourceProfileInputs] = useState("");
+  const [sourceProfileLabel, setSourceProfileLabel] = useState(biText("证据摘要", "Source profile"));
+  const [sourceProfileResult, setSourceProfileResult] = useState<Record<string, unknown> | null>(null);
+  const [sourceProfileError, setSourceProfileError] = useState("");
+  const [businessDashboardResult, setBusinessDashboardResult] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const importController = useSourceWorkbenchImportController({
+    preview,
+    importPolicies,
+    onPreview,
+    onCommitImport,
+    onPreviewFolderImport,
+    onCommitFolderImport,
+    onImportPolicy,
+  });
+  const connectorController = useSourceWorkbenchConnectorController({
+    firstTableKey,
+    tableKeySet,
+    onSaveConnector,
+    onSyncConnector,
+    onRemoveConnector,
+  });
+
+  useEffect(() => {
+    if (!activeNavigationModule) return;
+    setNavigationName(activeNavigationModule.name);
+    setNavigationSort(String(activeNavigationModule.sort));
+  }, [activeNavigationModule?.moduleKey, activeNavigationModule?.name, activeNavigationModule?.sort]);
+
+  useEffect(() => {
+    if (!firstTableKey) return;
+    const firstTableName = tables[0]?.display_name ?? firstTableKey;
+    setActiveTableKey((current) => tableKeySet.has(current) ? current : firstTableKey);
+    setManagedSourceKey((current) => tableKeySet.has(current) ? current : firstTableKey);
+    setSourceRenameName((current) => current || firstTableName);
+  }, [firstTableKey, tableKeySet, tables]);
+
+  useEffect(() => {
+    if (!navigationModules.length) return;
+    setNavigationModuleKey((current) => navigationModules.some((module) => module.moduleKey === current) ? current : navigationModules[0].moduleKey);
+  }, [navigationModules]);
+
+  useEffect(() => {
+    setQueryForm((current) => ({
+      ...current,
+      table: tableKeySet.has(current.table ?? "") ? current.table : selectedTableKey,
+      group: current.group || (groupFields[0]?.field_name ?? ""),
+      measure: current.measure || (measureFields[0]?.field_name ?? ""),
+      aggregation: current.aggregation || "count",
+    }));
+    setMetricField((current) => measureFields.some((field) => field.field_name === current) ? current : measureFields[0]?.field_name ?? "");
+    setMetricDimension((current) => groupFields.some((field) => field.field_name === current) ? current : groupFields[0]?.field_name ?? "");
+  }, [groupFields, measureFields, selectedTableKey, tableKeySet]);
+
+  useEffect(() => {
+    setRelationshipForm((current) => {
+      const leftTable = tableKeySet.has(current.leftTable) ? current.leftTable : tables[0]?.table_key ?? "";
+      const rightTable = tableKeySet.has(current.rightTable) && current.rightTable !== leftTable
+        ? current.rightTable
+        : tables.find((table) => table.table_key !== leftTable)?.table_key ?? "";
+      const leftFields = fieldsByTable.get(leftTable) ?? [];
+      const rightFields = fieldsByTable.get(rightTable) ?? [];
+      const hasLeftField = leftFields.some((field) => field.field_name === current.leftField);
+      const hasRightField = rightFields.some((field) => field.field_name === current.rightField);
+      return {
+        ...current,
+        leftTable,
+        rightTable,
+        leftField: hasLeftField ? current.leftField : leftFields[0]?.field_name ?? "",
+        rightField: hasRightField ? current.rightField : rightFields[0]?.field_name ?? "",
+      };
+    });
+  }, [fieldsByTable, tableKeySet, tables]);
+
+  function sourceProfileOptions(): SourceIntelligenceRunOptions {
+    return buildSourceProfileOptions({ sourceProfileInputs, sourceProfileLabel });
+  }
+
+  function fieldDraft(field: FieldConfig) {
+    return readFieldDraft(fieldDrafts, field);
+  }
+
+  function updateFieldDraft(field: FieldConfig, patch: Partial<FieldDraft>) {
+    setFieldDrafts((current) => applyFieldDraftPatch(current, field, patch));
+  }
+
+  async function runNavigationOperation(op: NavigationOperation, confirm = false) {
+    const result = await onNavigationOperation(buildNavigationOperationOptions({
+      activeNavigationModule,
+      navigationModuleKey,
+      op,
+      navigationName,
+      navigationSort,
+      confirm,
+    }));
+    setNavigationResult(result);
+  }
+
+  function selectManagedSource(tableKey: string) {
+    setManagedSourceKey(tableKey);
+    setSourceRenameName(managedSourceDisplayName(tables, tableKey));
+  }
+
+  async function runBusy(label: string, action: () => Promise<void>) {
+    setBusy(label);
+    try {
+      await action();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runSourceProfile(label: string, options: SourceIntelligenceRunOptions) {
+    setBusy(label);
+    setSourceProfileResult(null);
+    setSourceProfileError("");
+    try {
+      const result = await onSourceIntelligenceRun(options);
+      setSourceProfileResult(result && typeof result === "object" ? result as Record<string, unknown> : null);
+    } catch (error) {
+      setSourceProfileError(sourceProfileErrorMessage(error));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runBusinessDashboard(confirm: boolean) {
+    const result = await onBusinessDashboardOperation({
+      op: confirm ? "create" : "draft",
+      table: selectedTableKey,
+      limit: 10,
+      confirm,
+    });
+    setBusinessDashboardResult(result);
+    if (confirm && (typeof result.createdDashboardKey === "string" || typeof result.savedDashboardKey === "string")) {
+      onOpenDashboard();
+    }
+  }
+
+  const { runtimeStatus, queryInfo, queryRuntime } = buildSourceWorkbenchRuntimeSummary(workbench, status, query);
+  const effectiveMetricField = measureFields.some((field) => field.field_name === metricField) ? metricField : measureFields[0]?.field_name ?? "*";
+  const effectiveMetricDimension = groupFields.some((field) => field.field_name === metricDimension) ? metricDimension : groupFields[0]?.field_name ?? "";
+  const metricResultRows = resultRows(semanticMetricResult).slice(0, 5);
+  const latestSourceProfile = sourceIntelligenceRuns[0];
+  const connectedRowCount = tables.reduce((total, table) => total + table.row_count, 0);
+  const connectedFieldCount = tables.reduce((total, table) => total + table.column_count, 0);
+  const guidance = buildSourceWorkbenchGuidance({
+    busy,
+    preview,
+    tables,
+    fields,
+    selectedFields,
+    measureFields,
+    groupFields,
+    relationships,
+    selectedMetrics,
+    latestSourceProfile,
+    selectedTableKey,
+  });
+  const hasData = tables.length > 0 || status.counts.tables > 0;
+  const showExpertWorkbench = showAdvanced;
+
+  function metricDraft(confirm = false): MetricMutationOptions {
+    return buildMetricDraft({
+      metricName,
+      selectedTableKey,
+      effectiveMetricField,
+      metricAggregation,
+      effectiveMetricDimension,
+      confirm,
+    });
+  }
+
+  return {
+    tables,
+    fields,
+    relationships,
+    relationshipRecommendations,
+    importJobs,
+    connectors,
+    navigationModules,
+    sourceIntelligenceRuns,
+    fieldRoles,
+    fieldUsages,
+    safeAggregations,
+    sourceRuns,
+    queryRows,
+    activeNavigationModule,
+    navigationModuleKey,
+    navigationName,
+    navigationSort,
+    navigationResult,
+    selectedManagedSourceKey,
+    selectedTableKey,
+    selectedFields,
+    selectedMetrics,
+    measureFields,
+    groupFields,
+    indexCandidateName,
+    selectedFormulaAssets,
+    fieldSemanticReadiness,
+    queryForm,
+    relationshipForm,
+    formulaName,
+    formulaExpression,
+    formulaMode,
+    formulaMutation,
+    metricName,
+    metricAggregation,
+    semanticMetricResult,
+    sourceProfileInputs,
+    sourceProfileLabel,
+    sourceProfileResult,
+    sourceProfileError,
+    businessDashboardResult,
+    busy,
+    showAdvanced,
+    importController,
+    connectorController,
+    runtimeStatus,
+    queryInfo,
+    queryRuntime,
+    effectiveMetricField,
+    effectiveMetricDimension,
+    metricResultRows,
+    latestSourceProfile,
+    connectedRowCount,
+    connectedFieldCount,
+    ...guidance,
+    hasData,
+    showExpertWorkbench,
+    setActiveTableKey,
+    setNavigationModuleKey,
+    setNavigationName,
+    setNavigationSort,
+    setQueryForm,
+    setRelationshipForm,
+    setFormulaName,
+    setFormulaExpression,
+    setFormulaMode,
+    setFormulaMutation,
+    setMetricName,
+    setMetricField,
+    setMetricAggregation,
+    setMetricDimension,
+    setSemanticMetricResult,
+    setSourceProfileInputs,
+    setSourceProfileLabel,
+    setSourceRenameName,
+    setShowAdvanced,
+    fieldDraft,
+    updateFieldDraft,
+    runNavigationOperation,
+    selectManagedSource,
+    runBusy,
+    runSourceProfile,
+    runBusinessDashboard,
+    metricDraft,
+    sourceProfileOptions,
+    sourceRenameName,
+  };
+}

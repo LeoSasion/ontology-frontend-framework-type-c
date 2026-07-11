@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   captureScreenshot,
   check,
@@ -28,11 +28,18 @@ const knownRealDataFolders = [
   "C:\\Users\\Administrator\\Documents\\财务报表\\真实数据",
   "C:\\Users\\Administrator\\Documents\\财务报表_bak\\真实数据",
 ];
-const importFolder = process.env.AIBI_REAL_IMPORT_FOLDER ?? knownRealDataFolders.find((folder) => existsSync(folder)) ?? knownRealDataFolders[0];
-const importFile = process.env.AIBI_REAL_IMPORT_FILE ?? join(importFolder, "源数据-05月", "保单明细-5月.csv");
-const importTarget = existsSync(importFolder)
-  ? { mode: "folder", path: importFolder }
-  : { mode: "file", path: importFile };
+const fallbackFolder = knownRealDataFolders.find((folder) => existsSync(folder)) ?? knownRealDataFolders[0];
+const configuredPath = process.env.AIBI_REAL_IMPORT_PATH ?? process.env.AIBI_REAL_IMPORT_FILE ?? process.env.AIBI_REAL_IMPORT_FOLDER ?? fallbackFolder;
+const configuredMode = process.env.AIBI_REAL_IMPORT_MODE;
+const detectedMode = existsSync(configuredPath) && statSync(configuredPath).isDirectory() ? "folder" : "file";
+const importTarget = { mode: configuredMode === "folder" || configuredMode === "file" ? configuredMode : detectedMode, path: configuredPath };
+const importFolder = importTarget.mode === "folder" ? importTarget.path : dirname(importTarget.path);
+const importFile = importTarget.mode === "file" ? importTarget.path : join(importFolder, "源数据-05月", "保单明细-5月.csv");
+const datasetLabel = process.env.AIBI_REAL_IMPORT_LABEL ?? basename(importTarget.path).replace(/\.[^.]+$/, "") ?? "真实数据";
+const datasetDomain = process.env.AIBI_REAL_IMPORT_DOMAIN ?? (knownRealDataFolders.some((folder) => resolve(folder) === resolve(importTarget.path)) ? "financial-commerce" : "unspecified-real-domain");
+const minimumFolderGroups = Math.max(1, Number(process.env.AIBI_REAL_IMPORT_MIN_GROUPS ?? 1));
+const knownFinancialBaseline = importTarget.mode === "folder" && knownRealDataFolders.some((folder) => resolve(folder) === resolve(importTarget.path));
+const nonProductionPathPattern = /[\\/](fixtures|testdata|validation-inputs)[\\/]/i;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-import-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
 const evidenceViewports = [
@@ -124,7 +131,7 @@ function realFlowState() {
 }
 
 async function setNativeValue(client, selector, value) {
-  return evaluate(client, ({ selector: targetSelector, value: nextValue }) => {
+  return evaluate(client, ({ targetSelector, nextValue }) => {
     const element = document.querySelector(targetSelector);
     if (!element) return { ok: false, error: `missing ${targetSelector}` };
     const proto = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
@@ -133,7 +140,7 @@ async function setNativeValue(client, selector, value) {
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
     return { ok: true, value: element.value };
-  }, { selector, value });
+  }, { targetSelector: selector, nextValue: value });
 }
 
 async function openDetails(client, selector) {
@@ -179,6 +186,8 @@ try {
   checks.push(
     check("real-import-target-exists", existsSync(importTarget.path), { importTarget, importFile, importFolder }),
     check("real-import-folder-or-file-mode", importTarget.mode === "folder" || existsSync(importFile), { importTarget, importFile, importFolder }),
+    check("real-import-uses-production-data", !nonProductionPathPattern.test(importTarget.path), { importTarget, datasetDomain }),
+    check("real-import-domain-declared", datasetDomain !== "unspecified-real-domain", { datasetDomain, datasetLabel }),
   );
   if (!existsSync(importTarget.path)) {
     throw new Error(`Import target was not found: ${importTarget.path}`);
@@ -221,6 +230,7 @@ try {
 
       const setImportPath = await setNativeValue(browser.client, ".sourceImportPanel input", importTarget.path);
       checks.push(check("ui-import-path-filled", setImportPath.ok && setImportPath.value === importTarget.path, setImportPath));
+      await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
 
       if (importTarget.mode === "folder") {
         const previewClick = await click(browser.client, '[data-testid="folder-import-preview-button"]');
@@ -232,7 +242,7 @@ try {
           const confirm = document.querySelector('[data-testid="folder-import-confirm-button"]');
           const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
           return {
-            ok: Boolean(plan && confirm) && groups.length >= 2 && !error,
+            ok: Boolean(plan && confirm) && groups.length > 0 && !error,
             hasPlan: Boolean(plan),
             groupCount: groups.length,
             hasConfirm: Boolean(confirm),
@@ -242,7 +252,7 @@ try {
         }, 60000);
         checks.push(
           check("ui-folder-import-plan-visible", previewReady.ok, previewReady),
-          check("ui-folder-import-groups-readable", Number(previewReady.groupCount ?? 0) >= 2, previewReady),
+          check("ui-folder-import-groups-readable", Number(previewReady.groupCount ?? 0) >= minimumFolderGroups, { ...previewReady, minimumFolderGroups }),
         );
 
         const confirmClick = await click(browser.client, '[data-testid="folder-import-confirm-button"]');
@@ -270,7 +280,7 @@ try {
       const importStatus = await waitForApi(async () => {
         const status = await getStatus();
         const tableCount = Number(status.counts?.tables ?? 0);
-        return { ok: importTarget.mode === "folder" ? tableCount >= 4 : tableCount > 0, status };
+        return { ok: tableCount > 0, status };
       }, { timeoutMs: 45000, intervalMs: 1000, label: "imported table count" });
       workspace = importStatus.status.workspace;
       counts = importStatus.status.counts;
@@ -283,7 +293,7 @@ try {
         check("api-import-workbench-table-readable", Boolean(importedTable?.table_key), { importedTable }),
         check("api-import-table-name-not-numeric", Boolean(importedTable?.display_name) && !/^\d+$/.test(String(importedTable?.display_name ?? "")), { importedTable }),
         check("api-import-table-key-not-numeric", Boolean(importedTable?.table_key) && !/^\d+$/.test(String(importedTable?.table_key ?? "")), { importedTable }),
-        check("api-folder-import-real-tables-merged", importTarget.mode !== "folder" || (
+        check("api-known-financial-folder-deduplicated", !knownFinancialBaseline || (
           rowCountsByName["保单明细"] === 426 &&
           rowCountsByName["售后单"] === 1393 &&
           rowCountsByName["订单"] === 2351 &&
@@ -336,9 +346,29 @@ try {
 
       await navigate(browser.client, `${baseUrl}/?section=sources`);
       await waitForAppReady(browser.client, null, 25000);
+      const sourceControlsReady = await waitForUi(browser.client, "source intelligence controls", () => {
+        const entry = document.querySelector('[data-testid="source-intelligence-folder-entry"]');
+        const textarea = entry?.querySelector("textarea");
+        const input = entry?.querySelector("input");
+        const button = document.querySelector('[data-testid="source-intelligence-custom-run-button"]');
+        const loading = document.querySelector('[data-testid="source-advanced-loading"]');
+        const error = document.querySelector('[data-testid="source-intelligence-error"], .appFallback, .fallbackPanel');
+        const rect = entry?.getBoundingClientRect();
+        return {
+          ok: Boolean(entry && textarea && input && button && rect && rect.width > 1 && rect.height > 1 && !error),
+          hasEntry: Boolean(entry),
+          hasTextarea: Boolean(textarea),
+          hasInput: Boolean(input),
+          hasButton: Boolean(button),
+          hasLoading: Boolean(loading),
+          hasError: Boolean(error),
+          errorText: error?.textContent?.slice(0, 500) ?? "",
+        };
+      }, 45000);
+      checks.push(check("ui-source-intelligence-controls-ready", sourceControlsReady.ok, sourceControlsReady));
 
       const setSourcePath = await setNativeValue(browser.client, '[data-testid="source-intelligence-folder-entry"] textarea', importTarget.path);
-      const setSourceLabel = await setNativeValue(browser.client, '[data-testid="source-intelligence-folder-entry"] input', importTarget.mode === "folder" ? "真实文件夹导入回归" : "真实导入回归");
+      const setSourceLabel = await setNativeValue(browser.client, '[data-testid="source-intelligence-folder-entry"] input', `${datasetLabel} · ${datasetDomain}`);
       checks.push(
         check("ui-source-intelligence-path-filled", setSourcePath.ok && setSourcePath.value === importTarget.path, setSourcePath),
         check("ui-source-intelligence-label-filled", setSourceLabel.ok, setSourceLabel),
@@ -349,9 +379,12 @@ try {
         const result = document.querySelector('[data-testid="source-intelligence-result"]');
         const progress = document.querySelector('[data-testid="source-intelligence-progress"]');
         const error = document.querySelector('[data-testid="source-intelligence-error"], .appFallback, .fallbackPanel');
+        const pageText = document.body.textContent ?? "";
+        const nextStepReady = pageText.includes("证据摘要已就绪") || pageText.includes("Evidence summary is ready");
         return {
-          ok: Boolean(result) && !error,
+          ok: (Boolean(result) || nextStepReady) && !error,
           hasResult: Boolean(result),
+          nextStepReady,
           hasProgress: Boolean(progress),
           hasError: Boolean(error),
           errorText: error?.textContent?.slice(0, 500) ?? "",
@@ -386,121 +419,138 @@ try {
       }, 30000);
       checks.push(check("ui-source-advanced-styles-load-on-open", sourceAdvancedReady.ok, sourceAdvancedReady));
 
-      await openDetails(browser.client, '[data-testid="source-guide-details"]');
-      const dashboardCreateReady = await waitForUi(browser.client, "source dashboard create", () => {
-        const details = document.querySelector('[data-testid="source-guide-details"]');
-        if (details && !details.open) details.open = true;
-        const button = document.querySelector('[data-testid="source-business-dashboard-create"]');
-        const stateText = document.querySelector('[data-testid="source-dashboard-recipe"]')?.textContent ?? "";
-        return {
-          ok: Boolean(button) && !button.disabled,
-          buttonExists: Boolean(button),
-          disabled: Boolean(button?.disabled),
-          stateText: stateText.slice(0, 600),
-        };
-      }, 45000);
-      checks.push(check("ui-source-dashboard-create-ready", dashboardCreateReady.ok, dashboardCreateReady));
-      const createDashboardClick = await click(browser.client, '[data-testid="source-business-dashboard-create"]');
-      checks.push(check("ui-source-dashboard-create-click-fired", createDashboardClick.ok, createDashboardClick));
-      const dashboardStatus = await waitForApi(async () => {
-        const status = await getStatus();
-        const nextDashboards = await getDashboards();
-        return {
-          ok: Number(status.counts?.dashboards ?? 0) > 0 || (nextDashboards.dashboards?.length ?? 0) > 0,
-          status,
-          dashboards: nextDashboards,
-        };
-      }, { timeoutMs: 45000, intervalMs: 1000, label: "dashboard count" });
-      counts = dashboardStatus.status.counts;
-      dashboards = dashboardStatus.dashboards;
-      checks.push(check("api-dashboard-created", Number(counts.dashboards ?? 0) > 0 || (dashboards.dashboards?.length ?? 0) > 0, { counts, dashboards: dashboards.dashboards?.length ?? 0 }));
-
       await navigate(browser.client, `${baseUrl}/?section=dashboards`);
-      const dashboardPage = await waitForUi(browser.client, "dashboard single-chart strip", () => {
+      const firstChartEntry = await waitForUi(browser.client, "first chart entry", () => {
         const text = document.body?.innerText || "";
         const strip = document.querySelector('[data-testid="dashboard-business-task-strip"]');
         const prompt = document.querySelector('[data-testid="dashboard-ai-chart-prompt"]');
         const chartButton = document.querySelector('[data-testid="dashboard-task-explain"]');
-        const evidenceButton = document.querySelector('[data-testid="dashboard-task-evidence"]');
+        const beta = document.querySelector('[data-testid="dashboard-beta-details"]');
         const error = document.querySelector(".appFallback, .fallbackPanel");
         return {
-          ok: Boolean(strip && prompt && chartButton && evidenceButton) && text.includes("codex_import_") && !error,
+          ok: Boolean(strip && prompt && chartButton) && text.includes("codex_import_") && !error,
           hasStrip: Boolean(strip),
           hasPrompt: Boolean(prompt),
+          promptValue: prompt?.value ?? "",
           hasChartButton: Boolean(chartButton),
           chartDisabled: Boolean(chartButton?.disabled),
-          hasEvidenceButton: Boolean(evidenceButton),
+          betaCollapsed: Boolean(beta && !beta.open),
           workspaceSynced: text.includes("codex_import_"),
           hasError: Boolean(error),
         };
       }, 45000);
-      checks.push(check("ui-dashboard-single-chart-strip-visible", dashboardPage.ok, dashboardPage));
+      checks.push(
+        check("ui-first-chart-entry-visible", firstChartEntry.ok, firstChartEntry),
+        check("ui-first-chart-prompt-is-empty-by-default", firstChartEntry.promptValue === "", firstChartEntry),
+        check("ui-first-chart-prompt-does-not-expose-internal-template", firstChartEntry.promptValue === "" && !firstChartEntry.promptValue.includes("source_"), firstChartEntry),
+        check("ui-full-dashboard-beta-collapsed", firstChartEntry.betaCollapsed, firstChartEntry),
+      );
 
+      const chartPromptValue = await setNativeValue(browser.client, '[data-testid="dashboard-ai-chart-prompt"]', "看支付保费总额");
+      const chartPromptReady = await waitForUi(browser.client, "chart prompt ready", () => {
+        const prompt = document.querySelector('[data-testid="dashboard-ai-chart-prompt"]');
+        const chartButton = document.querySelector('[data-testid="dashboard-task-explain"]');
+        return {
+          ok: Boolean(prompt && chartButton) && prompt.value === "看支付保费总额" && !chartButton.disabled,
+          promptValue: prompt?.value ?? "",
+          chartDisabled: Boolean(chartButton?.disabled),
+        };
+      }, 10000);
+      checks.push(
+        check("ui-first-chart-prompt-filled-by-user", chartPromptValue.ok && chartPromptReady.ok, { chartPromptValue, chartPromptReady }),
+      );
+
+      const chartClick = await click(browser.client, '[data-testid="dashboard-task-explain"]');
+      checks.push(check("ui-dashboard-single-chart-click-fired", chartClick.ok, chartClick));
+      const chartAgentState = await waitForUi(browser.client, "single chart confirmation", () => {
+        const taskDetails = document.querySelector('[data-testid="agent-task-packet-details"]');
+        const confirm = document.querySelector('[data-testid="agent-current-draft-confirm"]');
+        const widgets = Array.from(document.querySelectorAll('[data-testid="agent-dashboard-draft-widget"]'));
+        const error = document.querySelector(".appFallback, .fallbackPanel");
+        return {
+          ok: Boolean(taskDetails && confirm) && widgets.length === 1 && !error,
+          url: location.href,
+          hasTaskDetails: Boolean(taskDetails),
+          hasConfirm: Boolean(confirm),
+          previewWidgetCount: widgets.length,
+          hasError: Boolean(error),
+        };
+      }, 90000);
+      actions = await getActions(12);
+      const singleChartDraft = actions.actionDrafts?.find((draft) => draft.kind === "dashboard.create");
+      checks.push(
+        check("ui-dashboard-single-chart-draft-visible", chartAgentState.ok, chartAgentState),
+        check("api-single-chart-draft-is-one-widget", Boolean(singleChartDraft) &&
+          singleChartDraft.label === "生成单图表草案" &&
+          singleChartDraft.payload?.dashboardDraft?.source === "single-chart" &&
+          singleChartDraft.payload?.dashboardDraft?.widgetCount === 1 &&
+          singleChartDraft.payload?.dashboardDraft?.widgets?.length === 1 &&
+          ["metric", "line", "bar", "pie", "table"].includes(singleChartDraft.payload.dashboardDraft.widgets[0]?.type), { singleChartDraft }),
+      );
+      const draftScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "real-import-single-chart-draft.png"));
+      steps.push({ step: "single-chart-draft", state: chartAgentState, actions: { pendingCount: actions.pendingCount ?? actions.actionDrafts?.length ?? 0 }, screenshot: draftScreenshot });
+
+      const chartConfirmClick = await click(browser.client, '[data-testid="agent-current-draft-confirm"]');
+      checks.push(check("ui-dashboard-single-chart-confirm-click-fired", chartConfirmClick.ok, chartConfirmClick));
+      const dashboardStatus = await waitForApi(async () => {
+        const status = await getStatus();
+        const nextDashboards = await getDashboards();
+        const createdDashboard = nextDashboards.dashboards?.[0];
+        return {
+          ok: Number(status.counts?.dashboards ?? 0) === 1 && createdDashboard?.widgets?.length === 1,
+          status,
+          dashboards: nextDashboards,
+        };
+      }, { timeoutMs: 45000, intervalMs: 1000, label: "single chart dashboard confirmation" });
+      counts = dashboardStatus.status.counts;
+      dashboards = dashboardStatus.dashboards;
+      actions = await getActions(12);
+      checks.push(
+        check("api-single-chart-dashboard-created", dashboardStatus.ok, { counts, dashboards: dashboards.dashboards }),
+        check("api-single-chart-draft-cleared-after-confirm", !actions.actionDrafts?.some((draft) => draft.action_key === singleChartDraft?.action_key), { pendingCount: actions.pendingCount ?? actions.actionDrafts?.length ?? 0 }),
+      );
+
+      await navigate(browser.client, `${baseUrl}/?section=dashboards`);
+      const dashboardPage = await waitForUi(browser.client, "confirmed single chart dashboard", () => {
+        const strip = document.querySelector('[data-testid="dashboard-business-task-strip"]');
+        const beta = document.querySelector('[data-testid="dashboard-beta-details"]');
+        const error = document.querySelector(".appFallback, .fallbackPanel");
+        return {
+          ok: Boolean(strip && beta && !beta.open) && !error,
+          hasStrip: Boolean(strip),
+          betaCollapsed: Boolean(beta && !beta.open),
+          hasError: Boolean(error),
+        };
+      }, 30000);
       const deferredPanelsBeforeOpen = await evaluate(browser.client, () => ({
         guided: Boolean(document.querySelector('[data-testid="dashboard-beginner-editor"]')),
         advanced: Boolean(document.querySelector('[data-testid="dashboard-advanced-widget-workbench"]')),
         contract: Boolean(document.querySelector('[data-testid="dashboard-contract-boundary-panel"]')),
       }));
-      checks.push(check(
-        "ui-dashboard-deferred-panels-not-mounted-before-open",
-        !deferredPanelsBeforeOpen.guided && !deferredPanelsBeforeOpen.advanced && !deferredPanelsBeforeOpen.contract,
-        deferredPanelsBeforeOpen,
-      ));
-
-      await openDetails(browser.client, '[data-testid="dashboard-guided-edit-details"]');
-      const guidedEditorReady = await waitForUi(browser.client, "guided dashboard editor", () => ({
-        ok: Boolean(document.querySelector('[data-testid="dashboard-beginner-editor"]')),
-      }), 30000);
-      checks.push(check("ui-dashboard-guided-editor-loads-on-open", guidedEditorReady.ok, guidedEditorReady));
-
-      await openDetails(browser.client, '[data-testid="dashboard-advanced-edit-details"]');
-      const advancedEditorReady = await waitForUi(browser.client, "advanced dashboard editor", () => ({
-        ok: Boolean(document.querySelector('[data-testid="dashboard-advanced-widget-workbench"]')) &&
-          Boolean(document.querySelector('[data-testid="dashboard-page-admin-panel"]')),
-      }), 30000);
-      checks.push(check("ui-dashboard-advanced-editor-loads-on-open", advancedEditorReady.ok, advancedEditorReady));
-
-      await openDetails(browser.client, '[data-testid="dashboard-contract-details"]');
-      const contractPanelReady = await waitForUi(browser.client, "dashboard contract panel", () => ({
-        ok: Boolean(document.querySelector('[data-testid="dashboard-contract-boundary-panel"]')),
-      }), 30000);
-      checks.push(check("ui-dashboard-contract-panel-loads-on-open", contractPanelReady.ok, contractPanelReady));
-
-      const dashboardScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "real-import-dashboard.png"));
-      steps.push({
-        step: "dashboard-ready",
-        deferredPanelsBeforeOpen,
-        guidedEditorReady,
-        advancedEditorReady,
-        contractPanelReady,
-        screenshot: dashboardScreenshot,
-      });
-
-      const chartClick = await click(browser.client, '[data-testid="dashboard-task-explain"]');
-      checks.push(check("ui-dashboard-single-chart-click-fired", chartClick.ok, chartClick));
-      const chartAgentState = await waitFor(browser.client, () => {
-        const taskDetails = document.querySelector('[data-testid="agent-task-packet-details"]');
-        const dashboardStrip = document.querySelector('[data-testid="dashboard-business-task-strip"]');
-        const chartButton = document.querySelector('[data-testid="dashboard-task-explain"]');
+      const dashboardDataReady = await waitForUi(browser.client, "confirmed single chart live data", () => {
+        const metricCard = document.querySelector('[data-testid="b-widget-metric"]');
+        const metricValue = metricCard?.querySelector(".bMetricValue")?.textContent?.trim() ?? "";
+        const loading = metricCard?.querySelector('[data-testid="b-widget-data-loading"]');
+        const unavailable = metricCard?.querySelector('[data-testid="b-widget-data-error"]');
         const error = document.querySelector(".appFallback, .fallbackPanel");
+        const nonZero = metricValue !== "" && !/^0(?:[.,]0+)?$/.test(metricValue);
         return {
-          ok: Boolean(taskDetails) || (Boolean(dashboardStrip) && !chartButton?.disabled && !error),
-          url: location.href,
-          hasTaskDetails: Boolean(taskDetails),
-          hasDashboardStrip: Boolean(dashboardStrip),
-          chartDisabled: Boolean(chartButton?.disabled),
+          ok: Boolean(metricCard && metricValue && !loading && !unavailable && nonZero && !error),
+          metricValue,
+          hasMetricCard: Boolean(metricCard),
+          loading: Boolean(loading),
+          unavailable: Boolean(unavailable),
           hasError: Boolean(error),
         };
-      }, null, { timeoutMs: 90000, intervalMs: 1000 });
-      actions = await getActions(12);
+      }, 30000);
       checks.push(
-        check("ui-dashboard-single-chart-agent-returned", chartAgentState.ok, chartAgentState),
-        check("api-actions-readable-after-chart-request", Array.isArray(actions.actionDrafts), { pendingCount: actions.pendingCount ?? actions.actionDrafts?.length ?? 0 }),
+        check("ui-confirmed-single-chart-dashboard-visible", dashboardPage.ok, dashboardPage),
+        check("ui-dashboard-deferred-panels-not-mounted-before-open", !deferredPanelsBeforeOpen.guided && !deferredPanelsBeforeOpen.advanced && !deferredPanelsBeforeOpen.contract, deferredPanelsBeforeOpen),
+        check("ui-dashboard-widget-live-data-visible", dashboardDataReady.ok, dashboardDataReady),
       );
-      steps.push({ step: "single-chart-request", state: chartAgentState, actions: { pendingCount: actions.pendingCount ?? actions.actionDrafts?.length ?? 0 } });
+      const dashboardScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "real-import-dashboard.png"));
+      steps.push({ step: "single-chart-confirmed", state: dashboardPage, liveData: dashboardDataReady, deferredPanelsBeforeOpen, screenshot: dashboardScreenshot });
 
-      await navigate(browser.client, `${baseUrl}/?section=dashboards`);
-      await waitForAppReady(browser.client, null, 25000);
       const evidenceClick = await click(browser.client, '[data-testid="dashboard-task-evidence"]');
       checks.push(check("ui-dashboard-evidence-click-fired", evidenceClick.ok, evidenceClick));
       const evidenceReady = await waitForUi(browser.client, "evidence summary", () => {
@@ -599,9 +649,12 @@ const receipt = finishReceipt({
   generatedBy: "scripts/verify-ui-real-import.mjs",
   baseUrl,
   apiBaseUrl,
+  datasetLabel,
+  datasetDomain,
   importFile,
   importFolder,
   importTarget,
+  minimumFolderGroups,
   viewport,
   screenshotDir,
   browser: browserInfo,

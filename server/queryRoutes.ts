@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { appendCliFilters, appendCliSorts } from "./cliArgBuilders";
 import { readBody, sendJson } from "./serverRuntime";
 
 type QueryRoutesOptions = {
@@ -29,22 +30,8 @@ export async function handleQueryApi(options: QueryRoutesOptions) {
     if (body.view) args.push("--view", String(body.view));
     if (body.mode) args.push("--mode", String(body.mode));
     if (Array.isArray(body.columns)) body.columns.map(String).forEach((column) => args.push("--column", column));
-    if (Array.isArray(body.filters)) {
-      for (const filter of body.filters) {
-        if (filter && typeof filter === "object") {
-          const item = filter as Record<string, unknown>;
-          args.push("--filter", `${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-        }
-      }
-    }
-    if (Array.isArray(body.sort)) {
-      for (const sort of body.sort) {
-        if (sort && typeof sort === "object") {
-          const item = sort as Record<string, unknown>;
-          args.push("--sort", `${String(item.field ?? "")}:${String(item.direction ?? "asc")}`);
-        }
-      }
-    }
+    appendCliFilters(args, body.filters);
+    appendCliSorts(args, body.sort);
     if (body.search !== undefined) args.push("--search", String(body.search));
     if (body.offset !== undefined) args.push("--offset", String(body.offset));
     if (body.limit !== undefined) args.push("--limit", String(body.limit));
@@ -63,22 +50,8 @@ export async function handleQueryApi(options: QueryRoutesOptions) {
     if (body.tag) args.push("--tag", String(body.tag));
     if (body.mode) args.push("--mode", String(body.mode));
     if (Array.isArray(body.columns)) args.push("--columns", body.columns.map(String).join(","));
-    if (Array.isArray(body.filters)) {
-      for (const filter of body.filters) {
-        if (filter && typeof filter === "object") {
-          const item = filter as Record<string, unknown>;
-          args.push("--filter", `${String(item.field ?? "")}:${String(item.operator ?? "contains")}:${String(item.value ?? "")}`);
-        }
-      }
-    }
-    if (Array.isArray(body.sort)) {
-      for (const sort of body.sort) {
-        if (sort && typeof sort === "object") {
-          const item = sort as Record<string, unknown>;
-          args.push("--sort", `${String(item.field ?? "")}:${String(item.direction ?? "asc")}`);
-        }
-      }
-    }
+    appendCliFilters(args, body.filters);
+    appendCliSorts(args, body.sort);
     if (body.search !== undefined) args.push("--search", String(body.search));
     if (body.agent === true) args.push("--agent");
     if (body.confirm === true) args.push("--yes");

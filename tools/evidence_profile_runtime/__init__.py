@@ -1,2 +1,2 @@
-"""Compact Source Intelligence helpers for AIBI Hybrid."""
+"""Compact Source Intelligence helpers for AIBI-C."""
 

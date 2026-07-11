@@ -15,10 +15,6 @@
   background: var(--surface);
 }
 
-.settingsHeader h2 {
-  margin: 0;
-}
-
 .settingsHeader p {
   max-width: 760px;
   margin: 8px 0 0;
@@ -36,11 +32,6 @@
   border-radius: 8px;
   background: var(--surface-2);
   padding: 12px;
-}
-
-.activeThemeBadge strong {
-  color: var(--text);
-  font-size: 13px;
 }
 
 .activeThemeBadge span:last-child {
@@ -126,17 +117,6 @@
   font-weight: 800;
 }
 
-.themePaletteCard strong {
-  color: var(--text);
-  font-size: 13px;
-}
-
-.themePaletteCard small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
-}
-
 .themeSwatches {
   display: inline-flex;
   align-items: center;
@@ -171,16 +151,6 @@
   padding: 0 10px;
 }
 
-.settingsActions button:hover {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
-
-.preferenceList {
-  display: grid;
-  gap: 10px;
-}
-
 .preferenceRow {
   min-width: 0;
   display: grid;
@@ -193,21 +163,10 @@
   padding: 12px;
 }
 
-.preferenceRow span {
-  display: grid;
-  gap: 4px;
-}
-
 .preferenceRow strong {
   color: var(--text);
   font-size: 13px;
   line-height: 1.25;
-}
-
-.preferenceRow small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
 }
 
 .preferenceRow input[type="checkbox"] {
@@ -215,11 +174,6 @@
   height: 20px;
   justify-self: end;
   accent-color: var(--accent);
-}
-
-.settingsSandboxCard {
-  display: grid;
-  gap: 12px;
 }
 
 .settingsSandboxLead {
@@ -243,12 +197,6 @@
 .settingsSandboxBadge.warn {
   background: var(--amber-soft);
   color: var(--amber);
-}
-
-.settingsSandboxGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 .settingsSandboxItem {
@@ -294,12 +242,6 @@
   color: var(--muted);
   font-size: 11px;
   line-height: 1.4;
-}
-
-.settingsSandboxActions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 .settingsSandboxActions .secondaryButton {
@@ -386,23 +328,6 @@
   stroke: currentColor;
 }
 
-.closureItem strong,
-.closureItem p,
-.closureItem code,
-.closureItem small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.closureItem strong {
-  display: block;
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
 .closureItem p {
   min-height: 40px;
   margin: 5px 0 8px;
@@ -441,26 +366,8 @@
   padding: 7px;
 }
 
-.closureTechnical summary {
-  cursor: pointer;
-  color: var(--bi-text);
-  font-size: 11px;
-  font-weight: 760;
-}
-
 .closureTechnical code {
   margin-top: 7px;
-}
-
-.configPortabilityCard {
-  display: grid;
-  gap: 12px;
-}
-
-.configActionGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
 }
 
 .configActionGrid .primaryButton,
@@ -475,16 +382,6 @@
   border-radius: 8px;
   background: var(--bi-accent-soft);
   padding: 12px;
-}
-
-.configSafetyLead {
-  display: grid;
-  gap: 5px;
-}
-
-.configSafetyLead strong,
-.configSafetyLead p {
-  min-width: 0;
 }
 
 .configSafetyLead strong {
@@ -524,23 +421,11 @@
   border-color: rgb(165 101 18 / 35%);
 }
 
-.configMigrationSteps span,
-.configMigrationSteps small {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
 .configMigrationSteps span {
   color: var(--text);
   font-size: 12px;
   font-weight: 820;
   line-height: 1.25;
-}
-
-.configMigrationSteps small {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.35;
 }
 
 .configMigrationScope {
@@ -583,11 +468,6 @@
   background: var(--amber-soft);
 }
 
-.configResultHeader {
-  display: grid;
-  gap: 5px;
-}
-
 .configResultStatus {
   width: max-content;
   max-width: 100%;
@@ -617,12 +497,6 @@
   font-size: 12px;
   line-height: 1.45;
   overflow-wrap: anywhere;
-}
-
-.configResultFacts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
 }
 
 .configResultFacts span {
@@ -662,10 +536,6 @@
 
 .configResultDetails li {
   overflow-wrap: anywhere;
-}
-
-.configRestoreDetails {
-  margin: 0;
 }
 
 .configRestoreForm {

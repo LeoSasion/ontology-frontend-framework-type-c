@@ -141,5 +141,5 @@ const server = createServer(async (request, response) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`AIBI Hybrid API listening on http://${host}:${port}`);
+  console.log(`AIBI-C API listening on http://${host}:${port}`);
 });

@@ -72,26 +72,6 @@
   text-align: left;
 }
 
-.viewRow.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.viewRow strong,
-.viewRow span,
-.viewRow small {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.viewRow span,
-.viewRow small {
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .viewQueryPanel {
   container: view-query / inline-size;
   display: grid;
@@ -115,39 +95,10 @@
   line-height: 1.22;
 }
 
-.viewSearch {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
-}
-
-.viewSearch span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
 .viewStats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
   gap: 8px;
-}
-
-.viewStats div {
-  min-width: 0;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--surface-2);
-  padding: 10px;
-}
-
-.viewStats strong,
-.viewStats span {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .viewStats strong {
@@ -176,30 +127,6 @@
 .viewOperationReceipt.warn {
   border-color: color-mix(in srgb, var(--amber) 30%, var(--bi-border));
   background: color-mix(in srgb, var(--amber-soft) 36%, var(--surface));
-}
-
-.viewOperationReceipt > div,
-.bDrilldownReceipt > div {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.viewOperationReceipt strong,
-.viewOperationReceipt span,
-.viewOperationReceipt small,
-.bDrilldownReceipt strong,
-.bDrilldownReceipt span,
-.bDrilldownReceipt small {
-  display: block;
-  min-width: 0;
-}
-
-.viewOperationReceipt strong,
-.bDrilldownReceipt strong {
-  color: var(--bi-text);
-  font-size: 12px;
-  line-height: 1.25;
 }
 
 .viewOperationReceipt span,
@@ -242,10 +169,6 @@
 
 .viewTableScroll table {
   min-width: 820px;
-}
-
-.viewTableScroll.empty table {
-  min-width: 0;
 }
 
 .viewFooter {
