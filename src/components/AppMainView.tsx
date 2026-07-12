@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import { AgentPanel, DashboardCanvas, EvidenceView, HomeOverview, SettingsPanel, SourceWorkbench, ViewWorkspace } from "../appLazyModules";
 import type { BusinessPathStepKey } from "../businessPathModel";
+import type { AppNavigationTarget } from "../appNavigationModel";
 import type { AppSection } from "./Sidebar";
 import type { useAppAgentActions } from "../useAppAgentActions";
 import type { useAppDataActions } from "../useAppDataActions";
@@ -30,11 +31,13 @@ type AppMainViewProps = {
   dashboardActions: ReturnType<typeof useAppDashboardActions>;
   dataActions: ReturnType<typeof useAppDataActions>;
   evidenceFocus: EvidenceFocus | null;
+  focusedTableKey: string;
   formulaPreview: FormulaPreviewPayload;
   lastActionResult: Record<string, unknown> | null;
   onOpenBusinessStep: (step: BusinessPathStepKey) => void;
   onOpenEvidence: (focus: EvidenceFocus) => void;
   openSection: (section: AppSection) => void;
+  navigateTo: (target: AppNavigationTarget) => void;
   pendingDraftCount: number;
   preview: ImportPreview;
   query: QueryResult;
@@ -58,11 +61,13 @@ export function AppMainView({
   dashboardActions,
   dataActions,
   evidenceFocus,
+  focusedTableKey,
   formulaPreview,
   lastActionResult,
   onOpenBusinessStep,
   onOpenEvidence,
   openSection,
+  navigateTo,
   pendingDraftCount,
   preview,
   query,
@@ -118,6 +123,7 @@ export function AppMainView({
   const {
     handleAgentCommandAsk,
     handleAsk,
+    handleAskBranch,
     handleConfirmAction,
     handleConfirmDryRun,
     handleDraftDashboard,
@@ -156,6 +162,7 @@ export function AppMainView({
     return (
       <DashboardCanvas
         dashboards={dashboards}
+        focusedTableKey={focusedTableKey}
         query={query}
         workbench={workbench}
         activeDashboardKey={activeDashboardKey}
@@ -183,6 +190,9 @@ export function AppMainView({
         onAsk={async (prompt) => {
           await handleAsk(prompt);
         }}
+        onAskBranch={async (prompt, parentRunKey, branchLabel) => {
+          await handleAskBranch(prompt, parentRunKey, branchLabel);
+        }}
         onConfirmDryRun={handleConfirmDryRun}
         onConfirmAction={handleConfirmAction}
         onRejectAction={handleRejectAction}
@@ -194,13 +204,14 @@ export function AppMainView({
     return (
       <EvidenceView
         agent={agent}
-        dashboardCount={dashboards.dashboards.length}
         focus={evidenceFocus}
         lastActionResult={lastActionResult}
         pendingDraftCount={pendingDraftCount}
         onSetSemantic={handleSetSemantic}
         onSourceIntelligenceRun={handleSourceIntelligenceRun}
         onOpenBusinessStep={onOpenBusinessStep}
+        onOpenAgent={() => navigateTo({ section: "agent", tableKey: evidenceFocus?.tableKey ?? focusedTableKey, dashboardKey: evidenceFocus?.dashboardKey })}
+        onOpenDashboard={(dashboardKey) => navigateTo({ section: "dashboards", dashboardKey, tableKey: evidenceFocus?.tableKey ?? focusedTableKey })}
         workbench={workbench}
       />
     );
@@ -242,6 +253,7 @@ export function AppMainView({
       workbench={workbench}
       relationshipPreview={relationshipPreview}
       formulaPreview={formulaPreview}
+      focusedTableKey={focusedTableKey}
       onPreview={handlePreview}
       onCommitImport={handleCommitImport}
       onPreviewFolderImport={handlePreviewFolderImport}
@@ -271,7 +283,7 @@ export function AppMainView({
       onBusinessDashboardOperation={handleBusinessDashboardOperation}
       onAsk={handleAgentCommandAsk}
       onOpenBusinessStep={onOpenBusinessStep}
-      onOpenDashboard={() => openSection("dashboards")}
+      onOpenDashboard={() => navigateTo({ section: "dashboards", tableKey: focusedTableKey })}
     />
   );
 }

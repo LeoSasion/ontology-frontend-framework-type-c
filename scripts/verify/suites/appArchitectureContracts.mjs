@@ -132,6 +132,12 @@ export function appendAppArchitectureContractChecks(context) {
   ].join("\n");
   checks.push(
     {
+        label: "workspace-create-atomically-activates-created-workspace",
+        ok: byLabel["cli-workspace-create-confirm"].parsed?.created?.id === "verify_workspace" &&
+          byLabel["cli-workspace-create-confirm"].parsed?.created?.isActive === true &&
+          byLabel["cli-status-after-workspace-create"].parsed?.workspace?.id === "verify_workspace",
+      },
+    {
         label: "app-workspace-model-boundary",
         ok: existsSync(join(root, "src", "appWorkspaceModel.ts")) &&
           appSource.includes('from "./appWorkspaceModel"') &&
@@ -285,6 +291,7 @@ export function appendAppArchitectureContractChecks(context) {
           appSource.includes("setRelationshipPreview,") &&
           appSource.includes("setFormulaPreview,") &&
           appSource.includes("setActionDrafts,") &&
+          appSource.includes("navigateTo,") &&
           appSource.includes("handleSourceIntelligenceRun,") &&
           appDataActionsSource.includes("export function useAppDataActions(") &&
           appDataActionsSource.includes("type AppDataActionsOptions") &&
@@ -294,11 +301,13 @@ export function appendAppArchitectureContractChecks(context) {
           appDataActionsSource.includes("const handleDashboardRelationshipSave = useCallback") &&
           appDataActionsSource.includes("const handleSaveConnector = useCallback") &&
           appDataActionsSource.includes("const handleSaveView = useCallback") &&
-          appDataActionsSource.includes("const { stayOnPage = false, ...sourceOptions }") &&
-          appDataActionsSource.includes("const hasInputs = Array.isArray(sourceOptions.inputs) && sourceOptions.inputs.length > 0") &&
-          appDataActionsSource.includes("setSection(\"sources\")") &&
-          appDataActionsSource.includes("setSection(\"views\")") &&
-          appDataActionsSource.includes("setSection(\"agent\")") &&
+          appDataActionsSource.includes("const { stayOnPage = false, inputs = [], ...sourceOptions }") &&
+          appDataActionsSource.includes("const hasInputs = inputs.length > 0") &&
+          appDataActionsSource.includes("const setSection = useCallback((section: AppSection) => navigateTo({ section })") &&
+          appDataActionsSource.includes('navigateTo({ section: "views", viewKey: savedView?.view_key })') &&
+          appDataActionsSource.includes('section: "dashboards"') &&
+          appDataActionsSource.includes("allowLocked: true") &&
+          appDataActionsSource.includes('section: "agent"') &&
           !appSource.includes("const handleCommitImport = useCallback") &&
           !appSource.includes("const handleSourceIntelligenceRun = useCallback") &&
           !appSource.includes("const handleSourceDashboardDraft = useCallback") &&
@@ -311,7 +320,7 @@ export function appendAppArchitectureContractChecks(context) {
         label: "frontend-section-lazy-split-boundary",
         ok: appSource.includes("import { Suspense") &&
           appSource.includes('from "./appLazyModules"') &&
-          appLazyModulesSource.includes("import { lazy } from \"react\"") &&
+          appLazyModulesSource.includes('import { lazyWithRetry } from "./lazyWithRetry"') &&
           appLazyModulesSource.includes('const loadAgentCommandDock = () => import("./components/AgentCommandDock")') &&
           appLazyModulesSource.includes('const loadAppMainView = () => import("./components/AppMainView")') &&
           appLazyModulesSource.includes('const loadBusinessPathBar = () => import("./components/BusinessPathBar")') &&
@@ -324,18 +333,18 @@ export function appendAppArchitectureContractChecks(context) {
           appLazyModulesSource.includes('const loadSettingsPanel = () => import("./components/SettingsPanel")') &&
           appLazyModulesSource.includes('const loadSourceWorkbench = () => import("./components/SourceWorkbench")') &&
           appLazyModulesSource.includes('const loadViewWorkspace = () => import("./components/ViewWorkspace")') &&
-          appLazyModulesSource.includes("export const AgentPanel = lazy(loadAgentPanel)") &&
-          appLazyModulesSource.includes("export const AgentCommandDock = lazy(loadAgentCommandDock)") &&
-          appLazyModulesSource.includes("export const AppMainView = lazy(loadAppMainView)") &&
-          appLazyModulesSource.includes("export const BusinessPathBar = lazy(loadBusinessPathBar)") &&
-          appLazyModulesSource.includes("export const TopBar = lazy(loadTopBar)") &&
-          appLazyModulesSource.includes("export const DashboardCanvas = lazy(loadDashboardCanvas)") &&
-          appLazyModulesSource.includes("export const EvidenceView = lazy(loadEvidenceView)") &&
-          appLazyModulesSource.includes("export const HomeOverview = lazy(loadHomeOverview)") &&
-          appLazyModulesSource.includes("export const InspectorPanel = lazy(loadInspectorPanel)") &&
-          appLazyModulesSource.includes("export const SettingsPanel = lazy(loadSettingsPanel)") &&
-          appLazyModulesSource.includes("export const SourceWorkbench = lazy(loadSourceWorkbench)") &&
-          appLazyModulesSource.includes("export const ViewWorkspace = lazy(loadViewWorkspace)") &&
+          appLazyModulesSource.includes("export const AgentPanel = lazyWithRetry(loadAgentPanel)") &&
+          appLazyModulesSource.includes("export const AgentCommandDock = lazyWithRetry(loadAgentCommandDock)") &&
+          appLazyModulesSource.includes("export const AppMainView = lazyWithRetry(loadAppMainView)") &&
+          appLazyModulesSource.includes("export const BusinessPathBar = lazyWithRetry(loadBusinessPathBar)") &&
+          appLazyModulesSource.includes("export const TopBar = lazyWithRetry(loadTopBar)") &&
+          appLazyModulesSource.includes("export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas)") &&
+          appLazyModulesSource.includes("export const EvidenceView = lazyWithRetry(loadEvidenceView)") &&
+          appLazyModulesSource.includes("export const HomeOverview = lazyWithRetry(loadHomeOverview)") &&
+          appLazyModulesSource.includes("export const InspectorPanel = lazyWithRetry(loadInspectorPanel)") &&
+          appLazyModulesSource.includes("export const SettingsPanel = lazyWithRetry(loadSettingsPanel)") &&
+          appLazyModulesSource.includes("export const SourceWorkbench = lazyWithRetry(loadSourceWorkbench)") &&
+          appLazyModulesSource.includes("export const ViewWorkspace = lazyWithRetry(loadViewWorkspace)") &&
           appLazyModulesSource.includes("export const sectionPreloaders: Record<AppSection") &&
           appLazyModulesSource.includes("export function scheduleIdlePreload") &&
           appLazyModulesSource.includes("requestIdleCallback") &&
@@ -490,7 +499,7 @@ export function appendAppArchitectureContractChecks(context) {
           topBarSource.includes("等待导入数据") &&
           topBarSource.includes("没有可用数据表") &&
           packageJson.scripts?.dev === "node scripts/dev.mjs" &&
-          packageJson.scripts?.["dev:ui"]?.includes("--port 8686") &&
+          packageJson.scripts?.["dev:ui"] === "vite" &&
           devScriptSource.includes("portIsOpen(8787)") &&
           devScriptSource.includes("portIsOpen(8686)") &&
           devScriptSource.includes("async function apiIsCompatible()") &&

@@ -236,12 +236,17 @@ def source_intelligence_command(args: argparse.Namespace) -> dict[str, Any]:
     label = args.label or "source-intelligence-run"
     if not inputs:
         raise ValueError("Source Intelligence requires imported source paths; import data first or pass one or more input paths.")
+    with open_db() as connection:
+        workspace_id = str(args.workspace or active_workspace_id(connection)).strip()
+        if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
+            raise ValueError(f"Unknown workspace: {workspace_id}")
     output_dir = Path(args.output_dir) if args.output_dir else default_source_intelligence_output_dir(label)
     manifest = source_intelligence(inputs, output_dir, None)
     run_key = unique_key("source_intelligence")
     created_at = now_iso()
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
+            raise ValueError(f"Workspace no longer exists: {workspace_id}")
         save_source_intelligence_run(
             connection,
             run_key=run_key,
@@ -280,8 +285,10 @@ def source_intelligence_command(args: argparse.Namespace) -> dict[str, Any]:
     )
     return {
         "ok": True,
+        "workspaceId": workspace_id,
         "runKey": run_key,
         "label": label,
+        "inputRoots": [str(path) for path in inputs],
         "outputDir": str(output_dir),
         "manifest": manifest,
         "dashboardCandidate": dashboard_candidate,

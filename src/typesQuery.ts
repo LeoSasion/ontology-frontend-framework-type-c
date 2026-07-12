@@ -1,3 +1,5 @@
+import type { QueryPlanReceipt } from "./typesAgent";
+
 export interface QueryResult {
   ok: boolean;
   query: {
@@ -19,4 +21,5 @@ export interface QueryResult {
     label?: string;
     value: number | string | null;
   }>;
+  queryPlanReceipt?: QueryPlanReceipt;
 }

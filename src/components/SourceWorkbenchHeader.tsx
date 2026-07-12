@@ -22,7 +22,7 @@ export function SourceWorkbenchHeader({
         </p>
       </div>
       <div className="buttonRow">
-        <span className="quietText">
+        <span aria-live="polite" className="quietText" role="status">
           {sourceProfileRunning
             ? biText("正在只读生成证据摘要", "Creating a read-only evidence summary")
             : biText("先导入或选择本地数据路径", "Import or choose a local data path first")}

@@ -14,6 +14,19 @@
   grid-column: 1 / -1;
 }
 
+.dashboardMoreDetails {
+  grid-column: 1 / -1;
+}
+
+.dashboardMoreBody {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboardMoreBody > .progressiveDetails {
+  margin: 0;
+}
+
 @media (max-width: 760px) {
   .dashboardGrid {
     --dashboard-lead-column: minmax(0, 1fr);
@@ -440,6 +453,13 @@
   color: var(--bi-text);
 }
 
+.dashboardTaskContext {
+  color: var(--ink-muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
 .workbenchGrid > .importSuccessNextStep {
   grid-column: 1 / -1;
   margin: 0;
@@ -658,6 +678,11 @@
 .bWidgetCard.metric-widget {
   grid-column: span 3;
   min-height: 168px;
+}
+
+.bWidgetGrid.singleMetric .bWidgetCard.metric-widget {
+  grid-column: span 6;
+  max-width: 720px;
 }
 
 .bWidgetCard.table-widget {

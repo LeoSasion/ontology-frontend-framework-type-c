@@ -78,6 +78,15 @@ export function SourceWorkbenchActionPanel({
   onAsk,
   onOpenDashboard,
 }: SourceWorkbenchActionPanelProps) {
+  const currentPlanKey = recommendedPrimaryAction === "check-file"
+    ? "file"
+    : recommendedPrimaryAction === "import-data"
+      ? "workspace"
+      : recommendedPrimaryAction === "refresh-profile"
+        ? "profile"
+        : "";
+  const currentPlan = beginnerPlan.find((item) => item.key === currentPlanKey);
+
   return (
     <article className="workbenchPanel simpleGuide" data-testid="beginner-import-plan">
       <div className="tileHeader">
@@ -92,22 +101,22 @@ export function SourceWorkbenchActionPanel({
               ? biText("预检已通过，下一步由你确认导入", "Preflight passed; you control the import")
               : recommendedPrimaryAction === "refresh-profile"
                 ? biText("数据已在工作区，建议生成证据摘要", "Data is in the workspace; create the evidence summary")
-                : biText("证据已就绪，可以生成可编辑看板", "Evidence is ready; create an editable dashboard")}
+                : biText("证据已就绪，下一步生成一个图表", "Evidence is ready; create one chart next")}
         </strong>
         <span>
           {biText("系统会把字段、关系、指标和公式放到后台推荐；你只需要按当前步骤继续。", "Fields, relationships, metrics, and formulas stay behind the recommendation layer; follow the current step.")}
         </span>
       </div>
-      <div className="beginnerPlanList">
-        {beginnerPlan.map((item) => (
+      {currentPlan ? <div className="beginnerPlanList">
+        {[currentPlan].map((item) => (
           <div className="beginnerPlanItem" data-testid={`beginner-plan-${item.key}`} key={item.key}>
             <span>{item.state}</span>
             <strong>{item.title}</strong>
             <small>{item.detail}</small>
           </div>
         ))}
-      </div>
-      <div className="beginnerActionGrid">
+      </div> : null}
+      {!sourceProfileComplete ? <div className="beginnerActionGrid">
         <button
           className={recommendedPrimaryAction === "refresh-profile" ? "primaryButton compactAction" : "miniButton"}
           data-testid="beginner-plan-refresh-profile"
@@ -118,14 +127,10 @@ export function SourceWorkbenchActionPanel({
           <Icon name="agent" />
           <Bilingual zh="更新画像" en="Refresh profile" />
         </button>
-      </div>
+      </div> : null}
       <div className={sourceProfileComplete ? "beginnerImportGuard ok" : "beginnerImportGuard warn"} data-testid="beginner-evidence-guard">
         <Icon name={sourceProfileComplete ? "check" : "evidence"} />
-        <span>
-          {sourceProfileComplete
-            ? biText("证据摘要已就绪，可以继续生成图表或看板草案。", "Evidence is ready; continue to chart or dashboard drafts.")
-            : biText("先生成证据摘要；字段、关系和指标缺口确认后再进入看板。", "Create the evidence summary first; review fields, links, and metric gaps before dashboarding.")}
-        </span>
+        {!sourceProfileComplete ? <span>{biText("先生成证据摘要；字段、关系和指标缺口确认后再进入看板。", "Create the evidence summary first; review fields, links, and metric gaps before dashboarding.")}</span> : null}
         {sourceProfileComplete ? (
           <button className="primaryButton compactAction" data-testid="source-next-dashboard" onClick={onOpenDashboard} type="button">
             <Icon name="dashboard" />
@@ -135,6 +140,10 @@ export function SourceWorkbenchActionPanel({
       </div>
       <details className="sourceGuideDetails" data-testid="source-guide-details">
         <summary>{biText("更多引导和高级建议", "More guidance and advanced suggestions")}</summary>
+      {sourceProfileComplete ? <button className="miniButton" data-testid="beginner-plan-refresh-profile" disabled={sourceProfileRunning} onClick={() => runSourceProfile("source-intelligence", sourceProfileOptions())} type="button">
+        <Icon name="evidence" />
+        <Bilingual zh="更新证据摘要" en="Refresh evidence" />
+      </button> : null}
       <div className="importToDashboardWizard" data-testid="import-to-dashboard-wizard">
         <div className="wizardLead">
           <span className="storyMode"><Bilingual zh="导入到看板向导" en="Import-to-dashboard guide" /></span>
@@ -197,7 +206,7 @@ export function SourceWorkbenchActionPanel({
           <div className="sourceDashboardRecipeFacts" data-testid="source-dashboard-recipe-facts">
             <span>{latestSourceProfile ? `${latestSourceProfile.source_count} ${biText("文件", "files")}` : biText("等待画像", "waiting profile")}</span>
             <span>{latestSourceProfile ? `${latestSourceProfile.relationship_count} ${biText("关系", "relations")}` : `${relationshipsCount} ${biText("已存关系", "saved relations")}`}</span>
-            <span>{latestSourceProfile ? `${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} ${biText("可执行问题", "answerable questions")}` : `${selectedMetricsCount} ${biText("指标", "metrics")}`}</span>
+            <span>{latestSourceProfile ? biText(`${latestSourceProfile.metric_sql_plan_count} 个候选问题中 ${latestSourceProfile.metric_sql_executable_count} 个可执行`, `${latestSourceProfile.metric_sql_executable_count} of ${latestSourceProfile.metric_sql_plan_count} candidate questions executable`) : `${selectedMetricsCount} ${biText("指标", "metrics")}`}</span>
             <span>{dashboardRecipeEvidenceCount} {biText("证据", "evidence")}</span>
           </div>
           <div className="sourceDashboardRecipeCards" data-testid="source-dashboard-recipe-cards">
@@ -281,8 +290,8 @@ export function SourceWorkbenchActionPanel({
         </button>
       </div>
       </details>
-      <button className="secondaryButton fullWidthButton" onClick={() => setShowAdvanced((current) => !current)} type="button">
-        {showAdvanced ? biText("收起字段、公式和关系设置", "Hide field, formula, and link setup") : biText("展开字段、公式和关系设置", "Show field, formula, and link setup")}
+      <button className="secondaryButton fullWidthButton" data-testid="source-expert-toggle" onClick={() => setShowAdvanced((current) => !current)} type="button">
+        {showAdvanced ? biText("收起数据模型与管理", "Hide data model and management") : biText("数据模型与管理", "Data model and management")}
       </button>
     </article>
   );

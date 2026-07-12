@@ -123,6 +123,7 @@ export function buildDashboardEvidenceFocus({
   latestRun?: SourceIntelligenceRunSummary | null;
   readiness: DashboardReadinessModel;
 }): EvidenceFocus {
+  const dashboardKey = dashboard.dashboard_key === "fallback" ? undefined : dashboard.dashboard_key;
   return {
     source: "dashboard-summary",
     title: dashboard.name,
@@ -130,15 +131,15 @@ export function buildDashboardEvidenceFocus({
     refs: [
       "dashboard-widget-contract",
       ...(latestRun ? [`source-intelligence:${latestRun.run_key}`] : []),
-      `dashboard:${dashboard.dashboard_key}`,
+      ...(dashboardKey ? [`dashboard:${dashboardKey}`] : []),
       `table:${dashboard.default_table_key}`,
       `filter-count:${filters.length}`,
       `widget-count:${widgets.length}`,
     ],
-    dashboardKey: dashboard.dashboard_key,
+    dashboardKey,
     tableKey: dashboard.default_table_key,
     detail: {
-      dashboardKey: dashboard.dashboard_key,
+      dashboardKey: dashboardKey ?? null,
       dashboardName: dashboard.name,
       defaultTableKey: dashboard.default_table_key,
       widgetCount: widgets.length,

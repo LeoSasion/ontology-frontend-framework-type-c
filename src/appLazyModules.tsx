@@ -1,6 +1,6 @@
-import { lazy } from "react";
 import { getAppSection } from "./appSections";
 import type { AppSection } from "./components/Sidebar";
+import { lazyWithRetry } from "./lazyWithRetry";
 
 const loadAgentCommandDock = () => import("./components/AgentCommandDock").then((module) => ({ default: module.AgentCommandDock }));
 const loadAppMainView = () => import("./components/AppMainView").then((module) => ({ default: module.AppMainView }));
@@ -15,18 +15,18 @@ const loadSettingsPanel = () => import("./components/SettingsPanel").then((modul
 const loadSourceWorkbench = () => import("./components/SourceWorkbench").then((module) => ({ default: module.SourceWorkbench }));
 const loadViewWorkspace = () => import("./components/ViewWorkspace").then((module) => ({ default: module.ViewWorkspace }));
 
-export const AgentCommandDock = lazy(loadAgentCommandDock);
-export const AppMainView = lazy(loadAppMainView);
-export const BusinessPathBar = lazy(loadBusinessPathBar);
-export const TopBar = lazy(loadTopBar);
-export const AgentPanel = lazy(loadAgentPanel);
-export const DashboardCanvas = lazy(loadDashboardCanvas);
-export const EvidenceView = lazy(loadEvidenceView);
-export const HomeOverview = lazy(loadHomeOverview);
-export const InspectorPanel = lazy(loadInspectorPanel);
-export const SettingsPanel = lazy(loadSettingsPanel);
-export const SourceWorkbench = lazy(loadSourceWorkbench);
-export const ViewWorkspace = lazy(loadViewWorkspace);
+export const AgentCommandDock = lazyWithRetry(loadAgentCommandDock);
+export const AppMainView = lazyWithRetry(loadAppMainView);
+export const BusinessPathBar = lazyWithRetry(loadBusinessPathBar);
+export const TopBar = lazyWithRetry(loadTopBar);
+export const AgentPanel = lazyWithRetry(loadAgentPanel);
+export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas);
+export const EvidenceView = lazyWithRetry(loadEvidenceView);
+export const HomeOverview = lazyWithRetry(loadHomeOverview);
+export const InspectorPanel = lazyWithRetry(loadInspectorPanel);
+export const SettingsPanel = lazyWithRetry(loadSettingsPanel);
+export const SourceWorkbench = lazyWithRetry(loadSourceWorkbench);
+export const ViewWorkspace = lazyWithRetry(loadViewWorkspace);
 
 export const sectionPreloaders: Record<AppSection, Array<() => Promise<unknown>>> = {
   home: [loadHomeOverview],

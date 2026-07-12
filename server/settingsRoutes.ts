@@ -11,6 +11,69 @@ type SettingsRoutesOptions = {
 export async function handleSettingsApi(options: SettingsRoutesOptions) {
   const { cli, request, response, url } = options;
 
+  if (url.pathname === "/api/context" && request.method === "GET") {
+    const result = await cli(["context-pack"]);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/context/terms" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "context-term",
+      "--name", String(body.name ?? ""),
+      "--definition", String(body.definition ?? ""),
+      "--scope-type", String(body.scopeType ?? "workspace"),
+      "--scope-ref", String(body.scopeRef ?? ""),
+      "--status", String(body.status ?? "draft"),
+      "--source", String(body.source ?? "manual"),
+    ];
+    if (body.termKey) args.push("--term", String(body.termKey));
+    if (Array.isArray(body.aliases)) for (const alias of body.aliases) args.push("--alias", String(alias));
+    if (Array.isArray(body.evidenceRefs)) for (const ref of body.evidenceRefs) args.push("--evidence", String(ref));
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/context/rules" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "context-rule",
+      "--title", String(body.title ?? ""),
+      "--statement", String(body.statement ?? ""),
+      "--type", String(body.ruleType ?? "other"),
+      "--status", String(body.status ?? "draft"),
+      "--source", String(body.source ?? "manual"),
+    ];
+    if (body.ruleKey) args.push("--rule", String(body.ruleKey));
+    if (Array.isArray(body.appliesTo)) for (const target of body.appliesTo) args.push("--applies-to", String(target));
+    if (Array.isArray(body.evidenceRefs)) for (const ref of body.evidenceRefs) args.push("--evidence", String(ref));
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/confirmed-queries" && request.method === "GET") {
+    const args = ["confirmed-queries", "--limit", url.searchParams.get("limit") ?? "20"];
+    const status = url.searchParams.get("status");
+    if (status) args.push("--status", status);
+    const result = await cli(args);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/confirmed-queries/confirm" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["confirm-query", "--query", String(body.queryKey ?? ""), "--status", String(body.status ?? "confirmed")];
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/preferences" && request.method === "GET") {
     const result = await cli(["preferences"]);
     sendJson(response, 200, result);

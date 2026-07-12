@@ -514,7 +514,8 @@ export function appendCoreContractExtendedChecks(context) {
           biCliRuntimeSource.includes('workspace_delete = sub.add_parser("workspace-delete")') &&
           byLabel["cli-workspace-create-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-workspace-create-confirm"].parsed?.created?.id === "verify_workspace" &&
-          byLabel["cli-workspace-select-dry-run"].parsed?.currentWorkspaceId === "default" &&
+          byLabel["cli-workspace-create-confirm"].parsed?.created?.isActive === true &&
+          byLabel["cli-workspace-select-dry-run"].parsed?.currentWorkspaceId === "verify_workspace" &&
           byLabel["cli-workspace-select-confirm"].parsed?.workspace?.isActive === true &&
           byLabel["cli-workspace-delete-confirm"].parsed?.deletedWorkspace?.id === "delete_workspace_target" &&
           byLabel["cli-workspace-delete-default-blocked"].ok === true &&

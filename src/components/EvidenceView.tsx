@@ -1,5 +1,5 @@
 import "./agentEvidenceWorkspace.css";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import type { AgentAskResult, EvidenceFocus, WorkbenchPayload } from "../types";
 import type { BusinessPathStepKey } from "../businessPathModel";
 import type { SourceIntelligenceRunOptions } from "../sourceIntelligenceRunModel";
@@ -25,16 +25,16 @@ import {
 } from "../evidenceViewModel";
 import { buildMetricRepairPlan } from "../metricRepairModel";
 import { buildEvidenceNarrative } from "../productIntelligenceModel";
-import { buildProductActivation } from "../productActivationModel";
+import { lazyWithRetry } from "../lazyWithRetry";
 import { Bilingual, biText } from "./Bilingual";
 import { EvidenceBusinessSummaryPanel } from "./EvidenceBusinessSummaryPanel";
-import { EvidenceNumberExplainerPanel } from "./EvidenceNumberExplainerPanel";
 import { MetricSemanticRepairActions } from "./MetricSemanticRepairActions";
-import { ProductActivationPanel } from "./ProductActivationPanel";
+
+const EvidenceTrustActions = lazyWithRetry(() => import("./EvidenceTrustActions"));
+const EvidenceNumberExplainerPanel = lazyWithRetry(() => import("./EvidenceNumberExplainerPanel").then((module) => ({ default: module.EvidenceNumberExplainerPanel })));
 
 type EvidenceViewProps = {
   agent: AgentAskResult;
-  dashboardCount?: number;
   focus?: EvidenceFocus | null;
   lastActionResult?: Record<string, unknown> | null;
   pendingDraftCount?: number;
@@ -42,9 +42,11 @@ type EvidenceViewProps = {
   onSetSemantic: (options: { table: string; field: string; role: string; tags?: string[]; usage?: string[]; confidence?: number; note?: string; confirm?: boolean; stayOnPage?: boolean }) => Promise<Record<string, unknown>>;
   onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions) => Promise<Record<string, unknown> | void>;
   onOpenBusinessStep: (step: BusinessPathStepKey) => void;
+  onOpenAgent: () => void;
+  onOpenDashboard: (dashboardKey?: string) => void;
 };
 
-export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, pendingDraftCount, workbench, onSetSemantic, onSourceIntelligenceRun, onOpenBusinessStep }: EvidenceViewProps) {
+export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount, workbench, onSetSemantic, onSourceIntelligenceRun, onOpenBusinessStep, onOpenAgent, onOpenDashboard }: EvidenceViewProps) {
   const runs = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
   const activeRun = sourceRunFromFocus(focus, runs);
   const activeRefs = focus?.refs?.length ? focus.refs : agent.ontology.evidenceFiles;
@@ -53,7 +55,6 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
   const technicalFocusDetails = allFocusDetails.filter(([key]) => isTechnicalFocusDetail(key));
   const activeAnswer = agent.answerCard;
   const evidenceNarrative = buildEvidenceNarrative(focus, agent, workbench);
-  const activation = buildProductActivation({ workbench, dashboardCount, pendingDraftCount, agentRequiresConfirmation: agent.requiresConfirmation });
   const hasData = workbench.tables.length > 0 || runs.length > 0;
   const qualityDoctorResult = useQualityDoctor(hasData, workbench);
   const metricRepairPlan = useMemo(() => buildMetricRepairPlan(qualityDoctorResult, workbench), [qualityDoctorResult, workbench]);
@@ -75,13 +76,9 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
             </p>
           </div>
         </div>
-        <ProductActivationPanel
-          activation={activation}
-          currentStep="evidence"
-          onOpenStep={onOpenBusinessStep}
-          testId="evidence-product-activation"
-          title={biText("先接入数据，再核对证据", "Connect data before reviewing evidence")}
-        />
+        <button className="primaryButton" data-testid="evidence-open-sources" onClick={() => onOpenBusinessStep("data")} type="button">
+          {biText("接入数据", "Connect data")}
+        </button>
       </section>
     );
   }
@@ -90,20 +87,22 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
     (activeAnswer?.title ? biText(activeAnswer.title.zh, activeAnswer.title.en) : biText("当前证据可以解释什么", "What this evidence can explain"));
   const businessMetrics = [
     {
-      label: biText("源文件", "source files"),
-      value: activeRun ? String(activeRun.source_count) : "-",
+      label: biText("已纳入分析", "included in analysis"),
+      value: activeRun ? biText(`${activeRun.source_count} 个文件`, `${activeRun.source_count} files`) : "-",
     },
     {
-      label: biText("可用问题", "answerable questions"),
-      value: activeRun ? `${activeRun.metric_sql_executable_count}/${activeRun.metric_sql_plan_count}` : "-",
+      label: activeRun
+        ? biText(`可直接回答（共识别 ${activeRun.metric_sql_plan_count} 个候选）`, `directly answerable (${activeRun.metric_sql_plan_count} candidates)`)
+        : biText("可直接回答", "directly answerable"),
+      value: activeRun ? biText(`${activeRun.metric_sql_executable_count} 个`, `${activeRun.metric_sql_executable_count}`) : "-",
     },
     {
-      label: biText("关系证据", "relationship evidence"),
-      value: activeRun ? String(activeRun.relationship_count) : "-",
+      label: biText("已验证业务连接", "validated business links"),
+      value: activeRun ? biText(`${activeRun.relationship_count} 条`, `${activeRun.relationship_count}`) : "-",
     },
     {
-      label: biText("证据线索", "evidence items"),
-      value: String(activeRefs.length),
+      label: biText("本次结论引用", "cited by this result"),
+      value: biText(`${activeRefs.length} 条`, `${activeRefs.length}`),
     },
   ];
   const nextEvidenceActions = [
@@ -128,13 +127,19 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
         </div>
       </div>
       <div className="evidenceGrid">
-        <ProductActivationPanel
-          activation={activation}
-          compact
-          currentStep="evidence"
-          onOpenStep={onOpenBusinessStep}
-          testId="evidence-product-activation"
-        />
+        <section className="evidenceNextAction wideArticle" data-testid="evidence-next-action">
+          <div>
+            <strong>{biText("证据可核对", "Evidence ready to review")} · {pendingDraftCount ? biText("审阅写入", "approve write") : focus?.dashboardKey ? biText("返回看板", "return to dashboard") : biText("继续分析", "continue analysis")}</strong>
+            <span>{pendingDraftCount ? biText(`${pendingDraftCount} 个草案仍未确认`, `${pendingDraftCount} drafts still need approval`) : biText("当前来源和口径会随下一步继续保留。", "The current source and metric context will carry into the next step.")}</span>
+          </div>
+          <button
+            className="primaryButton"
+            onClick={() => pendingDraftCount ? onOpenBusinessStep("confirm") : focus?.dashboardKey ? onOpenDashboard(focus.dashboardKey) : onOpenAgent()}
+            type="button"
+          >
+            {pendingDraftCount ? biText("审阅待确认动作", "Review pending action") : focus?.dashboardKey ? biText("返回当前看板", "Return to dashboard") : biText("继续分析", "Continue analysis")}
+          </button>
+        </section>
 
         <EvidenceBusinessSummaryPanel
           businessMetrics={businessMetrics}
@@ -144,10 +149,16 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
           nextEvidenceActions={nextEvidenceActions}
         />
 
+        <Suspense fallback={null}>
+          <EvidenceTrustActions agent={agent} lastActionResult={lastActionResult} />
+        </Suspense>
+
         <details className="progressiveDetails evidenceProgressiveDetails" data-testid="evidence-explanation-details">
           <summary>{biText("查看数字解释、缺口和追溯依据", "View number explanation, gaps, and trace basis")}</summary>
           <div className="progressiveDetailsBody evidenceProgressiveGrid">
-            <EvidenceNumberExplainerPanel evidenceNarrative={evidenceNarrative} />
+            <Suspense fallback={null}>
+              <EvidenceNumberExplainerPanel evidenceNarrative={evidenceNarrative} />
+            </Suspense>
 
             <article className="wideArticle evidenceGapPanel" data-testid="evidence-gap-panel">
               <div className="tileHeader">
@@ -156,7 +167,7 @@ export function EvidenceView({ agent, dashboardCount, focus, lastActionResult, p
                   <h3><Bilingual zh="哪些问题暂时不能放心回答" en="Questions not ready to trust yet" /></h3>
                   <span>{metricRepairPlan.blocked > 0 ? metricRepairPlan.summary : biText("当前没有指标 SQL 阻塞项。", "No metric SQL blockers are present.")}</span>
                 </div>
-                <strong>{metricRepairPlan.executable}/{metricRepairPlan.planned || activeRun?.metric_sql_plan_count || 0}</strong>
+                <strong>{biText(`${metricRepairPlan.executable} / ${metricRepairPlan.planned || activeRun?.metric_sql_plan_count || 0} 个候选问题可执行`, `${metricRepairPlan.executable} / ${metricRepairPlan.planned || activeRun?.metric_sql_plan_count || 0} candidate questions executable`)}</strong>
               </div>
               <div className="evidenceGapStats">
                 <span className={metricRepairPlan.blocked > 0 ? "warn" : "ok"}>

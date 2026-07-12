@@ -25,6 +25,9 @@ export function AgentPromptComposer({ isAsking, prompt, setPrompt, setPromptTouc
         <Icon name="agent" />
         {isAsking ? biText("规划中", "Planning") : biText("提问", "Ask")}
       </button>
+      <span aria-live="polite" className="srOnly" role="status">
+        {isAsking ? biText("AI 正在生成只读回答或待确认草案", "AI is preparing a read-only answer or approval draft") : ""}
+      </span>
     </div>
   );
 }

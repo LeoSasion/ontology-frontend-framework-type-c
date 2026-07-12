@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -41,7 +42,9 @@ def _bounded(value: Any, *, max_chars: int = 120_000) -> Any:
 
 
 def _default_bundle_dir(command: str, bundle_key: str) -> Path:
-    return ROOT / "data" / "local" / "evidence-bundles" / slug(command) / bundle_key
+    configured_root = str(os.environ.get("AIBI_EVIDENCE_BUNDLE_ROOT") or "").strip()
+    base = Path(configured_root).expanduser() if configured_root else ROOT / "data" / "local" / "evidence-bundles"
+    return base / slug(command) / bundle_key
 
 
 def artifact_ref(label: str, path: str | Path, *, kind: str = "file", role: str = "evidence") -> dict[str, Any]:

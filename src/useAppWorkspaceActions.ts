@@ -5,6 +5,8 @@ import { emptyAgentResult } from "./emptyWorkspaceData";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
 import { preferredLandingSection } from "./appWorkspaceModel";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
+import type { AppNavigationContext } from "./appNavigationModel";
+import type { EvidenceFocus } from "./types";
 
 type StateSetter<T> = Dispatch<SetStateAction<T>>;
 
@@ -16,6 +18,8 @@ type AppWorkspaceActionsOptions = {
   setAgent: StateSetter<AgentAskResult>;
   setDashboards: StateSetter<DashboardPayload>;
   setLastActionResult: StateSetter<Record<string, unknown> | null>;
+  setNavigationContext: StateSetter<AppNavigationContext>;
+  setEvidenceFocus: StateSetter<EvidenceFocus | null>;
   setSection: StateSetter<AppSection>;
   setStatus: StateSetter<WorkspaceStatus>;
   setWorkbench: StateSetter<WorkbenchPayload>;
@@ -29,6 +33,8 @@ export function useAppWorkspaceActions({
   setAgent,
   setDashboards,
   setLastActionResult,
+  setNavigationContext,
+  setEvidenceFocus,
   setSection,
   setStatus,
   setWorkbench,
@@ -45,11 +51,13 @@ export function useAppWorkspaceActions({
     return surface;
   }, [setActionDrafts, setActiveDashboardKey, setActiveViewKey, setAgent, setDashboards, setStatus, setWorkbench]);
 
-  const openWorkspaceLanding = useCallback(async () => {
+  const openWorkspaceLanding = useCallback(async (forceHome = false) => {
     const surface = await reloadWorkspaceSurface();
-    setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards, surface.actionDrafts.length));
+    setNavigationContext({});
+    setEvidenceFocus(null);
+    setSection(forceHome ? "home" : preferredLandingSection(surface.status, surface.workbench, surface.dashboards, surface.actionDrafts.length));
     return surface;
-  }, [reloadWorkspaceSurface, setSection]);
+  }, [reloadWorkspaceSurface, setEvidenceFocus, setNavigationContext, setSection]);
 
   const handleWorkspaceCreate = useCallback(async (name: string) => {
     const previewResult = await createWorkspace(name, false);
@@ -59,7 +67,14 @@ export function useAppWorkspaceActions({
     }
     const result = await createWorkspace(name, true);
     setLastActionResult(result);
-    if (result.ok !== false) await openWorkspaceLanding();
+    const created = result.created && typeof result.created === "object" ? result.created as Record<string, unknown> : null;
+    const createdWorkspaceId = typeof created?.id === "string" ? created.id : "";
+    if (result.ok !== false && createdWorkspaceId) {
+      setLastActionResult({ ...result, enteredWorkspace: createdWorkspaceId });
+      const surface = await openWorkspaceLanding(true);
+      if (surface.status.workspace.id !== createdWorkspaceId) throw new Error("Created workspace was not activated.");
+      return { ...result, enteredWorkspace: createdWorkspaceId };
+    }
     return result;
   }, [openWorkspaceLanding, setLastActionResult]);
 
@@ -70,16 +85,11 @@ export function useAppWorkspaceActions({
     if (result.ok !== false) await openWorkspaceLanding();
   }, [activeWorkspaceId, openWorkspaceLanding, setLastActionResult]);
 
-  const handleWorkspaceDelete = useCallback(async (workspaceId: string) => {
+  const handleWorkspaceDelete = useCallback(async (workspaceId: string, confirm = false) => {
     if (!workspaceId || workspaceId === "default" || workspaceId === activeWorkspaceId) return;
-    const previewResult = await deleteWorkspace(workspaceId, false);
-    if (previewResult.requiresConfirmation !== true) {
-      setLastActionResult(previewResult);
-      return previewResult;
-    }
-    const result = await deleteWorkspace(workspaceId, true);
+    const result = await deleteWorkspace(workspaceId, confirm);
     setLastActionResult(result);
-    if (result.ok !== false) await openWorkspaceLanding();
+    if (confirm && result.ok !== false) await openWorkspaceLanding();
     return result;
   }, [activeWorkspaceId, openWorkspaceLanding, setLastActionResult]);
 

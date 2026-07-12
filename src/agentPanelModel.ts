@@ -1,5 +1,6 @@
 import type { ActionDraft, MetricDefinition, SavedView, SourceIntelligenceRunSummary, WorkbenchPayload } from "./types";
 import { biText } from "./components/Bilingual";
+import { businessIdentifier } from "./businessPresentation";
 import { objectRecord } from "./safeValue";
 
 export { objectRecord };
@@ -89,7 +90,7 @@ export function pairText(value: { zh: string; en: string } | undefined) {
 export function evidenceRefText(ref: Record<string, unknown>) {
   const type = String(ref.type ?? "");
   if (type === "sourceRun") {
-    return `${biText("数据来源", "Data source")}: ${String(ref.name ?? ref.id ?? "-")}`;
+    return `${biText("数据来源", "Data source")}: ${businessIdentifier(ref.name, biText("当前导入数据", "Current imported data"))}`;
   }
   if (type === "metricDefinition") {
     return `${biText("指标口径", "Metric logic")}: ${String(ref.label ?? ref.metric_key ?? "-")}`;
@@ -98,12 +99,25 @@ export function evidenceRefText(ref: Record<string, unknown>) {
     return `${biText("查询回执", "Query receipt")}: ${biText("只读查询已完成", "Read-only query completed")}`;
   }
   if (type === "ontologyFunction") {
-    return `${biText("业务规则", "Business rule")}: ${String(ref.id ?? "-")}`;
+    return `${biText("业务规则", "Business rule")}: ${businessIdentifier(ref.id, biText("图表生成规则", "Chart generation rule"))}`;
   }
-  return `${type || biText("证据", "Evidence")}: ${String(ref.id ?? ref.key ?? "-")}`;
+  if (type === "contextTerm") {
+    return `${biText("业务术语", "Business term")}: ${String(ref.name ?? ref.termKey ?? "-")}`;
+  }
+  if (type === "contextRule") {
+    return `${biText("工作区规则", "Workspace rule")}: ${String(ref.title ?? ref.ruleKey ?? "-")}`;
+  }
+  if (type === "confirmedQuery") {
+    return `${biText("确认问法", "Confirmed query")}: ${String(ref.question ?? ref.queryKey ?? "-")}`;
+  }
+  return businessIdentifier(ref.name ?? ref.label, biText("已引用一条业务证据", "Business evidence referenced"));
 }
 
+
 export function confidenceText(value?: string) {
+  if (value === "query-runtime") return biText("已完成查询", "Query complete");
+  if (value === "ontology") return biText("已匹配业务规则", "Business rule matched");
+  if (value === "chart_preview") return biText("图表草案", "Chart draft");
   if (value === "explicit") return biText("明确命中", "Explicit match");
   if (value === "fallback") return biText("系统推断", "System inferred");
   if (value === "missing") return biText("未命中", "Missing");

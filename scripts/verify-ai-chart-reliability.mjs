@@ -32,6 +32,11 @@ const results = [];
 try {
   results.push(run("empty-chart", ["ask", "创建一个图表"]));
   results.push(run("import", ["import-commit", "validation-inputs/orders.csv", "--table", "records", "--name", "Records", "--mode", "create", "--yes"]));
+  const firstExplicitBarDraft = run("first-explicit-bar", ["ask", "基于 records，按 channel 汇总 net_sales，生成柱状图"]);
+  results.push(firstExplicitBarDraft);
+  const firstExplicitBarKey = firstExplicitBarDraft.parsed?.actionDraft?.actionKey ?? "missing-first-explicit-bar";
+  results.push(run("first-explicit-bar-actions", ["action-drafts", "--limit", "10"]));
+  results.push(run("first-explicit-bar-reject", ["confirm-action", firstExplicitBarKey, "--reject", "--yes"]));
   const firstChartDraft = run("first-chart-draft", ["ask", "基于 records，先问我最多一个必要问题，然后起草一个仅包含一个图表的看板。优先在折线图、柱状图、指标卡或表格中选择，说明字段、口径和证据，不直接写入。"]);
   results.push(firstChartDraft);
   const firstChartKey = firstChartDraft.parsed?.actionDraft?.actionKey ?? "missing-first-chart-draft";
@@ -52,6 +57,27 @@ try {
       ok: byLabel["empty-chart"].parsed?.requiresConfirmation === false &&
         byLabel["empty-chart"].parsed?.answerCard?.kind === "gap" &&
         byLabel["empty-chart"].parsed?.actionDraft?.status === "read-only",
+    },
+    {
+      label: "first-explicit-bar-preserves-resolved-widget",
+      ok: byLabel["first-explicit-bar"].parsed?.requiresConfirmation === true &&
+        byLabel["first-explicit-bar"].parsed?.actionDraft?.kind === "dashboard.create" &&
+        byLabel["first-explicit-bar"].parsed?.matched?.widget?.widgetType === "bar" &&
+        byLabel["first-explicit-bar"].parsed?.matched?.widget?.measure === "net_sales" &&
+        byLabel["first-explicit-bar"].parsed?.matched?.widget?.dimension === "channel" &&
+        byLabel["first-explicit-bar"].parsed?.matched?.widget?.aggregation === "sum" &&
+        byLabel["first-explicit-bar-actions"].parsed?.actionDrafts?.some((draft) =>
+          draft.action_key === firstExplicitBarKey &&
+          draft.payload?.originalPrompt === "基于 records，按 channel 汇总 net_sales，生成柱状图" &&
+          draft.payload?.dashboardDraft?.source === "single-chart" &&
+          draft.payload?.dashboardDraft?.widgets?.length === 1 &&
+          draft.payload.dashboardDraft.widgets[0]?.type === "bar" &&
+          draft.payload.dashboardDraft.widgets[0]?.measure === "net_sales" &&
+          draft.payload.dashboardDraft.widgets[0]?.dimension === "channel" &&
+          draft.payload.dashboardDraft.widgets[0]?.aggregation === "sum"
+        ) &&
+        byLabel["first-explicit-bar-reject"].parsed?.confirmed === true &&
+        byLabel["first-explicit-bar-reject"].parsed?.decision === "reject",
     },
     {
       label: "first-chart-from-import-creates-one-widget-draft",

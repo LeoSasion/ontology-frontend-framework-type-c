@@ -49,6 +49,7 @@ type DashboardAdvancedWidgetWorkbenchProps = {
   onBusinessTemplate: (label: string, options: BusinessDashboardOptions) => void;
   onCanvasWidthModeChange: (mode: DashboardCanvasWidthMode) => void;
   onModuleSave: (confirm: boolean) => void;
+  onMoveWidget: (widgetKey: string, targetIndex: number) => void;
   onRelationshipSave: (label: string, recommendation: RelationshipRecommendation, confirm: boolean) => void;
   onSelectedRelationshipChange: (relationshipKey: string) => void;
   onSelectedViewChange: (viewKey: string) => void;
@@ -101,6 +102,7 @@ export function DashboardAdvancedWidgetWorkbench({
   onBusinessTemplate,
   onCanvasWidthModeChange,
   onModuleSave,
+  onMoveWidget,
   onRelationshipSave,
   onSelectedRelationshipChange,
   onSelectedViewChange,
@@ -224,6 +226,7 @@ export function DashboardAdvancedWidgetWorkbench({
           busy={busy}
           dashboardKey={dashboardKey}
           onCopyPreview={(widget) => onWidgetOperation(`copy-preview-${widget.widget_key}`, { op: "copy", widgetKey: widget.widget_key, dashboardKey, confirm: false })}
+          onMoveWidget={onMoveWidget}
           onRemovePreview={(widget) => onWidgetOperation(`remove-preview-${widget.widget_key}`, { op: "remove", widgetKey: widget.widget_key, confirm: false })}
           onSelectWidget={onSelectWidget}
           selectedWidgetKey={selectedWidget?.widget_key}

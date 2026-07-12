@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `84`
+Command count: `92`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -13,8 +13,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `agent` | 3 |
 | `config` | 3 |
 | `connector` | 4 |
+| `context` | 5 |
 | `dashboard` | 19 |
-| `evidence` | 3 |
+| `evidence` | 6 |
 | `formula` | 4 |
 | `import` | 7 |
 | `integration` | 1 |
@@ -36,9 +37,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 1 |
-| `dry-run-confirm` | 44 |
-| `evidence-receipt` | 3 |
-| `read-only` | 32 |
+| `dry-run-confirm` | 47 |
+| `evidence-receipt` | 4 |
+| `read-only` | 36 |
 | `runtime-receipt` | 1 |
 
 ## Commands
@@ -51,13 +52,19 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `add-recommended-widgets` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--table`, `--limit`, `--allow-duplicates`, `--yes` |
 | `add-relationship-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--relationship`, `--type`, `--title`, `--subtitle`, `--group`, `--measure`, `...` |
 | `add-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--type`, `--table`, `--view`, `--title`, `--subtitle`, `--dimension`, `...` |
+| `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
 | `apply-config` | `config` | `dry-run-confirm` | `yes` | `no` | `input`, `--yes` |
-| `ask` | `agent` | `action-draft` | `yes` | `no` | `--read-only`, `prompt` |
+| `ask` | `agent` | `action-draft` | `yes` | `no` | `--read-only`, `--parent-run`, `--branch-label`, `prompt` |
 | `b-cli-capabilities` | `integration` | `read-only` | `no` | `no` | - |
 | `business-dashboard` | `dashboard` | `dry-run-confirm` | `yes` | `yes` | `--op`, `--dashboard`, `--name`, `--table`, `--template`, `--limit`, `--yes` |
 | `clear-filters` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--yes` |
 | `cli-contract` | `system` | `artifact-export` | `no` | `no` | `--format`, `--output`, `--command` |
 | `confirm-action` | `agent` | `action-confirmation` | `yes` | `no` | `action_key`, `--reject`, `--yes` |
+| `confirm-query` | `context` | `dry-run-confirm` | `yes` | `no` | `--query`, `--status`, `--yes` |
+| `confirmed-queries` | `context` | `read-only` | `no` | `no` | `--status`, `--limit` |
+| `context-pack` | `context` | `read-only` | `no` | `no` | - |
+| `context-rule` | `context` | `dry-run-confirm` | `yes` | `no` | `--rule`, `--title`, `--statement`, `--type`, `--applies-to`, `--status`, `--source`, `--evidence`, `...` |
+| `context-term` | `context` | `dry-run-confirm` | `yes` | `no` | `--term`, `--name`, `--definition`, `--alias`, `--scope-type`, `--scope-ref`, `--status`, `--source`, `...` |
 | `copy-view` | `view` | `dry-run-confirm` | `yes` | `no` | `--view`, `--name`, `--tag`, `--yes` |
 | `copy-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--widget`, `--dashboard`, `--title`, `--clear-filters`, `--yes` |
 | `create-index` | `performance` | `dry-run-confirm` | `yes` | `no` | `--table`, `--field`, `--index`, `--yes` |
@@ -69,6 +76,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `delete-view` | `view` | `dry-run-confirm` | `yes` | `no` | `--view`, `--yes` |
 | `erp-unit-library` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--limit`, `--select`, `--summary` |
 | `export-config` | `config` | `runtime-receipt` | `no` | `no` | `output` |
+| `export-evidence` | `evidence` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--output` |
 | `field-update` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--field`, `--role`, `--usage`, `--confidence`, `--yes` |
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |
 | `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--yes` |
@@ -92,8 +100,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `preview-import` | `import` | `evidence-receipt` | `no` | `yes` | `file`, `--table`, `--unique-fields`, `--conflict-rule` |
 | `preview-import-folder` | `import` | `evidence-receipt` | `no` | `yes` | `path`, `--limit`, `--no-recursive` |
 | `quality-doctor` | `system` | `read-only` | `no` | `no` | - |
-| `query` | `query` | `read-only` | `no` | `no` | `--table`, `--group`, `--measure`, `--agg`, `--limit` |
+| `query` | `query` | `read-only` | `no` | `no` | `--table`, `--group`, `--measure`, `--agg`, `--limit`, `--request` |
 | `query-metric` | `query` | `read-only` | `no` | `no` | `metric`, `--group`, `--filter`, `--sort`, `--limit` |
+| `query-receipts` | `evidence` | `read-only` | `no` | `no` | `--receipt`, `--limit` |
 | `query-relationship` | `relationship` | `read-only` | `no` | `no` | `--relationship`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--join-type`, `--group`, `--measure`, `...` |
 | `query-table` | `query` | `read-only` | `no` | `no` | `--table`, `--view`, `--mode`, `--column`, `--filter`, `--sort`, `--search`, `--offset`, `...` |
 | `recommend-indexes` | `performance` | `read-only` | `no` | `no` | `--table`, `--limit` |

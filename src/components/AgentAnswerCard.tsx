@@ -1,5 +1,6 @@
 import type { AgentAskResult } from "../types";
 import { confidenceText, evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
+import { formatBusinessValue } from "../businessPresentation";
 import { Bilingual, biText } from "./Bilingual";
 
 type AgentAnswerCardProps = {
@@ -37,15 +38,14 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
   const defaultMeasure = candidateMeasures[0] ?? "";
 
   function candidatePrompt(role: "measure" | "dimension", field: string) {
-    const tablePrefix = clarification?.tableKey ? biText(`在 ${clarification.tableKey} 中，`, `In ${clarification.tableKey}, `) : "";
     if (role === "measure") {
       return defaultDimension
-        ? biText(`${tablePrefix}用 ${field} 按 ${defaultDimension} 做${chartType}`, `${tablePrefix}build a ${chartType} with ${field} by ${defaultDimension}`)
-        : biText(`${tablePrefix}用 ${field} 做${chartType}`, `${tablePrefix}build a ${chartType} with ${field}`);
+        ? biText(`用 ${field} 按 ${defaultDimension} 做${chartType}`, `Build a ${chartType} with ${field} by ${defaultDimension}`)
+        : biText(`用 ${field} 做${chartType}`, `Build a ${chartType} with ${field}`);
     }
     return defaultMeasure
-      ? biText(`${tablePrefix}用 ${defaultMeasure} 按 ${field} 做${chartType}`, `${tablePrefix}build a ${chartType} with ${defaultMeasure} by ${field}`)
-      : biText(`${tablePrefix}按 ${field} 分组做${chartType}`, `${tablePrefix}build a ${chartType} grouped by ${field}`);
+      ? biText(`用 ${defaultMeasure} 按 ${field} 做${chartType}`, `Build a ${chartType} with ${defaultMeasure} by ${field}`)
+      : biText(`按 ${field} 分组做${chartType}`, `Build a ${chartType} grouped by ${field}`);
   }
 
   return (
@@ -62,7 +62,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
         {answerCard.metrics.map((metric, index) => (
           <div key={`${pairText(metric.label)}-${index}`}>
             <span>{pairText(metric.label)}</span>
-            <strong>{metric.value}</strong>
+            <strong>{formatBusinessValue(metric.value)}</strong>
           </div>
         ))}
       </div>
@@ -71,7 +71,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
           {answerCard.rows.slice(0, 5).map((row, index) => (
             <div key={`${String(row.label ?? index)}-${index}`}>
               <span>{String(row.label ?? biText("合计", "Total"))}</span>
-              <strong>{String(row.value ?? "-")}</strong>
+              <strong>{formatBusinessValue(row.value)}</strong>
             </div>
           ))}
         </div>

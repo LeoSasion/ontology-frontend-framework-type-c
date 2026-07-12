@@ -1,13 +1,15 @@
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getAppSection, primaryAppSections, utilityAppSections, type AppSection } from "../appSections";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "../types";
 import { isSectionLockedByFlow, resolveSectionForFlow, type WorkspaceFlowModel } from "../workspaceFlowModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 import { SidebarAssetSections } from "../sidebarAssetModules";
-import { SidebarWorkspaceCard } from "./SidebarWorkspaceCard";
+import { buildProductReadiness } from "../productReadinessModel";
 
 export type { AppSection } from "../appSections";
+
+const SidebarWorkspaceCard = lazy(() => import("./SidebarWorkspaceCard"));
 
 type SidebarProps = {
   activeSection: AppSection;
@@ -21,7 +23,7 @@ type SidebarProps = {
   agent: AgentAskResult;
   actionDrafts: ActionDraft[];
   onWorkspaceCreate: (name: string) => Promise<Record<string, unknown> | void>;
-  onWorkspaceDelete: (workspaceId: string) => Promise<Record<string, unknown> | void>;
+  onWorkspaceDelete: (workspaceId: string, confirm?: boolean) => Promise<Record<string, unknown> | void>;
   onWorkspaceRename: (workspaceId: string, name: string) => Promise<Record<string, unknown> | void>;
   onWorkspaceSelect: (workspaceId: string) => Promise<void>;
 };
@@ -46,6 +48,7 @@ export function Sidebar({
   const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [assetSectionsMounted, setAssetSectionsMounted] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceNotice, setWorkspaceNotice] = useState("");
   const currentWorkspace = status.workspace ?? {
     id: "default",
     name: biText("AIBI-C 工作区", "AIBI-C workspace"),
@@ -57,6 +60,11 @@ export function Sidebar({
     : [currentWorkspace];
   const safeStatus = { ...status, workspace: currentWorkspace, workspaces };
   const [workspaceRenameName, setWorkspaceRenameName] = useState(currentWorkspace.name);
+  const readiness = buildProductReadiness(status, {
+    hasData: flow.hasData,
+    hasEvidence: flow.hasEvidence,
+    hasPendingDraft: flow.hasPendingDraft,
+  });
 
   const activeRailItem = useMemo(
     () => getAppSection(activeRailSection),
@@ -80,8 +88,10 @@ export function Sidebar({
     if (!name) return;
     setWorkspaceBusy(true);
     try {
-      await onWorkspaceCreate(name);
+      const result = await onWorkspaceCreate(name);
+      if (result && typeof result.enteredWorkspace === "string") setWorkspaceNotice(biText("已进入新工作区", "Entered the new workspace"));
       setWorkspaceName("");
+      return result;
     } finally {
       setWorkspaceBusy(false);
     }
@@ -97,11 +107,11 @@ export function Sidebar({
     }
   }
 
-  async function deleteWorkspaceFromInput(workspaceId: string) {
+  async function deleteWorkspaceFromInput(workspaceId: string, confirm = false) {
     if (!workspaceId || workspaceId === "default" || workspaceId === currentWorkspace.id) return;
     setWorkspaceBusy(true);
     try {
-      await onWorkspaceDelete(workspaceId);
+      return await onWorkspaceDelete(workspaceId, confirm);
     } finally {
       setWorkspaceBusy(false);
     }
@@ -166,8 +176,8 @@ export function Sidebar({
             </button>
           );
         })}
-        <div className="railStatus" title={status.health.ok ? biText("可分析", "Ready") : biText("需要检查", "Needs review")}>
-          <span className={status.health.ok ? "dot ok" : "dot warn"} />
+        <div className="railStatus" title={readiness.label}>
+          <span className={`dot ${readiness.tone}`} />
         </div>
       </div>
 
@@ -180,7 +190,7 @@ export function Sidebar({
           <span className="assetModeChip"><Bilingual zh="沙盒" en="Sandbox" /></span>
         </div>
 
-        <SidebarWorkspaceCard
+        <Suspense fallback={<div className="assetWorkspaceCard" aria-hidden="true" />}><SidebarWorkspaceCard
           actionDrafts={actionDrafts}
           createWorkspaceFromInput={createWorkspaceFromInput}
           deleteWorkspaceFromInput={deleteWorkspaceFromInput}
@@ -191,9 +201,10 @@ export function Sidebar({
           status={safeStatus}
           workspaceBusy={workspaceBusy}
           workspaceName={workspaceName}
+          workspaceNotice={workspaceNotice}
           workspaceRenameName={workspaceRenameName}
           workspaces={workspaces}
-        />
+        /></Suspense>
 
         {assetSectionsMounted ? <Suspense fallback={null}>
           <SidebarAssetSections

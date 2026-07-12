@@ -53,6 +53,8 @@ const contract = byLabel["contract-json"].parsed?.contract;
 const contractCommands = Array.isArray(contract?.commands) ? contract.commands : [];
 const sourceIntelligenceContract = contractCommands.find((command) => command.name === "source-intelligence");
 const businessDashboardContract = contractCommands.find((command) => command.name === "business-dashboard");
+const trustCommandNames = ["context-pack", "query-receipts", "export-evidence", "confirmed-queries", "analysis-runs"];
+const trustCommands = trustCommandNames.map((name) => contractCommands.find((command) => command.name === name));
 const previewImport = byLabel["preview-import-evidence-bundle"].parsed;
 const businessDraft = byLabel["business-dashboard-draft-evidence-bundle"].parsed;
 const markdown = existsSync(markdownPath) ? readFileSync(markdownPath, "utf8") : "";
@@ -64,6 +66,11 @@ checks.push(
       contract.commandCount >= 70 &&
       sourceIntelligenceContract?.writesEvidence === true &&
       businessDashboardContract?.requiresYes === true,
+  },
+  {
+    label: "contract-discovers-trusted-analysis-surface",
+    ok: trustCommands.every(Boolean) &&
+      trustCommands.find((command) => command?.name === "export-evidence")?.writesEvidence === true,
   },
   {
     label: "status-has-compatible-envelope",

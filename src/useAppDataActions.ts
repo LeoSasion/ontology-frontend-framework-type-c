@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useRef, type Dispatch, type SetStateAction } from "react";
 import {
   addMetric,
   commitImport,
@@ -32,7 +32,8 @@ import {
   syncConnector,
   updateFieldConfig,
 } from "./api";
-import type { AppSection } from "./components/Sidebar";
+import type { AppNavigationTarget } from "./appNavigationModel";
+import type { AppSection } from "./appSections";
 import { actionErrorResult, normalizeQuery } from "./appWorkspaceModel";
 import {
   refreshStatusAndWorkbench,
@@ -54,6 +55,7 @@ import type {
 } from "./types";
 
 type AppDataActionsOptions = {
+  activeWorkspaceId: string;
   setActionDrafts: Dispatch<SetStateAction<ActionDraft[]>>;
   setActiveViewKey: Dispatch<SetStateAction<string>>;
   setDashboards: Dispatch<SetStateAction<DashboardPayload>>;
@@ -62,13 +64,22 @@ type AppDataActionsOptions = {
   setPreview: Dispatch<SetStateAction<ImportPreview>>;
   setQuery: Dispatch<SetStateAction<QueryResult>>;
   setRelationshipPreview: Dispatch<SetStateAction<RelationshipPreviewPayload>>;
-  setSection: Dispatch<SetStateAction<AppSection>>;
+  navigateTo: (target: AppNavigationTarget) => void;
   setStatus: Dispatch<SetStateAction<WorkspaceStatus>>;
   setTableQuery: Dispatch<SetStateAction<TableQueryPayload>>;
   setWorkbench: Dispatch<SetStateAction<WorkbenchPayload>>;
 };
 
+function resultString(result: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = result[key];
+    if (typeof value === "string" && value.trim()) return value;
+  }
+  return undefined;
+}
+
 export function useAppDataActions({
+  activeWorkspaceId,
   setActionDrafts,
   setActiveViewKey,
   setDashboards,
@@ -77,11 +88,13 @@ export function useAppDataActions({
   setPreview,
   setQuery,
   setRelationshipPreview,
-  setSection,
+  navigateTo,
   setStatus,
   setTableQuery,
   setWorkbench,
 }: AppDataActionsOptions) {
+  const sourceIntelligenceRequestRef = useRef(0);
+  const setSection = useCallback((section: AppSection) => navigateTo({ section }), [navigateTo]);
   const handlePreview = useCallback(async (options: { filePath: string; table?: string; uniqueFields?: string[]; conflictRule?: string }) => {
     const result = await previewImportWithOptions(options);
     setPreview(result);
@@ -95,8 +108,11 @@ export function useAppDataActions({
     setLastActionResult(result);
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
-    setSection("sources");
-  }, [setLastActionResult, setSection, setStatus, setWorkbench]);
+    navigateTo({
+      section: "sources",
+      tableKey: resultString(result, "tableKey", "table_key") ?? options.table ?? refreshed.workbench.tables[0]?.table_key,
+    });
+  }, [navigateTo, setLastActionResult, setStatus, setWorkbench]);
 
   const handlePreviewFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean }) => {
     const result = await previewFolderImport(options);
@@ -110,9 +126,9 @@ export function useAppDataActions({
     setLastActionResult(result as unknown as Record<string, unknown>);
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
-    setSection("sources");
+    navigateTo({ section: "sources", tableKey: result.groups[0]?.tableKey ?? refreshed.workbench.tables[0]?.table_key });
     return result;
-  }, [setLastActionResult, setSection, setStatus, setWorkbench]);
+  }, [navigateTo, setLastActionResult, setStatus, setWorkbench]);
 
   const handleImportPolicy = useCallback(async (options: { table: string; uniqueFields: string[]; conflictRule?: string; confirm?: boolean }) => {
     const result = await setImportPolicy(options);
@@ -131,8 +147,8 @@ export function useAppDataActions({
   const handleInspectSource = useCallback(async (table: string) => {
     const result = await inspectSource(table);
     setLastActionResult(result);
-    setSection("sources");
-  }, [setLastActionResult, setSection]);
+    navigateTo({ section: "sources", tableKey: table });
+  }, [navigateTo, setLastActionResult]);
 
   const handleRenameSource = useCallback(async (options: { source: string; name: string; confirm?: boolean }) => {
     const result = await renameSource(options);
@@ -210,12 +226,18 @@ export function useAppDataActions({
 
   const handleTableQuery = useCallback(async (options: Parameters<typeof runTableQuery>[0]) => {
     try {
-      setTableQuery(await runTableQuery(options));
+      const result = await runTableQuery(options);
+      setTableQuery(result);
+      navigateTo({
+        section: "views",
+        tableKey: result.tableQuery.tableKey,
+        viewKey: result.tableQuery.viewKey,
+      });
     } catch (error) {
       setLastActionResult(actionErrorResult("query-table", error));
+      navigateTo({ section: "views" });
     }
-    setSection("views");
-  }, [setLastActionResult, setSection, setTableQuery]);
+  }, [navigateTo, setLastActionResult, setTableQuery]);
 
   const handleSaveView = useCallback(async (options: Parameters<typeof saveView>[0]) => {
     const result = await saveView(options);
@@ -225,9 +247,11 @@ export function useAppDataActions({
     if (typeof (result as Record<string, unknown>).savedView === "object") {
       const savedView = (result as { savedView?: { view_key?: string } }).savedView;
       if (savedView?.view_key) setActiveViewKey(savedView.view_key);
+      navigateTo({ section: "views", viewKey: savedView?.view_key });
+      return;
     }
-    setSection("views");
-  }, [setActiveViewKey, setLastActionResult, setSection, setWorkbench]);
+    navigateTo({ section: "views" });
+  }, [navigateTo, setActiveViewKey, setLastActionResult, setWorkbench]);
 
   const handleCopyView = useCallback(async (options: Parameters<typeof copyView>[0]) => {
     const result = await copyView(options);
@@ -236,8 +260,8 @@ export function useAppDataActions({
     setWorkbench(nextWorkbench);
     const savedView = (result as { savedView?: { view_key?: string } }).savedView;
     if (savedView?.view_key) setActiveViewKey(savedView.view_key);
-    setSection("views");
-  }, [setActiveViewKey, setLastActionResult, setSection, setWorkbench]);
+    navigateTo({ section: "views", viewKey: savedView?.view_key });
+  }, [navigateTo, setActiveViewKey, setLastActionResult, setWorkbench]);
 
   const handleDeleteView = useCallback(async (options: Parameters<typeof deleteView>[0]) => {
     const result = await deleteView(options);
@@ -245,8 +269,8 @@ export function useAppDataActions({
     setLastActionResult(result);
     setWorkbench(nextWorkbench);
     setActiveViewKey(nextWorkbench.savedViews[0]?.view_key ?? "");
-    setSection("views");
-  }, [setActiveViewKey, setLastActionResult, setSection, setWorkbench]);
+    navigateTo({ section: "views", viewKey: nextWorkbench.savedViews[0]?.view_key });
+  }, [navigateTo, setActiveViewKey, setLastActionResult, setWorkbench]);
 
   const handleFieldUpdate = useCallback(async (options: { table: string; field: string; role: string; usage: string; confidence?: number; confirm?: boolean }) => {
     const result = await updateFieldConfig(options);
@@ -360,22 +384,33 @@ export function useAppDataActions({
   }, [setLastActionResult, setSection, setWorkbench]);
 
   const handleSourceIntelligenceRun = useCallback(async (options?: SourceIntelligenceRunOptions) => {
-    const { stayOnPage = false, ...sourceOptions } = options ?? {};
-    const hasInputs = Array.isArray(sourceOptions.inputs) && sourceOptions.inputs.length > 0;
+    const { stayOnPage = false, inputs = [], ...sourceOptions } = options ?? { inputs: [] };
+    const hasInputs = inputs.length > 0;
     if (!hasInputs) {
       const result = actionErrorResult("source-intelligence", new Error("请先在数据源工作台选择本地文件或文件夹。"));
       setLastActionResult(result);
       if (!stayOnPage) setSection("sources");
       return result;
     }
-    const request = sourceOptions;
+    const requestId = sourceIntelligenceRequestRef.current + 1;
+    sourceIntelligenceRequestRef.current = requestId;
+    const request = { ...sourceOptions, inputs, workspaceId: activeWorkspaceId };
     try {
       const result = await runSourceIntelligence(request);
+      if (sourceIntelligenceRequestRef.current !== requestId || result.workspaceId !== activeWorkspaceId) return result;
       setLastActionResult(result);
       const refreshed = await refreshStatusAndWorkbench();
+      if (sourceIntelligenceRequestRef.current !== requestId || refreshed.status.workspace.id !== result.workspaceId) return result;
       setWorkbench(refreshed.workbench);
       setStatus(refreshed.status);
-      if (!stayOnPage) setSection("sources");
+      if (!stayOnPage) {
+        navigateTo({
+          section: "dashboards",
+          allowLocked: true,
+          tableKey: result.tableKey ?? refreshed.workbench.tables[0]?.table_key,
+          sourceRunKey: result.runKey,
+        });
+      }
       return result;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error || "Source Intelligence failed");
@@ -387,7 +422,7 @@ export function useAppDataActions({
       if (!stayOnPage) setSection("sources");
       throw error;
     }
-  }, [setLastActionResult, setSection, setStatus, setWorkbench]);
+  }, [activeWorkspaceId, navigateTo, setLastActionResult, setSection, setStatus, setWorkbench]);
 
   const handleSourceDashboardDraft = useCallback(async (options: Parameters<typeof createSourceDashboardDraft>[0]) => {
     const result = await createSourceDashboardDraft(options);
@@ -396,9 +431,13 @@ export function useAppDataActions({
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
     setActionDrafts(refreshed.actionDrafts);
-    setSection("agent");
+    navigateTo({
+      section: "agent",
+      actionKey: resultString(result, "actionKey", "action_key"),
+      tableKey: resultString(result, "tableKey", "table_key"),
+    });
     return result;
-  }, [setActionDrafts, setLastActionResult, setSection, setStatus, setWorkbench]);
+  }, [navigateTo, setActionDrafts, setLastActionResult, setStatus, setWorkbench]);
 
   return {
     handleAddMetric,

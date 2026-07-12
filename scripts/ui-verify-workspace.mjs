@@ -5,17 +5,20 @@ export function sleep(ms) {
 }
 
 export async function fetchJson(path, options = {}) {
-  const response = await fetch(`${apiBaseUrl}${path}`, options);
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = { ok: false, error: `Non-JSON response from ${path}` };
+  let lastError = null;
+  const attempts = 8;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${apiBaseUrl}${path}`, options);
+      const payload = await response.json().catch(() => ({ ok: false, error: `Non-JSON response from ${path}` }));
+      if (!response.ok || payload?.ok === false) throw new Error(`${path}: ${payload?.error ?? `${response.status} ${response.statusText}`}`);
+      return payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) await sleep(250 * (attempt + 1));
+    }
   }
-  if (!response.ok || payload?.ok === false) {
-    throw new Error(`${path}: ${payload?.error ?? `${response.status} ${response.statusText}`}`);
-  }
-  return payload;
+  throw lastError;
 }
 
 export async function postJson(path, body) {

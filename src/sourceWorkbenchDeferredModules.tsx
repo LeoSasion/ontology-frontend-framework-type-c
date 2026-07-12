@@ -1,9 +1,7 @@
-import { lazy } from "react";
+import { lazyWithRetry } from "./lazyWithRetry";
 
 const loadActionPanel = () => import("./components/SourceWorkbenchActionPanel");
-const loadDataEntryPanel = () => import("./components/SourceWorkbenchDataEntryPanel");
 const loadDataManagementPanel = () => import("./components/SourceWorkbenchDataManagementPanel");
 
-export const SourceWorkbenchActionPanel = lazy(() => loadActionPanel().then((module) => ({ default: module.SourceWorkbenchActionPanel })));
-export const SourceWorkbenchDataEntryPanel = lazy(() => loadDataEntryPanel().then((module) => ({ default: module.SourceWorkbenchDataEntryPanel })));
-export const SourceWorkbenchDataManagementPanel = lazy(() => loadDataManagementPanel().then((module) => ({ default: module.SourceWorkbenchDataManagementPanel })));
+export const SourceWorkbenchActionPanel = lazyWithRetry(() => loadActionPanel().then((module) => ({ default: module.SourceWorkbenchActionPanel })));
+export const SourceWorkbenchDataManagementPanel = lazyWithRetry(() => loadDataManagementPanel().then((module) => ({ default: module.SourceWorkbenchDataManagementPanel })));

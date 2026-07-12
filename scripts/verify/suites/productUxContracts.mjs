@@ -13,10 +13,12 @@ export function appendProductUxContractChecks(context) {
     agentPromptComposerSource,
     agentPromptRoutingSource,
     agentTaskPacketSource,
+    appLazyModulesSource,
     appAgentActionsSource,
     appDataActionsSource,
     appSource: appEntrySource,
     appMainViewSource,
+    appRefreshModelSource,
     appWorkspaceModelSource,
     biCliSource,
     bWidgetKitModelSource,
@@ -29,6 +31,7 @@ export function appendProductUxContractChecks(context) {
     dashboardCanvasSource,
     dashboardOverviewStripSource,
     evidenceNumberExplainerPanelSource,
+    evidenceViewModelSource,
     evidenceViewSource,
     existsSync,
     globalStylesSource,
@@ -52,6 +55,8 @@ export function appendProductUxContractChecks(context) {
     settingsSandboxBoundaryPanelSource,
     settingsThemePreferencePanelSource,
     sourceIntelligenceRunModelSource,
+    sourceWorkbenchDeferredModulesSource,
+    sourceWorkbenchViewSource,
     sourceWorkbenchActionPanelSource,
     stylesSource,
     typesAgentSource,
@@ -60,6 +65,49 @@ export function appendProductUxContractChecks(context) {
   const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   const inspectorFeatureSource = `${inspectorPanelSource}\n${inspectorContextPanelSource}\n${inspectorTaskQueuePanelSource}\n${inspectorEvidenceDetailsSource}`;
   checks.push(
+    {
+        label: "agent-business-surface-hides-technical-identifiers-and-raw-floats",
+        ok: agentAnswerCardSource.includes("formatBusinessValue(metric.value)") &&
+          agentAnswerCardSource.includes("formatBusinessValue(row.value)") &&
+          !agentAnswerCardSource.includes('String(row.value ?? "-")') &&
+          agentPanelSource.includes("businessIdentifier(sourceRunRef?.name") &&
+          agentPanelSource.includes("businessPromptText(resultRequest, workbench)") &&
+          agentPanelModelSource.includes('value === "query-runtime"') &&
+          agentPendingChangesPanelSource.includes("resolveDraftTarget(currentDraft)") &&
+          agentPanelModelSource.includes('value === "chart_preview"') &&
+          evidenceViewModelSource.includes("evidenceBusinessIdentifier(ref.id") &&
+          evidenceViewSource.includes("可直接回答（共识别"),
+      },
+    {
+        label: "workspace-refresh-publishes-only-consistent-surfaces",
+        ok: appRefreshModelSource.includes("function workspaceSurfaceIsConsistent") &&
+          appRefreshModelSource.includes("async function readConsistentWorkspaceSurface") &&
+          appRefreshModelSource.includes("status.counts.tables === workbench.tables.length") &&
+          appRefreshModelSource.includes("throw new Error(\"Workspace data is still synchronizing"),
+      },
+    {
+        label: "agent-first-screen-keeps-one-visible-approval-path",
+        ok: agentPanelSource.indexOf("<AgentPendingChangesPanel") > -1 &&
+          agentPanelSource.indexOf("<AgentPendingChangesPanel") < agentPanelSource.indexOf('data-testid="agent-trust-analysis-details"') &&
+          !agentPanelSource.includes('data-testid="agent-task-packet-details" open={pendingDrafts.length > 0}') &&
+          agentPendingChangesPanelSource.includes('data-testid="agent-current-draft-confirm"') &&
+          agentPendingChangesPanelSource.includes('data-testid="agent-current-draft-summary"') &&
+          agentPendingChangesPanelSource.includes("agentDraftStickyActions") &&
+          agentTaskPacketSource.includes("agentTaskPacketTechnical"),
+      },
+    {
+        label: "responsive-square-desktop-collapses-secondary-rails",
+        ok: globalStylesSource.includes("@media (min-width: 761px) and (max-width: 1180px)") &&
+          globalStylesSource.includes(".assetPanel") &&
+          globalStylesSource.includes("display: none"),
+      },
+    {
+        label: "deferred-ui-recovers-without-global-page-failure",
+        ok: appLazyModulesSource.includes("lazyWithRetry") &&
+          sourceWorkbenchDeferredModulesSource.includes("lazyWithRetry") &&
+          !sourceWorkbenchDeferredModulesSource.includes("loadDataEntryPanel") &&
+          sourceWorkbenchViewSource.includes('import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel"'),
+      },
     {
         label: "frontend-inspector-selected-context",
         ok: inspectorPanelSource.includes("activeSection: AppSection") &&
@@ -197,7 +245,7 @@ export function appendProductUxContractChecks(context) {
     {
         label: "evidence-number-explainer-panel-component-boundary",
         ok: existsSync(join(root, "src", "components", "EvidenceNumberExplainerPanel.tsx")) &&
-          evidenceViewSource.includes('import { EvidenceNumberExplainerPanel } from "./EvidenceNumberExplainerPanel"') &&
+          evidenceViewSource.includes('const EvidenceNumberExplainerPanel = lazyWithRetry(() => import("./EvidenceNumberExplainerPanel")') &&
           evidenceViewSource.includes("<EvidenceNumberExplainerPanel") &&
           !evidenceViewSource.includes('data-testid="evidence-number-explainer"') &&
           evidenceNumberExplainerPanelSource.includes('import type { EvidenceNarrative } from "../productIntelligenceModel"') &&
@@ -231,7 +279,8 @@ export function appendProductUxContractChecks(context) {
           agentPromptRoutingSource.includes('section: "settings"') &&
           appAgentActionsSource.includes("targetSection?: AppSection") &&
           appAgentActionsSource.includes("if (nextAgent?.requiresConfirmation)") &&
-          appAgentActionsSource.includes('setSection(targetSection ?? "agent")') &&
+          appAgentActionsSource.includes('section: targetSection ?? "agent"') &&
+          appAgentActionsSource.includes("tableKey: nextAgent?.matched.table?.table_key") &&
           agentCommandDockSource.includes("aria-busy={busy}") &&
           agentCommandDockSource.includes("data-testid=\"agent-task-strip\"") &&
           agentCommandDockSource.includes("data-testid=\"agent-task-sources\"") &&
@@ -489,7 +538,7 @@ export function appendProductUxContractChecks(context) {
           agentPanelSource.includes("<AgentPendingChangesPanel") &&
           agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-queue\"") &&
           agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-queue-item\"") &&
-          agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-queue-empty\"") &&
+          agentPendingChangesPanelSource.includes("const otherDrafts = pendingDrafts.filter") &&
           agentPendingChangesPanelSource.includes("data-testid=\"agent-current-draft-reject\"") &&
           agentPendingChangesPanelSource.includes("data-testid={`agent-draft-reject-${draft.action_key}`}") &&
           agentPendingChangesPanelSource.includes("onConfirmDryRun(draft.action_key)") &&
@@ -539,12 +588,12 @@ export function appendProductUxContractChecks(context) {
           agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-impact-summary\"") &&
           agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-impact-grid\"") &&
           agentPendingChangesPanelSource.includes("data-testid={`agent-draft-impact-${item.key}`}") &&
-          agentPendingChangesPanelSource.includes("data-testid=\"agent-draft-next-review\"") &&
+          agentPanelSource.includes(".filter((item) => item.count > 0)") &&
           ["data", "dashboard", "model", "workspace"].every((key) => agentPanelSource.includes(`key: "${key}"`)) &&
           agentPendingChangesPanelSource.includes("Review impact before approval") &&
           stylesSource.includes(".agentDraftImpactSummary") &&
           stylesSource.includes(".agentDraftImpactGrid") &&
-          stylesSource.includes(".agentDraftNextReview"),
+          agentPendingChangesPanelSource.includes("otherDrafts.map((draft)"),
       },
     {
         label: "frontend-agent-task-packet-business-summary",

@@ -11,12 +11,12 @@ import {
 } from "../sourceWorkbenchAdvancedModules";
 import {
   SourceWorkbenchActionPanel,
-  SourceWorkbenchDataEntryPanel,
   SourceWorkbenchDataManagementPanel,
 } from "../sourceWorkbenchDeferredModules";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 import { SourceWorkbenchHeader } from "./SourceWorkbenchHeader";
+import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel";
 import { SourceWorkbenchImportPanel } from "./SourceWorkbenchImportPanel";
 
 type SourceWorkbenchViewProps = SourceWorkbenchProps & ReturnType<typeof useSourceWorkbenchState>;
@@ -147,28 +147,25 @@ export function SourceWorkbenchView({
         {!hasData ? <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} /> : null}
 
         {hasData && !sourceProfileComplete ? <div className="importSuccessNextStep" data-testid="import-success-next-step">
-          <Icon name="check" />
+          <Icon name={sourceProfileError || sourceProfileRunning ? "evidence" : "check"} />
           <div>
-            <strong>{biText(`已接入 ${tables.length} 张数据表`, `${tables.length} data tables connected`)}</strong>
+            <strong>{sourceProfileError
+              ? biText("数据已导入，证据生成失败", "Data imported; evidence generation failed")
+              : sourceProfileRunning
+                ? biText("数据已导入，正在生成证据", "Data imported; generating evidence")
+                : biText(`已接入 ${tables.length} 张数据表`, `${tables.length} data tables connected`)}</strong>
             <span>{connectedRowCount.toLocaleString()} {biText("行", "rows")} · {connectedFieldCount.toLocaleString()} {biText("字段", "fields")}</span>
-            <small>{biText("下一步生成证据摘要，再创建图表。", "Next, create the evidence summary, then create a chart.")}</small>
+            <small>{sourceProfileError || biText("系统会沿用本次导入来源，无需再次填写路径。", "The imported source is reused; no path needs to be entered again.")}</small>
+            {sourceProfileError && sourceProfileInputs.trim() ? <button
+              className="secondaryButton compactAction"
+              disabled={sourceProfileRunning}
+              onClick={() => runSourceProfile(biText("正在重试证据", "Retrying evidence"), sourceProfileOptions())}
+              type="button"
+            >
+              {biText("按本次来源重试", "Retry this source")}
+            </button> : null}
           </div>
         </div> : null}
-
-        {hasData && !sourceProfileComplete ? <Suspense fallback={<SourceWorkbenchAdvancedLoading />}><SourceWorkbenchDataEntryPanel
-          sourceIntelligenceRuns={sourceIntelligenceRuns}
-          sourceProfileInputs={sourceProfileInputs}
-          sourceProfileLabel={sourceProfileLabel}
-          sourceProfileResult={sourceProfileResult}
-          sourceProfileError={sourceProfileError}
-          sourceProfileRunning={sourceProfileRunning}
-          sourceProfileRunningLabel={sourceProfileRunningLabel}
-          setSourceProfileInputs={setSourceProfileInputs}
-          setSourceProfileLabel={setSourceProfileLabel}
-          sourceProfileOptions={sourceProfileOptions}
-          runSourceProfile={runSourceProfile}
-          onAsk={onAsk}
-        /></Suspense> : null}
 
         {hasData && sourceProfileComplete ? (
           <Suspense fallback={<SourceWorkbenchAdvancedLoading />}><SourceWorkbenchActionPanel
@@ -202,9 +199,9 @@ export function SourceWorkbenchView({
         ) : null}
 
         {hasData ? <details className="advancedDetails sourceSecondaryDetails" data-testid="source-evidence-details">
-          <summary>{sourceProfileComplete ? biText("查看或更新证据摘要", "Review or refresh evidence") : biText("导入与数据资产管理", "Import and manage data assets")}</summary>
+          <summary>{biText("重新生成、补充证据或管理数据", "Regenerate or supplement evidence, or manage data")}</summary>
           <Suspense fallback={<SourceWorkbenchAdvancedLoading />}><div className="sourceSecondaryGrid">
-            {sourceProfileComplete ? <SourceWorkbenchDataEntryPanel
+            <SourceWorkbenchDataEntryPanel
               sourceIntelligenceRuns={sourceIntelligenceRuns}
               sourceProfileInputs={sourceProfileInputs}
               sourceProfileLabel={sourceProfileLabel}
@@ -217,7 +214,7 @@ export function SourceWorkbenchView({
               sourceProfileOptions={sourceProfileOptions}
               runSourceProfile={runSourceProfile}
               onAsk={onAsk}
-            /> : null}
+            />
             <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} />
             <SourceWorkbenchDataManagementPanel
               busy={busy}
@@ -346,20 +343,7 @@ export function SourceWorkbenchView({
               onRemoveImportJob={onRemoveImportJob}
             />
           </Suspense>
-        ) : (
-          <details className="advancedDetails sourceExpertDetails" data-testid="source-expert-details">
-            <summary><Bilingual zh="显示高级配置" en="Show advanced configuration" /></summary>
-            <p>
-              <Bilingual
-                zh="表管理、字段口径、关系、公式和连接器默认收起。需要调整底层模型时再进入，不打断当前导入和生成图表路径。"
-                en="Table management, metrics, relationships, formulas, and connectors stay collapsed by default. Open them only when tuning the underlying model."
-              />
-            </p>
-            <button className="secondaryButton" onClick={() => setShowAdvanced(true)} type="button">
-              <Bilingual zh="打开高级工作台" en="Open advanced workbench" />
-            </button>
-          </details>
-        )}
+        ) : null}
       </div>
     </section>
   );

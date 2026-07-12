@@ -14,18 +14,28 @@ import {
   waitForAppReady,
 } from "./ui-verify-chrome.mjs";
 
-const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8686";
 const apiBaseUrl = process.env.AIBI_API_BASE_URL ?? "http://127.0.0.1:8787";
+const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-flow-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
 
 async function fetchJson(path) {
-  const response = await fetch(`${apiBaseUrl}${path}`);
-  const payload = await response.json();
-  if (!response.ok || payload?.ok === false) {
-    throw new Error(`${path}: ${payload?.error ?? `${response.status} ${response.statusText}`}`);
+  let lastError = null;
+  const attempts = 8;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${apiBaseUrl}${path}`);
+      const payload = await response.json();
+      if (!response.ok || payload?.ok === false) throw new Error(`${path}: ${payload?.error ?? `${response.status} ${response.statusText}`}`);
+      return payload;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts - 1) {
+        await new Promise((resolveDelay) => setTimeout(resolveDelay, 250 * (attempt + 1)));
+      }
+    }
   }
-  return payload;
+  throw lastError;
 }
 
 function assertPageState() {
@@ -69,8 +79,8 @@ function assertPageState() {
       taskStrip: Boolean(get("dashboard-business-task-strip")),
       chartPrompt: Boolean(get("dashboard-ai-chart-prompt")),
       createOneChart: Boolean(get("dashboard-task-explain")),
-      evidenceJump: Boolean(get("dashboard-task-evidence")),
-      betaCollapsed: Boolean(get("dashboard-beta-details")) && !get("dashboard-beta-details").open,
+      evidenceJump: Boolean(get("dashboard-more-evidence")),
+      secondaryCollapsed: Boolean(get("dashboard-more-details")) && !get("dashboard-more-details").open,
     },
     evidence: {
       businessSummary: Boolean(get("evidence-business-summary")),
@@ -93,8 +103,15 @@ async function readCurrentSection(client, testId) {
 }
 
 async function waitForSection(client, section, testId) {
-  await navigate(client, `${baseUrl}/?section=${section}`);
-  return readCurrentSection(client, testId);
+  let result = null;
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const retry = attempt ? `&retry=${Date.now()}-${attempt}` : "";
+    await navigate(client, `${baseUrl}/?section=${section}${retry}`);
+    result = await readCurrentSection(client, testId);
+    if (result.ready.ok) return result;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 250 * (attempt + 1)));
+  }
+  return result;
 }
 
 const checks = [];
@@ -195,13 +212,15 @@ try {
       check("ui-dashboard-ready", dashboardsPage.ready.ok, { ready: dashboardsPage.ready }),
       check("ui-dashboard-single-chart-prompt-visible", dashboardsPage.state.dashboards.chartPrompt && dashboardsPage.state.dashboards.createOneChart),
       check("ui-dashboard-evidence-jump-visible", dashboardsPage.state.dashboards.evidenceJump),
-      check("ui-dashboard-beta-secondary-collapsed", dashboardsPage.state.dashboards.betaCollapsed),
+      check("ui-dashboard-secondary-settings-collapsed", dashboardsPage.state.dashboards.secondaryCollapsed),
       check("ui-dashboard-no-error", !dashboardsPage.state.hasErrorBoundary && !dashboardsPage.state.hasFrameworkOverlay),
       check("ui-dashboard-no-sample-copy", dashboardsPage.state.noSampleCopy),
     );
     steps.push({ section: "dashboards", state: dashboardsPage.state });
 
-    const evidenceClick = await click(browser.client, '[data-testid="dashboard-task-evidence"]');
+    const moreClick = await click(browser.client, '[data-testid="dashboard-more-details"] > summary');
+    checks.push(check("ui-dashboard-more-opened", moreClick.ok, moreClick));
+    const evidenceClick = await click(browser.client, '[data-testid="dashboard-more-evidence"]');
     checks.push(check("ui-dashboard-evidence-click-fired", evidenceClick.ok, evidenceClick));
     const evidenceAfterClick = await waitFor(browser.client, () => ({
       ok: location.search.includes("section=evidence") && Boolean(document.querySelector('[data-testid="evidence-business-summary"]')),
@@ -237,7 +256,12 @@ try {
     checks.push(
       check("ui-agent-ready", agentPage.ready.ok, { ready: agentPage.ready }),
       check("ui-agent-task-packet-visible", agentPage.state.agent.taskPacket),
-      check("ui-agent-draft-boundary-visible", agentPage.state.agent.draftQueue || agentPage.state.agent.emptyDraftQueue),
+      check(
+        "ui-agent-draft-boundary-matches-pending-state",
+        Number(drafts.pendingCount ?? drafts.actionDrafts?.length ?? 0) > 0
+          ? agentPage.state.agent.draftQueue
+          : !agentPage.state.agent.draftQueue && !agentPage.state.agent.emptyDraftQueue,
+      ),
       check("ui-agent-not-no-data-route-with-real-data", !agentPage.state.agent.noDataRoute),
       check("ui-agent-no-error", !agentPage.state.hasErrorBoundary && !agentPage.state.hasFrameworkOverlay),
     );

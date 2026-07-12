@@ -1,5 +1,5 @@
 import "./settingsPanel.css";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getUserPreferences, makeThemeCopy, resolveThemePalette } from "../theme";
 import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload } from "../types";
 import { Bilingual } from "./Bilingual";
@@ -7,6 +7,8 @@ import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePan
 import { SettingsConfigPortabilityPanel } from "./SettingsConfigPortabilityPanel";
 import { SettingsSandboxBoundaryPanel } from "./SettingsSandboxBoundaryPanel";
 import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePreferencePanel";
+
+const TrustContextSettingsPanel = lazy(() => import("./TrustContextSettingsPanel"));
 
 type SettingsPanelProps = {
   workbench: WorkbenchPayload;
@@ -132,6 +134,13 @@ export function SettingsPanel({ workbench, onSavePreferences, onSaveThemePalette
               onRunConfigAction={runConfigAction}
               onValidateConfig={onValidateConfig}
             />
+          </div>
+        </details>
+
+        <details className="progressiveDetails settingsProgressiveDetails" data-testid="settings-trust-context-details">
+          <summary><Bilingual zh="业务术语、规则和确认问法" en="Business terms, rules, and confirmed queries" /></summary>
+          <div className="progressiveDetailsBody single">
+            <Suspense fallback={null}><TrustContextSettingsPanel /></Suspense>
           </div>
         </details>
 

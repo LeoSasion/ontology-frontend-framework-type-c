@@ -21,6 +21,7 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
   if (url.pathname === "/api/source-intelligence/run" && request.method === "POST") {
     const body = await readBody(request);
     const args = ["source-intelligence"];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
     if (body.label) args.push("--label", String(body.label));
     if (body.outputDir) args.push("--output-dir", String(body.outputDir));
     if (Array.isArray(body.inputs)) args.push(...body.inputs.map(String));

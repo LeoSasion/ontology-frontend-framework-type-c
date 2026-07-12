@@ -1,6 +1,13 @@
 import type { EvidenceFocus, SourceIntelligenceRunSummary } from "./types";
 import { biText } from "./components/Bilingual";
 
+function evidenceBusinessIdentifier(value: unknown, fallback: string) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text || /^(source|run|action|workspace)_[a-z0-9_-]+$/i.test(text)) return fallback;
+  if (text === "chart_preview") return biText("图表生成规则", "Chart generation rule");
+  return text;
+}
+
 export function sourceRunFromFocus(focus: EvidenceFocus | null | undefined, runs: SourceIntelligenceRunSummary[]) {
   const sourceIntelligenceRef = focus?.refs.find((ref) => ref.startsWith("source-intelligence:"));
   const runKey = sourceIntelligenceRef?.replace("source-intelligence:", "");
@@ -157,16 +164,22 @@ export function agentEvidenceBusinessLabel(ref: Record<string, unknown>) {
   if (type === "metricDefinition") return biText("指标口径已匹配", "Metric logic matched");
   if (type === "queryRuntime") return biText("只读查询已完成", "Read-only query completed");
   if (type === "ontologyFunction") return biText("业务规则已引用", "Business rule referenced");
+  if (type === "contextTerm") return biText("业务术语已命中", "Business term matched");
+  if (type === "contextRule") return biText("工作区规则已应用", "Workspace rule applied");
+  if (type === "confirmedQuery") return biText("确认问法已复用", "Confirmed query reused");
   return biText("证据线索已引用", "Evidence item referenced");
 }
 
 export function agentEvidenceBusinessDetail(ref: Record<string, unknown>) {
   const type = String(ref.type ?? "");
-  if (type === "sourceRun" || type === "table") return String(ref.name ?? ref.tableKey ?? ref.id ?? biText("当前工作区数据", "Current workspace data"));
+  if (type === "sourceRun" || type === "table") return evidenceBusinessIdentifier(ref.name ?? ref.tableName, biText("当前工作区数据", "Current workspace data"));
   if (type === "metricDefinition") return String(ref.label ?? ref.metric_key ?? biText("当前指标", "Current metric"));
   if (type === "queryRuntime") return biText("可追溯到查询回执，技术信息可展开查看。", "Traceable to a query receipt; technical details are expandable.");
-  if (type === "ontologyFunction") return String(ref.id ?? biText("业务规则", "Business rule"));
-  return String(ref.id ?? ref.key ?? (type || biText("证据", "Evidence")));
+  if (type === "ontologyFunction") return evidenceBusinessIdentifier(ref.id, biText("图表生成规则", "Chart generation rule"));
+  if (type === "contextTerm") return String(ref.name ?? ref.termKey ?? biText("业务术语", "Business term"));
+  if (type === "contextRule") return String(ref.title ?? ref.ruleKey ?? biText("工作区规则", "Workspace rule"));
+  if (type === "confirmedQuery") return String(ref.question ?? ref.queryKey ?? biText("确认问法", "Confirmed query"));
+  return evidenceBusinessIdentifier(ref.name ?? ref.label, biText("已引用业务证据", "Business evidence referenced"));
 }
 
 export function agentEvidenceTechnicalText(ref: Record<string, unknown>) {

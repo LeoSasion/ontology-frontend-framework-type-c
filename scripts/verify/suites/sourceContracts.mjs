@@ -174,9 +174,9 @@ export function appendSourceContractChecks(context) {
           apiClientSource.includes("let lastError: unknown = null") &&
           apiClientSource.includes("throw lastError") &&
           apiClientSource.includes("throw new Error(`Local API request failed for ${path}: ${message}`)") &&
-          apiSourceApiSource.includes("return fetchJsonStrict<Record<string, unknown>>(\"/api/source-intelligence/run\"") &&
-          appDataActionsSource.includes("const { stayOnPage = false, ...sourceOptions }") &&
-          appDataActionsSource.includes("const hasInputs = Array.isArray(sourceOptions.inputs) && sourceOptions.inputs.length > 0") &&
+          apiSourceApiSource.includes("return fetchJsonStrict<SourceIntelligenceRunResult>(\"/api/source-intelligence/run\"") &&
+          appDataActionsSource.includes("const { stayOnPage = false, inputs = [], ...sourceOptions }") &&
+          appDataActionsSource.includes("const hasInputs = inputs.length > 0") &&
           appDataActionsSource.includes("请先在数据源工作台选择本地文件或文件夹") &&
           appDataActionsSource.includes("return result;") &&
           byLabel["cli-source-intelligence-validation-inputs"].parsed?.manifest?.sourceCount >= 2,
@@ -184,8 +184,8 @@ export function appendSourceContractChecks(context) {
     {
         label: "source-workbench-data-entry-panel-boundary",
         ok: existsSync(join(root, "src", "components", "SourceWorkbenchDataEntryPanel.tsx")) &&
-          sourceWorkbenchSource.includes('from "../sourceWorkbenchDeferredModules"') &&
-          sourceWorkbenchDeferredModulesSource.includes("export const SourceWorkbenchDataEntryPanel = lazy") &&
+          sourceWorkbenchSource.includes('import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel"') &&
+          !sourceWorkbenchDeferredModulesSource.includes("SourceWorkbenchDataEntryPanel") &&
           sourceWorkbenchSource.includes("<SourceWorkbenchDataEntryPanel") &&
           !sourceWorkbenchSource.includes('data-testid="source-intelligence-folder-entry"') &&
           !sourceWorkbenchSource.includes("const aTestdataMonths") &&
@@ -218,6 +218,11 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchHeaderSource.includes('data-testid="source-intelligence-run-button"') &&
           !sourceWorkbenchHeaderSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA_COMMAND") &&
           !sourceWorkbenchHeaderSource.includes("aTestdata0305SourceIntelligenceOptions()") &&
+          sourceWorkbenchHeaderSource.includes('aria-live="polite"') &&
+          sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-receipt" role="status"') &&
+          sourceWorkbenchImportPanelSource.includes("导入去重规则") &&
+          sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
+          !sourceWorkbenchSource.includes('data-testid="source-expert-details"') &&
           sourceWorkbenchHeaderSource.includes("先导入或选择本地数据路径"),
       },
     {
@@ -281,7 +286,8 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchHeaderSource.includes("先检查文件，再让系统生成证据摘要和看板建议") &&
           sourceWorkbenchDataEntryPanelSource.includes("证据摘要") &&
           !sourceWorkbenchDataEntryPanelSource.includes("生成样例摘要") &&
-          sourceWorkbenchActionPanelSource.includes("展开字段、公式和关系设置") &&
+          sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
           !sidebarAssetSectionsSource.includes("生成证据摘要") &&
           inspectorPanelModelSource.includes("生成摘要、创建看板") &&
           bWidgetKitSource.includes("sourceIntelligenceRuns") &&
@@ -386,6 +392,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportControllerSource.includes("const previewSummary = buildImportPreviewSummary") &&
           sourceWorkbenchImportControllerSource.includes("...previewSummary") &&
           sourceWorkbenchGuidanceModelSource.includes("const recommendedPrimaryAction") &&
+          /hasImportedTables\s*\?\s*sourceProfileComplete/.test(sourceWorkbenchGuidanceModelSource) &&
           sourceWorkbenchGuidanceModelSource.includes('"draft-dashboard"') &&
           sourceWorkbenchGuidanceModelSource.includes("sourceProfileComplete") &&
           sourceWorkbenchGuidanceModelSource.includes("previewReadable") &&
@@ -470,10 +477,11 @@ export function appendSourceContractChecks(context) {
         label: "source-intelligence-run-model-boundary",
         ok: existsSync(join(root, "src", "sourceIntelligenceRunModel.ts")) &&
           sourceIntelligenceRunModelSource.includes("export type SourceIntelligenceRunRequest") &&
+          sourceIntelligenceRunModelSource.includes("export type SourceIntelligenceRunResult") &&
           sourceIntelligenceRunModelSource.includes("export type SourceIntelligenceRunOptions") &&
           !sourceIntelligenceRunModelSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA") &&
           !sourceIntelligenceRunModelSource.includes("aTestdata0305") &&
-          apiSourceApiSource.includes('import type { SourceIntelligenceRunRequest } from "./sourceIntelligenceRunModel"') &&
+          apiSourceApiSource.includes('SourceIntelligenceRunRequest, SourceIntelligenceRunResult') &&
           !appDataActionsSource.includes("aTestdata0305SourceIntelligenceRequest()") &&
           !homeOverviewSource.includes("aTestdata0305SourceIntelligenceOptions({") &&
           evidenceViewSource.includes("type { SourceIntelligenceRunOptions }") &&

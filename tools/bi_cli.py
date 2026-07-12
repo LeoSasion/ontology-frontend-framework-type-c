@@ -62,6 +62,24 @@ from bi_cli_core import (
 from bi_cli_contracts import build_cli_contract, command_contract_by_name, contract_to_markdown, filter_commands
 from bi_cli_envelope import enrich_cli_output, error_output
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
+from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
+from platform_analytics_knowledge import (
+    build_verified_analysis_gap,
+    execute_platform_knowledge,
+    match_platform_knowledge,
+    platform_knowledge_context,
+    platform_knowledge_pack,
+    requires_verified_analysis_plan,
+)
+from query_plan_receipt_service import create_query_plan_receipt, get_query_receipt, query_receipts_command
+from evidence_export_service import export_evidence_command
+from confirmed_query_service import (
+    confirm_query_command,
+    confirmed_queries_command,
+    create_confirmed_query_candidate,
+    recall_confirmed_queries,
+)
+from analysis_run_service import analysis_runs_command, create_analysis_run, validate_branch_parent
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -516,7 +534,9 @@ if hasattr(sys.stderr, "reconfigure"):
 
 def source_intelligence_dashboard_draft_command(args: argparse.Namespace) -> dict[str, Any]:
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
+        if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
+            raise ValueError(f"Unknown workspace: {workspace_id}")
         run = get_source_intelligence_run(connection, workspace_id=workspace_id, run_key=args.run) if args.run else latest_source_intelligence_run(connection, workspace_id=workspace_id)
         if not run:
             raise ValueError("No source intelligence run is available for dashboard draft creation")
@@ -1209,11 +1229,11 @@ def resolve_prompt_widget_action(
     table_confidence: str,
     prompt: str,
 ) -> tuple[dict[str, Any] | None, str]:
-    if not selected_dashboard or dashboard_confidence not in {"explicit", "fallback"}:
+    if selected_dashboard and dashboard_confidence not in {"explicit", "fallback"}:
         return None, "missing"
-    dashboard_key = str(selected_dashboard["dashboard_key"])
+    dashboard_key = str(selected_dashboard["dashboard_key"]) if selected_dashboard else ""
     table_key = str(selected_table["table_key"]) if selected_table else ""
-    if table_confidence != "explicit" and selected_dashboard.get("default_table_key"):
+    if table_confidence != "explicit" and selected_dashboard and selected_dashboard.get("default_table_key"):
         table_key = str(selected_dashboard["default_table_key"])
     if not table_key:
         return None, "missing"
@@ -1253,15 +1273,20 @@ def resolve_prompt_widget_action(
     if widget_type == "table":
         registry = resolve_table_registry(connection, table_key)
         options["columns"] = table_columns(connection, registry["physical_table"])[:6]
-    try:
-        proposed = build_widget_proposal(connection, dashboard_key, widget_type, options)
-    except ValueError:
-        return None, "missing"
+    proposed = None
+    if dashboard_key:
+        try:
+            proposed = build_widget_proposal(connection, dashboard_key, widget_type, options)
+        except ValueError:
+            return None, "missing"
     return {
         "dashboardKey": dashboard_key,
         "widgetType": widget_type,
         "tableKey": table_key,
         "title": title,
+        "measure": measure,
+        "dimension": dimension,
+        "aggregation": aggregation,
         "options": options,
         "proposedWidget": proposed,
         "widgetTypeSelectionConfidence": widget_type_confidence,
@@ -1865,7 +1890,12 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         "regressionStatus": "provider-ready" if deepseek_configured else "provider-skipped",
     }
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
+        if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
+            raise ValueError(f"Unknown workspace: {workspace_id}")
+        parent_run_key = str(getattr(args, "parent_run", "") or "").strip()
+        if parent_run_key:
+            validate_branch_parent(connection, workspace_id, parent_run_key)
         tables = rows_to_dicts(connection.execute("SELECT table_key, display_name FROM table_registry WHERE workspace_id = ? ORDER BY table_key", (workspace_id,)))
         dashboards = rows_to_dicts(
             connection.execute(
@@ -1874,27 +1904,60 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
         selected_table, table_confidence = select_agent_table(tables, prompt)
+        platform_match = match_platform_knowledge(connection, workspace_id, prompt)
+        verified_analysis_gap = platform_match is None and requires_verified_analysis_plan(prompt)
+        if platform_match:
+            primary_table_key = str(next(iter(platform_match["roles"].values()))["table_key"])
+            selected_table = next((table for table in tables if table["table_key"] == primary_table_key), selected_table)
+            table_confidence = "knowledge-rule"
+        context_matches = matched_context(
+            connection,
+            workspace_id,
+            prompt,
+            selected_table["table_key"] if selected_table else None,
+        )
+        recalled_queries = recall_confirmed_queries(
+            connection,
+            workspace_id=workspace_id,
+            prompt=prompt,
+            table_key=selected_table["table_key"] if selected_table else None,
+            now_iso=now_iso,
+        )
+        recalled_fields: list[str] = []
+        for recalled in recalled_queries:
+            receipt = get_query_receipt(connection, workspace_id, recalled["query_receipt_key"])
+            selection = receipt.get("selection") if isinstance(receipt, dict) and isinstance(receipt.get("selection"), dict) else {}
+            for field in [selection.get("measure"), selection.get("group")]:
+                if field and str(field) not in recalled_fields:
+                    recalled_fields.append(str(field))
+        resolution_prompt = " ".join(
+            [
+                contextualized_prompt(prompt, context_matches),
+                platform_knowledge_context(platform_match),
+                *recalled_fields,
+            ]
+        ).strip()
         selected_dashboard, dashboard_confidence = select_dashboard(dashboards, prompt, intents.wants_dashboard or intents.wants_widget)
-        single_chart_dashboard_create = intents.wants_widget and intents.wants_dashboard_create and selected_dashboard is None
+        single_chart_dashboard_create = intents.wants_widget and selected_dashboard is None
         dashboard_action = None
         dashboard_action_confidence = "missing"
         if intents.wants_dashboard:
-            dashboard_action, dashboard_action_confidence = resolve_prompt_dashboard_operation(connection, selected_dashboard, dashboard_confidence, prompt)
+            dashboard_action, dashboard_action_confidence = resolve_prompt_dashboard_operation(connection, selected_dashboard, dashboard_confidence, resolution_prompt)
         widget_action = None
         widget_confidence = "missing"
         if intents.wants_widget and not dashboard_action:
-            widget_action, widget_confidence = resolve_prompt_widget_action(connection, selected_dashboard, dashboard_confidence, selected_table, table_confidence, prompt)
+            widget_action, widget_confidence = resolve_prompt_widget_action(connection, selected_dashboard, dashboard_confidence, selected_table, table_confidence, resolution_prompt)
         widget_clarification = isinstance(widget_action, dict) and widget_action.get("needsClarification") is True
         actionable_widget_action = None if widget_clarification else widget_action
         dashboard_filter_action = None
         dashboard_filter_confidence = "missing"
         if intents.wants_dashboard_filter and not dashboard_action and not actionable_widget_action:
-            dashboard_filter_action, dashboard_filter_confidence = resolve_prompt_dashboard_filter_action(connection, selected_dashboard, dashboard_confidence, prompt)
+            dashboard_filter_action, dashboard_filter_confidence = resolve_prompt_dashboard_filter_action(connection, selected_dashboard, dashboard_confidence, resolution_prompt)
         index_field = None
         index_field_confidence = "missing"
         index_recommendation = None
         if intents.wants_index and selected_table:
-            index_field, index_field_confidence, index_recommendation = select_index_field(connection, selected_table["table_key"], prompt)
+            index_field, index_field_confidence, index_recommendation = select_index_field(connection, selected_table["table_key"], resolution_prompt)
         relationship_action = None
         relationship_confidence = "missing"
         if intents.wants_relationship:
@@ -1908,19 +1971,19 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         formula_action = None
         formula_confidence = "missing"
         if intents.wants_formula:
-            formula_action, formula_confidence = resolve_prompt_formula_action(connection, selected_table, prompt)
+            formula_action, formula_confidence = resolve_prompt_formula_action(connection, selected_table, resolution_prompt)
         view_action = None
         view_confidence = "missing"
         if intents.wants_view and not intents.wants_formula:
-            view_action, view_confidence = resolve_prompt_view_action(connection, selected_table, prompt)
+            view_action, view_confidence = resolve_prompt_view_action(connection, selected_table, resolution_prompt)
         metric_action = None
         metric_confidence = "missing"
         if intents.wants_metric and not intents.wants_formula and not view_action:
-            metric_action, metric_confidence = resolve_prompt_metric_action(connection, selected_table, prompt)
+            metric_action, metric_confidence = resolve_prompt_metric_action(connection, selected_table, resolution_prompt)
         semantic_action = None
         semantic_confidence = "missing"
         if intents.wants_semantic and not metric_action and not view_action and not actionable_widget_action and not dashboard_filter_action:
-            semantic_action, semantic_confidence = resolve_prompt_semantic_action(connection, selected_table, prompt)
+            semantic_action, semantic_confidence = resolve_prompt_semantic_action(connection, selected_table, resolution_prompt)
         should_create_draft = should_create_agent_draft(
             intents=intents,
             dashboard_confidence=dashboard_confidence,
@@ -1936,6 +1999,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             semantic_action=semantic_action,
             read_only=read_only,
         )
+        if verified_analysis_gap:
+            should_create_draft = False
         action_payload = build_agent_action_payload(
             prompt=prompt,
             selected_dashboard=selected_dashboard,
@@ -1974,8 +2039,9 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             dashboard_create_draft = build_agent_dashboard_create_draft(
                 connection,
                 action_payload.get("tableKey"),
-                prompt,
+                resolution_prompt,
                 1 if single_chart_dashboard_create else 8,
+                resolved_widget=actionable_widget_action if single_chart_dashboard_create else None,
             )
             action_payload.update(
                 {
@@ -1988,7 +2054,6 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         if should_create_draft:
             action_label = "生成单图表草案" if single_chart_dashboard_create else agent_action_label(action_kind, wants_dashboard=intents.wants_dashboard)
             action_evidence = agent_action_evidence(action_kind)
-            workspace_id = active_workspace_id(connection)
             create_action_draft(
                 connection,
                 action_key=action_key,
@@ -2000,9 +2065,100 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 created_at=now_iso(),
             )
             connection.commit()
-        answer_card = build_agent_answer_card(connection, prompt, selected_table, actionable_widget_action)
+        answer_card = (
+            execute_platform_knowledge(connection, platform_match)
+            if platform_match
+            else (
+                build_verified_analysis_gap(prompt, selected_table["table_key"] if selected_table else None)
+                if verified_analysis_gap
+                else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action)
+            )
+        )
         if widget_clarification and isinstance(widget_action, dict):
             answer_card = build_widget_clarification_answer_card(widget_action)
+        context_refs = [
+            {"type": "contextTerm", "termKey": item["term_key"], "name": item["canonical_name"]}
+            for item in context_matches["terms"]
+        ] + [
+            {"type": "contextRule", "ruleKey": item["rule_key"], "title": item["title"]}
+            for item in context_matches["rules"]
+        ] + [
+            {"type": "confirmedQuery", "queryKey": item["query_key"], "queryReceiptKey": item["query_receipt_key"]}
+            for item in recalled_queries
+        ]
+        if platform_match:
+            context_refs.append(
+                {
+                    "type": "knowledgeRule",
+                    "packId": platform_match["packId"],
+                    "ruleId": platform_match["ruleId"],
+                    "title": platform_match["title"],
+                }
+            )
+        if context_refs:
+            evidence_refs = list(answer_card.get("evidenceRefs", []))
+            def evidence_key(item: dict[str, Any]) -> str:
+                if item.get("type") == "knowledgeRule":
+                    return f"knowledgeRule:{item.get('packId')}:{item.get('ruleId')}"
+                return json.dumps(item, ensure_ascii=False, sort_keys=True)
+
+            evidence_keys = {evidence_key(item) for item in evidence_refs}
+            for item in context_refs:
+                key = evidence_key(item)
+                if key not in evidence_keys:
+                    evidence_refs.append(item)
+                    evidence_keys.add(key)
+            answer_card["evidenceRefs"] = evidence_refs
+        answer_query = answer_card.get("query") if isinstance(answer_card.get("query"), dict) else None
+        query_receipt = create_query_plan_receipt(
+            connection,
+            workspace_id=workspace_id,
+            request_text=prompt,
+            source_table_key=str(answer_query.get("table")) if answer_query and answer_query.get("table") else (selected_table["table_key"] if selected_table else None),
+            status="executed" if answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
+            group=str(answer_query.get("group")) if answer_query and answer_query.get("group") else None,
+            measure=str(answer_query.get("measure")) if answer_query and answer_query.get("measure") else None,
+            aggregation=str(answer_query.get("aggregation")) if answer_query and answer_query.get("aggregation") else None,
+            filters=list(answer_query.get("filters") or []) if answer_query else [],
+            joins=list(answer_query.get("joins") or []) if answer_query else [],
+            knowledge_rule=answer_card.get("knowledgeRule") if isinstance(answer_card.get("knowledgeRule"), dict) else None,
+            runtime=answer_query.get("runtime") if answer_query else None,
+            evidence_refs=list(answer_card.get("evidenceRefs", [])),
+            unresolved=[] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")],
+            context_refs=context_refs,
+            action_key=action_key if should_create_draft else None,
+            now_iso=now_iso,
+        )
+        answer_card["queryPlanReceipt"] = query_receipt
+        analysis_run = create_analysis_run(
+            connection,
+            workspace_id=workspace_id,
+            question=prompt,
+            status="pending_confirmation" if should_create_draft else query_receipt["status"],
+            query_receipt_key=query_receipt["receiptKey"],
+            action_key=action_key if should_create_draft else None,
+            result={
+                "kind": answer_card.get("kind"),
+                "title": answer_card.get("title"),
+                "summary": answer_card.get("summary"),
+                "selection": query_receipt.get("selection"),
+                "unresolved": query_receipt.get("unresolved"),
+            },
+            parent_run_key=parent_run_key or None,
+            branch_label=str(getattr(args, "branch_label", "") or "").strip() or None,
+            now_iso=now_iso,
+        )
+        if should_create_draft:
+            stored_action = get_action_draft(connection, action_key=action_key, workspace_id=workspace_id)
+            if stored_action:
+                stored_payload = action_draft_payload(stored_action)
+                stored_payload["queryReceiptKey"] = query_receipt["receiptKey"]
+                stored_payload["analysisRunKey"] = analysis_run["run_key"]
+                connection.execute(
+                    "UPDATE action_drafts SET payload_json = ? WHERE workspace_id = ? AND action_key = ?",
+                    (json.dumps(stored_payload, ensure_ascii=False), workspace_id, action_key),
+                )
+        connection.commit()
         ontology = ontology_snapshot(connection)
     recommended = build_agent_recommended_commands(
         answer_card=answer_card,
@@ -2023,6 +2179,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
     )
     return {
         "ok": True,
+        "workspaceId": workspace_id,
         "llm": {
             "configured": deepseek_configured,
             "mode": llm_audit["mode"],
@@ -2066,6 +2223,38 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             ),
         ],
         "answerCard": answer_card,
+        "queryPlanReceipt": query_receipt,
+        "analysisRun": analysis_run,
+        "context": {
+            "matchedTermCount": len(context_matches["terms"]),
+            "matchedRuleCount": len(context_matches["rules"]),
+            "terms": [
+                {"termKey": item["term_key"], "name": item["canonical_name"], "definition": item["definition"]}
+                for item in context_matches["terms"]
+            ],
+            "rules": [
+                {"ruleKey": item["rule_key"], "title": item["title"], "statement": item["statement"]}
+                for item in context_matches["rules"]
+            ],
+            "confirmedQueries": [
+                {"queryKey": item["query_key"], "question": item["question"], "matchScore": item["matchScore"]}
+                for item in recalled_queries
+            ],
+            "knowledgeRules": [
+                {
+                    "packId": platform_match["packId"],
+                    "ruleId": platform_match["ruleId"],
+                    "title": platform_match["title"],
+                    "grain": platform_match["grain"],
+                }
+            ] if platform_match else [],
+        },
+        "agentKnowledge": {
+            "packId": platform_knowledge_pack()["id"],
+            "version": platform_knowledge_pack()["version"],
+            "matchedRuleId": platform_match["ruleId"] if platform_match else None,
+            "modelIndependent": True,
+        },
         "recommendedCommands": recommended,
         "requiresConfirmation": should_create_draft,
         "actionDraft": {
@@ -2081,7 +2270,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def confirm_action_command(args: argparse.Namespace) -> dict[str, Any]:
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         action = get_action_draft(connection, action_key=args.action_key, workspace_id=workspace_id)
         if not action:
             raise ValueError(f"Unknown action draft in active workspace {workspace_id}: {args.action_key}")
@@ -2172,7 +2361,7 @@ def confirm_action_command(args: argparse.Namespace) -> dict[str, Any]:
                 semantic_row_to_payload=semantic_row_to_payload,
             )
         if action["kind"] == "dashboard.widget.add":
-            return handle_dashboard_widget_add_confirmation(
+            result = handle_dashboard_widget_add_confirmation(
                 connection,
                 action,
                 payload,
@@ -2182,6 +2371,19 @@ def confirm_action_command(args: argparse.Namespace) -> dict[str, Any]:
                 build_widget_proposal=build_widget_proposal,
                 insert_dashboard_widget=insert_dashboard_widget,
             )
+            if args.yes and result.get("confirmed") is True and isinstance(result.get("addedWidget"), dict):
+                candidate = create_confirmed_query_candidate(
+                    connection,
+                    workspace_id=workspace_id,
+                    action_key=args.action_key,
+                    action_payload=payload,
+                    added_widget=result["addedWidget"],
+                    now_iso=now_iso,
+                )
+                if candidate:
+                    connection.commit()
+                    result["confirmedQueryCandidate"] = candidate
+            return result
         if action["kind"] == "dashboard.filter.add":
             return handle_dashboard_filter_add_confirmation(
                 connection,
@@ -2205,7 +2407,7 @@ def confirm_action_command(args: argparse.Namespace) -> dict[str, Any]:
                 execute_dashboard_operation_plan=execute_dashboard_operation_plan,
             )
         if action["kind"] == "dashboard.create":
-            return handle_dashboard_create_confirmation(
+            result = handle_dashboard_create_confirmation(
                 connection,
                 action,
                 payload,
@@ -2218,6 +2420,27 @@ def confirm_action_command(args: argparse.Namespace) -> dict[str, Any]:
                 write_business_dashboard=write_business_dashboard,
                 upsert_navigation_module=upsert_navigation_module,
             )
+            dashboard_draft = payload.get("dashboardDraft") if isinstance(payload.get("dashboardDraft"), dict) else {}
+            draft_widgets = dashboard_draft.get("widgets") if isinstance(dashboard_draft.get("widgets"), list) else []
+            if (
+                args.yes
+                and result.get("confirmed") is True
+                and dashboard_draft.get("source") == "single-chart"
+                and len(draft_widgets) == 1
+                and isinstance(draft_widgets[0], dict)
+            ):
+                candidate = create_confirmed_query_candidate(
+                    connection,
+                    workspace_id=workspace_id,
+                    action_key=args.action_key,
+                    action_payload=payload,
+                    added_widget=draft_widgets[0],
+                    now_iso=now_iso,
+                )
+                if candidate:
+                    connection.commit()
+                    result["confirmedQueryCandidate"] = candidate
+            return result
         if not args.yes:
             return confirm_dry_run_response(action, payload)
         mark_action_confirmed(connection, args.action_key, now_iso())
@@ -2237,6 +2460,22 @@ def main() -> int:
             result = status_command(args)
         elif args.command == "quality-doctor":
             result = quality_doctor_command(args)
+        elif args.command == "context-pack":
+            result = context_pack_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "context-term":
+            result = context_term_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "context-rule":
+            result = context_rule_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "query-receipts":
+            result = query_receipts_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "export-evidence":
+            result = export_evidence_command(args, open_db=open_db, active_workspace_id=active_workspace_id, root=ROOT, now_iso=now_iso)
+        elif args.command == "confirmed-queries":
+            result = confirmed_queries_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "confirm-query":
+            result = confirm_query_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "analysis-runs":
+            result = analysis_runs_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "workspace-create":
             result = workspace_create_command(args)
         elif args.command == "workspace-select":
@@ -2394,6 +2633,9 @@ def main() -> int:
             result = ask_command(args)
         elif args.command == "confirm-action":
             result = confirm_action_command(args)
+            if not result.get("workspaceId"):
+                with open_db() as connection:
+                    result["workspaceId"] = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         elif args.command == "action-drafts":
             result = action_drafts_command(args)
         else:

@@ -3,6 +3,7 @@ import type { WorkspaceStatus } from "../types";
 import { Bilingual, biText, LanguageToggle } from "./Bilingual";
 import { Icon } from "./Icons";
 import type { AppSection } from "./Sidebar";
+import { buildProductReadiness } from "../productReadinessModel";
 
 type TopBarProps = {
   activeSection: AppSection;
@@ -21,6 +22,7 @@ export function TopBar({ activeSection, status, apiMode }: TopBarProps) {
     ? biText("前端已打开，正在等待本地数据服务返回工作区状态。", "The workspace is open and waiting for the local data service.")
     : biText("没有可用数据表。请先进入数据源工作台导入本地文件或文件夹。", "No data tables are available. Open the source workbench to import local files or folders.");
   const diagnosticNotes = Array.isArray(status.health?.notes) ? status.health.notes.slice(0, 2) : [];
+  const readiness = buildProductReadiness(status);
 
   return (
     <div className={activeSection === "home" || activeSection === "agent" ? "topBarStack" : "topBarStack workbenchTopBar"}>
@@ -44,8 +46,8 @@ export function TopBar({ activeSection, status, apiMode }: TopBarProps) {
             </span>
           </div>
           <div className="statusPill">
-            <span className={status.health.ok ? "dot ok" : "dot warn"} />
-            <span>{apiMode === "loading" ? biText("连接中", "Connecting") : status.health.ok ? biText("可分析", "Ready") : biText("需要检查", "Needs review")}</span>
+            <span className={`dot ${apiMode === "loading" ? "warn" : readiness.tone}`} />
+            <span>{apiMode === "loading" ? biText("连接中", "Connecting") : readiness.label}</span>
           </div>
         </div>
       </header>

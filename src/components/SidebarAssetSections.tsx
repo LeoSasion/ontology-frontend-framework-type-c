@@ -1,5 +1,4 @@
 import type { ActionDraft, AgentAskResult, DashboardPage, DashboardPayload, NavigationModule, WorkbenchPayload, WorkspaceStatus } from "../types";
-import { getAppSection } from "../appSections";
 import { getUserPreferences, resolveThemePalette } from "../theme";
 import type { AppSection } from "./Sidebar";
 import { Bilingual, biText, translateName } from "./Bilingual";
@@ -65,49 +64,8 @@ export function SidebarAssetSections({
   const activeTheme = resolveThemePalette(workbench, preferences);
   const latestRun = sourceIntelligenceRuns[0];
   const evidenceFiles = Array.isArray(agent.ontology?.evidenceFiles) ? agent.ontology.evidenceFiles : [];
-  const homeNextSection: AppSection = status.counts.tables <= 0
-    ? "sources"
-    : !latestRun
-      ? "sources"
-      : status.counts.dashboards <= 0
-        ? "dashboards"
-        : "agent";
-  const homeNextMeta = getAppSection(homeNextSection);
-  const homeNextDetail = homeNextSection === "sources"
-    ? biText("先完成预检、导入和证据摘要。", "Finish preflight, import, and evidence summary first.")
-    : homeNextSection === "dashboards"
-      ? biText("证据已生成，下一步整理成看板。", "Evidence is ready; organize it into a dashboard next.")
-      : biText("数据、看板和证据已连接，可以直接提问。", "Data, dashboards, and evidence are connected; ask directly.");
-
   return (
     <>
-      {activeRailSection === "home" ? (
-        <section className="assetSection" aria-labelledby="start-assets-title">
-          <div className="assetSectionTitle">
-            <span className="eyebrow">{biText("起步路径", "Start path")}</span>
-            <strong id="start-assets-title"><Bilingual zh="从业务问题开始" en="Start from a business question" /></strong>
-          </div>
-          <dl className="assetCounts stacked">
-            <div>
-              <dt>{biText("数据表", "Tables")}</dt>
-              <dd>{status.counts.tables}</dd>
-            </div>
-            <div>
-              <dt>{biText("指标", "Metrics")}</dt>
-              <dd>{status.counts.metrics}</dd>
-            </div>
-            <div>
-              <dt>{biText("证据画像", "Profiles")}</dt>
-              <dd>{sourceIntelligenceRuns.length}</dd>
-            </div>
-          </dl>
-          <button className="assetRow primaryAssetRow" onClick={() => onSectionChange(homeNextSection)} type="button">
-            <strong>{biText(`继续：${homeNextMeta.zh}`, `Continue: ${homeNextMeta.en}`)}</strong>
-            <span>{homeNextDetail}</span>
-          </button>
-        </section>
-      ) : null}
-
       {activeRailSection === "sources" ? (
         <section className="assetSection" aria-labelledby="source-assets-title">
           <div className="assetSectionTitle">
@@ -229,22 +187,6 @@ export function SidebarAssetSections({
             <span className="eyebrow">{biText("证据链", "Evidence chain")}</span>
             <strong id="evidence-assets-title">{latestRun ? latestRun.label : biText("等待画像", "Waiting for profile")}</strong>
           </div>
-          {latestRun ? (
-            <dl className="assetCounts stacked">
-              <div>
-                <dt>{biText("文件", "Files")}</dt>
-                <dd>{latestRun.source_count}</dd>
-              </div>
-              <div>
-                <dt>{biText("关系", "Relations")}</dt>
-                <dd>{latestRun.relationship_count}</dd>
-              </div>
-              <div>
-                <dt>{biText("可执行指标", "Executable metrics")}</dt>
-                <dd>{latestRun.metric_sql_executable_count}</dd>
-              </div>
-            </dl>
-          ) : null}
           <details className="sidebarAssetDetails" data-testid="sidebar-evidence-asset-details">
             <summary>{biText("查看引用证据列表", "View evidence reference list")}</summary>
             <div className="assetList compactEvidenceList">

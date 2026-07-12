@@ -1,85 +1,70 @@
 # AIBI-C Implementation Status
 
-Project boundary: this repository owns the product code, documentation, and verification contract. User data may live in configured local paths outside the repository.
-
-Current stage: local production baseline for a single-user workstation. The stable product path is import -> evidence -> one chart -> evidence review -> confirmed write. Full industry dashboards remain Beta.
+Current stage: local production baseline for a single-user workstation. The release is single-user and local-only; user data may live outside the repository in configured local paths.
 
 ## Current Release Boundary
 
-| Layer | Current implementation | Boundary |
+| Layer | Implementation | Boundary |
 | --- | --- | --- |
-| Client | React 19 and Vite desktop-first workbench | Progressive disclosure; no server-rendered or mobile-native client |
-| Local API | Node/TypeScript route facade | Loopback only, bounded request bodies, exact-origin optional CORS |
-| BI runtime | Python CLI, SQLite metadata, DuckDB analytics | Whitelisted query parameters; no arbitrary user SQL |
-| Storage | Local database files and user-selected source files | No cloud sync, multi-tenant storage, or repository data seeding |
-| Agent | Deterministic local resolution with optional model configuration | Workspace scoped; read-only answers and confirmed write drafts stay distinct |
-| Evidence | Source runs, query runtime, metric definitions, action and delete receipts | Business summary first; raw diagnostics remain collapsed |
+| Client | React 19 + Vite desktop workbench | Progressive disclosure; no mobile-native client |
+| Local API | Node/TypeScript route facade | Loopback, bounded body, exact-origin optional CORS |
+| BI runtime | Python CLI + SQLite metadata + DuckDB analytics | Whitelisted parameters; no arbitrary user SQL |
+| Storage | Local databases and user-selected files | No cloud sync, tenant storage or repository seeding |
+| Agent | Deterministic resolution with optional model provider | Read-only answers and confirmed write drafts remain separate |
+| Evidence | Source, query, action, delete and recovery receipts | Business summary first; raw diagnostics collapsed |
 
 ## Capability Status
 
 | Capability | Status | Current contract |
 | --- | --- | --- |
-| Clean first run | Stable | New workspaces contain no tables, charts, dashboards, answers, or sample shortcuts. Product activation shows only the current necessary step, and reload resumes the next unfinished step. |
-| File and folder import | Stable | CSV/XLSX/XLSM preview, same-type grouping, merge impact, key quality, confirmed commit, and receipts. |
-| Source evidence profiling | Stable | Field roles, data quality, metric candidates, relationship evidence, gaps, and source receipts. |
-| AI one-chart flow | Stable | Generic overview does not choose domain fields; vague charts clarify once; explicit charts create one confirmable draft; dashboard widgets query their bound source on first render and show loading/error states instead of default numbers. |
-| Details and saved views | Stable | Whitelisted detail queries, search, filter, sort, save/copy/delete, dashboard and Agent handoff. |
-| Dashboard widget set | Stable advanced capability | Metric, bar, line, pie, table, text, slicer, relationship, filters, styles, lifecycle, and source switching. |
-| Full industry dashboard | Beta | Evidence-matched ERP units, omitted-unit disclosure, preview, then confirmation. |
-| Agent write boundary | Stable | Writes become dry-runs or action drafts; confirmation, rejection, impact, and receipt are explicit. |
-| Evidence experience | Stable | Business meaning and gaps are primary; runtime and raw receipts are secondary. |
-| Local operations | Stable | Loopback startup, health checks, production/security gates, checksum backup, and guarded restore. |
+| Clean first run | Stable | No tables, charts, dashboards, answers or sample shortcuts. Product activation shows only the current necessary step. |
+| File/folder import and profiling | Stable | CSV/XLSX/XLSM preview, same-type grouping, merge and dedup impact, key quality, confirmation, field/quality/relationship evidence. |
+| AI one-chart flow | Stable | Generic questions do not choose domain fields; vague charts clarify once; explicit requests create one confirmable draft. |
+| Details and saved views | Stable | Whitelisted query, search, filter, sort, save/copy/delete and contextual handoff. |
+| Dashboard editor | Stable advanced | Metric, bar, line, pie, table, text, slicer, relationship, filter, drilldown, lifecycle and style controls remain progressively disclosed. |
+| Full industry dashboard | Beta | Evidence-matched units, omitted-unit disclosure, preview and existing confirmation boundary. |
+| Controlled writes and deletes | Stable | Dry-run or draft first; one confirmation; explicit rejection, dependency impact and receipt. |
+| Trusted analysis | Stable advanced | Scoped Context Pack, Query Plan Receipt, redacted evidence export, explicitly saved query memory and confirmed-parent analysis branches. |
+| Model-independent Agent knowledge | Stable initial pack | Platform-commerce rules cover refund, dedup, logistics, version, traceability and percent thresholds; current schemas bind to read-only SQL, while unsupported compound metrics block. |
+| Object continuity | Stable | URL-addressable table, view, dashboard, evidence and action context survives refresh and browser history. |
+| Local operations | Stable | Loopback startup, health, security gates, checksum backup and guarded restore. |
 
 ## Known Limitations
 
-- Current release is single-user and local-only; it does not provide authentication, roles, collaboration, remote hosting, or cloud synchronization.
-- The full-dashboard path is Beta and has not met a promotion gate across multiple independent industries.
-- Legacy XLS can be profiled by Source Intelligence but is not yet supported by the confirmed import path; convert it to XLSX or CSV before import.
-- Real-data acceptance currently proves one local multi-table financial/commerce folder shape. A second independent real dataset is still required for stronger generalization evidence.
-- Optional model-provider quality is separate from the deterministic fallback contract; provider availability must never disable local evidence and query behavior.
-- Backup protects local SQLite and DuckDB files, but this is not a remote disaster-recovery service.
-- UI verification is desktop focused at 1440x900, 900x1440, and 1100x1100; mobile is not a release target.
+- 不支持认证、角色、协作、远程托管、云同步或移动端交付。
+- 整套行业看板仍是 Beta；晋级条件见 `development-roadmap.md`。
+- 旧 XLS 仅支持画像读取，确认导入前需转换为 XLSX 或 CSV。
+- 可选模型质量不属于确定性本地能力承诺，模型不可用不得阻断本地查询与证据。
+- 备份不是远程灾备；视觉回归只覆盖 1440x900、900x1440、1100x1100 PC 比例。
 
 ## Architecture Ownership
 
 | Path | Owns |
 | --- | --- |
-| `src/components/` | Page surfaces and presentational workflow components |
-| `src/*Model.ts`, `src/*ViewModel.ts` | Derived UI state, labels, readiness, and safe transformations |
-| `src/api*.ts` | Typed client calls and empty fallbacks |
-| `server/` | Thin local HTTP routing, security boundary, and CLI invocation |
-| `tools/bi_cli.py`, `tools/*_service.py` | BI CLI bridge, deterministic business actions, evidence, and write drafts |
-| `scripts/` | Build, release, browser, backup, security, and regression verification |
-| `docs/` | Current product, UX, acceptance, roadmap, and implementation contracts |
+| `src/components/` | 页面与可见工作流 |
+| `src/*Model.ts`, `src/*ViewModel.ts` | 派生状态、标签、就绪判断与安全转换 |
+| `src/appNavigationModel.ts`, `src/api*.ts` | 对象级路由上下文与类型化客户端边界 |
+| `server/` | 本地 HTTP、安全边界与 CLI 调用 |
+| `tools/` | 确定性 BI、证据、动作草案和公共 CLI |
+| `scripts/` | 构建、浏览器、发布、安全、备份与回归 |
 
-Component-level ownership is enforced by imports and `scripts/verify.mjs`; it is intentionally not duplicated as a manual list in this document.
+组件级约束由 import 边界与 `scripts/verify.mjs` 检查，不在文档手抄文件清单。
 
 ## Verification Entry Points
-
-Use the smallest relevant command while developing and `npm run preflight` before local delivery.
 
 ```powershell
 npm run build
 npm run verify
-npm run verify:ai-reliability
-npm run verify:ui-visual
-npm run verify:ui-empty
-npm run verify:ui-import
-npm run verify:backup
+npm run verify:ui
 npm run verify:production
-npm run verify:security-runtime
+npm run verify:backup
+npm run verify:platform-knowledge
+npm run verify:platform-materials
+npm run verify:platform-behavior
+npm run verify:platform-commerce -- --root C:\Users\Administrator\Documents\AIBI-B\data\platform-research
 npm run preflight
 python tools/bi_cli.py --json status
 python tools/bi_cli.py --json cli-contract
 ```
 
-`npm run verify:ui-import` uses a temporary workspace, restores the original workspace, and removes its imported runtime state after verification. Real source files remain external and are never committed.
-
-## Release Evidence
-
-- Core verification covers the static/runtime contract suite plus the BI CLI Agent contract; the live receipt owns the exact check count.
-- AI reliability separately covers empty, generic, ambiguous, explicit bar/line, unknown-field, and missing-dimension cases.
-- Views visual verification creates an isolated table and saved view before checking all three desktop ratios; it does not treat an empty-state redirect as a Views pass.
-- GitHub Actions repeats build, production, backup, runtime security, and browser smoke checks on Windows.
-
-Exact counts are receipts, not durable product promises. Re-run the commands above instead of copying old totals into planning documents.
+开发时选择最小相关命令，本地交付前运行 `npm run preflight`。真实导入与第二领域验证读取外部文件并使用临时数据库，不把数据复制进仓库；精确检查数由最新回执负责。

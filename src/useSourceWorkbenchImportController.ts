@@ -16,6 +16,7 @@ type ImportControllerOptions = Pick<
   "preview" | "onPreview" | "onCommitImport" | "onPreviewFolderImport" | "onCommitFolderImport" | "onImportPolicy"
 > & {
   importPolicies: ImportPolicy[];
+  onCommittedInputs?: (inputs: string[]) => Promise<void>;
 };
 
 export function useSourceWorkbenchImportController({
@@ -26,6 +27,7 @@ export function useSourceWorkbenchImportController({
   onPreviewFolderImport,
   onCommitFolderImport,
   onImportPolicy,
+  onCommittedInputs,
 }: ImportControllerOptions) {
   const [filePath, setFilePath] = useState("");
   const [targetTable, setTargetTable] = useState("");
@@ -103,6 +105,7 @@ export function useSourceWorkbenchImportController({
       importSkipRows: previewSummary.importSkipRows,
       importAfterRows: previewSummary.importAfterRows,
     }));
+    if (confirm && filePath.trim()) await onCommittedInputs?.([filePath.trim()]);
   }
 
   async function runFolderImportPreviewAction() {
@@ -144,6 +147,7 @@ export function useSourceWorkbenchImportController({
         : biText("确认后才会写入工作区。", "Confirm before writing to the workspace."),
       technical: result.groups.map((group) => `${group.displayName}: ${group.fileCount} files, ${group.rowCount} rows`).join("; ") || result.path,
     });
+    if (confirm && result.committed && filePath.trim()) await onCommittedInputs?.([filePath.trim()]);
   }
 
   async function runImportPolicyAction(confirm: boolean) {

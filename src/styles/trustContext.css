@@ -1,0 +1,182 @@
+.trustContextPanel,
+.agentTrustAdvanced,
+.evidenceTrustActions {
+  min-width: 0;
+}
+
+.trustContextLead,
+.evidenceTrustActions,
+.trustContextCounts,
+.agentTrustSummary,
+.evidenceTrustButtons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.trustContextLead,
+.evidenceTrustActions {
+  justify-content: space-between;
+}
+
+.trustContextLead h3,
+.evidenceTrustActions strong {
+  margin: 4px 0 0;
+}
+
+.trustContextCounts span,
+.agentTrustSummary span {
+  display: grid;
+  min-width: 68px;
+  gap: 2px;
+}
+
+.trustContextCounts strong,
+.agentTrustSummary strong {
+  font-size: 18px;
+}
+
+.trustContextCounts small,
+.agentTrustSummary small,
+.trustContextList small,
+.evidenceTrustActions span,
+.evidenceTrustActions small {
+  color: var(--text-muted);
+}
+
+.trustContextList {
+  display: grid;
+  margin: 16px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.trustContextList > div {
+  display: grid;
+  grid-template-columns: minmax(120px, .45fr) minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.trustContextForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.trustContextForm label,
+.agentBranchForm {
+  display: grid;
+  gap: 6px;
+}
+
+.trustContextForm .wide {
+  grid-column: 1 / -1;
+}
+
+.trustContextForm input,
+.trustContextForm select,
+.trustContextForm textarea,
+.agentBranchForm input,
+.agentBranchForm textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.trustContextForm textarea,
+.agentBranchForm textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+.trustContextForm button {
+  justify-self: start;
+}
+
+.trustContextMessage {
+  margin: 12px 0 0;
+  color: var(--success-text);
+}
+
+.agentTrustSummary {
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.agentTrustPlan {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.agentTrustPlan > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.agentTrustPlan dt {
+  color: var(--text-muted);
+}
+
+.agentTrustPlan dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.trustSql {
+  display: block;
+  overflow: auto;
+  max-width: 100%;
+  padding: 10px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.agentBranchForm {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.agentBranchForm button {
+  justify-self: start;
+}
+
+.evidenceTrustActions {
+  grid-column: 1 / -1;
+  padding: 14px 0;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.evidenceTrustActions > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+@media (max-width: 760px) {
+  .trustContextLead,
+  .evidenceTrustActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .trustContextList > div,
+  .trustContextForm,
+  .agentTrustPlan {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .trustContextForm .wide {
+    grid-column: auto;
+  }
+
+  .evidenceTrustButtons {
+    flex-wrap: wrap;
+  }
+}

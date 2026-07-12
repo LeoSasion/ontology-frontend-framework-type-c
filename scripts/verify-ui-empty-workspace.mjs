@@ -22,7 +22,7 @@ import {
   zeroCounts,
 } from "./ui-verify-workspace.mjs";
 
-const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8686";
+const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-empty-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
 
@@ -45,6 +45,13 @@ function emptyWorkspaceState() {
   const get = (testId) => document.querySelector(`[data-testid="${testId}"]`);
   const isVisible = (testId) => visible(get(testId));
   const disabled = (testId) => Boolean(get(testId)?.disabled);
+  const importPanel = document.querySelector(".sourceImportPanel");
+  const focusableImportControls = importPanel
+    ? Array.from(importPanel.querySelectorAll('input, button, select, textarea, summary, a[href], [tabindex]:not([tabindex="-1"])')).filter(visible)
+    : [];
+  const focusIndex = (element) => focusableImportControls.indexOf(element);
+  const importPathInput = importPanel?.querySelector('input[placeholder]') ?? null;
+  const advancedSummary = importPanel?.querySelector("details > summary") ?? null;
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
   const seededSamplePattern = /样例订单|示例订单|demo|test|fallback source|临时看板|mock data|lorem|orders|refunds/i;
   return {
@@ -71,6 +78,13 @@ function emptyWorkspaceState() {
       dashboardNextVisible: isVisible("source-dashboard-next-action"),
       guideDetailsOpen: Boolean(get("source-guide-details")?.open),
       sourceError: isVisible("source-intelligence-error"),
+      keyboardOrder: {
+        pathInput: focusIndex(importPathInput),
+        checkFile: focusIndex(get("import-preview-button")),
+        checkFolder: focusIndex(get("folder-import-preview-button")),
+        advancedSettings: focusIndex(advancedSummary),
+        positiveTabIndexCount: importPanel?.querySelectorAll('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])').length ?? 0,
+      },
     },
     dashboards: {
       taskStripVisible: isVisible("dashboard-business-task-strip"),
@@ -89,19 +103,28 @@ function emptyWorkspaceState() {
 }
 
 async function openSection(client, section) {
-  await navigate(client, `${baseUrl}/?section=${section}`);
-  const shellReady = await waitForAppReady(client, null, 25000);
   const selector = section === "home"
     ? '[data-testid="product-activation-panel"]'
     : section === "agent"
       ? '[data-testid="agent-no-data-route"]'
       : '[data-testid="import-preview-button"]';
-  const sectionReady = await waitFor(client, (expectedSelector) => {
-    const element = document.querySelector(expectedSelector);
-    const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
-    return { ok: Boolean(element) && !error, selector: expectedSelector, url: location.href };
-  }, selector, { timeoutMs: 30000, intervalMs: 250 });
-  const ready = { ...shellReady, ok: shellReady.ok && sectionReady.ok, sectionReady };
+  const attempt = async (targetUrl) => {
+    await navigate(client, targetUrl);
+    const shellReady = await waitForAppReady(client, null, 25000);
+    const sectionReady = await waitFor(client, (expectedSelector) => {
+      const element = document.querySelector(expectedSelector);
+      const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
+      return { ok: Boolean(element) && !error, selector: expectedSelector, url: location.href };
+    }, selector, { timeoutMs: 30000, intervalMs: 250 });
+    return { ...shellReady, ok: shellReady.ok && sectionReady.ok, sectionReady };
+  };
+  let ready = null;
+  for (let attemptIndex = 0; attemptIndex < 4; attemptIndex += 1) {
+    const retry = attemptIndex === 0 ? "" : `&retry=${Date.now()}-${attemptIndex}`;
+    ready = await attempt(`${baseUrl}/?section=${section}${retry}`);
+    if (ready.ok) break;
+    await new Promise((resolve) => setTimeout(resolve, 500 * (attemptIndex + 1)));
+  }
   const state = await evaluate(client, emptyWorkspaceState, null, 10000);
   return { section, ready, state };
 }
@@ -157,6 +180,14 @@ try {
         check("ui-empty-sources-import-only", !sources.state.sources.importEntry && sources.state.sources.importPreviewButton),
         check("ui-empty-sources-no-coverage-list", sources.state.sources.coverageItems === 0, { sources: sources.state.sources }),
         check("ui-empty-sources-next-action-collapsed", !sources.state.sources.dashboardNextVisible && !sources.state.sources.guideDetailsOpen, { sources: sources.state.sources }),
+        check("ui-empty-sources-keyboard-order", (() => {
+          const order = sources.state.sources.keyboardOrder;
+          return order.pathInput >= 0 &&
+            order.pathInput < order.checkFile &&
+            order.checkFile < order.checkFolder &&
+            order.checkFolder < order.advancedSettings &&
+            order.positiveTabIndexCount === 0;
+        })(), { keyboardOrder: sources.state.sources.keyboardOrder }),
         check("ui-empty-sources-no-error", !sources.state.hasErrorBoundary && !sources.state.hasFrameworkOverlay && !sources.state.sources.sourceError),
         check("ui-empty-sources-no-seeded-copy", !sources.state.hasSeededSampleCopy),
       );

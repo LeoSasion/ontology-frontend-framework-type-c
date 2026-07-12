@@ -224,9 +224,16 @@ export function appendDashboardViewContractChecks(context) {
           dashboardCanvasActionsSource.includes("async function runDashboardAsk") &&
           !dashboardCanvasSource.includes("function runDashboardAsk") &&
           dashboardBusinessTaskStripSource.includes("先说想看的一个图表") &&
-          dashboardBusinessTaskStripSource.includes("高级：优化或整套看板 Beta") &&
+          dashboardBusinessTaskStripSource.includes("const scopedPrompt = tableKey") &&
+          dashboardBusinessTaskStripSource.includes("当前数据：") &&
+          appSource.includes("focusedTableKey={focusedTableKey}") &&
+          dashboardCanvasSource.includes("tableKey={activeTable?.table_key") &&
+          dashboardBusinessTaskStripSource.includes('<summary><Bilingual zh="更多" en="More"') &&
           dashboardBusinessTaskStripSource.includes('className="advancedDetails compactAdvanced dashboardBetaDetails"') &&
+          dashboardCanvasSource.includes('data-testid="dashboard-more-details"') &&
+          dashboardCanvasSource.includes('zh="更多设置与证据"') &&
           dashboardCanvasReadinessModelSource.includes("source: \"dashboard-summary\"") &&
+          dashboardCanvasReadinessModelSource.includes('dashboard.dashboard_key === "fallback" ? undefined') &&
           appSource.includes("onAsk={handleAgentCommandAsk}") &&
           stylesSource.includes(".dashboardBusinessTaskStrip") &&
           stylesSource.includes(".dashboardBusinessTasks") &&
@@ -246,7 +253,8 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetModulesSource.includes("export const BiDashboardWidgetKit = lazy") &&
           dashboardCanvasSource.includes("dashboardWidgets.length ? (") &&
           dashboardCanvasSource.includes('data-testid="dashboard-widget-empty-state"') &&
-          dashboardCanvasSource.indexOf("<DashboardBusinessTaskStrip") < dashboardCanvasSource.indexOf("<BiDashboardWidgetKit") &&
+          dashboardCanvasSource.indexOf("<BiDashboardWidgetKit") < dashboardCanvasSource.indexOf("<DashboardBusinessTaskStrip") &&
+          dashboardCanvasSource.includes("compact={dashboardWidgets.length > 0}") &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-explain"') &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-improve"') &&
           !dashboardCanvasSource.includes('data-testid="dashboard-task-template"') &&
@@ -287,7 +295,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardDeferredModulesSource.includes("export const DashboardAdvancedWidgetWorkbench = lazy") &&
           dashboardDeferredPanelsSource.includes('from "./DashboardAdvancedWidgetWorkbench"') &&
           dashboardCanvasSource.includes("<DashboardAdvancedWidgetWorkbench") &&
-          dashboardCanvasSource.includes("dashboardWidgets={dashboardWidgets}") &&
+          dashboardCanvasSource.includes("dashboardWidgets={orderedWidgets}") &&
           dashboardCanvasSource.includes("onWidgetOperation={runWidgetOperation}") &&
           dashboardCanvasSource.includes("onModuleSave={runModuleSave}") &&
           dashboardCanvasSource.includes("widgetSettingsPayload={widgetSettingsPayload}") &&
@@ -478,7 +486,7 @@ export function appendDashboardViewContractChecks(context) {
           dashboardWidgetManagePanelSource.includes("export function DashboardWidgetManagePanel(") &&
           dashboardWidgetManagePanelSource.includes("type DashboardWidgetManagePanelProps") &&
           dashboardWidgetManagePanelSource.includes('data-testid="dashboard-widget-manage-panel"') &&
-          dashboardWidgetManagePanelSource.includes("widgets.map((widget)") &&
+          dashboardWidgetManagePanelSource.includes("widgets.map((widget, index)") &&
           dashboardWidgetManagePanelSource.includes('data-testid={`widget-edit-${widget.widget_key}`}') &&
           dashboardWidgetManagePanelSource.includes('data-testid={`widget-copy-preview-${widget.widget_key}`}') &&
           dashboardWidgetManagePanelSource.includes('data-testid={`widget-remove-preview-${widget.widget_key}`}') &&

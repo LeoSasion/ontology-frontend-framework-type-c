@@ -5,7 +5,6 @@ import {
   actionNextStepText,
   actionResultDetail,
   actionResultHeadline,
-  actionTarget,
 } from "../agentPanelModel";
 import { Bilingual, biText } from "./Bilingual";
 
@@ -22,11 +21,12 @@ type AgentPendingChangesPanelProps = {
   activeActionResult: Record<string, unknown> | null;
   canConfirmCurrent: boolean;
   currentDraft?: ActionDraft;
+  currentDraftBusinessSummary: string;
   draftImpactItems: DraftImpactItem[];
-  nextDraftToReview?: ActionDraft;
   pendingDrafts: ActionDraft[];
   riskyDraftCount: number;
   runningActionKey: string | null;
+  resolveDraftTarget: (draft: ActionDraft) => string;
   onConfirmDryRun: (actionKey: string) => Promise<void>;
   onConfirmAction: (actionKey: string) => Promise<void>;
   onRejectAction: (actionKey: string) => Promise<void>;
@@ -39,18 +39,20 @@ export function AgentPendingChangesPanel({
   activeActionResult,
   canConfirmCurrent,
   currentDraft,
+  currentDraftBusinessSummary,
   draftImpactItems,
-  nextDraftToReview,
   pendingDrafts,
   riskyDraftCount,
   runningActionKey,
+  resolveDraftTarget,
   onConfirmDryRun,
   onConfirmAction,
   onRejectAction,
   onRunAction,
 }: AgentPendingChangesPanelProps) {
+  const otherDrafts = pendingDrafts.filter((draft) => draft.action_key !== activeActionKey);
   return (
-    <article className="wideArticle">
+    <article className="wideArticle agentApprovalPanel">
       <div className="tileHeader">
         <h3><Bilingual zh="待确认修改" en="Pending changes" /></h3>
         <span>{pendingDrafts.length ? biText(`${pendingDrafts.length} 个待确认`, `${pendingDrafts.length} pending`) : biText("无待确认写入", "no pending writes")}</span>
@@ -58,11 +60,12 @@ export function AgentPendingChangesPanel({
       <div className="actionDraft">
         <div>
           <strong>{actionKindText(activeActionKind)}</strong>
-          <span>{currentDraft ? actionTarget(currentDraft) : biText("只读回答，无需确认", "Read-only answer, no approval needed")}</span>
+          <span>{currentDraft ? resolveDraftTarget(currentDraft) : biText("只读回答，无需确认", "Read-only answer, no approval needed")}</span>
+          {currentDraftBusinessSummary ? <small className="agentDraftBusinessSummary" data-testid="agent-current-draft-summary">{currentDraftBusinessSummary}</small> : null}
           <small className="agentActionNextStep" data-testid="agent-current-draft-next-step">{actionNextStepText(currentDraft)}</small>
         </div>
         {canConfirmCurrent ? (
-          <div className="buttonRow">
+          <div className="buttonRow agentDraftStickyActions">
             <button className="secondaryButton" data-testid="agent-current-draft-preview" onClick={() => onConfirmDryRun(activeActionKey)} type="button">
               {biText("预演", "Preview")}
             </button>
@@ -113,12 +116,6 @@ export function AgentPendingChangesPanel({
             </div>
           ))}
         </div>
-        {nextDraftToReview ? (
-          <div className="agentDraftNextReview" data-testid="agent-draft-next-review">
-            <span>{biText("下一项", "Next review")}: {actionKindText(nextDraftToReview.kind)}</span>
-            <strong>{actionTarget(nextDraftToReview)}</strong>
-          </div>
-        ) : null}
       </div>
       {activeActionResult ? (
         <div className={`agentActionResult ${activeActionResult.confirmed === true ? "confirmed" : activeActionResult.ok === false ? "failed" : "preview"}`} data-testid="agent-action-result">
@@ -126,12 +123,13 @@ export function AgentPendingChangesPanel({
           <span data-testid="agent-action-result-detail">{actionResultDetail(activeActionResult, currentDraft)}</span>
         </div>
       ) : null}
-      <div className="agentDraftQueue" data-testid="agent-draft-queue">
-        {pendingDrafts.length ? pendingDrafts.map((draft) => (
+      {otherDrafts.length ? <details className="agentDraftQueue" data-testid="agent-draft-queue">
+        <summary>{biText(`其他 ${otherDrafts.length} 个待处理修改`, `${otherDrafts.length} other pending changes`)}</summary>
+        {otherDrafts.map((draft) => (
           <div className="agentDraftQueueItem" data-testid="agent-draft-queue-item" key={draft.action_key}>
             <div>
               <strong>{actionKindText(draft.kind)}</strong>
-              <span>{actionTarget(draft)}</span>
+              <span>{resolveDraftTarget(draft)}</span>
               <small>{actionNextStepText(draft)}</small>
               <details className="agentDraftQueueTechnical" data-testid={`agent-draft-queue-technical-${draft.action_key}`}>
                 <summary>{biText("查看证据和编号", "View evidence and id")}</summary>
@@ -154,12 +152,8 @@ export function AgentPendingChangesPanel({
               </button>
             </div>
           </div>
-        )) : (
-          <p className="emptyDraftQueue" data-testid="agent-draft-queue-empty">
-            <Bilingual zh="Agent 可以准备导入、关系或看板修改，但不会直接执行。需要确认的任务会出现在这里。" en="Agent can prepare imports, relationships, or dashboard changes, but it never executes directly. Tasks needing approval appear here." />
-          </p>
-        )}
-      </div>
+        ))}
+      </details> : null}
       <details className="advancedDetails compactAdvanced agentActionTechnical" data-testid="agent-action-technical-details">
         <summary>{biText("查看动作技术详情", "View action technical details")}</summary>
         <dl className="definitionGrid">

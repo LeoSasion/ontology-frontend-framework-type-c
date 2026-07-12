@@ -443,6 +443,7 @@ def build_agent_dashboard_create_draft(
     prompt: str,
     limit: int = 8,
     template_key: str = BUSINESS_TEMPLATE_KEY,
+    resolved_widget: dict[str, Any] | None = None,
     *,
     build_business_dashboard_payload: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
@@ -450,6 +451,23 @@ def build_agent_dashboard_create_draft(
     if template_key == BUSINESS_TEMPLATE_KEY and prompt_prefers_erp_unit_library(prompt):
         template_key = ERP_UNIT_LIBRARY_TEMPLATE_KEY
     payload = build_business_dashboard_payload(connection, table_key, limit, template_key=template_key)
+    if single_chart and resolved_widget and isinstance(resolved_widget.get("options"), dict):
+        options = dict(resolved_widget["options"])
+        widget_type = str(resolved_widget.get("widgetType") or "table")
+        widget_key = "agent_chart_1"
+        item_layout = {"i": widget_key, **template_widget_layout(widget_type, 0)}
+        payload.update({
+            "defaultTableKey": str(resolved_widget.get("tableKey") or table_key or ""),
+            "widgets": [{
+                "id": widget_key,
+                "type": widget_type,
+                **options,
+                "layout": item_layout,
+            }],
+            "layout": [item_layout],
+            "categories": [{"category": "agent", "count": 1}],
+            "missingRequirements": [],
+        })
     erp_unit_library = payload.get("erpUnitLibrary") if isinstance(payload.get("erpUnitLibrary"), dict) else None
     preview_widgets: list[dict[str, Any]] = []
     for widget in payload.get("widgets", [])[:limit]:
@@ -502,6 +520,7 @@ def build_agent_dashboard_create_draft(
         "layout": payload.get("layout", []),
         "previewWidgets": preview_widgets,
         "prompt": prompt,
+        "originalPrompt": prompt,
         "evidence": evidence,
         "confirmationSummary": confirmation_summary,
     }

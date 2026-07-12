@@ -198,6 +198,7 @@ def build_agent_action_payload(
         "dashboardKey": selected_dashboard["dashboard_key"] if selected_dashboard else None,
         "tableKey": selected_table["table_key"] if selected_table else None,
         "prompt": prompt,
+        "originalPrompt": prompt,
     }
     for action in [widget_action, dashboard_filter_action, relationship_action, formula_action, view_action, metric_action, semantic_action, dashboard_action]:
         if action:
@@ -246,6 +247,8 @@ def agent_action_kind(
         return f"dashboard.{dashboard_action['op']}"
     if intents.wants_dashboard_filter and dashboard_filter_action:
         return "dashboard.filter.add"
+    if intents.wants_widget and widget_action and not widget_action.get("dashboardKey"):
+        return "dashboard.create"
     if intents.wants_widget and widget_action:
         return "dashboard.widget.add"
     if intents.wants_relationship and relationship_action:

@@ -19,6 +19,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     appDashboardActionsSource,
     appDataActionsSource,
     appLazyModulesSource,
+    appNavigationModelSource,
     appRefreshModelSource,
     appSectionsSource,
     appSettingsActionsSource,
@@ -67,6 +68,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     metricRepairModelSource,
     metricSemanticRepairActionsSource,
     packageJson,
+    preflightSource,
     prdDocSource,
     productAcceptanceMatrixDocSource,
     productActivationModelSource,
@@ -92,7 +94,10 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     sidebarSource,
     sidebarWorkspaceCardSource,
     sourceWorkbenchModelSource,
+    sourceWorkbenchActionPanelSource,
     sourceWorkbenchSource,
+    sourceWorkbenchStateSource,
+    sourceWorkbenchViewSource,
     stylesSource,
     themeSource,
     topBarSource,
@@ -184,16 +189,22 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           businessPathBarSource.includes("isBusinessStepLockedByFlow") &&
           productActivationModelSource.includes("Charts and evidence appear only after a real import") &&
           productActivationModelSource.includes("full industry boards remain beta") &&
+          productActivationPanelSource.includes("const step = activation.primaryStep") &&
           productActivationPanelSource.includes('data-testid={`product-activation-step-${step.key}`}') &&
-          sourceWorkbenchSource.includes("const hasData = tables.length > 0 || status.counts.tables > 0") &&
-          sourceWorkbenchSource.includes("const showExpertWorkbench = showAdvanced") &&
+          !productActivationPanelSource.includes("activation.steps.map") &&
+          sourceWorkbenchStateSource.includes("const hasData = tables.length > 0 || status.counts.tables > 0") &&
+          sourceWorkbenchStateSource.includes("const showExpertWorkbench = showAdvanced") &&
+          sourceWorkbenchStateSource.includes("if (!focusedTableKey || !tableKeySet.has(focusedTableKey)) return") &&
           !sourceWorkbenchSource.includes("ProductActivationPanel") &&
-          sourceWorkbenchSource.includes("onOpenDashboard={onOpenDashboard}") &&
-          !sourceWorkbenchSource.includes('data-testid="source-no-data-guide"') &&
-          sourceWorkbenchSource.includes('data-testid="source-expert-details"') &&
+          sourceWorkbenchViewSource.includes("onOpenDashboard={onOpenDashboard}") &&
+          !sourceWorkbenchViewSource.includes('data-testid="source-no-data-guide"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
+          !sourceWorkbenchViewSource.includes('data-testid="source-expert-details"') &&
           dashboardCanvasSource.includes("onOpenBusinessStep: (step: BusinessPathStepKey) => void") &&
           dashboardCanvasSource.includes('testId="dashboard-product-activation"') &&
           !dashboardCanvasSource.includes('data-testid="dashboard-no-data-route"') &&
+          evidenceViewSource.includes('data-testid="evidence-next-action"') &&
+          !evidenceViewSource.includes("ProductActivationPanel") &&
           dashboardCanvasSource.includes('data-testid="dashboard-guided-edit-details"') &&
           dashboardCanvasSource.includes('data-testid="dashboard-advanced-edit-details"') &&
           dashboardCanvasSource.includes('data-testid="dashboard-contract-details"') &&
@@ -205,7 +216,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           evidenceViewSource.includes("onOpenBusinessStep: (step: BusinessPathStepKey) => void") &&
           evidenceViewSource.includes("useQualityDoctor(hasData, workbench)") &&
           /if \(!enabled\) \{\s*setResult\(null\);\s*return;\s*\}/.test(useQualityDoctorSource) &&
-          evidenceViewSource.includes('testId="evidence-product-activation"') &&
+          evidenceViewSource.includes('data-testid="evidence-open-sources"') &&
           !evidenceViewSource.includes('data-testid="evidence-no-data-route"') &&
           evidenceViewSource.includes('data-testid="evidence-explanation-details"') &&
           evidenceViewSource.includes('data-testid="evidence-receipts-details"') &&
@@ -274,11 +285,24 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
           prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
           developmentRoadmapDocSource.includes("## 先记住一条主流程") &&
-          developmentRoadmapDocSource.includes("## 当前状态") &&
-          developmentRoadmapDocSource.includes("多种真实数据验证") &&
-          developmentRoadmapDocSource.includes("至少两个不同业务领域") &&
+          developmentRoadmapDocSource.includes("## 当前队列") &&
+          !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
+          !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
+          developmentRoadmapDocSource.includes("本地升级与回滚") &&
+          developmentRoadmapDocSource.includes("整套行业看板 Beta 晋级条件") &&
           developmentRoadmapDocSource.includes("## 明确暂时不做") &&
-          developmentRoadmapDocSource.includes("npm run verify:workspace-flow"),
+          !developmentRoadmapDocSource.includes("已完成") &&
+          !developmentRoadmapDocSource.includes("npm run"),
+      },
+    {
+        label: "preflight-delegates-to-stable-verification-entrypoints",
+        ok: packageJson.scripts?.preflight === "node scripts/preflight.mjs" &&
+          preflightSource.includes('runNpmScript("production build and bundle budgets", "build")') &&
+          preflightSource.includes('runNpmScript("core, CLI, and AI verification", "verify")') &&
+          preflightSource.includes('runNpmScript("workspace landing flow", "verify:workspace-flow")') &&
+          preflightSource.includes('runNpmScript("complete UI verification", "verify:ui")') &&
+          !preflightSource.includes("node_modules/typescript") &&
+          !preflightSource.includes("scripts/verify-ui-flow.mjs"),
       },
     {
         label: "home-detailed-path-panel-boundary",
@@ -295,11 +319,15 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-state-driven-landing",
-        ok: appSource.includes("function sectionFromUrl(): AppSection | null") &&
-          appSource.includes('import { isAppSection } from "./appSections"') &&
+        ok: appSource.includes("readNavigationTarget(window.location.search)") &&
+          appSource.includes("window.addEventListener(\"popstate\", handlePopState)") &&
           appSectionsSource.includes("export function isAppSection") &&
-          appSource.includes("return isAppSection(section) ? section : null") &&
-          appSource.includes("return sectionFromUrl() ?? \"home\"") &&
+          appNavigationModelSource.includes("export function readNavigationTarget") &&
+          appNavigationModelSource.includes("isAppSection(sectionParam) ? sectionParam : \"home\"") &&
+          appNavigationModelSource.includes("export function writeNavigationUrl") &&
+          appNavigationModelSource.includes('tableKey: "table"') &&
+          appNavigationModelSource.includes('dashboardKey: "dashboard"') &&
+          appNavigationModelSource.includes('viewKey: "view"') &&
           appSource.includes('from "./appWorkspaceModel"') &&
           appWorkspaceModelSource.includes("export function preferredLandingSection") &&
           appWorkspaceModelSource.includes("if (hasDashboard) return \"dashboards\"") &&
@@ -319,15 +347,20 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appSource.includes("setAgent,") &&
           appSource.includes("handleAgentCommandAsk,") &&
           appSource.includes("handleConfirmAction,") &&
+          appSource.includes("navigateTo,") &&
           appAgentActionsSource.includes("export function useAppAgentActions(") &&
           appAgentActionsSource.includes("type AppAgentActionsOptions") &&
           appAgentActionsSource.includes("const handleAsk = useCallback") &&
           appAgentActionsSource.includes("const handleAskReadOnly = useCallback") &&
           appAgentActionsSource.includes("const handleConfirmAction = useCallback") &&
           appAgentActionsSource.includes("const handleRejectAction = useCallback") &&
-          appAgentActionsSource.includes("confirmAction(actionKey, true, true)") &&
-          appAgentActionsSource.includes("setSection(\"dashboards\")") &&
-          appAgentActionsSource.includes("setSection(\"agent\")") &&
+          appAgentActionsSource.includes("confirmAction(actionKey, true, true, activeWorkspaceId)") &&
+          appAgentActionsSource.includes("nextAgent.workspaceId !== activeWorkspaceId") &&
+          appAgentActionsSource.includes("result.workspaceId !== activeWorkspaceId") &&
+          appAgentActionsSource.includes('section: "dashboards"') &&
+          appAgentActionsSource.includes('section: "agent"') &&
+          appAgentActionsSource.includes("actionKey: nextAgent.actionDraft?.actionKey") &&
+          appAgentActionsSource.includes("dashboardKey: typeof result.createdDashboardKey") &&
           !appSource.includes("const handleAsk = useCallback") &&
           !appSource.includes("const handleConfirmAction = useCallback") &&
           !appSource.includes("const handleRejectAction = useCallback"),
@@ -416,7 +449,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appSource.includes("useAppWorkspaceActions({") &&
           appWorkspaceActionsSource.includes("createWorkspace(name, false)") &&
           appWorkspaceActionsSource.includes("selectWorkspace(workspaceId, true)") &&
-          appWorkspaceActionsSource.includes("deleteWorkspace(workspaceId, false)") &&
+          appWorkspaceActionsSource.includes("deleteWorkspace(workspaceId, confirm)") &&
           appWorkspaceActionsSource.includes("renameWorkspace(workspaceId, nextName, false)") &&
           appWorkspaceActionsSource.includes("const handleWorkspaceDelete = useCallback") &&
           appWorkspaceActionsSource.includes("reloadWorkspaceSurface"),
@@ -424,16 +457,17 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     {
         label: "sidebar-workspace-card-component-boundary",
         ok: existsSync(join(root, "src", "components", "SidebarWorkspaceCard.tsx")) &&
-          sidebarSource.includes('import { SidebarWorkspaceCard } from "./SidebarWorkspaceCard"') &&
+          sidebarSource.includes('const SidebarWorkspaceCard = lazy(() => import("./SidebarWorkspaceCard"))') &&
           sidebarSource.includes("<SidebarWorkspaceCard") &&
           !sidebarSource.includes('data-testid="workspace-switcher"') &&
           sidebarWorkspaceCardSource.includes("type SidebarWorkspaceCardProps") &&
-          sidebarWorkspaceCardSource.includes("createWorkspaceFromInput: () => Promise<void>") &&
+          sidebarWorkspaceCardSource.includes("createWorkspaceFromInput: () => Promise<Record<string, unknown> | void>") &&
           sidebarWorkspaceCardSource.includes("selectWorkspaceFromInput: (workspaceId: string) => Promise<void>") &&
-          sidebarWorkspaceCardSource.includes("deleteWorkspaceFromInput: (workspaceId: string) => Promise<void>") &&
+          sidebarWorkspaceCardSource.includes("deleteWorkspaceFromInput: (workspaceId: string, confirm?: boolean)") &&
           sidebarWorkspaceCardSource.includes('data-testid="workspace-delete-list"') &&
           sidebarWorkspaceCardSource.includes("deletableWorkspaces") &&
-          sidebarWorkspaceCardSource.includes("window.confirm") &&
+          !sidebarWorkspaceCardSource.includes("window.confirm") &&
+          sidebarWorkspaceCardSource.includes('data-testid="workspace-delete-preview"') &&
           sidebarWorkspaceCardSource.includes("工作区沙盒") &&
           sidebarWorkspaceCardSource.includes("写入类动作仍必须先生成草案并确认") &&
           sidebarWorkspaceCardSource.includes('title={currentWorkspace.name}') &&
@@ -468,6 +502,10 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           sidebarAssetSectionsSource.includes('aria-labelledby="evidence-assets-title"') &&
           sidebarAssetSectionsSource.includes("全局提问与确认") &&
           sidebarAssetSectionsSource.includes("右下角都可以直接提问") &&
+          !sidebarAssetSectionsSource.includes('aria-labelledby="start-assets-title"') &&
+          !sidebarAssetSectionsSource.includes("可执行指标") &&
+          !sidebarAssetSectionsSource.includes("homeNextSection") &&
+          !sidebarAssetSectionsSource.includes("primaryAssetRow") &&
           !sidebarAssetSectionsSource.includes("promptStack") &&
           !sidebarAssetSectionsSource.includes("用自然语言改看板") &&
           sidebarAssetSectionsSource.includes('aria-labelledby="settings-assets-title"'),
@@ -485,7 +523,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           sidebarSource.includes("utilityAppSections.map") &&
           topBarSource.includes("getAppSection(activeSection)") &&
           appLazyModulesSource.includes("getAppSection(section)") &&
-          appSource.includes("isAppSection(section) ? section : null"),
+          appNavigationModelSource.includes("isAppSection(sectionParam) ? sectionParam : \"home\""),
       },
     {
         label: "frontend-desktop-shell-fluid-width",

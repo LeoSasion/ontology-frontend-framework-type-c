@@ -3,7 +3,6 @@ import { Sidebar, type AppSection } from "./components/Sidebar";
 import { useLanguage } from "./components/Bilingual";
 import { emptyAgentResult, emptyDashboardPayload, emptyFormulaPreview, emptyImportPreview, emptyQueryResult, emptyRelationshipPreview, emptyTableQuery, emptyWorkbenchPayload, emptyWorkspaceStatus } from "./emptyWorkspaceData";
 import { applyThemePalette, getUserPreferences, hasStoredThemeSnapshot, resolveThemePalette } from "./theme";
-import { isAppSection } from "./appSections";
 import { businessSectionForStep, type BusinessPathStepKey } from "./businessPathModel";
 import { actionErrorResult, connectingStatus, preferredLandingSection, type ApiMode, type LoadState } from "./appWorkspaceModel";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
@@ -16,20 +15,24 @@ import { useAppWorkspaceActions } from "./useAppWorkspaceActions";
 import { useInspectorController } from "./useInspectorController";
 import type { ActionDraft, AgentAskResult, DashboardPayload, EvidenceFocus, FormulaPreviewPayload, ImportPreview, QueryResult, RelationshipPreviewPayload, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import { buildWorkspaceFlow, resolveSectionForFlow } from "./workspaceFlowModel";
-
-function sectionFromUrl(): AppSection | null {
-  const section = new URLSearchParams(window.location.search).get("section");
-  return isAppSection(section) ? section : null;
-}
-
-function initialSection(): AppSection {
-  return sectionFromUrl() ?? "home";
-}
+import {
+  evidenceFocusFromNavigation,
+  navigationContextFromEvidence,
+  navigationContextFromTarget,
+  readNavigationTarget,
+  sameNavigationTarget,
+  writeNavigationUrl,
+  type AppNavigationContext,
+  type AppNavigationTarget,
+} from "./appNavigationModel";
 
 export default function App() {
   const { resolvedLanguage } = useLanguage();
-  const [section, setSection] = useState<AppSection>(() => initialSection());
-  const explicitInitialSectionRef = useRef(sectionFromUrl() !== null);
+  const initialNavigationRef = useRef<AppNavigationTarget | null>(null);
+  if (!initialNavigationRef.current) initialNavigationRef.current = readNavigationTarget(window.location.search);
+  const initialNavigation = initialNavigationRef.current;
+  const [section, setSection] = useState<AppSection>(initialNavigation.section);
+  const explicitInitialSectionRef = useRef(new URLSearchParams(window.location.search).has("section"));
   const autoLandingAppliedRef = useRef(false);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<WorkspaceStatus>(emptyWorkspaceStatus);
@@ -40,12 +43,13 @@ export default function App() {
   const [relationshipPreview, setRelationshipPreview] = useState<RelationshipPreviewPayload>(emptyRelationshipPreview);
   const [formulaPreview, setFormulaPreview] = useState<FormulaPreviewPayload>(emptyFormulaPreview);
   const [dashboards, setDashboards] = useState<DashboardPayload>(emptyDashboardPayload);
-  const [activeDashboardKey, setActiveDashboardKey] = useState("default");
-  const [activeViewKey, setActiveViewKey] = useState("");
+  const [activeDashboardKey, setActiveDashboardKey] = useState(initialNavigation.dashboardKey ?? "default");
+  const [activeViewKey, setActiveViewKey] = useState(initialNavigation.viewKey ?? "");
   const [agent, setAgent] = useState<AgentAskResult>(emptyAgentResult);
   const [actionDrafts, setActionDrafts] = useState<ActionDraft[]>([]);
   const [lastActionResult, setLastActionResult] = useState<Record<string, unknown> | null>(null);
-  const [evidenceFocus, setEvidenceFocus] = useState<EvidenceFocus | null>(null);
+  const [navigationContext, setNavigationContext] = useState<AppNavigationContext>(() => navigationContextFromTarget(initialNavigation));
+  const [evidenceFocus, setEvidenceFocus] = useState<EvidenceFocus | null>(() => evidenceFocusFromNavigation(initialNavigation));
   const workspaceActions = useAppWorkspaceActions({
     activeWorkspaceId: status.workspace.id,
     setActionDrafts,
@@ -54,6 +58,8 @@ export default function App() {
     setAgent,
     setDashboards,
     setLastActionResult,
+    setNavigationContext,
+    setEvidenceFocus,
     setSection,
     setStatus,
     setWorkbench,
@@ -96,15 +102,6 @@ export default function App() {
   }), []);
 
   useEffect(() => {
-    const url = new URL(window.location.href);
-    if (url.searchParams.get("section") === section) {
-      return;
-    }
-    url.searchParams.set("section", section);
-    window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}${url.hash}`);
-  }, [section]);
-
-  useEffect(() => {
     if (!status.database && hasStoredThemeSnapshot()) {
       return;
     }
@@ -117,16 +114,65 @@ export default function App() {
     return loadState === "loading" ? "loading" : "fallback";
   }, [loadState, status.database]);
   const displayStatus = apiMode === "loading" ? connectingStatus : status;
-  const pendingDraftCount = agent.requiresConfirmation ? Math.max(1, actionDrafts.length) : actionDrafts.length;
+  const pendingDraftCount = actionDrafts.filter((draft) => draft.status === "draft").length;
+  const agentHasPendingDraft = agent.requiresConfirmation === true && pendingDraftCount > 0;
   const workspaceFlow = useMemo(() => buildWorkspaceFlow({
     status: displayStatus,
     workbench,
     dashboardCount: dashboards.dashboards.length,
     pendingDraftCount,
-    agentRequiresConfirmation: agent.requiresConfirmation === true,
-  }), [agent.requiresConfirmation, dashboards.dashboards.length, displayStatus, pendingDraftCount, workbench]);
+    agentRequiresConfirmation: agentHasPendingDraft,
+  }), [agentHasPendingDraft, dashboards.dashboards.length, displayStatus, pendingDraftCount, workbench]);
+  const navigateTo = useCallback((target: AppNavigationTarget) => {
+    const resolvedTarget: AppNavigationTarget = {
+      ...navigationContext,
+      ...target,
+      section: target.allowLocked ? target.section : resolveSectionForFlow(target.section, workspaceFlow),
+      dashboardKey: target.dashboardKey ?? (activeDashboardKey !== "default" ? activeDashboardKey : undefined),
+      viewKey: target.viewKey ?? (activeViewKey || undefined),
+      origin: target.section === "evidence" ? target.origin : undefined,
+    };
+    if (target.dashboardKey) setActiveDashboardKey(target.dashboardKey);
+    if (target.viewKey) setActiveViewKey(target.viewKey);
+    if (target.evidenceFocus !== undefined) setEvidenceFocus(target.evidenceFocus);
+    else if (resolvedTarget.section === "evidence") setEvidenceFocus(evidenceFocusFromNavigation(resolvedTarget));
+    setNavigationContext(navigationContextFromTarget(resolvedTarget));
+    setSection(resolvedTarget.section);
+
+    const currentTarget = readNavigationTarget(window.location.search);
+    if (!sameNavigationTarget(currentTarget, resolvedTarget)) {
+      window.history.pushState(null, "", writeNavigationUrl(window.location.href, resolvedTarget));
+    }
+  }, [activeDashboardKey, activeViewKey, navigationContext, workspaceFlow]);
+
   const openSection = useCallback((nextSection: AppSection) => {
-    setSection(resolveSectionForFlow(nextSection, workspaceFlow));
+    navigateTo({ section: nextSection });
+  }, [navigateTo]);
+
+  useEffect(() => {
+    const target: AppNavigationTarget = {
+      ...navigationContext,
+      section,
+      dashboardKey: activeDashboardKey !== "default" ? activeDashboardKey : undefined,
+      viewKey: activeViewKey || undefined,
+    };
+    const nextUrl = writeNavigationUrl(window.location.href, target);
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentUrl !== nextUrl) window.history.replaceState(null, "", nextUrl);
+  }, [activeDashboardKey, activeViewKey, navigationContext, section]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      const target = readNavigationTarget(window.location.search);
+      const resolvedSection = resolveSectionForFlow(target.section, workspaceFlow);
+      setNavigationContext(navigationContextFromTarget(target));
+      if (target.dashboardKey) setActiveDashboardKey(target.dashboardKey);
+      if (target.viewKey) setActiveViewKey(target.viewKey);
+      setEvidenceFocus(resolvedSection === "evidence" ? evidenceFocusFromNavigation(target) : null);
+      setSection(resolvedSection);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
   }, [workspaceFlow]);
 
   useEffect(() => {
@@ -138,6 +184,7 @@ export default function App() {
   }, [loadState, section, workspaceFlow]);
 
   const dataActions = useAppDataActions({
+    activeWorkspaceId: status.workspace.id,
     setActionDrafts,
     setActiveViewKey,
     setDashboards,
@@ -146,7 +193,7 @@ export default function App() {
     setPreview,
     setQuery,
     setRelationshipPreview,
-    setSection,
+    navigateTo,
     setStatus,
     setTableQuery,
     setWorkbench,
@@ -161,12 +208,13 @@ export default function App() {
   });
 
   const agentActions = useAppAgentActions({
+    activeWorkspaceId: status.workspace.id,
     setActionDrafts,
     setActiveDashboardKey,
     setAgent,
     setDashboards,
     setLastActionResult,
-    setSection,
+    navigateTo,
     setStatus,
     setWorkbench,
   });
@@ -180,9 +228,12 @@ export default function App() {
   });
 
   const handleOpenEvidence = useCallback((focus: EvidenceFocus) => {
-    setEvidenceFocus(focus);
-    openSection("evidence");
-  }, [openSection]);
+    navigateTo({
+      section: "evidence",
+      evidenceFocus: focus,
+      ...navigationContextFromEvidence(focus, section),
+    });
+  }, [navigateTo, section]);
 
   const handleOpenBusinessStep = useCallback((step: BusinessPathStepKey) => {
     openSection(businessSectionForStep(step));
@@ -190,7 +241,8 @@ export default function App() {
 
   const activeDashboardName = dashboards.dashboards.find((dashboard) => dashboard.dashboard_key === activeDashboardKey)?.name ?? activeDashboardKey;
   const activeViewName = workbench.savedViews.find((view) => view.view_key === activeViewKey)?.name ?? activeViewKey;
-  const activeTableName = workbench.tables[0]?.display_name ?? status.sourceRuns[0]?.name ?? "";
+  const focusedTable = workbench.tables.find((table) => table.table_key === navigationContext.tableKey) ?? workbench.tables[0];
+  const activeTableName = focusedTable?.display_name ?? status.sourceRuns[0]?.name ?? "";
   const inspector = useInspectorController(openSection);
 
   return (
@@ -242,11 +294,13 @@ export default function App() {
             dashboardActions={dashboardActions}
             dataActions={dataActions}
             evidenceFocus={evidenceFocus}
+            focusedTableKey={focusedTable?.table_key ?? navigationContext.tableKey ?? ""}
             formulaPreview={formulaPreview}
             lastActionResult={lastActionResult}
             onOpenBusinessStep={handleOpenBusinessStep}
             onOpenEvidence={handleOpenEvidence}
             openSection={openSection}
+            navigateTo={navigateTo}
             pendingDraftCount={pendingDraftCount}
             preview={preview}
             query={query}

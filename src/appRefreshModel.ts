@@ -6,6 +6,25 @@ function actionDraftsFromPayload(payload: { actionDrafts?: unknown }): ActionDra
   return Array.isArray(payload.actionDrafts) ? payload.actionDrafts as ActionDraft[] : [];
 }
 
+function workspaceSurfaceIsConsistent(status: WorkspaceStatus, workbench: WorkbenchPayload) {
+  return status.counts.tables === workbench.tables.length &&
+    workbench.tables.every((table) => !table.workspace_id || table.workspace_id === status.workspace.id);
+}
+
+function waitForSurfaceRetry(delay: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, delay));
+}
+
+async function readConsistentWorkspaceSurface() {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const status = normalizeStatus(await getWorkspaceStatus());
+    const workbench = normalizeWorkbench(await getWorkbenchData());
+    if (workspaceSurfaceIsConsistent(status, workbench)) return { status, workbench };
+    if (attempt < 2) await waitForSurfaceRetry(120 * (attempt + 1));
+  }
+  throw new Error("Workspace data is still synchronizing. Retry the refresh without changing the current workspace.");
+}
+
 export async function refreshWorkbench(): Promise<WorkbenchPayload> {
   return normalizeWorkbench(await getWorkbenchData());
 }
@@ -18,11 +37,7 @@ export async function refreshStatusAndWorkbench(): Promise<{
   status: WorkspaceStatus;
   workbench: WorkbenchPayload;
 }> {
-  const [status, workbench] = await Promise.all([getWorkspaceStatus(), getWorkbenchData()]);
-  return {
-    status: normalizeStatus(status),
-    workbench: normalizeWorkbench(workbench),
-  };
+  return readConsistentWorkspaceSurface();
 }
 
 export async function refreshStatusWorkbenchDashboards(): Promise<{
@@ -30,10 +45,10 @@ export async function refreshStatusWorkbenchDashboards(): Promise<{
   workbench: WorkbenchPayload;
   dashboards: DashboardPayload;
 }> {
-  const [status, workbench, dashboards] = await Promise.all([getWorkspaceStatus(), getWorkbenchData(), getDashboards()]);
+  const [{ status, workbench }, dashboards] = await Promise.all([readConsistentWorkspaceSurface(), getDashboards()]);
   return {
-    status: normalizeStatus(status),
-    workbench: normalizeWorkbench(workbench),
+    status,
+    workbench,
     dashboards: normalizeDashboards(dashboards),
   };
 }
@@ -66,16 +81,15 @@ export async function refreshStatusDashboardsWorkbenchDrafts(): Promise<{
   workbench: WorkbenchPayload;
   actionDrafts: ActionDraft[];
 }> {
-  const [status, dashboards, workbench, drafts] = await Promise.all([
-    getWorkspaceStatus(),
+  const [{ status, workbench }, dashboards, drafts] = await Promise.all([
+    readConsistentWorkspaceSurface(),
     getDashboards(),
-    getWorkbenchData(),
     getActionDrafts(),
   ]);
   return {
-    status: normalizeStatus(status),
+    status,
     dashboards: normalizeDashboards(dashboards),
-    workbench: normalizeWorkbench(workbench),
+    workbench,
     actionDrafts: actionDraftsFromPayload(drafts),
   };
 }
@@ -85,14 +99,13 @@ export async function refreshStatusWorkbenchDrafts(): Promise<{
   workbench: WorkbenchPayload;
   actionDrafts: ActionDraft[];
 }> {
-  const [status, workbench, drafts] = await Promise.all([
-    getWorkspaceStatus(),
-    getWorkbenchData(),
+  const [{ status, workbench }, drafts] = await Promise.all([
+    readConsistentWorkspaceSurface(),
     getActionDrafts(),
   ]);
   return {
-    status: normalizeStatus(status),
-    workbench: normalizeWorkbench(workbench),
+    status,
+    workbench,
     actionDrafts: actionDraftsFromPayload(drafts),
   };
 }

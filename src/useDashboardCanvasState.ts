@@ -40,6 +40,7 @@ export function useDashboardCanvasState({
   const [selectedViewKey, setSelectedViewKey] = useState("");
   const [selectedRelationshipKey, setSelectedRelationshipKey] = useState("");
   const [selectedWidgetKey, setSelectedWidgetKey] = useState("");
+  const [widgetOrder, setWidgetOrder] = useState<string[]>([]);
   const [sourceSwitchTableKey, setSourceSwitchTableKey] = useState(dashboard.default_table_key);
   const [canvasWidthMode, setCanvasWidthMode] = useState<DashboardCanvasWidthMode>(dashboard.layout?.canvasWidthMode === "center" ? "center" : "stretch");
   const [widgetFilterField, setWidgetFilterField] = useState("");
@@ -50,9 +51,16 @@ export function useDashboardCanvasState({
   const [advancedEditorMounted, setAdvancedEditorMounted] = useState(false);
   const [contractPanelMounted, setContractPanelMounted] = useState(false);
 
+  const orderedWidgets = useMemo(() => {
+    const byKey = new Map(dashboardWidgets.map((widget) => [widget.widget_key, widget]));
+    return [
+      ...widgetOrder.map((key) => byKey.get(key)).filter((widget): widget is DashboardWidget => Boolean(widget)),
+      ...dashboardWidgets.filter((widget) => !widgetOrder.includes(widget.widget_key)),
+    ];
+  }, [dashboardWidgets, widgetOrder]);
   const selectedWidget = useMemo(
-    () => dashboardWidgets.find((widget) => widget.widget_key === selectedWidgetKey) ?? dashboardWidgets[0],
-    [dashboardWidgets, selectedWidgetKey],
+    () => orderedWidgets.find((widget) => widget.widget_key === selectedWidgetKey) ?? orderedWidgets[0],
+    [orderedWidgets, selectedWidgetKey],
   );
   const selectedRelationship = useMemo(
     () => savedRelationships.find((relationship) => relationship.relation_key === selectedRelationshipKey) ?? savedRelationships[0],
@@ -98,8 +106,30 @@ export function useDashboardCanvasState({
   }, [dashboard.dashboard_key, savedRelationships]);
 
   useEffect(() => {
-    setSelectedWidgetKey((current) => dashboardWidgets.some((widget) => widget.widget_key === current) ? current : dashboardWidgets[0]?.widget_key ?? "");
+    const available = dashboardWidgets.map((widget) => widget.widget_key);
+    setWidgetOrder((current) => [
+      ...current.filter((key) => available.includes(key)),
+      ...available.filter((key) => !current.includes(key)),
+    ]);
+    setSelectedWidgetKey((current) => available.includes(current) ? current : available[0] ?? "");
   }, [dashboard.dashboard_key, dashboardWidgets]);
+
+  function moveWidget(widgetKey: string, targetIndex: number) {
+    setWidgetOrder((current) => {
+      const available = dashboardWidgets.map((widget) => widget.widget_key);
+      const ordered = [
+        ...current.filter((key) => available.includes(key)),
+        ...available.filter((key) => !current.includes(key)),
+      ];
+      const sourceIndex = ordered.indexOf(widgetKey);
+      if (sourceIndex < 0) return ordered;
+      const boundedTarget = Math.max(0, Math.min(targetIndex, ordered.length - 1));
+      const next = [...ordered];
+      next.splice(sourceIndex, 1);
+      next.splice(boundedTarget, 0, widgetKey);
+      return next;
+    });
+  }
 
   useEffect(() => {
     const widget = selectedWidget;
@@ -121,6 +151,8 @@ export function useDashboardCanvasState({
     filterOperator,
     filterValue,
     guidedEditorMounted,
+    moveWidget,
+    orderedWidgets,
     selectedRelationship,
     selectedRelationshipKey,
     selectedViewKey,

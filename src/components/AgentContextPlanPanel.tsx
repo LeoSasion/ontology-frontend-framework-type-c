@@ -22,7 +22,9 @@ export function AgentContextPlanPanel({
   targetBoundaryState,
 }: AgentContextPlanPanelProps) {
   return (
-    <>
+    <details className="advancedDetails compactAdvanced agentContextDetails" data-testid="agent-context-details">
+      <summary>{biText("查看目标匹配、置信度和计划", "View target match, confidence, and plan")}</summary>
+      <div className="agentContextDetailsBody">
       <article className={`agentTargetBoundary ${targetBoundaryState}`} data-testid="agent-target-boundary">
         <div>
           <h3><Bilingual zh="目标匹配与写入边界" en="Target match and write boundary" /></h3>
@@ -75,6 +77,7 @@ export function AgentContextPlanPanel({
           ))}
         </ol>
       </article>
-    </>
+      </div>
+    </details>
   );
 }

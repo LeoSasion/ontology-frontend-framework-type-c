@@ -168,6 +168,7 @@ export const emptyFormulaPreview: FormulaPreviewPayload = {
 
 export const emptyAgentResult: AgentAskResult = {
   ok: true,
+  workspaceId: "",
   llm: {
     configured: false,
     mode: "deterministic-fallback",

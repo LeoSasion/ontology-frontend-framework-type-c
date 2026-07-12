@@ -1,31 +1,26 @@
 # Documentation Map
 
-本目录只保留当前项目文档。
+每类信息只在一个文件维护。
 
-## Current Documents
-
-| File | Owns |
+| File | Single responsibility |
 | --- | --- |
-| `../README.md` | 安装、运行、验证、数据策略 |
-| `../PRODUCT.md` | 唯一产品定位、目标用户、价值主张、产品边界和非目标 |
-| `PRD.md` | 当前用户故事、主流程、功能需求和发布条件 |
-| `product-ux-standard.md` | 交互标准、信息架构、文案标准、确认策略 |
-| `product-acceptance-matrix.md` | 新手首次成功、无样例边界、确认/删除/证据验收矩阵 |
-| `development-roadmap.md` | 只记录尚未完成的开发顺序、产品指标和能力晋级条件 |
-| `implementation-status.md` | 当前交付边界、能力状态、架构归属、限制和验证入口 |
-| `bi-cli-contract.md` | 公共 CLI 命令索引、突变模式、证据输出 |
-| `erp-dashboard-unit-library.md` | ERP 公开参考、业务单元选择规则、验证方式 |
+| `../PRODUCT.md` | 产品定位、用户、能力分层、边界、成功标准 |
+| `PRD.md` | 当前版本的用户结果、功能需求、发布条件 |
+| `product-ux-standard.md` | 页面职责、渐进展示、路由、文案、确认与删除 |
+| `product-acceptance-matrix.md` | 用户可观察的稳定验收行为 |
+| `implementation-status.md` | 当前实现、限制、架构归属与分项验证入口 |
+| `development-roadmap.md` | 唯一未来队列、顺序与退出条件 |
+| `bi-cli-contract.md` | 公共 CLI 命令、突变模式与输出合同 |
+| `erp-dashboard-unit-library.md` | ERP 单元选择规则与公开参考 |
+| `reference-project-gap-analysis.md` | 外部项目取舍形成的架构决策记录 |
+| `agent-knowledge-packs.md` | 模型无关业务知识包、证据合同与验证方式 |
+| `../README.md` | 安装、运行、验证、数据与恢复 |
 
 ## Maintenance Rules
 
-- 文档只描述当前项目、当前命令和当前运行边界。
-- 产品定位只放在 `PRODUCT.md`；PRD 引用定位，只维护可执行需求。
-- 用户体验、页面层级、文案和确认策略放在 `product-ux-standard.md`，不要散落到实现状态文档。
-- 首次成功和生产空状态验收放在 `product-acceptance-matrix.md`，不要用页面样例替代验收标准。
-- 当前实现边界放在 `implementation-status.md`，只保留稳定模块级归属，不手抄组件清单。
-- `development-roadmap.md` 只保留未来工作；已经完成的事项移出活动队列，不长期保留“全部完成”的状态表。
-- CLI 命令变化后更新 `bi-cli-contract.md` 的公共命令索引。
-- ERP 公开参考、字段别名和单元选择规则只放在 `erp-dashboard-unit-library.md`。
-- 验证命令优先记录稳定入口：`npm run preflight` 是本地交付前总入口；分解命令只放在 README 或 implementation status，不在产品定位和路线图重复。
-- 容易漂移的命令数、组件数、字段别名数和测试总数由脚本输出，不手写为长期产品事实。
-- 产品文档不提供内置数据入口；验证材料只服务自动化测试，不作为用户默认路径。
+- 产品事实必须能由当前代码、运行边界或验收场景支持。
+- 当前能力不进入路线图；研究结论不冒充当前功能；实现细节不进入产品定位。
+- UX 规则只描述可观察约束，不手抄组件结构。
+- 容易漂移的文件数、测试数和字段数由脚本回执负责。
+- `npm run preflight` 是本地交付前总入口；其他命令只在 README 或 implementation status 维护。
+- 验证数据可位于 `validation-inputs` 或仓库外部，但生产 UI 不提供样例入口。

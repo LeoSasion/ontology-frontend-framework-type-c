@@ -233,10 +233,11 @@ export function appendCoreContractChecks(context) {
     {
         label: "agent-confirm-execution-handlers-phase3-boundary",
         ok: existsSync(join(root, "tools", "agent_confirm_execution_handlers.py")) &&
-          biCliRuntimeSource.includes("return handle_dashboard_widget_add_confirmation(") &&
+          biCliRuntimeSource.includes("handle_dashboard_widget_add_confirmation(") &&
+          biCliRuntimeSource.includes("create_confirmed_query_candidate(") &&
           biCliRuntimeSource.includes("return handle_dashboard_filter_add_confirmation(") &&
           biCliRuntimeSource.includes("return handle_dashboard_operation_confirmation(") &&
-          biCliRuntimeSource.includes("return handle_dashboard_create_confirmation(") &&
+          biCliRuntimeSource.includes("handle_dashboard_create_confirmation(") &&
           agentConfirmExecutionHandlersSource.includes("def handle_dashboard_widget_add_confirmation(") &&
           agentConfirmExecutionHandlersSource.includes("def handle_dashboard_filter_add_confirmation(") &&
           agentConfirmExecutionHandlersSource.includes("def handle_dashboard_operation_confirmation(") &&
@@ -446,8 +447,9 @@ export function appendCoreContractChecks(context) {
           apiSourceApiSource.includes("function normalizeFolderImportPlan(") &&
           apiSourceApiSource.includes("Array.isArray(plan.groups) ? plan.groups : []") &&
           verifyUiRealImportSource.includes("api-known-financial-folder-deduplicated") &&
-          verifyUiRealImportSource.includes("source intelligence controls") &&
-          verifyUiRealImportSource.includes("ui-source-intelligence-controls-ready") &&
+          verifyUiRealImportSource.includes("automatic source intelligence count") &&
+          verifyUiRealImportSource.includes("ui-import-continues-to-evidence-automatically") &&
+          verifyUiRealImportSource.includes("ui-manual-evidence-path-is-secondary") &&
           verifyUiRealImportSource.includes('rowCountsByName["保单明细"] === 426') &&
           verifyUiRealImportSource.includes('rowCountsByName["售后单"] === 1393') &&
           verifyUiRealImportSource.includes('rowCountsByName["订单"] === 2351') &&

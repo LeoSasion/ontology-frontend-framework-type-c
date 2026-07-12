@@ -77,6 +77,8 @@ def build_relationship_preview(
     matched_left_rows = sum(left_stats["counts"][key] for key in overlap)
     unmatched_left_rows = len(left_rows) - matched_left_rows
     joined_rows = sum(left_stats["counts"][key] * right_stats["counts"][key] for key in overlap)
+    output_rows = joined_rows + (unmatched_left_rows if join_type == "left" else 0)
+    row_expansion = output_rows / max(1, len(left_rows))
     confidence = len(overlap) / max(1, min(len(left_keys), len(right_keys)))
 
     right_by_key: dict[str, dict[str, Any]] = {}
@@ -112,6 +114,8 @@ def build_relationship_preview(
             "matchedLeftRows": matched_left_rows,
             "unmatchedLeftRows": unmatched_left_rows,
             "joinedRows": joined_rows,
+            "outputRows": output_rows,
+            "rowExpansion": round(row_expansion, 4),
             "leftDuplicateKeyGroups": left_stats["duplicateKeyGroups"],
             "rightDuplicateKeyGroups": right_stats["duplicateKeyGroups"],
             "leftEmptyKeyRows": left_stats["emptyKeyRows"],
@@ -132,6 +136,11 @@ def build_relationship_preview(
             *(
                 ["存在左表未匹配行，跨表指标需要标记覆盖率。"]
                 if unmatched_left_rows
+                else []
+            ),
+            *(
+                [f"连接输出为左表的 {row_expansion:.2f} 倍，汇总前必须按目标粒度去重。"]
+                if row_expansion > 1
                 else []
             ),
         ],

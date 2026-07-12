@@ -12,12 +12,36 @@ type QueryRoutesOptions = {
 export async function handleQueryApi(options: QueryRoutesOptions) {
   const { cli, request, response, url } = options;
 
+  if (url.pathname === "/api/query-receipts" && request.method === "GET") {
+    const args = ["query-receipts", "--limit", url.searchParams.get("limit") ?? "20"];
+    const receipt = url.searchParams.get("receipt");
+    if (receipt) args.push("--receipt", receipt);
+    const result = await cli(args);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/evidence/export" && request.method === "POST") {
+    const body = await readBody(request);
+    const receipt = String(body.receipt ?? "");
+    if (!receipt) {
+      sendJson(response, 400, { ok: false, action: "export-evidence", error: "receipt is required" });
+      return true;
+    }
+    const args = ["export-evidence", "--receipt", receipt];
+    if (body.output) args.push("--output", String(body.output));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/query" && request.method === "POST") {
     const body = await readBody(request);
     const args = ["query", "--table", String(body.table ?? ""), "--agg", String(body.aggregation ?? body.agg ?? "count")];
     if (body.group) args.push("--group", String(body.group));
     if (body.measure) args.push("--measure", String(body.measure));
     if (body.limit) args.push("--limit", String(body.limit));
+    if (body.request) args.push("--request", String(body.request));
     const result = await cli(args);
     sendJson(response, 200, result);
     return true;

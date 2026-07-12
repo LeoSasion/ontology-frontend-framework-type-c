@@ -13,12 +13,13 @@ import {
 } from "./ui-verify-chrome.mjs";
 import { postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
-const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8686";
+const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8787";
 const url = process.env.AIBI_UI_URL ?? `${baseUrl}/?section=views`;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-visual-"));
 const viewports = [
+  { key: "compact-landscape", label: "compact landscape", width: 1280, height: 720 },
   { key: "landscape", label: "landscape", width: 1440, height: 900 },
-  { key: "portrait", label: "portrait", width: 900, height: 1440 },
+  { key: "portrait-pc", label: "portrait PC", width: 900, height: 1440 },
   { key: "square", label: "square", width: 1100, height: 1100 },
 ];
 
@@ -155,14 +156,18 @@ try {
     bootstrap = { imported: imported.ok === true, savedView: savedView.ok === true };
     checks.push(check("visual-workspace-bootstrap", bootstrap.imported && bootstrap.savedView, bootstrap));
 
-    for (const viewport of viewports) {
-      let browser = null;
-      try {
-        browser = await launchChrome();
-        browserInfo ??= { chromePath: browser.chromePath, chromeName: browser.chromeName };
+    let browser = null;
+    try {
+      browser = await launchChrome();
+      browserInfo = { chromePath: browser.chromePath, chromeName: browser.chromeName };
+      for (const viewport of viewports) {
         await setViewport(browser.client, viewport);
         await navigate(browser.client, url);
-        const ready = await waitForAppReady(browser.client, null, 25000);
+        let ready = await waitForAppReady(browser.client, null, 25000);
+        if (!ready.ok) {
+          await navigate(browser.client, `${url}&retry=${Date.now()}`);
+          ready = await waitForAppReady(browser.client, null, 25000);
+        }
         const metrics = await evaluate(browser.client, visualMetrics, null, 10000);
         const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `${viewport.key}-${viewport.width}x${viewport.height}.png`));
         const prefix = `visual-${viewport.key}`;
@@ -188,11 +193,11 @@ try {
           metrics,
           screenshot,
         });
-      } finally {
-        if (browser) {
-          browserIssues.push({ viewport: viewport.key, issues: browser.client.consoleIssues() });
-          await browser.close();
-        }
+      }
+    } finally {
+      if (browser) {
+        browserIssues.push({ viewport: "all", issues: browser.client.consoleIssues() });
+        await browser.close();
       }
     }
     return {};

@@ -1,119 +1,86 @@
 # AIBI-C Product UX Standard
 
-This document owns the interaction and documentation standard for the current product. It is not a historical design note.
+本文件只维护当前产品的交互与信息架构约束，不记录设计过程。
 
 ## Product Experience Contract
 
-- The default user path is AI-assisted: the user states the business question or chart they want, and the workbench turns it into a reviewed result without hiding deterministic import, query, evidence, or confirmation behavior.
-- One business capability has one owning surface. Data intake belongs to Sources, chart creation belongs to Dashboards, evidence review belongs to Evidence, and write approval belongs to AI. Other screens should route into that surface instead of repeating the same operation.
-- The conservative default is one conversation to one chart. The assistant may ask at most one necessary clarification before drafting a line chart, bar chart, metric card, table, or text insight.
-- A vague chart request must ask for fields instead of guessing. "图表/chart" means one chart; "看板/仪表盘/dashboard" means a dashboard container or full dashboard draft.
-- Chart clarification should be actionable. When the assistant cannot safely choose a measure or dimension, it should show candidate field buttons that resubmit a more explicit chart request, not ask the user to copy field names manually.
-- Chart candidates and auto metrics must use business fields only. Internal fields such as canonical dates and import source markers may power time windows or evidence lineage, but they must not appear as user-facing measures, default dimensions, or field-choice buttons.
-- The beta path is one conversation to a full industry dashboard. It must be labeled Beta, generated from field evidence, and previewed before any write.
-- A fresh workspace must be empty by default. Do not auto-load bundled data, run placeholder queries, create placeholder dashboards, or ask Agent warmup questions before the user imports data.
-- Folder import is a first-class intake path. It should preview how files will be grouped into business tables and write only after confirmation.
-- The first screen of a workflow should expose one primary action, the current result, and the minimum status needed to trust it.
-- Advanced controls stay available through progressive disclosure: filters, data-source switch, widget maintenance, relationship tools, style controls, contract details, and validation labs should not all be open by default.
-- Confirmation is reserved for real writes. Drafting, explanation, preview, and evidence lookup should not require extra confirmation clicks.
-- Write actions still stop at draft or dry-run-confirm. The simplification goal is fewer unnecessary clicks, not weaker control.
+- 默认路径是一问一图；字段不明确时最多澄清一次，并提供可点击候选。
+- 第一屏只展示当前意图、确定结果、最小信任信息和一个下一步。
+- 无数据时只引导导入；不加载样例、占位查询、默认看板或预设问题。
+- 普通概览不猜销售、退款、渠道等行业字段；不确定结果不默认显示。
+- 只读、解释、证据和预演无需确认；真实写入只有一个确认面。
+- 高级能力按结构折叠，不与当前任务竞争视觉优先级。
+- 整套行业看板是次要 Beta 路径，必须先预演字段命中与省略项。
 
 ## Screen Priority Standard
 
-Every main screen should order content this way:
+页面按以下顺序组织：
 
-1. Intent capture: a business action, natural-language prompt, or direct import action.
-2. Result preview: chart, table, dashboard, answer, or draft summary.
-3. Trust summary: source, metric definition, evidence count, gaps, or blocker.
-4. Next best action: create one chart, ask Agent, review evidence, or confirm draft.
-5. Advanced maintenance: filters, style, page admin, field semantics, relationships, raw receipts, validation labs.
+1. 当前意图或主要动作。
+2. 结果或草案。
+3. 来源、口径、缺口等最小信任摘要。
+4. 唯一下一步。
+5. 按需展开的维护与技术细节。
 
-If a screen starts by showing maintenance controls before the result or intent capture, it should be refactored.
+若维护控件早于意图或结果出现，页面层级即不合格。
 
 ## First Success Flow Standard
 
-The product default is a guided first-success loop:
+`Sources 导入 -> 生成证据 -> Dashboards 创建一个图表 -> Evidence 核对 -> AI 确认或拒绝写入`
 
-1. Connect data in Sources.
-2. Create an evidence summary from the imported data.
-3. Create one chart in Dashboards.
-4. Review evidence in Evidence.
-5. Approve or reject any write draft in AI.
-
-Only the current necessary step should be visually primary. Locked future steps may be visible as status, but they must not expose their full controls before the prerequisite exists. The shared product activation panel owns this status so pages do not each write their own onboarding flow.
+只突出当前可执行步骤。后续步骤可以显示状态，但前置条件未满足时不得展开完整控件。首次成功进度由共享激活组件维护，各页面不得各写一套引导。
 
 ## Object Ownership Matrix
 
-| Object | Owning surface | Other surfaces may do |
+| Object | Owning surface | Other surfaces |
 | --- | --- | --- |
-| Source table, import job, connector | Sources | Route to Sources, show read-only count or latest receipt |
-| Field semantic, metric definition, relationship, formula | Sources | Show trust summary or blocker, then route to Sources |
-| Saved view | Details | Add to chart context, route to Details for edits |
-| Chart widget and dashboard page | Dashboards | Link to focused dashboard, show evidence reference |
-| Evidence run, query receipt, action receipt | Evidence | Show short trust summary, route to Evidence for details |
-| Action draft, confirmation, rejection | AI | Show pending count, route to AI for approval |
-| Workspace, theme, config portability | System | Show current workspace identity only |
+| 数据表、导入、字段语义、指标、关系、公式 | Sources | 只显示摘要并跳转 |
+| 保存视图 | Details | 携带视图上下文使用 |
+| 看板、页面、组件 | Dashboards | 显示链接或证据摘要 |
+| 查询、证据与动作回执 | Evidence | 显示最小可信状态 |
+| 动作草案、确认与拒绝 | AI | 显示待处理数并跳转 |
+| 工作区、配置、术语、规则、确认问法 | System | 在 AI 或 Evidence 显示命中摘要 |
 
-If a page needs another object, it should navigate with context instead of duplicating that object's create/edit/delete workflow.
+创建、编辑和删除必须留在对象主页面。其他页面通过跳转传递步骤，不复制操作。
 
 ## Route Handoff Standard
 
-- Use the global business path to pass the user between steps: connect data, create chart, review evidence, approve writes.
-- A page may summarize another step, but its primary button should navigate to the owning page instead of duplicating the same operation locally.
-- Guidance panels may explain the next step, but they must not duplicate the owning panel's write buttons. For example, file import confirmation belongs to the import panel, not the next-action guide.
-- Homepage actions should be orientation and handoff only. They should not run source scans, dashboard templates, Agent questions, or confirmations directly unless the user opens an advanced validation lab.
-- Empty states must route to data import. They should not offer built-in data shortcuts in the product UI.
-- Importing a folder should show only file count, business-table groups, key fields, and the confirm action by default. Raw file lists and policy receipts belong in details.
-- Relationship recommendations must require real sample overlap and avoid low-cardinality or many-to-many exploding joins as primary suggestions. Name similarity alone is not enough.
-- Automatic metric repair may delete and rebuild stale auto-generated metrics, but only when the metric is marked `source=auto`. Manual metric definitions are user-owned and must not be removed by cleanup.
-- Creating an empty dashboard creates only the dashboard container. Widgets require imported data, field evidence, or an explicit AI/recommendation draft; do not inject default chart templates.
-- Repeated expert shortcuts stay behind details, beta labels, or validation labs; they should not compete with the main path.
-- The active page owns its own confirmation logic. Navigation itself does not add confirmation.
+- URL 只携带完成下一步所需的 `table`、`view`、`dashboard`、`run`、`action`。
+- 刷新、后退和前进恢复同一对象；对象不存在时显示真实空态，不创建 fallback。
+- 导入后打开真实表；画像后进入该表的单图创建；确认图表后打开真实看板；Evidence 返回来源看板或沿同一回执继续分析。
+- 首页只负责定位与跳转，不直接执行扫描、模板、Agent 问题或确认。
+- 空态只有一个主要动作；侧栏只描述资产，不重复主内容的下一步和指标。
+- Folder import 默认只显示文件数、业务表分组、键与确认，原始文件清单放入详情。
+- Creating an empty dashboard creates only the dashboard container. 组件必须来自真实字段证据或明确草案。
 
-## Documentation Standard
+## Progressive Disclosure Standard
 
-- `PRODUCT.md` owns positioning, product category, users, value proposition, boundaries, and non-goals.
-- `docs/PRD.md` owns current user stories, workflows, functional requirements, and release acceptance.
-- `docs/product-ux-standard.md` owns interaction, information architecture, and documentation standards.
-- `docs/product-acceptance-matrix.md` owns durable executable scenarios.
-- `docs/implementation-status.md` owns current release boundaries, capability status, architecture ownership, and known limitations.
-- `docs/development-roadmap.md` contains future work only; completed baseline work is summarized once and removed from the active queue.
-- CLI, ERP references, and implementation receipts stay in their dedicated docs. Do not repeat them in product docs unless the product contract changes.
+- 默认收起筛选、数据源切换、关系、样式、组件维护、查询计划、原始 SQL、可信语境、确认问法、分析分支与验证工具。
+- 已确认结果才可显示“继续比较”；阻塞、待确认或被拒绝结果不能成为分支父节点。
+- 管理区允许包含删除，但默认收起；不得把删除永久藏在原始技术详情中。
+- 组件数量或横向空间不足时减少并列列数，优先保持文字、按钮和状态完整，不强迫紧凑控件换行。
 
 ## Copy Standard
 
-- Use business language first: "生成一个图表", "查看证据", "确认写入", "行业看板 Beta".
-- Avoid internal labels as primary copy: source-intelligence, widget payload, module save, stale cleanup, and receipt paths belong in details.
-- Button labels must state the outcome. Prefer "生成一个图表" over "提交", and "预演行业看板" over "运行".
-- Status text should explain what happened and whether anything was written.
-- Empty states should offer one next action, not a list of every possible action.
+- 使用结果导向文案：`生成一个图表`、`查看证据`、`确认写入`、`预演行业看板`。
+- 主界面不用 payload、module、stale cleanup 等内部术语。
+- 状态必须说明发生了什么、是否写入、下一步是什么。
+- 按钮标题不得绑定某个数据月份、行业或样例字段。
 
 ## Confirmation Standard
 
-- Read-only answer: no confirmation.
-- Draft or preview: no confirmation, but clearly state that nothing was written.
-- Write: one confirmation surface that shows target, impact, evidence, and rollback or rejection path.
-- Dangerous overwrite/delete: keep explicit confirmation, but do not add redundant confirmation before the draft.
+| Action | Confirmation |
+| --- | --- |
+| 只读回答、解释、证据、预演 | 不确认，并说明未写入 |
+| 普通写入 | 一个确认面，展示目标、影响、证据与拒绝路径 |
+| 覆盖、删除、恢复 | 先预演依赖与影响，再显式确认 |
 
 ## Delete And Rollback Standard
 
-- Delete entry points stay on the owning surface: source deletes in Sources, view deletes in Details, dashboard/widget deletes in Dashboards, workspace deletes in System.
-- A destructive action must first show target, dependent objects, expected impact, and whether the result is a dry run or confirmed write.
-- Rejection is the rollback path for drafts that have not been written.
-- After a confirmed delete, the UI should show a receipt and route the user to the nearest still-valid object instead of leaving them on a broken selection.
-- Do not hide delete forever inside raw technical details; place it in a clearly labeled management section that is collapsed by default.
+- 删除入口位于对象主页面的折叠管理区。
+- 预演显示目标、依赖、影响和写入状态；确认后显示回执并跳转到最近的有效对象。
+- 尚未写入的草案以拒绝作为回滚路径，不增加第二次确认。
 
 ## Acceptance Matrix Standard
 
-The durable product acceptance matrix lives in `docs/product-acceptance-matrix.md`. Product or UX changes are not done until the matrix still covers empty workspace, import, evidence, one-chart creation, beta dashboard preview, confirmation/rejection, delete impact, workspace isolation, and no-demo production boundaries.
-
-## Beta Dashboard Standard
-
-The full industry dashboard path remains beta until it can reliably:
-
-- select units from current field evidence,
-- omit missing-field charts instead of faking them,
-- explain matched and omitted units,
-- show source references,
-- preview impact before creation or overwrite,
-- preserve the same confirmation boundary as other writes.
+稳定行为只在 `docs/product-acceptance-matrix.md` 定义。产品或 UX 改动必须继续覆盖空工作区、真实导入、证据、单图、Beta 预演、确认/拒绝、删除、工作区隔离和 Production no-demo boundary。

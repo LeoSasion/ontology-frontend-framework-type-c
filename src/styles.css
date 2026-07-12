@@ -441,10 +441,32 @@ button:disabled {
 }
 
 .workspaceDeleteList {
+  min-width: 0;
   display: grid;
   gap: 6px;
   border-top: 1px solid var(--bi-border-soft);
   padding: 8px;
+}
+
+.srOnly {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  clip-path: inset(50%) !important;
+}
+
+.workspaceDeleteList label,
+.workspaceDeleteList select,
+.workspaceDeleteList button {
+  width: 100%;
+  max-width: 100%;
+}
+
+.workspaceDeleteList select {
+  min-width: 0;
 }
 
 .workspaceDeleteList button {
@@ -459,6 +481,37 @@ button:disabled {
   font-weight: 760;
   cursor: pointer;
   text-align: left;
+  white-space: normal;
+}
+
+.workspaceNotice {
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.workspaceDeleteList > small,
+.workspaceDeletePreview span,
+.workspaceDeletePreview small {
+  color: var(--bi-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.workspaceDeletePreview {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--bi-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--danger) 5%, var(--bi-panel));
+  padding: 9px;
+}
+
+.workspaceDeletePreview strong {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -672,7 +725,7 @@ button:disabled {
   padding: 16px 20px 20px;
 }
 
-@media (min-width: 761px) and (max-width: 1040px) {
+@media (min-width: 761px) and (max-width: 1180px) {
   .appShell,
   .appShell[data-inspector-state="expanded"] {
     grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-width);

@@ -201,7 +201,7 @@ export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, 
         </div>
       ) : null}
 
-      <div className="bWidgetGrid">
+      <div className={`bWidgetGrid${widgets.length === 1 && widgets[0]?.type === "metric" ? " singleMetric" : ""}`}>
         {widgets.map((widget) => (
           <BiDashboardWidgetCard
             dashboardFilters={effectiveDashboardFilters}

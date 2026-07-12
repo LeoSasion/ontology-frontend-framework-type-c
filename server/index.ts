@@ -59,10 +59,12 @@ const cli = (args: string[]) => runCli(root, args);
 function actionForApiPath(url: URL) {
   if (url.pathname.includes("query-table")) return "query-table";
   if (url.pathname.includes("query")) return "query";
+  if (url.pathname.includes("evidence")) return "evidence";
   if (url.pathname.includes("views")) return "view";
   if (url.pathname.includes("dashboard")) return "dashboard";
   if (url.pathname.includes("source") || url.pathname.includes("import") || url.pathname.includes("connector")) return "source";
   if (url.pathname.includes("agent") || url.pathname.includes("actions")) return "agent";
+  if (url.pathname.includes("context")) return "context";
   if (url.pathname.includes("preferences") || url.pathname.includes("theme") || url.pathname.includes("config")) return "settings";
   if (url.pathname.includes("workspace")) return "workspace";
   return "api";

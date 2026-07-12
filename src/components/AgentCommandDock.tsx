@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { getAppSection } from "../appSections";
 import type { AppSection } from "../appSections";
 import { resolveAgentPromptRoute, type AgentPromptRoute } from "../agentPromptRouting";
@@ -21,6 +21,7 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
   const [busy, setBusy] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [routeHint, setRouteHint] = useState<AgentPromptRoute | null>(null);
+  const previousSection = useRef(activeSection);
   const expanded = assistantOpen;
   const pendingDrafts = actionDrafts.filter((draft) => draft.status === "draft");
   const latestDraft = pendingDrafts[0];
@@ -58,7 +59,7 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
     if (status.counts.dashboards === 0) {
       return {
         tone: "info",
-        label: biText("可以生成首个看板", "Ready for first dashboard"),
+        label: biText("可以生成首个图表", "Ready for first chart"),
         detail: biText("Agent 先生成待确认修改，工作台负责落地编辑。", "Agent creates pending changes first; the workbench keeps them editable."),
       };
     }
@@ -112,6 +113,13 @@ export function AgentCommandDock({ activeSection, status, agent, actionDrafts, o
   const sectionLabel = getAppSection(activeSection);
   const routeSectionLabel = routeHint ? getAppSection(routeHint.section) : null;
   const shouldMinimize = !hasTables && !assistantOpen && activeSection !== "agent";
+
+  useEffect(() => {
+    if (previousSection.current !== activeSection) {
+      setAssistantOpen(false);
+      previousSection.current = activeSection;
+    }
+  }, [activeSection]);
 
   async function submitPrompt(event?: FormEvent<HTMLFormElement>, nextPrompt = prompt) {
     event?.preventDefault();

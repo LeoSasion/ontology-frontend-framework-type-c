@@ -36,3 +36,4 @@ export type {
   WorkbenchTable,
 } from "./typesSource";
 export type { QueryRuntimeStatus, SelectionConfidence, SourceRunSummary, WorkspaceRecord, WorkspaceStatus } from "./typesWorkspace";
+export type { AnalysisRunsPayload, ConfirmedQueriesPayload, ConfirmedQuery, ContextPackPayload, ContextRule, ContextTerm, QueryReceiptsPayload } from "./typesTrust";

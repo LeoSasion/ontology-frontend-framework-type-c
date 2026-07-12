@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const read = (path) => readFileSync(resolve(root, path), "utf8");
 const packageJson = JSON.parse(read("package.json"));
+const viteConfig = read("vite.config.ts");
 const serverIndex = read("server/index.ts");
 const serverRuntime = read("server/serverRuntime.ts");
 const envExample = read(".env.example");
@@ -20,7 +21,7 @@ function check(label, ok, detail) {
 
 const checks = [
   check("loopback-api-default", serverIndex.includes('process.env.AIBI_API_HOST ?? "127.0.0.1"') && serverIndex.includes("loopbackHosts") && !serverIndex.includes('server.listen(port, "0.0.0.0"'), "API defaults to loopback and rejects non-loopback hosts."),
-  check("loopback-ui-default", packageJson.scripts?.["dev:ui"]?.includes("--host 127.0.0.1") && packageJson.scripts?.preview?.includes("--host 127.0.0.1"), "Development and preview UI bind only to loopback."),
+  check("loopback-ui-default", packageJson.scripts?.["dev:ui"] === "vite" && viteConfig.includes('host: "127.0.0.1"') && packageJson.scripts?.preview?.includes("--host 127.0.0.1"), "Development and preview UI bind only to loopback."),
   check("cors-not-wildcard", !serverRuntime.includes('"access-control-allow-origin": "*"') && serverRuntime.includes("AIBI_CORS_ORIGIN"), "Cross-origin access is disabled unless one explicit origin is configured."),
   check("request-size-limit", serverRuntime.includes("configuredMaxRequestBodyBytes") && serverRuntime.includes("bodyBytes > maxRequestBodyBytes"), "JSON request bodies have a bounded size and read configuration after local .env loading."),
   check("request-errors-are-specific", serverRuntime.includes("RequestBodyTooLargeError") && serverRuntime.includes("InvalidJsonBodyError") && serverIndex.includes("status = error instanceof RequestBodyTooLargeError ? 413"), "Oversized and invalid JSON requests return specific client errors."),

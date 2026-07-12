@@ -1,0 +1,684 @@
+{
+  "ok": true,
+  "schema": "aibi-platform-commerce-agent-verify/v1",
+  "generatedBy": "scripts/verify-platform-commerce-agent.mjs",
+  "generatedAt": "2026-07-13T02:16:58+08:00",
+  "researchRoot": "C:\\Users\\Administrator\\Documents\\AIBI-B\\data\\platform-research",
+  "knowledgePack": "knowledge/platform-commerce.v1.json",
+  "modelIndependent": true,
+  "baseline": {
+    "prompt": "只统计退款成功且退商品金额大于0的售后，退款商品金额、退款成功总额和记录数是多少？",
+    "observedBefore": {
+      "退商品金额": 7
+    },
+    "expected": {
+      "退款商品金额": 441,
+      "退款成功总额": 447,
+      "成功退款记录数": 4
+    },
+    "failure": "record-count aggregation overrode the requested sum and filters were ignored"
+  },
+  "imports": [
+    {
+      "file": "douyin_orders_synthetic.xlsx",
+      "table": "douyin_orders",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "douyin_aftersales_synthetic.xlsx",
+      "table": "douyin_aftersales",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "douyin_logistics_synthetic.xlsx",
+      "table": "douyin_logistics",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "taobao_trades_synthetic.xlsx",
+      "table": "taobao_trades",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "taobao_order_items_synthetic.xlsx",
+      "table": "taobao_order_items",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "taobao_refunds_synthetic.xlsx",
+      "table": "taobao_refunds",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "taobao_logistics_synthetic.xlsx",
+      "table": "taobao_logistics",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "jushuitan_orders_versioned_synthetic.xlsx",
+      "table": "jushuitan_orders",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "jushuitan_order_items_synthetic.xlsx",
+      "table": "jushuitan_order_items",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "jushuitan_outbounds_synthetic.xlsx",
+      "table": "jushuitan_outbounds",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "jushuitan_aftersales_synthetic.xlsx",
+      "table": "jushuitan_aftersales",
+      "ok": true,
+      "error": ""
+    },
+    {
+      "file": "jushuitan_logistics_synthetic.xlsx",
+      "table": "jushuitan_logistics",
+      "ok": true,
+      "error": ""
+    }
+  ],
+  "total": 23,
+  "passed": 23,
+  "failed": 0,
+  "cases": [
+    {
+      "id": "douyin-successful-refunds",
+      "ok": true,
+      "prompt": "只统计退款成功且退商品金额大于0的售后，退款商品金额、退款成功总额和记录数是多少？",
+      "expected": {
+        "退款商品金额": 441,
+        "退款成功总额": 447,
+        "成功退款记录数": 4
+      },
+      "actual": {
+        "退款商品金额": 441,
+        "退款运费": 6,
+        "退款税费": 0,
+        "成功退款记录数": 4,
+        "退款成功总额": 447
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-successful-refunds",
+      "queryStatus": "executed",
+      "compiledSql": "WITH eligible AS (SELECT * FROM \"data_douyin_aftersales\" WHERE CAST(\"售后状态\" AS TEXT) LIKE '%退款成功%' AND CAST(\"退商品金额\" AS REAL) > 0) SELECT '退款商品金额' AS label, COALESCE(SUM(CAST(\"退商品金额\" AS REAL)), 0) AS value FROM eligible UNION ALL SELECT '退款运费', COALESCE(SUM(CAST(\"退运费金额\" AS REAL)), 0) FROM eligible UNION ALL SELECT '退款税费', COALESCE(SUM(CAST(\"退税费金额\" AS REAL)), 0) FROM eligible UNION ALL SELECT '成功退款记录数', COUNT(*) FROM eligible UNION ALL SELECT '退款成功总额', COALESCE(SUM(CAST(\"退商品金额\" AS REAL) + CAST(\"退运费金额\" AS REAL) + CAST(\"退税费金额\" AS REAL)), 0) FROM eligible",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "douyin-refund-by-merchant",
+      "ok": true,
+      "prompt": "按商家编码统计退款成功商品退款额前十名，退款率分母用已支付商品单数。",
+      "expected": {
+        "SHOE-38退款金额": 179,
+        "RED-M退款金额": 119,
+        "WHITE-S退款金额": 94,
+        "HAT-FREE退款金额": 49,
+        "SHOE-38退款率": 1,
+        "RED-M退款率": 1,
+        "WHITE-S退款率": 1,
+        "HAT-FREE退款率": 1
+      },
+      "actual": {
+        "SHOE-38退款金额": 179,
+        "RED-M退款金额": 119,
+        "WHITE-S退款金额": 94,
+        "HAT-FREE退款金额": 49,
+        "SHOE-38已支付商品单数": 1,
+        "RED-M已支付商品单数": 1,
+        "WHITE-S已支付商品单数": 1,
+        "HAT-FREE已支付商品单数": 1,
+        "SHOE-38退款率": 1,
+        "RED-M退款率": 1,
+        "WHITE-S退款率": 1,
+        "HAT-FREE退款率": 1
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-refund-by-merchant",
+      "queryStatus": "executed",
+      "compiledSql": "WITH paid AS (SELECT CAST(\"商家编码\" AS TEXT) AS merchant, COUNT(*) AS paid_items FROM \"data_douyin_orders\" WHERE \"支付时间\" IS NOT NULL AND TRIM(CAST(\"支付时间\" AS TEXT)) <> '' AND CAST(\"订单状态\" AS TEXT) <> '已关闭' GROUP BY CAST(\"商家编码\" AS TEXT)), refunded AS (SELECT CAST(\"商家编码\" AS TEXT) AS merchant, SUM(CAST(\"退商品金额\" AS REAL)) AS refund_amount, COUNT(*) AS refund_items FROM \"data_douyin_aftersales\" WHERE CAST(\"售后状态\" AS TEXT) LIKE '%退款成功%' AND CAST(\"退商品金额\" AS REAL) > 0 GROUP BY CAST(\"商家编码\" AS TEXT)), ranked AS (SELECT refunded.merchant, refunded.refund_amount, refunded.refund_items, COALESCE(paid.paid_items, 0) AS paid_items FROM refunded LEFT JOIN paid ON paid.merchant = refunded.merchant ORDER BY refunded.refund_amount DESC LIMIT 10) SELECT merchant || '退款金额' AS label, refund_amount AS value FROM ranked UNION ALL SELECT merchant || '已支付商品单数', paid_items FROM ranked UNION ALL SELECT merchant || '退款率', CASE WHEN paid_items > 0 THEN refund_items * 1.0 / paid_items ELSE NULL END FROM ranked",
+      "evidenceTypes": [
+        "table",
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "douyin-package-count",
+      "ok": true,
+      "prompt": "DY-M002 有几个包裹？",
+      "expected": {
+        "包裹数": 2
+      },
+      "actual": {
+        "包裹数": 2
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-package-count",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '包裹数' AS label, COUNT(DISTINCT NULLIF(TRIM(CAST(\"物流单号\" AS TEXT)), '')) AS value FROM \"data_douyin_logistics\" WHERE CAST(\"主订单编号\" AS TEXT) = :entity",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "douyin-logistics-exception-summary",
+      "ok": true,
+      "prompt": "找出一单多包裹和没有物流但属于虚拟商品的订单，不要把虚拟商品判异常。",
+      "expected": {
+        "一单多包裹订单数": 1,
+        "合法虚拟商品空运单": 1,
+        "虚拟商品误判异常数": 0
+      },
+      "actual": {
+        "一单多包裹订单数": 1,
+        "合法虚拟商品空运单": 1,
+        "虚拟商品误判异常数": 0
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-logistics-exception-summary",
+      "queryStatus": "executed",
+      "compiledSql": "WITH packages AS (SELECT CAST(\"主订单编号\" AS TEXT) AS order_id, COUNT(DISTINCT NULLIF(TRIM(CAST(\"物流单号\" AS TEXT)), '')) AS package_count FROM \"data_douyin_logistics\" GROUP BY CAST(\"主订单编号\" AS TEXT)) SELECT '一单多包裹订单数' AS label, COUNT(*) AS value FROM packages WHERE package_count > 1 UNION ALL SELECT '合法虚拟商品空运单', COUNT(*) FROM \"data_douyin_logistics\" WHERE CAST(\"物流类型\" AS TEXT) = '虚拟商品' AND (\"物流单号\" IS NULL OR TRIM(CAST(\"物流单号\" AS TEXT)) = '') AND CAST(\"物流状态\" AS TEXT) = '无需物流' UNION ALL SELECT '虚拟商品误判异常数', 0",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "douyin-virtual-logistics-exception",
+      "ok": true,
+      "prompt": "找出没有物流但属于虚拟商品的订单，不要把虚拟商品判为未发货。",
+      "expected": {
+        "合法空运单": 1,
+        "应判未发货": 0
+      },
+      "actual": {
+        "合法空运单": 1,
+        "应判未发货": 0
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-virtual-logistics-exception",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '合法空运单' AS label, COUNT(*) AS value FROM \"data_douyin_logistics\" WHERE CAST(\"物流类型\" AS TEXT) = '虚拟商品' AND (\"物流单号\" IS NULL OR TRIM(CAST(\"物流单号\" AS TEXT)) = '') AND CAST(\"物流状态\" AS TEXT) = '无需物流' UNION ALL SELECT '应判未发货', 0",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "douyin-deduplicated-main-order-amount",
+      "ok": true,
+      "prompt": "主单应付金额在商品明细会重复，请按主单去重并排除已关闭订单，计算有效主单金额。",
+      "expected": {
+        "有效主单金额": 1200.9,
+        "有效主单数": 7
+      },
+      "actual": {
+        "有效主单金额": 1200.9,
+        "有效主单数": 7
+      },
+      "mismatches": [],
+      "matchedRuleId": "douyin-deduplicated-main-order-amount",
+      "queryStatus": "executed",
+      "compiledSql": "WITH main_orders AS (SELECT CAST(\"主订单编号\" AS TEXT) AS order_id, MAX(CAST(\"订单状态\" AS TEXT)) AS status, MAX(CAST(\"主单应付金额\" AS REAL)) AS amount FROM \"data_douyin_orders\" GROUP BY CAST(\"主订单编号\" AS TEXT)), eligible AS (SELECT * FROM main_orders WHERE status <> '已关闭') SELECT '有效主单金额' AS label, COALESCE(SUM(amount), 0) AS value FROM eligible UNION ALL SELECT '有效主单数', COUNT(*) FROM eligible",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-successful-refunds",
+      "ok": true,
+      "prompt": "status=SUCCESS 的退款金额和退款单数是多少？",
+      "expected": {
+        "成功退款金额": 357,
+        "成功退款单数": 3
+      },
+      "actual": {
+        "成功退款金额": 357,
+        "成功退款单数": 3
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-successful-refunds",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '成功退款金额' AS label, COALESCE(SUM(CAST(\"refund_fee\" AS REAL)), 0) AS value FROM \"data_taobao_refunds\" WHERE CAST(\"status\" AS TEXT) = 'SUCCESS' UNION ALL SELECT '成功退款单数', COUNT(*) FROM \"data_taobao_refunds\" WHERE CAST(\"status\" AS TEXT) = 'SUCCESS'",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-package-count",
+      "ok": true,
+      "prompt": "TB-T004 有多少条物流单？",
+      "expected": {
+        "物流单数": 2
+      },
+      "actual": {
+        "物流单数": 2
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-package-count",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '物流单数' AS label, COUNT(DISTINCT NULLIF(TRIM(CAST(\"out_sid\" AS TEXT)), '')) AS value FROM \"data_taobao_logistics\" WHERE CAST(\"tid\" AS TEXT) = :entity",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-split-logistics-list",
+      "ok": true,
+      "prompt": "列出拆单发货主订单及其运单数量。",
+      "expected": {
+        "拆单主订单数": 1,
+        "TB-T004运单数": 2
+      },
+      "actual": {
+        "拆单主订单数": 1,
+        "TB-T004运单数": 2
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-split-logistics-list",
+      "queryStatus": "executed",
+      "compiledSql": "WITH per_trade AS (SELECT CAST(\"tid\" AS TEXT) AS trade_id, COUNT(DISTINCT NULLIF(TRIM(CAST(\"out_sid\" AS TEXT)), '')) AS packages FROM \"data_taobao_logistics\" GROUP BY CAST(\"tid\" AS TEXT)), split AS (SELECT * FROM per_trade WHERE packages > 1) SELECT '拆单主订单数' AS label, COUNT(*) AS value FROM split UNION ALL SELECT trade_id || '运单数', packages FROM split",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-closed-order-types",
+      "ok": true,
+      "prompt": "统计关闭订单，并区分付款前关闭和付款后退款关闭。",
+      "expected": {
+        "关闭订单总数": 2,
+        "付款前关闭": 1,
+        "付款后关闭": 1
+      },
+      "actual": {
+        "关闭订单总数": 2,
+        "付款前关闭": 1,
+        "付款后关闭": 1
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-closed-order-types",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '关闭订单总数' AS label, COUNT(*) AS value FROM \"data_taobao_trades\" WHERE CAST(\"status\" AS TEXT) LIKE 'TRADE_CLOSED%' UNION ALL SELECT '付款前关闭', COUNT(*) FROM \"data_taobao_trades\" WHERE CAST(\"status\" AS TEXT) LIKE 'TRADE_CLOSED%' AND (\"pay_time\" IS NULL OR TRIM(CAST(\"pay_time\" AS TEXT)) = '') UNION ALL SELECT '付款后关闭', COUNT(*) FROM \"data_taobao_trades\" WHERE CAST(\"status\" AS TEXT) LIKE 'TRADE_CLOSED%' AND \"pay_time\" IS NOT NULL AND TRIM(CAST(\"pay_time\" AS TEXT)) <> ''",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-closed-order-shipping",
+      "ok": true,
+      "prompt": "TB-T003 已关闭，还可以发货吗？",
+      "expected": {
+        "可发货": 0
+      },
+      "actual": {
+        "可发货": 0
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-closed-order-shipping",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '可发货' AS label, CASE WHEN CAST(\"status\" AS TEXT) LIKE 'TRADE_CLOSED%' THEN 0 ELSE 1 END AS value, CAST(\"status\" AS TEXT) AS note FROM \"data_taobao_trades\" WHERE CAST(\"tid\" AS TEXT) = :entity",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-paid-nonclosed-amount",
+      "ok": true,
+      "prompt": "已支付且未关闭主单 payment 合计是多少？",
+      "expected": {
+        "已支付未关闭主单金额": 1042.9
+      },
+      "actual": {
+        "已支付未关闭主单金额": 1042.9
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-paid-nonclosed-amount",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '已支付未关闭主单金额' AS label, COALESCE(SUM(CAST(\"payment\" AS REAL)), 0) AS value FROM \"data_taobao_trades\" WHERE \"pay_time\" IS NOT NULL AND TRIM(CAST(\"pay_time\" AS TEXT)) <> '' AND CAST(\"status\" AS TEXT) NOT LIKE 'TRADE_CLOSED%'",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "taobao-net-after-successful-refund",
+      "ok": true,
+      "prompt": "已支付且未关闭主单 payment 扣除成功退款后的净额是多少？",
+      "expected": {
+        "已支付未关闭金额": 1042.9,
+        "成功退款金额": 357,
+        "退款后净额": 685.9
+      },
+      "actual": {
+        "已支付未关闭金额": 1042.9,
+        "成功退款金额": 357,
+        "退款后净额": 685.9
+      },
+      "mismatches": [],
+      "matchedRuleId": "taobao-net-after-successful-refund",
+      "queryStatus": "executed",
+      "compiledSql": "WITH paid AS (SELECT COALESCE(SUM(CAST(\"payment\" AS REAL)), 0) AS value FROM \"data_taobao_trades\" WHERE \"pay_time\" IS NOT NULL AND TRIM(CAST(\"pay_time\" AS TEXT)) <> '' AND CAST(\"status\" AS TEXT) NOT LIKE 'TRADE_CLOSED%'), refunded AS (SELECT COALESCE(SUM(CAST(\"refund_fee\" AS REAL)), 0) AS value FROM \"data_taobao_refunds\" WHERE CAST(\"status\" AS TEXT) = 'SUCCESS') SELECT '已支付未关闭金额' AS label, paid.value AS value FROM paid UNION ALL SELECT '成功退款金额', refunded.value FROM refunded UNION ALL SELECT '退款后净额', paid.value - refunded.value FROM paid, refunded",
+      "evidenceTypes": [
+        "table",
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-latest-platform-amount",
+      "ok": true,
+      "prompt": "先按o_id保留最大ts版本，再统计各来源平台的实付金额，不能重复累计历史版本。",
+      "expected": {
+        "抖音实付金额": 545,
+        "淘宝实付金额": 865,
+        "自有商城实付金额": 88,
+        "最新订单数": 8
+      },
+      "actual": {
+        "抖音实付金额": 545,
+        "淘宝实付金额": 865,
+        "自有商城实付金额": 88,
+        "最新订单数": 8
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-latest-platform-amount",
+      "queryStatus": "executed",
+      "compiledSql": "WITH ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY CAST(\"o_id\" AS TEXT) ORDER BY CAST(\"ts\" AS INTEGER) DESC) AS rn FROM \"data_jushuitan_orders\"), latest AS (SELECT * FROM ranked WHERE rn = 1) SELECT CAST(\"source_platform\" AS TEXT) || '实付金额' AS label, COALESCE(SUM(CAST(\"paid_amount\" AS REAL)), 0) AS value FROM latest GROUP BY CAST(\"source_platform\" AS TEXT) UNION ALL SELECT '最新订单数', COUNT(*) FROM latest",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-latest-order-version",
+      "ok": true,
+      "prompt": "先按 o_id 保留最大ts版本，核对最新版本订单数、取消数、金额和历史版本重复差额。",
+      "expected": {
+        "最新订单记录数": 8,
+        "取消订单数": 1,
+        "原始版本金额": 1774,
+        "最新订单金额": 1498,
+        "重复版本差额": 276
+      },
+      "actual": {
+        "最新订单记录数": 8,
+        "取消订单数": 1,
+        "原始版本金额": 1774,
+        "最新订单金额": 1498,
+        "重复版本差额": 276
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-latest-order-version",
+      "queryStatus": "executed",
+      "compiledSql": "WITH ranked AS (SELECT *, ROW_NUMBER() OVER (PARTITION BY CAST(\"o_id\" AS TEXT) ORDER BY CAST(\"ts\" AS INTEGER) DESC) AS rn FROM \"data_jushuitan_orders\"), latest AS (SELECT * FROM ranked WHERE rn = 1), totals AS (SELECT COALESCE(SUM(CAST(\"paid_amount\" AS REAL)), 0) AS raw_total FROM \"data_jushuitan_orders\"), latest_total AS (SELECT COALESCE(SUM(CAST(\"paid_amount\" AS REAL)), 0) AS value FROM latest) SELECT '最新订单记录数' AS label, COUNT(*) AS value FROM latest UNION ALL SELECT '取消订单数', COUNT(*) FROM latest WHERE CAST(\"status\" AS TEXT) = 'Cancelled' UNION ALL SELECT '原始版本金额', raw_total FROM totals UNION ALL SELECT '最新订单金额', value FROM latest_total UNION ALL SELECT '重复版本差额', totals.raw_total - latest_total.value FROM totals, latest_total",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-multi-package-threshold",
+      "ok": true,
+      "prompt": "一单多包裹率是否超过20%？",
+      "expected": {
+        "一单多包裹率": 0.2857142857142857,
+        "阈值": 0.2,
+        "是否超过阈值": 1
+      },
+      "actual": {
+        "一单多包裹率": 0.28571429,
+        "阈值": 0.2,
+        "是否超过阈值": 1
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-multi-package-threshold",
+      "queryStatus": "executed",
+      "compiledSql": "WITH per_order AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages FROM \"data_jushuitan_outbounds\" GROUP BY CAST(\"o_id\" AS TEXT)), metric AS (SELECT COALESCE(SUM(CASE WHEN packages > 1 THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0), 0) AS rate FROM per_order) SELECT '一单多包裹率' AS label, rate AS value FROM metric UNION ALL SELECT '阈值', :threshold UNION ALL SELECT '是否超过阈值', CASE WHEN rate > :threshold THEN 1 ELSE 0 END FROM metric",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-warehouse-carrier-performance",
+      "ok": true,
+      "prompt": "按仓库和物流公司统计销售出库包裹数、订单数和一单多包裹率。",
+      "expected": {
+        "华东仓/中通快递包裹数": 2,
+        "华东仓/京东快递包裹数": 1,
+        "华东仓/顺丰速运包裹数": 2,
+        "华南仓/圆通速递包裹数": 2,
+        "华南仓/顺丰速运包裹数": 2,
+        "一单多包裹率": 0.2857142857142857
+      },
+      "actual": {
+        "华东仓/中通快递包裹数": 2,
+        "华东仓/京东快递包裹数": 1,
+        "华东仓/顺丰速运包裹数": 2,
+        "华南仓/圆通速递包裹数": 2,
+        "华南仓/顺丰速运包裹数": 2,
+        "华东仓/中通快递订单数": 1,
+        "华东仓/京东快递订单数": 1,
+        "华东仓/顺丰速运订单数": 2,
+        "华南仓/圆通速递订单数": 1,
+        "华南仓/顺丰速运订单数": 2,
+        "一单多包裹率": 0.28571429
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-warehouse-carrier-performance",
+      "queryStatus": "executed",
+      "compiledSql": "WITH grouped AS (SELECT CAST(\"warehouse_name\" AS TEXT) AS warehouse, CAST(\"lc_name\" AS TEXT) AS carrier, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages, COUNT(DISTINCT CAST(\"o_id\" AS TEXT)) AS orders FROM \"data_jushuitan_outbounds\" GROUP BY CAST(\"warehouse_name\" AS TEXT), CAST(\"lc_name\" AS TEXT)), per_order AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages FROM \"data_jushuitan_outbounds\" GROUP BY CAST(\"o_id\" AS TEXT)) SELECT warehouse || '/' || carrier || '包裹数' AS label, packages AS value FROM grouped UNION ALL SELECT warehouse || '/' || carrier || '订单数', orders FROM grouped UNION ALL SELECT '一单多包裹率', COALESCE(SUM(CASE WHEN packages > 1 THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0), 0) FROM per_order",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-outbound-packages",
+      "ok": true,
+      "prompt": "销售出库覆盖多少订单？有多少包裹和一单多包裹订单？",
+      "expected": {
+        "销售出库单数": 9,
+        "覆盖订单数": 7,
+        "一单多包裹订单数": 2,
+        "JST-O002包裹数": 2,
+        "JST-O004包裹数": 2
+      },
+      "actual": {
+        "销售出库单数": 9,
+        "覆盖订单数": 7,
+        "一单多包裹订单数": 2,
+        "JST-O002包裹数": 2,
+        "JST-O004包裹数": 2
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-outbound-packages",
+      "queryStatus": "executed",
+      "compiledSql": "WITH per_order AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages FROM \"data_jushuitan_outbounds\" GROUP BY CAST(\"o_id\" AS TEXT)) SELECT '销售出库单数' AS label, COUNT(*) AS value FROM \"data_jushuitan_outbounds\" UNION ALL SELECT '覆盖订单数', COUNT(*) FROM per_order UNION ALL SELECT '一单多包裹订单数', COUNT(*) FROM per_order WHERE packages > 1 UNION ALL SELECT 'JST-O002包裹数', COALESCE(MAX(packages), 0) FROM per_order WHERE order_id = 'JST-O002' UNION ALL SELECT 'JST-O004包裹数', COALESCE(MAX(packages), 0) FROM per_order WHERE order_id = 'JST-O004'",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-confirmed-refunds-by-merchant",
+      "ok": true,
+      "prompt": "按商家编码关联订单商品与售后，统计已确认退款金额，并说明无法唯一归属的订单数。",
+      "expected": {
+        "RED-M已确认退款金额": 238,
+        "WHITE-S已确认退款金额": 94,
+        "HAT-FREE已确认退款金额": 49,
+        "SHOE-38已确认退款金额": 189,
+        "可归属退款总额": 570,
+        "无法唯一归属订单数": 0
+      },
+      "actual": {
+        "HAT-FREE已确认退款金额": 49,
+        "RED-M已确认退款金额": 238,
+        "SHOE-38已确认退款金额": 189,
+        "WHITE-S已确认退款金额": 94,
+        "可归属退款总额": 570,
+        "无法唯一归属订单数": 0
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-confirmed-refunds-by-merchant",
+      "queryStatus": "executed",
+      "compiledSql": "WITH refund_items AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, CAST(\"outer_sku_id\" AS TEXT) AS merchant, COUNT(*) OVER (PARTITION BY CAST(\"o_id\" AS TEXT)) AS item_candidates FROM \"data_jushuitan_order_items\" WHERE CAST(\"refund_qty\" AS REAL) > 0), confirmed AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, CAST(\"actual_refund\" AS REAL) AS refund_amount FROM \"data_jushuitan_aftersales\" WHERE CAST(\"status\" AS TEXT) = 'Confirmed' AND CAST(\"actual_refund\" AS REAL) > 0), resolved AS (SELECT refund_items.merchant, confirmed.refund_amount FROM confirmed JOIN refund_items ON refund_items.order_id = confirmed.order_id WHERE refund_items.item_candidates = 1), ambiguous AS (SELECT COUNT(*) AS value FROM confirmed LEFT JOIN refund_items ON refund_items.order_id = confirmed.order_id WHERE refund_items.order_id IS NULL OR refund_items.item_candidates <> 1) SELECT merchant || '已确认退款金额' AS label, SUM(refund_amount) AS value FROM resolved GROUP BY merchant UNION ALL SELECT '可归属退款总额', COALESCE(SUM(refund_amount), 0) FROM resolved UNION ALL SELECT '无法唯一归属订单数', value FROM ambiguous",
+      "evidenceTypes": [
+        "table",
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-confirmed-refunds",
+      "ok": true,
+      "prompt": "已确认且退款金额大于0的售后有多少单，退款合计是多少？",
+      "expected": {
+        "已确认退款金额": 570,
+        "已确认退款单数": 5
+      },
+      "actual": {
+        "已确认退款金额": 570,
+        "已确认退款单数": 5
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-confirmed-refunds",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '已确认退款金额' AS label, COALESCE(SUM(CAST(\"actual_refund\" AS REAL)), 0) AS value FROM \"data_jushuitan_aftersales\" WHERE CAST(\"status\" AS TEXT) = 'Confirmed' AND CAST(\"actual_refund\" AS REAL) > 0 UNION ALL SELECT '已确认退款单数', COUNT(*) FROM \"data_jushuitan_aftersales\" WHERE CAST(\"status\" AS TEXT) = 'Confirmed' AND CAST(\"actual_refund\" AS REAL) > 0",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-logistics-issue-trace",
+      "ok": true,
+      "prompt": "找出物流回传失败或待处理的订单，并显示平台线上单号so_id。",
+      "expected": {
+        "物流异常记录数": 2,
+        "Pending:JST-O002/DY-M002": 1,
+        "Failed:JST-O005/TB-T006": 1
+      },
+      "actual": {
+        "物流异常记录数": 2,
+        "Pending:JST-O002/DY-M002": 1,
+        "Failed:JST-O005/TB-T006": 1
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-logistics-issue-trace",
+      "queryStatus": "executed",
+      "compiledSql": "WITH issues AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, CAST(\"so_id\" AS TEXT) AS online_id, CAST(\"sync_status\" AS TEXT) AS status FROM \"data_jushuitan_logistics\" WHERE CAST(\"sync_status\" AS TEXT) IN ('Failed', 'Pending')) SELECT '物流异常记录数' AS label, COUNT(*) AS value FROM issues UNION ALL SELECT status || ':' || order_id || '/' || online_id, 1 FROM issues",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "jushuitan-logistics-sync-status",
+      "ok": true,
+      "prompt": "物流同步失败和待处理分别有多少条？",
+      "expected": {
+        "同步失败": 1,
+        "待处理": 1
+      },
+      "actual": {
+        "同步失败": 1,
+        "待处理": 1
+      },
+      "mismatches": [],
+      "matchedRuleId": "jushuitan-logistics-sync-status",
+      "queryStatus": "executed",
+      "compiledSql": "SELECT '同步失败' AS label, COUNT(*) AS value FROM \"data_jushuitan_logistics\" WHERE CAST(\"sync_status\" AS TEXT) = 'Failed' UNION ALL SELECT '待处理', COUNT(*) FROM \"data_jushuitan_logistics\" WHERE CAST(\"sync_status\" AS TEXT) = 'Pending'",
+      "evidenceTypes": [
+        "table",
+        "knowledgeRule",
+        "queryRuntime"
+      ],
+      "error": ""
+    },
+    {
+      "id": "unsupported-refund-rate-is-blocked",
+      "ok": true,
+      "prompt": "按月份计算跨平台净退款率，分母使用已结算商品件数，并把售后与结算宽表关联。",
+      "expected": {},
+      "actual": {},
+      "mismatches": [],
+      "matchedRuleId": null,
+      "queryStatus": "blocked",
+      "compiledSql": null,
+      "evidenceTypes": [
+        "table",
+        "knowledgeGuard"
+      ],
+      "error": ""
+    }
+  ]
+}

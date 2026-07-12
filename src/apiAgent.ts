@@ -2,24 +2,24 @@ import { fetchJson, fetchJsonStrict } from "./apiClient";
 import { emptyActionDrafts } from "./emptyWorkspaceData";
 import type { ActionDraftPayload, AgentAskResult } from "./types";
 
-export function askAgent(prompt: string) {
+export function askAgent(prompt: string, options: { parentRunKey?: string; branchLabel?: string; workspaceId?: string } = {}) {
   return fetchJsonStrict<AgentAskResult>("/api/agent/ask", {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, ...options }),
   });
 }
 
-export function askAgentReadOnly(prompt: string) {
+export function askAgentReadOnly(prompt: string, workspaceId?: string) {
   return fetchJsonStrict<AgentAskResult>("/api/agent/explain", {
     method: "POST",
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, workspaceId }),
   });
 }
 
-export function confirmAction(actionKey: string, confirm = false, reject = false) {
+export function confirmAction(actionKey: string, confirm = false, reject = false, workspaceId?: string) {
   return fetchJson<Record<string, unknown>>("/api/actions/confirm", { ok: false, dryRun: true }, {
     method: "POST",
-    body: JSON.stringify({ actionKey, confirm, reject }),
+    body: JSON.stringify({ actionKey, confirm, reject, workspaceId }),
   });
 }
 

@@ -1,6 +1,6 @@
 .agentTargetBoundary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   align-items: center;
   border: 1px solid var(--bi-border);
@@ -28,8 +28,8 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  max-width: 420px;
+  justify-content: flex-start;
+  max-width: 100%;
 }
 
 .agentBoundaryChips span {
@@ -566,6 +566,17 @@
   margin-top: 12px;
 }
 
+.agentDraftQueue > summary {
+  color: var(--bi-accent-strong);
+  font-size: 12px;
+  font-weight: 760;
+  cursor: pointer;
+}
+
+.agentDraftQueue[open] > summary {
+  margin-bottom: 10px;
+}
+
 .agentDraftQueueItem {
   min-width: 0;
   display: flex;
@@ -650,6 +661,48 @@
   display: grid;
   gap: 8px;
   margin-top: 12px;
+}
+
+.agentDraftBusinessSummary {
+  display: block;
+  margin-top: 6px;
+  color: var(--bi-text);
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.35;
+}
+
+.agentContextDetails {
+  grid-column: 1 / -1;
+}
+
+.agentContextDetailsBody {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.agentDraftStickyActions {
+  flex: 0 0 auto;
+}
+
+.agentPrimaryApproval {
+  position: sticky;
+  z-index: 6;
+  bottom: 0;
+  margin: 14px 20px 0;
+  padding-bottom: 12px;
+}
+
+.agentApprovalPanel {
+  border-color: color-mix(in srgb, var(--bi-accent) 38%, var(--bi-border)) !important;
+  box-shadow: 0 -10px 24px rgb(15 23 42 / 9%);
+}
+
+@media (max-width: 720px) {
+  .agentPrimaryApproval {
+    margin-inline: 10px;
+  }
 }
 
 .evidenceProgressiveGrid {
@@ -766,6 +819,11 @@
   .evidenceGrid > .productActivationPanel,
   .wideArticle {
     grid-column: 1 / -1;
+  }
+
+  .evidenceNextAction {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .evidenceNarrativeSteps,

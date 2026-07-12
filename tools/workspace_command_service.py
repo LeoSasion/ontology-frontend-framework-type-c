@@ -9,6 +9,11 @@ from bi_cli_core import now_iso, quote_identifier, workspace_slug
 
 
 WORKSPACE_SCOPED_TABLES = [
+    "context_rules",
+    "context_terms",
+    "confirmed_queries",
+    "analysis_runs",
+    "query_plan_receipts",
     "dashboard_widgets",
     "dashboards",
     "navigation_modules",
@@ -91,8 +96,9 @@ def workspace_create_command(
             """,
             (workspace_id, args.name, now_iso()),
         )
+        set_system_flag(connection, "active_workspace_id", workspace_id)
         connection.commit()
-    return {"ok": True, "created": proposed}
+    return {"ok": True, "confirmed": True, "created": {**proposed, "isActive": True}}
 
 
 def workspace_select_command(

@@ -66,6 +66,52 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("status")
     sub.add_parser("quality-doctor")
 
+    sub.add_parser("context-pack")
+
+    context_term = sub.add_parser("context-term")
+    context_term.add_argument("--term", default="")
+    context_term.add_argument("--name", required=True)
+    context_term.add_argument("--definition", required=True)
+    context_term.add_argument("--alias", action="append", default=[])
+    context_term.add_argument("--scope-type", default="workspace", choices=["workspace", "source", "table", "field", "metric"])
+    context_term.add_argument("--scope-ref", default="")
+    context_term.add_argument("--status", default="draft", choices=["draft", "confirmed", "deprecated"])
+    context_term.add_argument("--source", default="manual")
+    context_term.add_argument("--evidence", action="append", default=[])
+    context_term.add_argument("--yes", action="store_true")
+
+    context_rule = sub.add_parser("context-rule")
+    context_rule.add_argument("--rule", default="")
+    context_rule.add_argument("--title", required=True)
+    context_rule.add_argument("--statement", required=True)
+    context_rule.add_argument("--type", default="other", choices=["definition", "enum", "unit", "null", "default_filter", "canonical_source", "aggregation", "other"])
+    context_rule.add_argument("--applies-to", action="append", default=[])
+    context_rule.add_argument("--status", default="draft", choices=["draft", "confirmed", "deprecated"])
+    context_rule.add_argument("--source", default="manual")
+    context_rule.add_argument("--evidence", action="append", default=[])
+    context_rule.add_argument("--yes", action="store_true")
+
+    query_receipts = sub.add_parser("query-receipts")
+    query_receipts.add_argument("--receipt", default="")
+    query_receipts.add_argument("--limit", type=int, default=20)
+
+    export_evidence = sub.add_parser("export-evidence")
+    export_evidence.add_argument("--receipt", required=True)
+    export_evidence.add_argument("--output", default="")
+
+    confirmed_queries = sub.add_parser("confirmed-queries")
+    confirmed_queries.add_argument("--status", default="", choices=["", "candidate", "confirmed", "stale", "deprecated"])
+    confirmed_queries.add_argument("--limit", type=int, default=20)
+
+    confirm_query = sub.add_parser("confirm-query")
+    confirm_query.add_argument("--query", required=True)
+    confirm_query.add_argument("--status", default="confirmed", choices=["confirmed", "deprecated"])
+    confirm_query.add_argument("--yes", action="store_true")
+
+    analysis_runs = sub.add_parser("analysis-runs")
+    analysis_runs.add_argument("--run", default="")
+    analysis_runs.add_argument("--limit", type=int, default=30)
+
     workspace_create = sub.add_parser("workspace-create")
     workspace_create.add_argument("--name", required=True)
     workspace_create.add_argument("--yes", action="store_true")
@@ -102,6 +148,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     source_intelligence_run = sub.add_parser("source-intelligence")
     source_intelligence_run.add_argument("inputs", nargs="*")
+    source_intelligence_run.add_argument("--workspace", default="")
     source_intelligence_run.add_argument("--output-dir")
     source_intelligence_run.add_argument("--label")
 
@@ -397,6 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--measure", default="*")
     query.add_argument("--agg", default="count")
     query.add_argument("--limit", type=int, default=20)
+    query.add_argument("--request", default="")
 
     query_table = sub.add_parser("query-table")
     query_table.add_argument("--table")
@@ -548,12 +596,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     ask = sub.add_parser("ask")
     ask.add_argument("--read-only", action="store_true")
+    ask.add_argument("--parent-run", default="")
+    ask.add_argument("--branch-label", default="")
+    ask.add_argument("--workspace", default="")
     ask.add_argument("prompt", nargs="+")
 
     confirm = sub.add_parser("confirm-action")
     confirm.add_argument("action_key")
     confirm.add_argument("--reject", action="store_true")
     confirm.add_argument("--yes", action="store_true")
+    confirm.add_argument("--workspace", default="")
 
     drafts = sub.add_parser("action-drafts")
     drafts.add_argument("--limit", type=int, default=12)

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FieldConfig, FormulaMutationPayload } from "./types";
 import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 import type { QueryOptions, SourceWorkbenchProps } from "./sourceWorkbenchContracts";
@@ -31,6 +31,7 @@ import { useSourceWorkbenchImportController } from "./useSourceWorkbenchImportCo
 import { biText } from "./components/Bilingual";
 
 export function useSourceWorkbenchState({
+  focusedTableKey,
   status,
   preview,
   query,
@@ -171,6 +172,8 @@ export function useSourceWorkbenchState({
   const [businessDashboardResult, setBusinessDashboardResult] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const sourceProfileInFlightRef = useRef(false);
+  const sourceProfileRecoveryKeyRef = useRef("");
   const importController = useSourceWorkbenchImportController({
     preview,
     importPolicies,
@@ -179,6 +182,14 @@ export function useSourceWorkbenchState({
     onPreviewFolderImport,
     onCommitFolderImport,
     onImportPolicy,
+    onCommittedInputs: async (inputs) => {
+      setSourceProfileInputs(inputs.join("\n"));
+      await runSourceProfile(biText("正在生成证据", "Generating evidence"), {
+        inputs,
+        label: sourceProfileLabel.trim() || "Source profile",
+        stayOnPage: true,
+      });
+    },
   });
   const connectorController = useSourceWorkbenchConnectorController({
     firstTableKey,
@@ -201,6 +212,34 @@ export function useSourceWorkbenchState({
     setManagedSourceKey((current) => tableKeySet.has(current) ? current : firstTableKey);
     setSourceRenameName((current) => current || firstTableName);
   }, [firstTableKey, tableKeySet, tables]);
+
+  useEffect(() => {
+    if (!focusedTableKey || !tableKeySet.has(focusedTableKey)) return;
+    setActiveTableKey(focusedTableKey);
+    setManagedSourceKey(focusedTableKey);
+    setSourceRenameName(managedSourceDisplayName(tables, focusedTableKey));
+  }, [focusedTableKey, tableKeySet, tables]);
+
+  useEffect(() => {
+    if (!tables.length || sourceIntelligenceRuns.length || busy || sourceProfileInFlightRef.current) return;
+    const inputs = Array.from(new Set(importJobs
+      .filter((job) => job.status === "success" && job.source_file.trim())
+      .map((job) => job.source_file.trim())));
+    if (!inputs.length) return;
+    const recoveryKey = `${status.workspace.id}:${inputs.join("\n")}`;
+    if (sourceProfileRecoveryKeyRef.current === recoveryKey) return;
+    const recoveryTimer = window.setTimeout(() => {
+      if (sourceProfileInFlightRef.current || sourceProfileRecoveryKeyRef.current === recoveryKey) return;
+      sourceProfileRecoveryKeyRef.current = recoveryKey;
+      setSourceProfileInputs(inputs.join("\n"));
+      void runSourceProfile(biText("正在恢复证据生成", "Resuming evidence generation"), {
+        inputs,
+        label: sourceProfileLabel.trim() || "Source profile",
+        stayOnPage: true,
+      });
+    }, 1500);
+    return () => window.clearTimeout(recoveryTimer);
+  }, [busy, importJobs, sourceIntelligenceRuns.length, sourceProfileLabel, status.workspace.id, tables.length]);
 
   useEffect(() => {
     if (!navigationModules.length) return;
@@ -278,6 +317,7 @@ export function useSourceWorkbenchState({
   }
 
   async function runSourceProfile(label: string, options: SourceIntelligenceRunOptions) {
+    sourceProfileInFlightRef.current = true;
     setBusy(label);
     setSourceProfileResult(null);
     setSourceProfileError("");
@@ -287,6 +327,7 @@ export function useSourceWorkbenchState({
     } catch (error) {
       setSourceProfileError(sourceProfileErrorMessage(error));
     } finally {
+      sourceProfileInFlightRef.current = false;
       setBusy(null);
     }
   }

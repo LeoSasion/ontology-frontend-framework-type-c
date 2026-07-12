@@ -1,6 +1,6 @@
 import { fetchJson, fetchJsonStrict } from "./apiClient";
 import { emptyImportPreview } from "./emptyWorkspaceData";
-import type { SourceIntelligenceRunRequest } from "./sourceIntelligenceRunModel";
+import type { SourceIntelligenceRunRequest, SourceIntelligenceRunResult } from "./sourceIntelligenceRunModel";
 import type { FolderImportPlan, ImportPreview } from "./types";
 
 const emptyFolderImportPlan: FolderImportPlan = {
@@ -207,7 +207,7 @@ export function deleteSource(options: { source: string; confirm?: boolean }) {
 }
 
 export function runSourceIntelligence(options: SourceIntelligenceRunRequest) {
-  return fetchJsonStrict<Record<string, unknown>>("/api/source-intelligence/run", {
+  return fetchJsonStrict<SourceIntelligenceRunResult>("/api/source-intelligence/run", {
     method: "POST",
     body: JSON.stringify(options),
   });

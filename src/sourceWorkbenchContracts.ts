@@ -47,6 +47,7 @@ export type MetricQueryOptions = {
 };
 
 export type SourceWorkbenchProps = {
+  focusedTableKey?: string;
   status: WorkspaceStatus;
   preview: ImportPreview;
   query: QueryResult;

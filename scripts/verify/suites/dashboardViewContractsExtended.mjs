@@ -255,7 +255,7 @@ export function appendDashboardViewContractExtendedChecks(context) {
           dashboardCanvasStateSource.includes("const [draftName, setDraftName] = useState") &&
           dashboardCanvasStateSource.includes("const [selectedWidgetKey, setSelectedWidgetKey] = useState") &&
           dashboardCanvasStateSource.includes("const selectedWidget = useMemo(") &&
-          dashboardCanvasStateSource.includes("dashboardWidgets.find((widget) => widget.widget_key === selectedWidgetKey)") &&
+          dashboardCanvasStateSource.includes("orderedWidgets.find((widget) => widget.widget_key === selectedWidgetKey)") &&
           dashboardCanvasStateSource.includes("const fieldModel = useMemo(() => buildDashboardCanvasFieldModel({") &&
           dashboardCanvasStateSource.includes("setDraftName(dashboard?.name ?? \"\")") &&
           dashboardCanvasStateSource.includes("setCanvasWidthMode(dashboard.layout?.canvasWidthMode === \"center\" ? \"center\" : \"stretch\")") &&

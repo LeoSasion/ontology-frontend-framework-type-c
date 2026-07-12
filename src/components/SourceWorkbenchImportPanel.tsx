@@ -86,7 +86,7 @@ export function SourceWorkbenchImportPanel({
         </div>
       </div>
       <details className="advancedDetails compactAdvanced">
-        <summary>{biText("高级导入设置", "Advanced import setup")}</summary>
+        <summary>{biText("导入去重规则", "Import deduplication rules")}</summary>
         <div className="formGrid">
           <label>
             <span>{biText("目标表", "Target table")}</span>
@@ -148,7 +148,7 @@ export function SourceWorkbenchImportPanel({
         </div>
       </details>
       {importOperationReceipt ? (
-        <div className={`operationReceipt ${importOperationReceipt.tone}`} data-testid="import-operation-receipt">
+        <div aria-live="polite" className={`operationReceipt ${importOperationReceipt.tone}`} data-testid="import-operation-receipt" role="status">
           <div>
             <strong>{importOperationReceipt.title}</strong>
             <span>{importOperationReceipt.detail}</span>

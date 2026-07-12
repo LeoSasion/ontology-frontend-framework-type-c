@@ -32,6 +32,8 @@ function runWorkspaceIsolationSmoke() {
     "--json",
     "source-intelligence",
     "validation-inputs",
+    "--workspace",
+    "default",
     "--label",
     "workspace-isolation-default",
     "--output-dir",
@@ -57,6 +59,19 @@ function runWorkspaceIsolationSmoke() {
   const select = run("workspace-isolation-select", "python", ["tools/bi_cli.py", "--json", "workspace-select", "isolation_workspace", "--yes"]);
   const isolatedDrafts = run("workspace-isolation-drafts-after-select", "python", ["tools/bi_cli.py", "--json", "action-drafts", "--limit", "5"]);
   const isolatedRuns = run("workspace-isolation-runs-after-select", "python", ["tools/bi_cli.py", "--json", "source-intelligence-runs", "--limit", "5"]);
+  const explicitDefaultRun = run("workspace-isolation-explicit-default-source-intelligence", "python", [
+    "tools/bi_cli.py",
+    "--json",
+    "source-intelligence",
+    "validation-inputs",
+    "--workspace",
+    "default",
+    "--label",
+    "workspace-isolation-explicit-default",
+    "--output-dir",
+    join(verifyDataDir, "workspace-isolation-explicit-default-source-intelligence"),
+  ]);
+  const isolatedRunsAfterExplicitDefault = run("workspace-isolation-runs-after-explicit-default", "python", ["tools/bi_cli.py", "--json", "source-intelligence-runs", "--limit", "5"]);
   const blockedConfirm = draftKey
     ? runExpectedFailure("workspace-isolation-cross-confirm-blocked", "python", ["tools/bi_cli.py", "--json", "confirm-action", draftKey, "--yes"])
     : { ok: false, parsed: { error: "Missing draft key" } };
@@ -77,6 +92,8 @@ function runWorkspaceIsolationSmoke() {
       select.parsed?.workspace?.id === "isolation_workspace" &&
       isolatedDrafts.parsed?.pendingCount === 0 &&
       isolatedRuns.parsed?.sourceIntelligenceRuns?.length === 0 &&
+      explicitDefaultRun.parsed?.workspaceId === "default" &&
+      isolatedRunsAfterExplicitDefault.parsed?.sourceIntelligenceRuns?.length === 0 &&
       blockedConfirm.ok &&
       String(blockedConfirm.parsed?.error ?? "").includes("active workspace isolation_workspace") &&
       isolatedStatus.parsed?.counts?.actionDrafts === 0 &&
@@ -91,6 +108,7 @@ function runWorkspaceIsolationSmoke() {
       defaultDraftWorkspace: defaultDrafts.parsed?.actionDrafts?.find((item) => item.action_key === draftKey)?.workspace_id,
       isolatedDraftCount: isolatedDrafts.parsed?.pendingCount,
       isolatedRunCount: isolatedRuns.parsed?.sourceIntelligenceRuns?.length,
+      explicitDefaultRunWorkspace: explicitDefaultRun.parsed?.workspaceId,
       blockedError: blockedConfirm.parsed?.error,
       cleanupDecision: cleanup.parsed?.decision,
       deleteImported: deleteImported.parsed?.deletedSource,
@@ -336,11 +354,13 @@ const checks = [
   runWorkspaceSameKeyIsolationSmoke(),
   run("cli-workspace-create-dry-run", "python", ["tools/bi_cli.py", "--json", "workspace-create", "--name", "验证工作区"]),
   run("cli-workspace-create-confirm", "python", ["tools/bi_cli.py", "--json", "workspace-create", "--name", "verify_workspace", "--yes"]),
+  run("cli-status-after-workspace-create", "python", ["tools/bi_cli.py", "--json", "status"]),
   run("cli-workspace-select-dry-run", "python", ["tools/bi_cli.py", "--json", "workspace-select", "verify_workspace"]),
   run("cli-workspace-select-confirm", "python", ["tools/bi_cli.py", "--json", "workspace-select", "verify_workspace", "--yes"]),
   run("cli-status-after-workspace-select", "python", ["tools/bi_cli.py", "--json", "status"]),
   run("cli-workspace-select-default", "python", ["tools/bi_cli.py", "--json", "workspace-select", "default", "--yes"]),
   run("cli-workspace-delete-target-create", "python", ["tools/bi_cli.py", "--json", "workspace-create", "--name", "delete_workspace_target", "--yes"]),
+  run("cli-workspace-delete-target-select-default", "python", ["tools/bi_cli.py", "--json", "workspace-select", "default", "--yes"]),
   run("cli-workspace-delete-dry-run", "python", ["tools/bi_cli.py", "--json", "workspace-delete", "delete_workspace_target"]),
   run("cli-workspace-delete-confirm", "python", ["tools/bi_cli.py", "--json", "workspace-delete", "delete_workspace_target", "--yes"]),
   runExpectedFailure("cli-workspace-delete-default-blocked", "python", ["tools/bi_cli.py", "--json", "workspace-delete", "default", "--yes"]),

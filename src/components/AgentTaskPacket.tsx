@@ -35,7 +35,7 @@ export function AgentTaskPacket({ currentDraft, fallbackKind, dashboardDraft, da
   const erpNotSelectedCount = numberValue(erpUnitLibrary?.notSelectedUnitCount);
 
   return (
-    <div className={`agentTaskPacket ${currentDraft ? "draft" : "readonly"}`} data-testid="agent-task-packet">
+    <div className={`agentTaskPacket agentTaskPacketTechnical ${currentDraft ? "draft" : "readonly"}`} data-testid="agent-task-packet">
       <div className="agentTaskPacketMain">
         <span className="storyMode"><Bilingual zh="Agent 任务包" en="Agent task packet" /></span>
         <strong>{currentDraft ? actionKindText(currentDraft.kind) : actionKindText(fallbackKind)}</strong>

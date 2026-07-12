@@ -695,13 +695,21 @@ def erp_unit_library_command(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def build_agent_dashboard_create_draft(connection: sqlite3.Connection, table_key: str | None, prompt: str, limit: int = 8, template_key: str = "business") -> dict[str, Any]:
+def build_agent_dashboard_create_draft(
+    connection: sqlite3.Connection,
+    table_key: str | None,
+    prompt: str,
+    limit: int = 8,
+    template_key: str = "business",
+    resolved_widget: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     return build_agent_dashboard_create_draft_service(
         connection,
         table_key,
         prompt,
         limit,
         template_key=template_key,
+        resolved_widget=resolved_widget,
         build_business_dashboard_payload=build_business_dashboard_payload,
     )
 

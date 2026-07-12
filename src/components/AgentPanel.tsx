@@ -1,8 +1,9 @@
 import "./agentEvidenceWorkspace.css";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import type { ActionDraft, AgentAskResult, WorkbenchPayload } from "../types";
 import {
   actionImpactGroup,
+  actionTarget,
   actionNeedsDashboard,
   confidenceText,
   dashboardCreateDraft,
@@ -13,19 +14,32 @@ import {
   objectRecord,
   llmModeText,
   resultActionKey,
+  stringField,
   sourceRunPrompt,
   viewPrompt,
   type AnswerEvidenceStep,
   type CheckedItem,
 } from "../agentPanelModel";
+import { businessIdentifier } from "../businessPresentation";
+import { lazyWithRetry } from "../lazyWithRetry";
 import { AgentAnswerCard } from "./AgentAnswerCard";
-import { AgentCanAnswerPanel, type AgentCanAnswerSuggestion } from "./AgentCanAnswerPanel";
+import type { AgentCanAnswerSuggestion } from "./AgentCanAnswerPanel";
 import { AgentContextPlanPanel } from "./AgentContextPlanPanel";
-import { AgentEvidenceAuditPanels } from "./AgentEvidenceAuditPanels";
 import { AgentPendingChangesPanel } from "./AgentPendingChangesPanel";
 import { AgentPromptComposer } from "./AgentPromptComposer";
 import { AgentTaskPacket } from "./AgentTaskPacket";
 import { Bilingual, biText, useLanguage } from "./Bilingual";
+
+const AgentTrustAdvancedPanel = lazyWithRetry(() => import("./AgentTrustAdvancedPanel"));
+const AgentCanAnswerPanel = lazyWithRetry(() => import("./AgentCanAnswerPanel").then((module) => ({ default: module.AgentCanAnswerPanel })));
+const AgentEvidenceAuditPanels = lazyWithRetry(() => import("./AgentEvidenceAuditPanels").then((module) => ({ default: module.AgentEvidenceAuditPanels })));
+
+function businessPromptText(value: string, workbench: WorkbenchPayload) {
+  if (!value.trim()) return "";
+  let text = value;
+  for (const table of workbench.tables) text = text.replaceAll(table.table_key, table.display_name);
+  return businessIdentifier(text, biText("基于当前工作区生成一个图表", "Create a chart from the current workspace"));
+}
 
 type AgentPanelProps = {
   result: AgentAskResult;
@@ -33,24 +47,27 @@ type AgentPanelProps = {
   workbench: WorkbenchPayload;
   lastActionResult: Record<string, unknown> | null;
   onAsk: (prompt: string) => Promise<void>;
+  onAskBranch: (prompt: string, parentRunKey: string, branchLabel?: string) => Promise<void>;
   onConfirmDryRun: (actionKey: string) => Promise<void>;
   onConfirmAction: (actionKey: string) => Promise<void>;
   onRejectAction: (actionKey: string) => Promise<void>;
   onOpenSources: () => void;
 };
 
-export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, onAsk, onConfirmDryRun, onConfirmAction, onRejectAction, onOpenSources }: AgentPanelProps) {
+export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, onAsk, onAskBranch, onConfirmDryRun, onConfirmAction, onRejectAction, onOpenSources }: AgentPanelProps) {
   const { resolvedLanguage } = useLanguage();
   const [prompt, setPrompt] = useState(() => defaultAgentPrompt(resolvedLanguage, workbench));
   const [promptTouched, setPromptTouched] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
+  const resultRequest = result.queryPlanReceipt?.request ?? result.answerCard?.queryPlanReceipt?.request ?? "";
+  const visibleResultRequest = businessPromptText(resultRequest, workbench);
 
   useEffect(() => {
     if (!promptTouched) {
-      setPrompt(defaultAgentPrompt(resolvedLanguage, workbench));
+      setPrompt(visibleResultRequest || defaultAgentPrompt(resolvedLanguage, workbench));
     }
-  }, [promptTouched, resolvedLanguage, workbench]);
+  }, [promptTouched, resolvedLanguage, visibleResultRequest, workbench]);
 
   async function submit(nextPrompt = prompt) {
     const normalizedPrompt = nextPrompt.trim();
@@ -82,9 +99,22 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   const activeHasWriteDraft = Boolean(currentDraft) || result.requiresConfirmation;
   const activeBoundaryBlocked = !currentDraft && blockedDashboardWrite;
   const activeActionResult = activeActionKey && resultActionKey(lastActionResult) === activeActionKey ? lastActionResult : null;
+  const canBranchAnalysis = Boolean(result.analysisRun?.run_key) && (
+    result.analysisRun?.status === "confirmed"
+    || (lastActionResult?.confirmed === true && resultActionKey(lastActionResult) === result.analysisRun?.action_key)
+  );
   const currentDashboardDraft = dashboardCreateDraft(currentDraft);
   const currentDashboardDraftWidgets = currentDashboardDraft ? dashboardDraftWidgets(currentDashboardDraft) : [];
   const currentDashboardDraftTable = currentDashboardDraft ? String(currentDashboardDraft.defaultTableKey ?? currentDraft?.payload.tableKey ?? "-") : "-";
+  const currentDraftWidget = currentDashboardDraftWidgets[0];
+  const currentDraftMeasure = currentDraftWidget ? stringField(currentDraftWidget, "measure") : "";
+  const currentDraftAggregation = currentDraftWidget ? stringField(currentDraftWidget, "aggregation") : "";
+  const currentDraftBusinessSummary = currentDraftWidget ? [
+    stringField(currentDraftWidget, "title") || biText("单图草案", "Single-chart draft"),
+    currentDraftMeasure
+      ? `${currentDraftAggregation === "sum" ? biText("合计", "Total") : currentDraftAggregation === "avg" ? biText("平均", "Average") : ""} ${currentDraftMeasure}`.trim()
+      : "",
+  ].filter(Boolean).join(" · ") : "";
   const targetBoundaryState = activeBoundaryBlocked
     ? "blocked"
     : canConfirmCurrent
@@ -92,6 +122,12 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       : "readonly";
   const latestRun = workbench.sourceIntelligenceRuns[0];
   const primaryTable = workbench.tables[0];
+  const tableNameByKey = new Map(workbench.tables.map((table) => [table.table_key, table.display_name]));
+  const resolveDraftTarget = (draft: ActionDraft) => {
+    let target = actionTarget(draft);
+    for (const [tableKey, displayName] of tableNameByKey) target = target.replaceAll(tableKey, displayName);
+    return businessIdentifier(target, biText("当前工作区", "Current workspace"));
+  };
   const hasData = workbench.tables.length > 0;
   const topMetric = workbench.metrics.find((metric) => metric.enabled !== 0 && metric.measure !== "*") ?? workbench.metrics[0];
   const topView = workbench.savedViews[0];
@@ -106,7 +142,9 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     {
       key: "source",
       label: biText("数据来源", "Data source"),
-      detail: String(sourceRunRef?.name ?? sourceRunRef?.id ?? sourceRunRef?.tableKey ?? answerQuery?.table ?? result.matched.table?.display_name ?? biText("当前工作区数据", "Current workspace data")),
+      detail: result.matched.table?.display_name ??
+        tableNameByKey.get(String(sourceRunRef?.tableKey ?? answerQuery?.table ?? "")) ??
+        businessIdentifier(sourceRunRef?.name, primaryTable?.display_name ?? biText("当前工作区数据", "Current workspace data")),
       badge: biText("已定位", "Located"),
       tone: sourceRunRef || result.matched.table ? "ok" : "warn",
     },
@@ -313,8 +351,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       count: pendingDrafts.filter((draft) => actionImpactGroup(draft.kind) === "workspace").length,
       detail: biText("视图、索引和本地元数据", "Views, indexes, and local metadata"),
     },
-  ];
-  const nextDraftToReview = pendingDrafts.find((draft) => draft.action_key === activeActionKey) ?? pendingDrafts[0];
+  ].filter((item) => item.count > 0);
   const riskyDraftCount = pendingDrafts.filter((draft) => draft.kind === "dashboard.delete" || draft.kind === "import.commit").length;
 
   async function runAction(actionKey: string, task: () => Promise<void>) {
@@ -407,30 +444,67 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         />
       ) : null}
 
+      {pendingDrafts.length > 0 || activeActionResult ? (
+        <div className="agentPrimaryApproval" data-testid="agent-primary-approval">
+          <AgentPendingChangesPanel
+            activeActionKey={activeActionKey}
+            activeActionKind={activeActionKind}
+            activeActionResult={activeActionResult}
+            canConfirmCurrent={canConfirmCurrent}
+            currentDraft={currentDraft}
+            currentDraftBusinessSummary={currentDraftBusinessSummary}
+            draftImpactItems={draftImpactItems}
+            onConfirmAction={onConfirmAction}
+            onConfirmDryRun={onConfirmDryRun}
+            onRejectAction={onRejectAction}
+            onRunAction={runAction}
+            pendingDrafts={pendingDrafts}
+            riskyDraftCount={riskyDraftCount}
+            runningActionKey={runningActionKey}
+            resolveDraftTarget={resolveDraftTarget}
+          />
+        </div>
+      ) : null}
+
+      {result.analysisRun || result.queryPlanReceipt ? (
+        <details className="progressiveDetails agentProgressiveDetails" data-testid="agent-trust-analysis-details">
+          <summary>{biText("查看查询计划和高级比较", "View query plan and advanced comparison")}</summary>
+          <div className="progressiveDetailsBody single">
+            <Suspense fallback={null}>
+              <AgentTrustAdvancedPanel canBranch={canBranchAnalysis} onAskBranch={onAskBranch} result={result} />
+            </Suspense>
+          </div>
+        </details>
+      ) : null}
+
       <details className="progressiveDetails agentProgressiveDetails" data-testid="agent-suggestion-details">
         <summary>{biText("查看可提问建议", "View suggested questions")}</summary>
         <div className="progressiveDetailsBody single">
-          <AgentCanAnswerPanel
-            executableMetricCount={latestRun?.metric_sql_executable_count}
-            isAsking={isAsking}
-            onAskSuggestion={(suggestionPrompt) => {
-              setPromptTouched(true);
-              void submit(biText(suggestionPrompt.zh, suggestionPrompt.en));
-            }}
-            suggestions={canAnswerSuggestions}
-          />
+          <Suspense fallback={null}>
+            <AgentCanAnswerPanel
+              executableMetricCount={latestRun?.metric_sql_executable_count}
+              isAsking={isAsking}
+              onAskSuggestion={(suggestionPrompt) => {
+                setPromptTouched(true);
+                void submit(biText(suggestionPrompt.zh, suggestionPrompt.en));
+              }}
+              suggestions={canAnswerSuggestions}
+            />
+          </Suspense>
         </div>
       </details>
 
       <details className="progressiveDetails agentProgressiveDetails" data-testid="agent-evidence-audit-details">
         <summary>{biText("查看证据检查和模型审计", "View evidence checks and model audit")}</summary>
         <div className="progressiveDetailsBody single">
-          <AgentEvidenceAuditPanels checkedItems={checkedItems} fallbackReason={llmAudit?.fallbackReason} llmAuditItems={llmAuditItems} />
+          <Suspense fallback={null}>
+            <AgentEvidenceAuditPanels checkedItems={checkedItems} fallbackReason={llmAudit?.fallbackReason} llmAuditItems={llmAuditItems} />
+          </Suspense>
         </div>
       </details>
 
-      <details className="progressiveDetails agentProgressiveDetails" data-testid="agent-task-packet-details" open={pendingDrafts.length > 0}>
-        <summary>{pendingDrafts.length ? biText("处理待确认修改", "Review pending changes") : biText("查看执行边界和任务包", "View execution boundary and task packet")}</summary>
+      <details className="progressiveDetails agentProgressiveDetails" data-testid="agent-task-packet-details">
+        <summary>{biText("查看执行边界和任务包", "View execution boundary and task packet")}</summary>
         <div className="progressiveDetailsBody single">
           <AgentTaskPacket
             currentDraft={currentDraft}
@@ -448,23 +522,6 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
               canConfirmCurrent={canConfirmCurrent}
               result={result}
               targetBoundaryState={targetBoundaryState}
-            />
-
-            <AgentPendingChangesPanel
-              activeActionKey={activeActionKey}
-              activeActionKind={activeActionKind}
-              activeActionResult={activeActionResult}
-              canConfirmCurrent={canConfirmCurrent}
-              currentDraft={currentDraft}
-              draftImpactItems={draftImpactItems}
-              nextDraftToReview={nextDraftToReview}
-              onConfirmAction={onConfirmAction}
-              onConfirmDryRun={onConfirmDryRun}
-              onRejectAction={onRejectAction}
-              onRunAction={runAction}
-              pendingDrafts={pendingDrafts}
-              riskyDraftCount={riskyDraftCount}
-              runningActionKey={runningActionKey}
             />
 
             <article className="wideArticle">

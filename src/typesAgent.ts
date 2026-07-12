@@ -3,6 +3,7 @@ import type { SelectionConfidence } from "./typesWorkspace";
 
 export interface AgentAskResult {
   ok: boolean;
+  workspaceId: string;
   llm: {
     configured: boolean;
     mode: "provider" | "deterministic-fallback" | string;
@@ -51,6 +52,15 @@ export interface AgentAskResult {
     indexFieldSelectionConfidence?: SelectionConfidence;
   };
   plan: string[];
+  queryPlanReceipt?: QueryPlanReceipt;
+  analysisRun?: AnalysisRun;
+  context?: {
+    matchedTermCount: number;
+    matchedRuleCount: number;
+    terms: Array<{ termKey: string; name: string; definition: string }>;
+    rules: Array<{ ruleKey: string; title: string; statement: string }>;
+    confirmedQueries: Array<{ queryKey: string; question: string; matchScore: number }>;
+  };
   answerCard?: {
     kind: string;
     title: { zh: string; en: string };
@@ -74,6 +84,7 @@ export interface AgentAskResult {
     };
     evidenceRefs: Array<Record<string, unknown>>;
     nextActions: Array<{ zh: string; en: string }>;
+    queryPlanReceipt?: QueryPlanReceipt;
   };
   recommendedCommands: string[];
   requiresConfirmation: boolean;
@@ -92,6 +103,51 @@ export interface AgentAskResult {
   };
   domainPackRuntime: DomainPackRuntime;
   sourcePipelineContract: SourcePipelineContract;
+}
+
+export interface QueryPlanReceipt {
+  schema: "aibi-query-plan-receipt/v1" | string;
+  receiptKey: string;
+  request: string;
+  status: "executed" | "blocked" | string;
+  source: {
+    workspaceId: string;
+    tableKey?: string | null;
+    schemaFingerprint: string;
+  };
+  selection: {
+    group?: string | null;
+    measure?: string | null;
+    aggregation?: string | null;
+    filters: Array<Record<string, unknown>>;
+    joins: Array<Record<string, unknown>>;
+  };
+  runtime: {
+    engine?: string | null;
+    database?: string | null;
+    compiledSql?: string | null;
+    sqlIntent: string;
+  };
+  validation: Record<string, boolean>;
+  contextRefs: Array<Record<string, unknown>>;
+  evidenceRefs: Array<Record<string, unknown>>;
+  unresolved: unknown[];
+  actionKey?: string | null;
+  createdAt: string;
+}
+
+export interface AnalysisRun {
+  run_key: string;
+  workspace_id: string;
+  parent_run_key?: string | null;
+  branch_label: string;
+  question: string;
+  status: "pending_confirmation" | "confirmed" | "executed" | "blocked" | "rejected" | string;
+  query_receipt_key: string;
+  action_key?: string | null;
+  result: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ActionDraft {

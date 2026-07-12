@@ -165,19 +165,18 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
             />
           </p>
         </div>
-        <div className="readinessCard">
+        {hasData ? <div className="readinessCard">
           <span className={hasData ? "statusBadge ok" : "statusBadge warn"}>
             {readiness.label}
           </span>
           <strong>{status.counts.tables}</strong>
           <span>{biText("张数据表可用", "tables available")}</span>
           <p>{readiness.detail}</p>
-        </div>
+        </div> : null}
       </div>
 
       <ProductActivationPanel
         activation={activation}
-        currentStep={activation.primaryStep.route}
         onOpenStep={onOpenBusinessStep}
       />
 

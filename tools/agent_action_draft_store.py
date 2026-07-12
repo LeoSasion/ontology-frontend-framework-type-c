@@ -90,10 +90,18 @@ def mark_action_confirmed(connection: sqlite3.Connection, action_key: str, confi
         "UPDATE action_drafts SET status = 'confirmed', confirmed_at = ? WHERE action_key = ?",
         (confirmed_at, action_key),
     )
+    connection.execute(
+        "UPDATE analysis_runs SET status = 'confirmed', updated_at = ? WHERE action_key = ?",
+        (confirmed_at, action_key),
+    )
 
 
 def mark_action_rejected(connection: sqlite3.Connection, action_key: str, confirmed_at: str) -> None:
     connection.execute(
         "UPDATE action_drafts SET status = 'rejected', confirmed_at = ? WHERE action_key = ?",
+        (confirmed_at, action_key),
+    )
+    connection.execute(
+        "UPDATE analysis_runs SET status = 'rejected', updated_at = ? WHERE action_key = ?",
         (confirmed_at, action_key),
     )

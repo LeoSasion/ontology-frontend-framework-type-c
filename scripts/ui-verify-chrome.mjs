@@ -178,11 +178,7 @@ class CdpClient {
   }
 }
 
-export async function launchChrome() {
-  const chromePath = findChromeExecutable();
-  if (!chromePath) {
-    throw new Error("Chrome or Edge executable was not found. Set AIBI_CHROME_PATH to run UI verification.");
-  }
+async function launchChromeAttempt(chromePath) {
   const port = await getFreePort();
   const profileDir = join(tmpdir(), `aibi-ui-chrome-profile-${Date.now()}-${Math.random().toString(16).slice(2)}`);
   mkdirSync(profileDir, { recursive: true });
@@ -206,30 +202,56 @@ export async function launchChrome() {
   child.stderr.on("data", (chunk) => {
     stderr += chunk.toString();
   });
-  await waitForJson(`http://127.0.0.1:${port}/json/version`);
-  const targets = await waitForJson(`http://127.0.0.1:${port}/json/list`);
-  const pageTarget = Array.isArray(targets) ? targets.find((target) => target.type === "page" && target.webSocketDebuggerUrl) : null;
-  if (!pageTarget) {
-    throw new Error("Chrome page debugger target was not found.");
+
+  try {
+    await waitForJson(`http://127.0.0.1:${port}/json/version`, 15000);
+    const targets = await waitForJson(`http://127.0.0.1:${port}/json/list`);
+    const pageTarget = Array.isArray(targets) ? targets.find((target) => target.type === "page" && target.webSocketDebuggerUrl) : null;
+    if (!pageTarget) {
+      throw new Error("Chrome page debugger target was not found.");
+    }
+    const client = new CdpClient(pageTarget.webSocketDebuggerUrl);
+    await client.connect();
+    await client.send("Page.enable");
+    await client.send("Runtime.enable");
+    await client.send("Log.enable").catch(() => {});
+    return {
+      chromePath,
+      chromeName: basename(chromePath),
+      client,
+      profileDir,
+      stderr: () => stderr,
+      async close() {
+        client.close();
+        if (!child.killed) child.kill();
+        await waitForExit(child);
+        await removeDirectoryWithRetry(profileDir);
+      },
+    };
+  } catch (error) {
+    if (!child.killed) child.kill();
+    await waitForExit(child);
+    await removeDirectoryWithRetry(profileDir);
+    const detail = stderr.trim();
+    throw new Error(`${error instanceof Error ? error.message : String(error)}${detail ? `\n${detail}` : ""}`);
   }
-  const client = new CdpClient(pageTarget.webSocketDebuggerUrl);
-  await client.connect();
-  await client.send("Page.enable");
-  await client.send("Runtime.enable");
-  await client.send("Log.enable").catch(() => {});
-  return {
-    chromePath,
-    chromeName: basename(chromePath),
-    client,
-    profileDir,
-    stderr: () => stderr,
-    async close() {
-      client.close();
-      if (!child.killed) child.kill();
-      await waitForExit(child);
-      await removeDirectoryWithRetry(profileDir);
-    },
-  };
+}
+
+export async function launchChrome(attempts = 3) {
+  const chromePath = findChromeExecutable();
+  if (!chromePath) {
+    throw new Error("Chrome or Edge executable was not found. Set AIBI_CHROME_PATH to run UI verification.");
+  }
+  let lastError = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await launchChromeAttempt(chromePath);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await sleep(250 * attempt);
+    }
+  }
+  throw new Error(`Chrome UI verification failed after ${attempts} attempts: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
 }
 
 export function expressionFor(fn, arg) {

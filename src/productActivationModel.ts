@@ -2,6 +2,7 @@ import type { BusinessPathIcon, BusinessPathStepKey } from "./businessPathModel"
 import { biText } from "./components/Bilingual";
 import type { WorkbenchPayload, WorkspaceStatus } from "./types";
 import { buildWorkspaceFlow } from "./workspaceFlowModel";
+import { buildProductReadiness } from "./productReadinessModel";
 
 export type ProductActivationStepKey = "connect" | "profile" | "chart" | "evidence" | "confirm";
 
@@ -75,6 +76,11 @@ export function buildProductActivation({
   } = flow.counts;
   const latestProfile = sourceIntelligenceRuns[0];
   const activeStepKey: ProductActivationStepKey = flow.activeStage;
+  const readiness = buildProductReadiness(status ?? ({ health: { ok: true }, counts: {} } as WorkspaceStatus), {
+    hasData: flow.hasData,
+    hasEvidence: flow.hasEvidence,
+    hasPendingDraft: flow.hasPendingDraft,
+  });
 
   const allSteps: ProductActivationStep[] = [
     {
@@ -157,15 +163,7 @@ export function buildProductActivation({
     hasPendingDraft: flow.hasPendingDraft,
     activeStepKey,
     primaryStep,
-    progressLabel: !flow.hasData
-      ? biText("待接入", "Connect data")
-      : !flow.hasProfile
-        ? biText("待画像", "Create profile")
-        : !flow.hasDashboard
-          ? biText("待生成", "Create chart")
-          : flow.hasPendingDraft
-            ? biText("待确认", "Review draft")
-            : biText("可核对", "Review evidence"),
+    progressLabel: readiness.label,
     stateLabel,
     stateDetail,
     steps,

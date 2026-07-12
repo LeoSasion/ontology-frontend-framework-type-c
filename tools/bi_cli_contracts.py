@@ -11,6 +11,14 @@ CONTRACT_SCHEMA_VERSION = "aibi-bi-cli-contract/v1"
 COMMAND_DOMAINS: dict[str, str] = {
     "status": "system",
     "quality-doctor": "system",
+    "context-pack": "context",
+    "context-term": "context",
+    "context-rule": "context",
+    "query-receipts": "evidence",
+    "export-evidence": "evidence",
+    "confirmed-queries": "context",
+    "confirm-query": "context",
+    "analysis-runs": "evidence",
     "cli-contract": "system",
     "list-commands": "system",
     "workspace-create": "workspace",
@@ -96,7 +104,7 @@ COMMAND_DOMAINS: dict[str, str] = {
 }
 
 ACTION_DRAFT_COMMANDS = {"ask", "source-dashboard-draft"}
-EVIDENCE_WRITING_COMMANDS = {"source-intelligence", "preview-import", "preview-import-folder", "business-dashboard"}
+EVIDENCE_WRITING_COMMANDS = {"source-intelligence", "preview-import", "preview-import-folder", "business-dashboard", "export-evidence"}
 IMMEDIATE_RUNTIME_WRITES = {"source-intelligence", "export-config", "cli-contract"}
 CONFIRMATION_COMMANDS = {"confirm-action"}
 

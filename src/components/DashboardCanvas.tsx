@@ -29,6 +29,7 @@ import { ProductActivationPanel } from "./ProductActivationPanel";
 
 type DashboardCanvasProps = {
   dashboards: DashboardPayload;
+  focusedTableKey?: string;
   query: QueryResult;
   workbench: WorkbenchPayload;
   activeDashboardKey: string;
@@ -45,13 +46,13 @@ type DashboardCanvasProps = {
   onOpenBusinessStep: (step: BusinessPathStepKey) => void;
 };
 
-export function DashboardCanvas({ dashboards, query, workbench, activeDashboardKey, onDashboardSelect, onAgentDraft, onAsk, onOpenEvidence, onDashboardOperation, onDashboardFilterOperation, onDashboardModulesSave, onBusinessDashboardOperation, onRelationshipSave, onDashboardWidgetOperation, onOpenBusinessStep }: DashboardCanvasProps) {
+export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench, activeDashboardKey, onDashboardSelect, onAgentDraft, onAsk, onOpenEvidence, onDashboardOperation, onDashboardFilterOperation, onDashboardModulesSave, onBusinessDashboardOperation, onRelationshipSave, onDashboardWidgetOperation, onOpenBusinessStep }: DashboardCanvasProps) {
   const dashboardPages = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
   const dashboard = dashboardPages.find((item) => item.dashboard_key === activeDashboardKey) ?? dashboardPages[0] ?? {
     dashboard_key: "fallback",
     name: biText("未命名看板", "Untitled dashboard"),
     workspace_id: "default",
-    default_table_key: query.query?.table ?? "",
+    default_table_key: focusedTableKey || query.query?.table || workbench.tables[0]?.table_key || "",
     created_by: "fallback",
     agent_managed: 0,
     layout: { version: 1 },
@@ -64,6 +65,9 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
   const savedRelationships = Array.isArray(workbench.relationships) ? workbench.relationships : [];
   const relationshipRecommendations = Array.isArray(workbench.relationshipRecommendations) ? workbench.relationshipRecommendations : [];
   const editableTables = Array.isArray(workbench.tables) ? workbench.tables : [];
+  const activeTable = editableTables.find((table) => table.table_key === (focusedTableKey || dashboard.default_table_key))
+    ?? editableTables.find((table) => table.table_key === dashboard.default_table_key)
+    ?? editableTables[0];
   const {
     advancedEditorMounted,
     availableFilterFields,
@@ -78,6 +82,8 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
     filterOperator,
     filterValue,
     guidedEditorMounted,
+    moveWidget,
+    orderedWidgets,
     selectedRelationship,
     selectedRelationshipKey,
     selectedViewKey,
@@ -142,7 +148,7 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
     selectedWidgetKey: selectedWidget?.widget_key,
     sourceSwitchTableKey,
     widgetDraft,
-    widgets: dashboardWidgets,
+    widgets: orderedWidgets,
   });
 
   const {
@@ -175,7 +181,7 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
     widgetFilterValue,
     widgetFilters,
     widgetPlan,
-    widgets: dashboardWidgets,
+    widgets: orderedWidgets,
     workbench,
   });
 
@@ -223,17 +229,9 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
       </div>
 
       <div className="dashboardGrid">
-        <DashboardBusinessTaskStrip
-          busy={busy}
-          dashboardName={dashboard.name}
-          hasDashboard={dashboardPages.length > 0}
-          onAsk={runDashboardAsk}
-          onOpenEvidence={openDashboardEvidence}
-        />
-
         {dashboardWidgets.length ? (
           <DashboardDeferredBoundary>
-            <BiDashboardWidgetKit dashboard={dashboard} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
+            <BiDashboardWidgetKit dashboard={{ ...dashboard, widgets: orderedWidgets }} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
           </DashboardDeferredBoundary>
         ) : (
           <section className="bDashboardKit wide dashboardWidgetEmptyState" data-testid="dashboard-widget-empty-state">
@@ -241,6 +239,24 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
             <span><Bilingual zh="描述一个业务问题，AI 会先起草带口径和证据的单图。" en="Describe a business question and AI will draft one chart with scope and evidence." /></span>
           </section>
         )}
+
+        <DashboardBusinessTaskStrip
+          busy={busy}
+          compact={dashboardWidgets.length > 0}
+          dashboardName={dashboard.name}
+          hasDashboard={dashboardPages.length > 0}
+          tableKey={activeTable?.table_key ?? ""}
+          tableName={activeTable?.display_name ?? ""}
+          onAsk={runDashboardAsk}
+          onOpenEvidence={openDashboardEvidence}
+        />
+
+        <details className="progressiveDetails dashboardProgressiveDetails dashboardMoreDetails" data-testid="dashboard-more-details">
+          <summary><Bilingual zh="更多设置与证据" en="More settings and evidence" /></summary>
+          <div className="progressiveDetailsBody single dashboardMoreBody">
+            <button className="miniButton" data-testid="dashboard-more-evidence" onClick={openDashboardEvidence} type="button">
+              <Bilingual zh="查看当前看板证据" en="Review current dashboard evidence" />
+            </button>
 
         <details className="progressiveDetails dashboardProgressiveDetails dashboardResultContextDetails" data-testid="dashboard-result-context-details">
           <summary><Bilingual zh="查看结果来源、口径和验收信息" en="View result source, scope, and acceptance" /></summary>
@@ -335,7 +351,7 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
               canvasWidthMode={canvasWidthMode}
               dashboardFilters={dashboardFilters}
               dashboardKey={dashboard.dashboard_key}
-              dashboardWidgets={dashboardWidgets}
+              dashboardWidgets={orderedWidgets}
               defaultTableKey={dashboard.default_table_key}
               draftDimensions={draftDimensions}
               draftFields={draftFields}
@@ -348,6 +364,7 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
               onBusinessTemplate={runBusinessTemplate}
               onCanvasWidthModeChange={setCanvasWidthMode}
               onModuleSave={runModuleSave}
+              onMoveWidget={moveWidget}
               onRelationshipSave={runRelationshipSave}
               onSelectedRelationshipChange={setSelectedRelationshipKey}
               onSelectedViewChange={setSelectedViewKey}
@@ -408,6 +425,8 @@ export function DashboardCanvas({ dashboards, query, workbench, activeDashboardK
               </div>
             </DashboardDeferredBoundary>
           ) : null}
+        </details>
+          </div>
         </details>
       </div>
     </section>

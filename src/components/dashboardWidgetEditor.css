@@ -324,6 +324,17 @@
 .widgetManageItem {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
+  cursor: grab;
+  transition: border-color 120ms ease, opacity 120ms ease;
+}
+
+.widgetManageItem:active {
+  cursor: grabbing;
+}
+
+.widgetManageItem.dragging {
+  border-color: var(--accent);
+  opacity: 0.55;
 }
 
 .widgetManageActions {

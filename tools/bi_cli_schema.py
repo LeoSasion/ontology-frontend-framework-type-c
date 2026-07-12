@@ -551,6 +551,82 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           manifest_json TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS context_terms (
+          term_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          canonical_name TEXT NOT NULL,
+          aliases_json TEXT NOT NULL,
+          definition TEXT NOT NULL,
+          scope_type TEXT NOT NULL,
+          scope_ref TEXT NOT NULL,
+          status TEXT NOT NULL,
+          source TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          confirmed_at TEXT,
+          PRIMARY KEY(workspace_id, term_key)
+        );
+        CREATE TABLE IF NOT EXISTS context_rules (
+          rule_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          statement TEXT NOT NULL,
+          rule_type TEXT NOT NULL,
+          applies_to_json TEXT NOT NULL,
+          status TEXT NOT NULL,
+          source TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          confirmed_at TEXT,
+          PRIMARY KEY(workspace_id, rule_key)
+        );
+        CREATE TABLE IF NOT EXISTS query_plan_receipts (
+          receipt_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          request_text TEXT NOT NULL,
+          status TEXT NOT NULL,
+          source_table_key TEXT,
+          schema_fingerprint TEXT NOT NULL,
+          plan_json TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          action_key TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, receipt_key)
+        );
+        CREATE TABLE IF NOT EXISTS confirmed_queries (
+          query_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          question TEXT NOT NULL,
+          status TEXT NOT NULL,
+          query_receipt_key TEXT NOT NULL,
+          source_table_key TEXT,
+          schema_fingerprint TEXT NOT NULL,
+          chart_spec_json TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          originating_action_key TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          confirmed_at TEXT,
+          stale_reason TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, query_key)
+        );
+        CREATE TABLE IF NOT EXISTS analysis_runs (
+          run_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          parent_run_key TEXT,
+          branch_label TEXT NOT NULL,
+          question TEXT NOT NULL,
+          status TEXT NOT NULL,
+          query_receipt_key TEXT NOT NULL,
+          action_key TEXT,
+          result_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, run_key)
+        );
         """
     )
     connection.execute(
@@ -791,4 +867,4 @@ def list_navigation_modules(connection: sqlite3.Connection, include_disabled: bo
     ).fetchall()
     return [navigation_module_payload(row) for row in rows]
 
-
+

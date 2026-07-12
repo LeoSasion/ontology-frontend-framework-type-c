@@ -9,6 +9,7 @@ from bi_cli_io_services import analysis_columns_for_table
 from bi_cli_schema import active_workspace_id, open_db, registry_for_table, table_columns, upsert_navigation_module
 from bi_cli_source_commands import resolve_table_registry
 from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, run_duckdb_aggregate_query, run_sqlite_aggregate_query
+from query_plan_receipt_service import create_query_plan_receipt
 from saved_view_query_service import (
     build_save_view_plan as build_save_view_plan_service,
     copy_view_command as copy_view_command_service,
@@ -55,6 +56,22 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
             )
             fallback_reason = str(exc)
         rows = runtime.pop("rows")
+        workspace_id = active_workspace_id(connection)
+        request_text = str(args.request or "").strip() or f"{args.agg} {args.measure} by {args.group or '-'} from {args.table}"
+        query_receipt = create_query_plan_receipt(
+            connection,
+            workspace_id=workspace_id,
+            request_text=request_text,
+            source_table_key=args.table,
+            status="executed",
+            group=args.group,
+            measure=args.measure,
+            aggregation=args.agg,
+            runtime=runtime,
+            evidence_refs=[{"type": "queryRuntime", "compiledSql": runtime.get("compiledSql")}],
+            now_iso=now_iso,
+        )
+        connection.commit()
     return {
         "ok": True,
         "query": {
@@ -67,6 +84,7 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
             "runtime": runtime,
             "fallbackReason": fallback_reason,
         },
+        "queryPlanReceipt": query_receipt,
         "rows": rows,
     }
 
@@ -162,4 +180,4 @@ def delete_view_command(args: argparse.Namespace) -> dict[str, Any]:
         resolve_view=resolve_view,
     )
 
-
+

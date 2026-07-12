@@ -1,6 +1,7 @@
 import { spawnSync } from "node:child_process";
 
-const nodeCommand = process.execPath;
+const npmCommand = process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : "npm";
+const npmPrefixArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm"] : [];
 const powershellCommand = process.platform === "win32" ? "powershell.exe" : "pwsh";
 const args = new Set(process.argv.slice(2));
 const skipUi = args.has("--skip-ui");
@@ -26,33 +27,27 @@ function runCommand(label, command, commandArgs) {
   console.log(`[preflight] ${label} passed in ${seconds}s.`);
 }
 
-function runNode(label, scriptPath, scriptArgs = []) {
-  runCommand(label, nodeCommand, [scriptPath, ...scriptArgs]);
+function runNpmScript(label, scriptName) {
+  runCommand(label, npmCommand, [...npmPrefixArgs, "run", scriptName]);
 }
 
 function runPowerShell(label, scriptPath) {
   runCommand(label, powershellCommand, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath]);
 }
 
-runNode("TypeScript build", "node_modules/typescript/bin/tsc", ["-p", "tsconfig.json"]);
-runNode("Vite production build", "node_modules/vite/bin/vite.js", ["build"]);
-runNode("core verification", "scripts/verify.mjs");
-runNode("BI CLI Agent contract", "scripts/verify-bi-cli-agent-contract.mjs");
-runNode("AI one-chart reliability", "scripts/verify-ai-chart-reliability.mjs");
-runNode("workspace landing flow", "node_modules/tsx/dist/cli.mjs", ["scripts/verify-workspace-flow.ts"]);
-runNode("local backup and restore", "scripts/verify-local-backup.mjs");
-runNode("production readiness", "scripts/verify-production-readiness.mjs");
+runNpmScript("production build and bundle budgets", "build");
+runNpmScript("core, CLI, and AI verification", "verify");
+runNpmScript("workspace landing flow", "verify:workspace-flow");
+runNpmScript("local backup and restore", "verify:backup");
+runNpmScript("production readiness", "verify:production");
 runPowerShell("start local services", "scripts/start-local.ps1");
 runPowerShell("health check", "scripts/local-health.ps1");
-runNode("server security runtime", "scripts/verify-server-runtime-security.mjs");
+runNpmScript("server security runtime", "verify:security-runtime");
 
 if (skipUi) {
   console.log("\n[preflight] UI verification skipped by --skip-ui.");
 } else {
-  runNode("UI flow verification", "scripts/verify-ui-flow.mjs");
-  runNode("UI visual verification", "scripts/verify-ui-visual.mjs");
-  runNode("empty workspace verification", "scripts/verify-ui-empty-workspace.mjs");
-  runNode("real import verification", "scripts/verify-ui-real-import.mjs");
+  runNpmScript("complete UI verification", "verify:ui");
   runPowerShell("final health check", "scripts/local-health.ps1");
 }
 

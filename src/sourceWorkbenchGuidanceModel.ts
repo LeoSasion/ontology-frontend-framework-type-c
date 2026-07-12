@@ -88,13 +88,13 @@ export function buildSourceWorkbenchGuidance({
       state: selectedFields.length ? biText("可追溯", "Traceable") : biText("等待字段", "Waiting"),
     },
   ];
-  const recommendedPrimaryAction: RecommendedPrimaryAction = !previewReadable
-    ? "check-file"
-    : !hasImportedTables
+  const recommendedPrimaryAction: RecommendedPrimaryAction = hasImportedTables
+    ? sourceProfileComplete
+      ? "draft-dashboard"
+      : "refresh-profile"
+    : previewReadable
       ? "import-data"
-      : !sourceProfileComplete
-        ? "refresh-profile"
-        : "draft-dashboard";
+      : "check-file";
   const beginnerPlan: BeginnerPlanItem[] = [
     {
       key: "file",

@@ -5,7 +5,10 @@ import { Icon } from "./Icons";
 type DashboardBusinessTaskStripProps = {
   dashboardName: string;
   hasDashboard: boolean;
+  tableKey?: string;
+  tableName?: string;
   busy: string | null;
+  compact?: boolean;
   onAsk: (label: string, prompt: string) => void;
   onOpenEvidence: () => void;
 };
@@ -13,20 +16,26 @@ type DashboardBusinessTaskStripProps = {
 export function DashboardBusinessTaskStrip({
   dashboardName,
   hasDashboard,
+  tableKey = "",
+  tableName = "",
   busy,
+  compact = false,
   onAsk,
   onOpenEvidence,
 }: DashboardBusinessTaskStripProps) {
   const [prompt, setPrompt] = useState("");
   const resolvedPrompt = prompt.trim();
   const promptReady = Boolean(resolvedPrompt);
+  const scopedPrompt = tableKey
+    ? biText(`基于数据表「${tableName || tableKey}」，${resolvedPrompt}`, `Using table "${tableName || tableKey}", ${resolvedPrompt}`)
+    : resolvedPrompt;
 
   return (
-    <section className="dashboardBusinessTaskStrip dashboardAICreatePanel wide" data-testid="dashboard-business-task-strip" aria-label={biText("看板业务任务", "Dashboard business tasks")}>
+    <section className={`dashboardBusinessTaskStrip dashboardAICreatePanel wide${compact ? " compact" : ""}`} data-testid="dashboard-business-task-strip" aria-label={biText("看板业务任务", "Dashboard business tasks")}>
       <div className="dashboardBusinessTaskLead">
         <span className="storyMode"><Bilingual zh="AI 创建" en="AI create" /></span>
         <h3><Bilingual zh="先说想看的一个图表" en="Describe one chart first" /></h3>
-        <p>
+        {!compact ? <p>
           <Bilingual
             zh={hasDashboard
               ? "默认只引导创建一个图表；整套证据看板保留 Beta 入口。涉及写入仍先生成草案。"
@@ -35,9 +44,10 @@ export function DashboardBusinessTaskStrip({
               ? "The default path creates one guided chart; full evidence dashboards remain a beta entry. Writes still become drafts first."
               : "There is no dashboard yet. Approval creates one chart only; full evidence dashboards remain a beta entry."}
           />
-        </p>
+        </p> : null}
       </div>
       <div className="dashboardAICreateBody">
+        {tableKey ? <small className="dashboardTaskContext">{biText(`当前数据：${tableName || tableKey}`, `Current data: ${tableName || tableKey}`)}</small> : null}
         <label className="dashboardAIPromptBox">
           <span>{biText("我想看", "I want to see")}</span>
           <textarea
@@ -51,7 +61,7 @@ export function DashboardBusinessTaskStrip({
           <button
             data-testid="dashboard-task-explain"
             disabled={busy === "dashboard-task-explain" || !promptReady}
-            onClick={() => onAsk("dashboard-task-explain", resolvedPrompt)}
+            onClick={() => onAsk("dashboard-task-explain", scopedPrompt)}
             type="button"
           >
             <Icon name="agent" />
@@ -60,17 +70,17 @@ export function DashboardBusinessTaskStrip({
               <small><Bilingual zh={promptReady ? "单次对话给草案" : "先描述目标"} en={promptReady ? "Guided draft" : "Describe the goal first"} /></small>
             </span>
           </button>
-          <button data-testid="dashboard-task-evidence" onClick={onOpenEvidence} type="button">
-            <Icon name="evidence" />
-            <span>
-              <strong><Bilingual zh="完整证据" en="Full evidence" /></strong>
-              <small><Bilingual zh="来源、指标和组件" en="Sources and metrics" /></small>
-            </span>
-          </button>
         </div>
-        <details className="advancedDetails compactAdvanced dashboardBetaDetails" data-testid="dashboard-beta-details">
-          <summary><Bilingual zh="高级：优化或整套看板 Beta" en="Advanced: optimize or full dashboard beta" /></summary>
+        {!compact ? <details className="advancedDetails compactAdvanced dashboardBetaDetails" data-testid="dashboard-beta-details">
+          <summary><Bilingual zh="更多" en="More" /></summary>
           <div className="dashboardBusinessTasks secondary">
+            <button data-testid="dashboard-task-evidence" onClick={onOpenEvidence} type="button">
+              <Icon name="evidence" />
+              <span>
+                <strong><Bilingual zh="核对完整证据" en="Review full evidence" /></strong>
+                <small><Bilingual zh="来源、指标和组件" en="Sources and metrics" /></small>
+              </span>
+            </button>
             <button
               data-testid="dashboard-task-improve"
               disabled={busy === "dashboard-task-improve"}
@@ -96,7 +106,7 @@ export function DashboardBusinessTaskStrip({
               </span>
             </button>
           </div>
-        </details>
+        </details> : null}
       </div>
     </section>
   );

@@ -276,6 +276,32 @@
   grid-column: span 2;
 }
 
+.evidenceNextAction {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--bi-border);
+  border-bottom: 1px solid var(--bi-border);
+}
+
+.evidenceNextAction > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.evidenceNextAction span {
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.evidenceNextAction .primaryButton {
+  flex: 0 0 auto;
+}
+
 .evidenceBusinessSummary {
   display: grid;
   gap: 12px;
