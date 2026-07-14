@@ -16,11 +16,25 @@ COMMAND_DOMAINS: dict[str, str] = {
     "context-rule": "context",
     "query-receipts": "evidence",
     "export-evidence": "evidence",
+    "export-analysis": "evidence",
     "confirmed-queries": "context",
     "confirm-query": "context",
     "analysis-runs": "evidence",
+    "analysis-unit-build": "analysis",
+    "analysis-units": "analysis",
+    "analysis-unit-verify": "analysis",
+    "chart-adapt": "analysis",
+    "jobs": "job",
+    "job-cancel": "job",
+    "job-recover": "job",
+    "source-intelligence-job-create": "job",
+    "source-intelligence-job-run": "job",
+    "job-process-exit": "job",
     "cli-contract": "system",
     "list-commands": "system",
+    "capability-contracts": "system",
+    "workflow-plan": "workflow",
+    "context-budget": "context",
     "workspace-create": "workspace",
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
@@ -37,7 +51,7 @@ COMMAND_DOMAINS: dict[str, str] = {
     "list-navigation": "navigation",
     "navigation-op": "navigation",
     "dashboard-widget-catalog": "dashboard",
-    "b-cli-capabilities": "integration",
+    "cli-capabilities": "system",
     "recommend-widgets": "dashboard",
     "add-recommended-widgets": "dashboard",
     "save-dashboard-modules": "dashboard",
@@ -59,6 +73,10 @@ COMMAND_DOMAINS: dict[str, str] = {
     "save-connector": "connector",
     "sync-connector": "connector",
     "remove-connector": "connector",
+    "list-connector-adapters": "connector",
+    "discover-connector": "connector",
+    "preview-connector": "connector",
+    "plan-connector-sync": "connector",
     "infer-semantics": "semantic",
     "list-semantics": "semantic",
     "set-semantic": "semantic",
@@ -97,6 +115,7 @@ COMMAND_DOMAINS: dict[str, str] = {
     "list-relationships": "relationship",
     "remove-relationship": "relationship",
     "query-relationship": "relationship",
+    "semantic-query": "query",
     "formula-preview": "formula",
     "ask": "agent",
     "confirm-action": "agent",
@@ -104,8 +123,26 @@ COMMAND_DOMAINS: dict[str, str] = {
 }
 
 ACTION_DRAFT_COMMANDS = {"ask", "source-dashboard-draft"}
-EVIDENCE_WRITING_COMMANDS = {"source-intelligence", "preview-import", "preview-import-folder", "business-dashboard", "export-evidence"}
-IMMEDIATE_RUNTIME_WRITES = {"source-intelligence", "export-config", "cli-contract"}
+EVIDENCE_WRITING_COMMANDS = {
+    "source-intelligence",
+    "source-intelligence-job-run",
+    "preview-import",
+    "preview-import-folder",
+    "business-dashboard",
+    "export-evidence",
+    "analysis-unit-build",
+    "query",
+    "semantic-query",
+}
+IMMEDIATE_RUNTIME_WRITES = {
+    "source-intelligence",
+    "source-intelligence-job-create",
+    "source-intelligence-job-run",
+    "job-process-exit",
+    "export-config",
+    "cli-contract",
+    "export-analysis",
+}
 CONFIRMATION_COMMANDS = {"confirm-action"}
 
 

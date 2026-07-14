@@ -312,7 +312,7 @@ export function appendSourceContractExtendedChecks(context) {
           sourceWorkbenchConnectorControllerSource.includes("runConnectorRemoveAction") &&
           sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-receipt"') &&
           sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-technical-details"') &&
-          sourceWorkbenchConnectorPanelSource.includes("同步数据仍然需要先预览，再确认") &&
+          sourceWorkbenchConnectorPanelSource.includes("同步前先由只读 Adapter 检查来源") &&
           !sourceWorkbenchSource.includes("Dry-run rename") &&
           !sourceWorkbenchSource.includes("Dry-run move") &&
           !sourceWorkbenchSource.includes("Dry-run hide") &&

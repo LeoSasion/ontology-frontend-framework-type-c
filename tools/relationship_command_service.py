@@ -20,6 +20,87 @@ def parse_json_object(value: Any, default: Any | None = None) -> Any:
         return {} if default is None else default
 
 
+def normalize_relationship_mappings(value: Any) -> list[dict[str, str]]:
+    mappings: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue
+        left_field = str(item.get("leftField") or item.get("left_field") or "").strip()
+        right_field = str(item.get("rightField") or item.get("right_field") or "").strip()
+        signature = (left_field, right_field)
+        if not left_field or not right_field or signature in seen:
+            continue
+        seen.add(signature)
+        mappings.append({"leftField": left_field, "rightField": right_field})
+    return mappings
+
+
+def relationship_mappings_from_args(args: argparse.Namespace) -> list[dict[str, str]]:
+    raw_mappings: list[dict[str, str]] = []
+    for raw_json in getattr(args, "map_json", []) or []:
+        parsed = parse_json_object(raw_json, None)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Relationship mapping JSON must be an object: {raw_json}")
+        raw_mappings.append(parsed)
+    for raw in getattr(args, "map", []) or []:
+        text = str(raw or "")
+        if ":" not in text:
+            raise ValueError(f"Relationship mapping must be leftField:rightField: {text}")
+        left_field, right_field = text.split(":", 1)
+        raw_mappings.append({"leftField": left_field, "rightField": right_field})
+    left_field = str(getattr(args, "left_field", "") or "").strip()
+    right_field = str(getattr(args, "right_field", "") or "").strip()
+    if left_field or right_field:
+        raw_mappings.insert(0, {"leftField": left_field, "rightField": right_field})
+    mappings = normalize_relationship_mappings(raw_mappings)
+    if not mappings:
+        raise ValueError("Provide --left-field and --right-field, or one or more --map leftField:rightField values.")
+    return mappings
+
+
+def relationship_record_payload(value: sqlite3.Row | dict[str, Any]) -> dict[str, Any]:
+    payload = dict(value)
+    mappings = normalize_relationship_mappings(parse_json_object(payload.get("mappings_json"), []))
+    if not mappings:
+        mappings = normalize_relationship_mappings(
+            [{"leftField": payload.get("left_field"), "rightField": payload.get("right_field")}]
+        )
+    validation = parse_json_object(payload.get("validation_json"), {})
+    filters = parse_json_object(payload.get("filters_json"), [])
+    preaggregation = parse_json_object(payload.get("preaggregation_json"), {})
+    payload["fieldMappings"] = mappings
+    payload["validation"] = validation if isinstance(validation, dict) else {}
+    payload["filters"] = filters if isinstance(filters, list) else []
+    payload["preaggregation"] = preaggregation if isinstance(preaggregation, dict) else {}
+    payload.pop("mappings_json", None)
+    payload.pop("validation_json", None)
+    payload.pop("filters_json", None)
+    payload.pop("preaggregation_json", None)
+    return payload
+
+
+def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
+    metrics = preview.get("metrics") if isinstance(preview.get("metrics"), dict) else {}
+    blockers: list[str] = []
+    if int(metrics.get("overlapKeys") or 0) <= 0:
+        blockers.append("no-overlap")
+    if float(metrics.get("confidence") or 0) < 0.55:
+        blockers.append("low-confidence")
+    if float(metrics.get("rowExpansion") or 0) > 1.000001:
+        blockers.append("row-expansion")
+    return {
+        "schema": "aibi-relationship-validation/v1",
+        "status": "validated" if not blockers else "review-required",
+        "blockers": blockers,
+        "metrics": metrics,
+        "warnings": list(preview.get("warnings") or []),
+        "filters": list(preview.get("filters") or []),
+        "preaggregation": preview.get("preaggregation") or {},
+        "validatedAt": now_iso(),
+    }
+
+
 def normalize_relation_field_name(value: str) -> str:
     text = re.sub(r"[\s_\-\.]+", "", str(value or "").strip().lower())
     replacements = {
@@ -291,10 +372,10 @@ def list_relationships_command(
     with open_db() as connection:
         workspace_id = active_workspace_id(connection)
         relationships = [
-            dict(row)
+            relationship_record_payload(row)
             for row in connection.execute(
                 """
-                SELECT relation_key, workspace_id, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence, created_at
+                SELECT *
                 FROM relationships
                 WHERE workspace_id = ?
                 ORDER BY confidence DESC, created_at DESC, relation_key
@@ -321,38 +402,63 @@ def resolve_relationship_query_inputs(
             raise ValueError(f"Unknown relationship: {args.relationship}")
         left_table_key = relation["left_table_key"]
         right_table_key = relation["right_table_key"]
-        left_field = relation["left_field"]
-        right_field = relation["right_field"]
+        relation_payload = relationship_record_payload(relation)
+        validation = relation_payload.get("validation") if isinstance(relation_payload.get("validation"), dict) else {}
+        if validation.get("status") != "validated":
+            raise ValueError(
+                f"Relationship requires a current validated preview before querying: {args.relationship}"
+            )
+        mappings = relation_payload["fieldMappings"]
         join_type = relation["join_type"]
+        saved_filters = relation_payload.get("filters") if isinstance(relation_payload.get("filters"), list) else []
+        saved_preaggregation = relation_payload.get("preaggregation") if isinstance(relation_payload.get("preaggregation"), dict) else {}
     else:
         left_table_key = args.left_table
         right_table_key = args.right_table
-        left_field = args.left_field
-        right_field = args.right_field
+        mappings = relationship_mappings_from_args(args)
         join_type = args.join_type
-        if not left_table_key or not right_table_key or not left_field or not right_field:
-            raise ValueError("Use --relationship or provide --left-table, --right-table, --left-field and --right-field.")
+        saved_filters = []
+        saved_preaggregation = {}
+        if not left_table_key or not right_table_key:
+            raise ValueError("Use --relationship or provide --left-table and --right-table with relationship mappings.")
     left = registry_for_table(connection, left_table_key)
     right = registry_for_table(connection, right_table_key)
     if not left or not right:
         raise ValueError("Unknown relationship table.")
+    if relation:
+        validation = relation_payload.get("validation") if isinstance(relation_payload.get("validation"), dict) else {}
+        expected_versions = validation.get("dataVersions") if isinstance(validation.get("dataVersions"), dict) else {}
+        current_versions = {
+            str(left_table_key): int(left["data_version"] or 1),
+            str(right_table_key): int(right["data_version"] or 1),
+        }
+        if expected_versions and any(
+            int(expected_versions.get(key) or 0) != version for key, version in current_versions.items()
+        ):
+            raise ValueError(f"Relationship validation is stale for current source versions: {args.relationship}")
     left_columns = table_columns(connection, left["physical_table"])
     right_columns = table_columns(connection, right["physical_table"])
     return {
-        "relation": dict(relation) if relation else None,
+        "relation": relationship_record_payload(relation) if relation else None,
         "leftTableKey": left_table_key,
         "rightTableKey": right_table_key,
         "leftPhysicalTable": left["physical_table"],
         "rightPhysicalTable": right["physical_table"],
         "leftColumns": left_columns,
         "rightColumns": right_columns,
-        "mappings": [{"leftField": left_field, "rightField": right_field}],
+        "mappings": mappings,
         "joinType": join_type,
+        "savedFilters": saved_filters,
+        "savedPreaggregation": saved_preaggregation,
     }
 
 
 def parse_relationship_filter(raw_filter: str) -> dict[str, Any]:
-    parts = raw_filter.split(":", 3)
+    phase = "post"
+    text = str(raw_filter or "")
+    if text.startswith("pre:") or text.startswith("post:"):
+        phase, text = text.split(":", 1)
+    parts = text.split(":", 3)
     if len(parts) == 4:
         side, field, operator, value = parts
     elif len(parts) == 3:
@@ -370,7 +476,29 @@ def parse_relationship_filter(raw_filter: str) -> dict[str, Any]:
         "operator": operator.strip(),
         "value": value.strip(),
         "enabled": True,
+        "phase": phase,
     }
+
+
+def relationship_filters_from_args(args: argparse.Namespace) -> list[dict[str, Any]]:
+    filters: list[dict[str, Any]] = []
+    for raw_json in getattr(args, "filter_json", []) or []:
+        parsed = parse_json_object(raw_json, None)
+        if not isinstance(parsed, dict):
+            raise ValueError(f"Relationship filter JSON must be an object: {raw_json}")
+        filters.append(parsed)
+    filters.extend(parse_relationship_filter(item) for item in (getattr(args, "filter", []) or []))
+    return filters
+
+
+def relationship_preaggregation_from_args(args: argparse.Namespace) -> dict[str, Any] | None:
+    raw = str(getattr(args, "preaggregate_json", "") or "").strip()
+    if not raw:
+        return None
+    parsed = parse_json_object(raw, None)
+    if not isinstance(parsed, dict):
+        raise ValueError("Relationship preaggregation JSON must be an object.")
+    return parsed
 
 
 def to_number(value: Any) -> float:
@@ -425,7 +553,8 @@ def query_relationship_command(
         )
         group_fields = [parse_relationship_field_ref(item) for item in args.group]
         measure = parse_relationship_field_ref(args.measure) if args.measure else None
-        filters = [parse_relationship_filter(item) for item in args.filter]
+        filters = [*resolved["savedFilters"], *relationship_filters_from_args(args)]
+        preaggregation = relationship_preaggregation_from_args(args) or resolved["savedPreaggregation"]
         payload = build_relationship_query(
             connection,
             resolved["leftPhysicalTable"],
@@ -438,6 +567,7 @@ def query_relationship_command(
             aggregation=args.agg,
             join_type=resolved["joinType"],
             filters=filters,
+            preaggregation=preaggregation,
             limit=args.limit,
             sort_by=args.sort_by,
             sort_direction=args.sort_direction,
@@ -451,6 +581,8 @@ def query_relationship_command(
             "rightTable": resolved["rightTableKey"],
             "fieldMappings": resolved["mappings"],
             "joinType": resolved["joinType"],
+            "filters": payload["filters"],
+            "preaggregation": payload["preaggregation"],
         },
         "relationshipQuery": payload,
         "query": {
@@ -480,7 +612,7 @@ def remove_relationship_command(
         ).fetchone()
         if not row:
             raise ValueError(f"Unknown relationship: {args.relationship}")
-        relationship = dict(row)
+        relationship = relationship_record_payload(row)
         if not args.yes:
             return {"ok": True, "dryRun": True, "requiresConfirmation": True, "removedRelationship": relationship}
         connection.execute(
@@ -507,16 +639,21 @@ def relationship_preview_command(
             raise ValueError("Unknown relationship table.")
         left_columns = table_columns(connection, left["physical_table"])
         right_columns = table_columns(connection, right["physical_table"])
+        mappings = relationship_mappings_from_args(args)
+        filters = relationship_filters_from_args(args)
+        preaggregation = relationship_preaggregation_from_args(args)
         preview = build_relationship_preview(
             connection,
             left["physical_table"],
             right["physical_table"],
             left_columns,
             right_columns,
-            [{"leftField": args.left_field, "rightField": args.right_field}],
+            mappings,
             join_type=args.join_type,
             sample_limit=args.limit,
             quote_identifier=quote_identifier,
+            filters=filters,
+            preaggregation=preaggregation,
         )
     return {
         "ok": True,
@@ -524,11 +661,14 @@ def relationship_preview_command(
         "relationship": {
             "leftTable": args.left_table,
             "rightTable": args.right_table,
-            "leftField": args.left_field,
-            "rightField": args.right_field,
+            "leftField": mappings[0]["leftField"],
+            "rightField": mappings[0]["rightField"],
+            "fieldMappings": mappings,
             "joinType": args.join_type,
             "overlapCount": preview["metrics"]["overlapKeys"],
             "confidence": preview["metrics"]["confidence"],
+            "filters": preview["filters"],
+            "preaggregation": preview["preaggregation"] or {},
         },
         "relationshipPreview": preview,
     }
@@ -542,6 +682,9 @@ def build_relationship_save_plan(
     right_field: str,
     join_type: str = "left",
     limit: int = 20,
+    mappings: list[dict[str, str]] | None = None,
+    filters: list[dict[str, Any]] | None = None,
+    preaggregation: dict[str, Any] | None = None,
     *,
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
@@ -554,36 +697,55 @@ def build_relationship_save_plan(
         raise ValueError("Unknown relationship table.")
     left_columns = table_columns(connection, left["physical_table"])
     right_columns = table_columns(connection, right["physical_table"])
+    normalized_mappings = normalize_relationship_mappings(
+        mappings or [{"leftField": left_field, "rightField": right_field}]
+    )
+    if not normalized_mappings:
+        raise ValueError("At least one complete relationship mapping is required.")
     preview = build_relationship_preview(
         connection,
         left["physical_table"],
         right["physical_table"],
         left_columns,
         right_columns,
-        [{"leftField": left_field, "rightField": right_field}],
+        normalized_mappings,
         join_type=join_type,
         sample_limit=limit,
         quote_identifier=quote_identifier,
+        filters=filters,
+        preaggregation=preaggregation,
     )
     relationship = {
         "leftTable": left_table,
         "rightTable": right_table,
-        "leftField": left_field,
-        "rightField": right_field,
+        "leftField": normalized_mappings[0]["leftField"],
+        "rightField": normalized_mappings[0]["rightField"],
+        "fieldMappings": normalized_mappings,
         "joinType": join_type,
         "overlapCount": preview["metrics"]["overlapKeys"],
         "confidence": preview["metrics"]["confidence"],
     }
-    relation_key = slug(f"{left_table}_{right_table}_{left_field}_{right_field}")
+    mapping_key = "_".join(f"{item['leftField']}_{item['rightField']}" for item in normalized_mappings)
+    mapping_label = " + ".join(f"{item['leftField']}={item['rightField']}" for item in normalized_mappings)
+    validation = relationship_validation_snapshot(preview)
+    validation["dataVersions"] = {
+        str(left["table_key"]): int(left["data_version"] or 1),
+        str(right["table_key"]): int(right["data_version"] or 1),
+    }
+    relation_key = slug(f"{left_table}_{right_table}_{mapping_key}")
     proposed = {
         "relation_key": relation_key,
-        "name": f"{left_table}.{left_field} -> {right_table}.{right_field}",
+        "name": f"{left_table} -> {right_table} ({mapping_label})",
         "left_table_key": left_table,
         "right_table_key": right_table,
-        "left_field": left_field,
-        "right_field": right_field,
+        "left_field": normalized_mappings[0]["leftField"],
+        "right_field": normalized_mappings[0]["rightField"],
+        "fieldMappings": normalized_mappings,
+        "validation": validation,
         "join_type": join_type,
         "confidence": relationship["confidence"],
+        "filters": preview["filters"],
+        "preaggregation": preview["preaggregation"] or {},
     }
     return {"relationship": proposed, "relationshipPreview": preview}
 
@@ -595,10 +757,13 @@ def execute_relationship_save(
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     workspace_id = active_workspace_id(connection)
+    timestamp = now_iso()
     connection.execute(
         """
-        INSERT OR REPLACE INTO relationships(relation_key, workspace_id, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence, created_at)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO relationships(
+          relation_key, workspace_id, name, left_table_key, right_table_key, left_field, right_field,
+          mappings_json, filters_json, preaggregation_json, join_type, confidence, validation_json, created_at, updated_at
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             proposed["relation_key"],
@@ -608,9 +773,14 @@ def execute_relationship_save(
             proposed["right_table_key"],
             proposed["left_field"],
             proposed["right_field"],
+            json.dumps(proposed["fieldMappings"], ensure_ascii=False),
+            json.dumps(proposed["filters"], ensure_ascii=False),
+            json.dumps(proposed["preaggregation"], ensure_ascii=False),
             proposed["join_type"],
             proposed["confidence"],
-            now_iso(),
+            json.dumps(proposed["validation"], ensure_ascii=False),
+            timestamp,
+            timestamp,
         ),
     )
     proposed["workspace_id"] = workspace_id
@@ -626,7 +796,21 @@ def relationship_save_command(
 ) -> dict[str, Any]:
     limit = getattr(args, "limit", 20)
     with open_db() as connection:
-        plan = build_relationship_save_plan(connection, args.left_table, args.right_table, args.left_field, args.right_field, args.join_type, limit)
+        mappings = relationship_mappings_from_args(args)
+        filters = relationship_filters_from_args(args)
+        preaggregation = relationship_preaggregation_from_args(args)
+        plan = build_relationship_save_plan(
+            connection,
+            args.left_table,
+            args.right_table,
+            mappings[0]["leftField"],
+            mappings[0]["rightField"],
+            args.join_type,
+            limit,
+            mappings=mappings,
+            filters=filters,
+            preaggregation=preaggregation,
+        )
         proposed = plan["relationship"]
         if not args.yes:
             return {

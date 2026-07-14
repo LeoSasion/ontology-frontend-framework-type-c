@@ -3,13 +3,14 @@ import { readBody, sendJson } from "./serverRuntime";
 
 type SourceRoutesOptions = {
   cli: (args: string[]) => Promise<Record<string, unknown>>;
+  startSourceIntelligenceJob?: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
   request: IncomingMessage;
   response: ServerResponse;
   url: URL;
 };
 
 export async function handleSourceApi(options: SourceRoutesOptions) {
-  const { cli, request, response, url } = options;
+  const { cli, request, response, startSourceIntelligenceJob, url } = options;
 
   if (url.pathname === "/api/source-intelligence/runs" && request.method === "GET") {
     const limit = url.searchParams.get("limit") ?? "10";
@@ -20,6 +21,15 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
 
   if (url.pathname === "/api/source-intelligence/run" && request.method === "POST") {
     const body = await readBody(request);
+    if (body.async === true) {
+      if (!startSourceIntelligenceJob) {
+        sendJson(response, 503, { ok: false, action: "source-intelligence", error: "Durable job runtime is unavailable" });
+        return true;
+      }
+      const result = await startSourceIntelligenceJob(body);
+      sendJson(response, result.ok === false ? 400 : 202, result);
+      return true;
+    }
     const args = ["source-intelligence"];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
     if (body.label) args.push("--label", String(body.label));
@@ -193,6 +203,7 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
     if (body.schedule) args.push("--schedule", String(body.schedule));
     if (body.notes) args.push("--notes", String(body.notes));
+    if (body.credentialRef) args.push("--credential-ref", String(body.credentialRef));
     if (body.confirm === true) args.push("--yes");
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : 200, result);
@@ -206,6 +217,35 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     if (body.confirm === true) args.push("--yes");
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/connector-adapters" && request.method === "GET") {
+    const result = await cli(["list-connector-adapters"]);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/connectors/discover" && request.method === "POST") {
+    const body = await readBody(request);
+    const result = await cli(["discover-connector", "--connector", String(body.connector ?? "")]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/connectors/preview" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["preview-connector", "--connector", String(body.connector ?? "")];
+    if (body.limit) args.push("--limit", String(body.limit));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/connectors/sync-plan" && request.method === "POST") {
+    const body = await readBody(request);
+    const result = await cli(["plan-connector-sync", "--connector", String(body.connector ?? "")]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
     return true;
   }
 

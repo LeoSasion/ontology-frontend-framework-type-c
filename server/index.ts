@@ -4,6 +4,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { handleAgentApi } from "./agentRoutes";
+import { handleAnalysisUnitApi } from "./analysisUnitRoutes";
+import { handleExportApi } from "./exportRoutes";
+import { DurableJobRuntime } from "./durableJobRuntime";
+import { handleJobApi } from "./jobRoutes";
 import { handleDashboardApi } from "./dashboardRoutes";
 import { handleModelApi } from "./modelRoutes";
 import { handleQueryApi } from "./queryRoutes";
@@ -12,6 +16,7 @@ import { handleSourceApi } from "./sourceRoutes";
 import { handleSettingsApi } from "./settingsRoutes";
 import { handleStatic } from "./staticServer";
 import { handleWorkspaceApi } from "./workspaceRoutes";
+import { handleWorkflowApi } from "./workflowRoutes";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 
@@ -56,14 +61,22 @@ if (!loopbackHosts.has(host)) {
 }
 const cli = (args: string[]) => runCli(root, args);
 
+// A read through the deterministic CLI is the startup compatibility gate.
+// New databases are initialized here; legacy or future schemas stop before the API binds.
+await cli(["status"]);
+await cli(["job-recover", "--all", "--yes"]);
+const jobRuntime = new DurableJobRuntime(root, cli);
+
 function actionForApiPath(url: URL) {
   if (url.pathname.includes("query-table")) return "query-table";
   if (url.pathname.includes("query")) return "query";
-  if (url.pathname.includes("evidence")) return "evidence";
+  if (url.pathname.includes("evidence") || url.pathname.includes("export")) return "evidence";
   if (url.pathname.includes("views")) return "view";
   if (url.pathname.includes("dashboard")) return "dashboard";
   if (url.pathname.includes("source") || url.pathname.includes("import") || url.pathname.includes("connector")) return "source";
   if (url.pathname.includes("agent") || url.pathname.includes("actions")) return "agent";
+  if (url.pathname.includes("analysis-unit") || url.pathname.includes("chart-adapt")) return "analysis";
+  if (url.pathname.includes("jobs")) return "job";
   if (url.pathname.includes("context")) return "context";
   if (url.pathname.includes("preferences") || url.pathname.includes("theme") || url.pathname.includes("config")) return "settings";
   if (url.pathname.includes("workspace")) return "workspace";
@@ -84,7 +97,13 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
     return;
   }
 
-  if (await handleSourceApi({ cli, request, response, url })) {
+  if (await handleSourceApi({
+    cli,
+    request,
+    response,
+    startSourceIntelligenceJob: (body) => jobRuntime.startSourceIntelligence(body),
+    url,
+  })) {
     return;
   }
 
@@ -100,7 +119,29 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
     return;
   }
 
-  if (await handleAgentApi({ cli, request, response, url })) {
+  if (await handleAgentApi({ cli, request, response, root, url })) {
+    return;
+  }
+
+  if (await handleAnalysisUnitApi({ cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleExportApi({ cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleWorkflowApi({ cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleJobApi({
+    cancelJobProcess: (jobKey) => jobRuntime.cancel(jobKey),
+    cli,
+    request,
+    response,
+    url,
+  })) {
     return;
   }
 
@@ -145,3 +186,12 @@ const server = createServer(async (request, response) => {
 server.listen(port, host, () => {
   console.log(`AIBI-C API listening on http://${host}:${port}`);
 });
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.once(signal, () => {
+    void (async () => {
+      await jobRuntime.shutdown();
+      server.close(() => process.exit(0));
+    })();
+  });
+}

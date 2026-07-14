@@ -52,7 +52,7 @@ def workspace_schema_fingerprint(
         where += " AND table_key = ?"
         params.append(table_key)
     registries = connection.execute(
-        f"SELECT table_key, physical_table FROM table_registry WHERE {where} ORDER BY table_key",
+        f"SELECT table_key, physical_table, data_version, updated_at FROM table_registry WHERE {where} ORDER BY table_key",
         tuple(params),
     ).fetchall()
     tables: list[dict[str, Any]] = []
@@ -73,12 +73,20 @@ def workspace_schema_fingerprint(
                 (workspace_id, registry["table_key"]),
             ).fetchall()
         ]
-        tables.append({"tableKey": registry["table_key"], "columns": columns, "semantics": semantics})
+        tables.append({
+            "tableKey": registry["table_key"],
+            "dataVersion": int(registry["data_version"] or 1),
+            "updatedAt": str(registry["updated_at"] or ""),
+            "columns": columns,
+            "semantics": semantics,
+        })
     relationships = [
         dict(row)
         for row in connection.execute(
             """
-            SELECT relation_key, left_table_key, right_table_key, left_field, right_field, join_type
+            SELECT relation_key, left_table_key, right_table_key, left_field, right_field,
+                   mappings_json, filters_json, preaggregation_json, join_type, confidence,
+                   validation_json, updated_at
             FROM relationships
             WHERE workspace_id = ?
             ORDER BY relation_key

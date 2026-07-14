@@ -56,6 +56,8 @@ def build_relationship_preview(
     join_type: str,
     sample_limit: int,
     quote_identifier: QuoteIdentifier,
+    filters: list[dict[str, Any]] | None = None,
+    preaggregation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if join_type not in {"left", "inner"}:
         raise ValueError("关系预览只支持 left 或 inner。")
@@ -67,8 +69,35 @@ def build_relationship_preview(
         if mapping["rightField"] not in right_columns:
             raise ValueError(f"右表字段不存在：{mapping['rightField']}")
 
-    left_rows = rows_for_table(connection, left_table_name, left_columns, quote_identifier)
-    right_rows = rows_for_table(connection, right_table_name, right_columns, quote_identifier)
+    raw_left_rows = rows_for_table(connection, left_table_name, left_columns, quote_identifier)
+    raw_right_rows = rows_for_table(connection, right_table_name, right_columns, quote_identifier)
+    normalized_filters = [
+        item
+        for item in (
+            normalize_relationship_filter(filter_rule, left_columns, right_columns)
+            for filter_rule in (filters or [])
+        )
+        if item is not None
+    ]
+    left_rows = [
+        row for row in raw_left_rows
+        if all(
+            relationship_filter_matches(row, item)
+            for item in normalized_filters
+            if item["phase"] == "pre" and item["side"] == "left"
+        )
+    ]
+    right_rows = [
+        row for row in raw_right_rows
+        if all(
+            relationship_filter_matches(row, item)
+            for item in normalized_filters
+            if item["phase"] == "pre" and item["side"] == "right"
+        )
+    ]
+    normalized_preaggregation = normalize_relationship_preaggregation(preaggregation, right_columns, mappings)
+    if normalized_preaggregation:
+        right_rows = preaggregate_relationship_rows(right_rows, normalized_preaggregation)
     left_stats = key_stats(left_rows, mappings, "left")
     right_stats = key_stats(right_rows, mappings, "right")
     left_keys = set(left_stats["counts"].keys())
@@ -105,7 +134,11 @@ def build_relationship_preview(
     return {
         "joinType": join_type,
         "mappings": mappings,
+        "filters": normalized_filters,
+        "preaggregation": normalized_preaggregation,
         "metrics": {
+            "leftRowsBeforeFilters": len(raw_left_rows),
+            "rightRowsBeforeFilters": len(raw_right_rows),
             "leftRows": len(left_rows),
             "rightRows": len(right_rows),
             "leftDistinctKeys": len(left_keys),
@@ -271,6 +304,9 @@ def normalize_relationship_filter(
     field = str(filter_rule.get("field", "")).strip()
     if not field:
         return None
+    phase = str(filter_rule.get("phase") or "post").strip().lower()
+    if phase not in {"pre", "post"}:
+        raise ValueError(f"筛选阶段必须是 pre 或 post：{phase}")
     operator = normalize_filter_operator(str(filter_rule.get("operator", "contains")))
     raw_side = str(filter_rule.get("side", "")).strip()
     if raw_side:
@@ -290,7 +326,117 @@ def normalize_relationship_filter(
         "field": field,
         "operator": operator,
         "value": filter_rule.get("value", ""),
+        "phase": phase,
     }
+
+
+def relationship_filter_matches(row: dict[str, Any], filter_rule: dict[str, Any]) -> bool:
+    value = row.get(filter_rule["field"])
+    text = clean(value)
+    operator = filter_rule["operator"]
+    expected = filter_rule.get("value", "")
+    if operator == "empty":
+        return text == ""
+    if operator == "notEmpty":
+        return text != ""
+    if operator == "equals":
+        return text == str(expected)
+    if operator == "notEquals":
+        return text != str(expected)
+    if operator == "contains":
+        return str(expected) in text
+    if operator == "in":
+        return text in parse_filter_values(expected)
+    if operator == "between":
+        start, end = parse_range_values(expected)
+        number = numeric_value(value)
+        return (not start or number >= numeric_value(start)) and (not end or number <= numeric_value(end))
+    number = numeric_value(value)
+    target = numeric_value(expected)
+    if operator == "gt":
+        return number > target
+    if operator == "gte":
+        return number >= target
+    if operator == "lt":
+        return number < target
+    return number <= target
+
+
+def numeric_value(value: Any) -> float:
+    try:
+        return float(str(value or "0").replace(",", "").strip() or "0")
+    except ValueError:
+        return 0.0
+
+
+VALID_PREAGGREGATIONS = {"count", "count-distinct", "sum", "avg", "min", "max"}
+
+
+def normalize_relationship_preaggregation(
+    value: dict[str, Any] | None,
+    right_columns: list[str],
+    mappings: list[dict[str, str]],
+) -> dict[str, Any] | None:
+    if not isinstance(value, dict) or not value:
+        return None
+    side = str(value.get("side") or "right").strip().lower()
+    if side != "right":
+        raise ValueError("当前只支持右表连接前预聚合。")
+    group_fields = list(dict.fromkeys(str(item).strip() for item in value.get("groupFields", []) if str(item).strip()))
+    mapping_fields = [item["rightField"] for item in mappings]
+    if any(field not in right_columns for field in group_fields):
+        raise ValueError("右表预聚合分组字段不存在。")
+    if any(field not in group_fields for field in mapping_fields):
+        raise ValueError("右表预聚合必须包含完整关系键。")
+    measures: list[dict[str, str]] = []
+    seen_fields: set[str] = set()
+    for item in value.get("measures", []):
+        if not isinstance(item, dict):
+            continue
+        field = str(item.get("field") or "").strip()
+        aggregation = str(item.get("aggregation") or "sum").strip().lower()
+        if not field or field in seen_fields:
+            continue
+        if field not in right_columns:
+            raise ValueError(f"右表预聚合指标字段不存在：{field}")
+        if aggregation not in VALID_PREAGGREGATIONS:
+            raise ValueError(f"不支持的右表预聚合方式：{aggregation}")
+        if field in group_fields:
+            raise ValueError(f"右表预聚合字段不能同时作为分组和指标：{field}")
+        seen_fields.add(field)
+        measures.append({"field": field, "aggregation": aggregation})
+    if not measures:
+        raise ValueError("右表预聚合至少需要一个指标字段。")
+    return {"side": "right", "groupFields": group_fields, "measures": measures}
+
+
+def preaggregate_relationship_rows(rows: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
+    grouped: dict[tuple[str, ...], list[dict[str, Any]]] = {}
+    group_fields = config["groupFields"]
+    for row in rows:
+        key = tuple(clean(row.get(field)) for field in group_fields)
+        grouped.setdefault(key, []).append(row)
+    result: list[dict[str, Any]] = []
+    for key, members in grouped.items():
+        output = {field: key[index] for index, field in enumerate(group_fields)}
+        for measure in config["measures"]:
+            field = measure["field"]
+            aggregation = measure["aggregation"]
+            values = [numeric_value(member.get(field)) for member in members]
+            if aggregation == "count":
+                output[field] = len(members)
+            elif aggregation == "count-distinct":
+                output[field] = len({clean(member.get(field)) for member in members if clean(member.get(field))})
+            elif aggregation == "sum":
+                output[field] = sum(values)
+            elif aggregation == "avg":
+                output[field] = sum(values) / max(1, len(values))
+            elif aggregation == "min":
+                output[field] = min(values) if values else 0
+            else:
+                output[field] = max(values) if values else 0
+        result.append(output)
+    return result
 
 
 def build_relationship_filter_sql(
@@ -351,7 +497,13 @@ def build_relationship_filter_sql(
             else:
                 clauses.append(f"{expression} <= ?")
             params.append(str(value))
-        applied_filters.append({"side": normalized["side"], "field": field, "operator": operator, "value": value})
+        applied_filters.append({
+            "phase": normalized["phase"],
+            "side": normalized["side"],
+            "field": field,
+            "operator": operator,
+            "value": value,
+        })
     if not clauses:
         return "", [], applied_filters
     return " WHERE " + " AND ".join(clauses), params, applied_filters
@@ -383,6 +535,8 @@ def build_relationship_query(
     aggregation: str = "count",
     join_type: str = "left",
     filters: list[dict[str, Any]] | None = None,
+    preaggregation: dict[str, Any] | None = None,
+    deduplicate_left: bool = False,
     limit: int = 50,
     sort_by: str = "metric",
     sort_direction: str = "desc",
@@ -404,11 +558,25 @@ def build_relationship_query(
         if mapping["rightField"] not in right_columns:
             raise ValueError(f"右表字段不存在：{mapping['rightField']}")
 
+    normalized_filters = [
+        item
+        for item in (
+            normalize_relationship_filter(filter_rule, left_columns, right_columns)
+            for filter_rule in (filters or [])
+        )
+        if item is not None
+    ]
+    normalized_preaggregation = normalize_relationship_preaggregation(preaggregation, right_columns, mappings)
+    effective_right_columns = (
+        [*normalized_preaggregation["groupFields"], *[item["field"] for item in normalized_preaggregation["measures"]]]
+        if normalized_preaggregation
+        else right_columns
+    )
     condition_sql = build_relation_condition_sql(mappings, quote_identifier)
     sql_join_type = "JOIN" if join_type == "inner" else "LEFT JOIN"
     safe_limit = max(1, min(int(limit or 50), 10000))
     normalized_groups = [
-        normalize_query_field(item, left_columns, right_columns, "分组字段")
+        normalize_query_field(item, left_columns, effective_right_columns, "分组字段")
         for item in (group_fields or [])
     ]
     select_parts = [
@@ -418,7 +586,27 @@ def build_relationship_query(
     group_sql = ""
     if normalized_groups:
         group_sql = " GROUP BY " + ", ".join(qualified(item["alias"], item["field"], quote_identifier) for item in normalized_groups)
-    where_sql, filter_params, applied_filters = build_relationship_filter_sql(filters, left_columns, right_columns, quote_identifier)
+    left_pre_filters = [item for item in normalized_filters if item["phase"] == "pre" and item["side"] == "left"]
+    right_pre_filters = [item for item in normalized_filters if item["phase"] == "pre" and item["side"] == "right"]
+    remaining_filters = [item for item in normalized_filters if item not in [*left_pre_filters, *right_pre_filters]]
+    left_pre_where, left_pre_params, left_pre_applied = build_relationship_filter_sql(
+        left_pre_filters,
+        left_columns,
+        right_columns,
+        quote_identifier,
+    )
+    right_pre_where, right_pre_params, right_pre_applied = build_relationship_filter_sql(
+        right_pre_filters,
+        left_columns,
+        right_columns,
+        quote_identifier,
+    )
+    where_sql, filter_params, applied_filters = build_relationship_filter_sql(
+        remaining_filters,
+        left_columns,
+        effective_right_columns,
+        quote_identifier,
+    )
 
     normalized_measure = None
     if aggregation == "count":
@@ -427,7 +615,7 @@ def build_relationship_query(
     else:
         if not measure:
             raise ValueError(f"{aggregation} 聚合需要指定指标字段")
-        normalized_measure = normalize_query_field(measure, left_columns, right_columns, "指标字段")
+        normalized_measure = normalize_query_field(measure, left_columns, effective_right_columns, "指标字段")
         metric_name = f"{aggregation}_{normalized_measure['outputName']}"
         field_sql = qualified(normalized_measure["alias"], normalized_measure["field"], quote_identifier)
         numeric_sql = numeric_expr(normalized_measure["alias"], normalized_measure["field"], quote_identifier)
@@ -444,14 +632,48 @@ def build_relationship_query(
     select_parts.append(f"{metric_sql} AS {quote_identifier(metric_name)}")
     order_field = normalized_groups[0]["outputName"] if sort_by == "dimension" and normalized_groups else metric_name
     order_sql = f" ORDER BY {quote_identifier(order_field)} {sort_direction.upper()}"
+    right_source_sql = quote_identifier(right_table_name)
+    if normalized_preaggregation:
+        select_parts_right = [qualified("r", field, quote_identifier) for field in normalized_preaggregation["groupFields"]]
+        for item in normalized_preaggregation["measures"]:
+            field_sql = qualified("r", item["field"], quote_identifier)
+            numeric_sql = numeric_expr("r", item["field"], quote_identifier)
+            preaggregation_name = item["aggregation"]
+            if preaggregation_name == "count":
+                expression = "COUNT(*)"
+            elif preaggregation_name == "count-distinct":
+                expression = f"COUNT(DISTINCT {field_sql})"
+            else:
+                expression = f"{preaggregation_name.upper()}({numeric_sql})"
+            select_parts_right.append(f"{expression} AS {quote_identifier(item['field'])}")
+        group_right_sql = ", ".join(qualified("r", field, quote_identifier) for field in normalized_preaggregation["groupFields"])
+        right_source_sql = (
+            f"(SELECT {', '.join(select_parts_right)} FROM {quote_identifier(right_table_name)} AS r"
+            f"{right_pre_where} GROUP BY {group_right_sql})"
+        )
+    elif right_pre_where:
+        right_source_sql = f"(SELECT * FROM {quote_identifier(right_table_name)} AS r{right_pre_where})"
+    left_source_sql = quote_identifier(left_table_name)
+    if deduplicate_left:
+        left_source_fields = list(dict.fromkeys([
+            *[item["leftField"] for item in mappings],
+            *[item["field"] for item in normalized_groups if item["side"] == "left"],
+        ]))
+        left_select_sql = ", ".join(qualified("l", field, quote_identifier) for field in left_source_fields)
+        left_source_sql = (
+            f"(SELECT {left_select_sql} FROM {quote_identifier(left_table_name)} AS l"
+            f"{left_pre_where} GROUP BY {left_select_sql})"
+        )
+    elif left_pre_where:
+        left_source_sql = f"(SELECT * FROM {quote_identifier(left_table_name)} AS l{left_pre_where})"
     sql = (
         f"SELECT {', '.join(select_parts)} "
-        f"FROM {quote_identifier(left_table_name)} AS l "
-        f"{sql_join_type} {quote_identifier(right_table_name)} AS r "
+        f"FROM {left_source_sql} AS l "
+        f"{sql_join_type} {right_source_sql} AS r "
         f"ON {condition_sql}"
         f"{where_sql}{group_sql}{order_sql} LIMIT ?"
     )
-    rows = connection.execute(sql, (*filter_params, safe_limit)).fetchall()
+    rows = connection.execute(sql, (*left_pre_params, *right_pre_params, *filter_params, safe_limit)).fetchall()
     columns = [item["outputName"] for item in normalized_groups] + [metric_name]
     return {
         "leftTable": left_table_name,
@@ -465,7 +687,9 @@ def build_relationship_query(
             else None
         ),
         "aggregation": aggregation,
-        "filters": applied_filters,
+        "filters": [*left_pre_applied, *right_pre_applied, *applied_filters],
+        "preaggregation": normalized_preaggregation,
+        "leftDeduplicated": deduplicate_left,
         "sortBy": sort_by,
         "sortDirection": sort_direction,
         "metricName": metric_name,
@@ -478,7 +702,9 @@ def build_relationship_query(
             "groups": [item["outputName"] for item in normalized_groups],
             "measure": normalized_measure["outputName"] if normalized_measure else "",
             "aggregation": aggregation,
-            "filters": applied_filters,
+            "filters": [*left_pre_applied, *right_pre_applied, *applied_filters],
+            "preaggregation": normalized_preaggregation,
+            "leftDeduplicated": deduplicate_left,
             "limit": safe_limit,
         },
     }

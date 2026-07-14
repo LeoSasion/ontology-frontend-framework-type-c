@@ -925,6 +925,7 @@ def _unit(
     required: dict[str, list[str]] | None = None,
     optional: dict[str, list[str]] | None = None,
     signals: list[str] | None = None,
+    anchors: list[str] | None = None,
     options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
@@ -937,6 +938,7 @@ def _unit(
         "required": required or {},
         "optional": optional or {},
         "signals": signals or [],
+        "anchors": anchors or [],
         "options": options or {},
     }
 
@@ -1021,7 +1023,7 @@ ERP_DASHBOARD_UNITS.extend([
     _unit("customer-receipt-risk-rank", "销售执行/回款", "bar", "客户回款风险排行", "按客户聚合未结算、未收款或账龄字段，给销售和财务共同处理。", ["kingdee-sales-order-execution", "sellfox-ar-report"], {"measure": ["ar_amount", "unfulfilled_qty", "age_days"], "dimension": ["customer"]}, {"status": ["settlement_status"], "receipt": ["receipt_amount"]}, options={"aggregation": "sum", "valueFormat": "currency", "barOrientation": "horizontal", "topN": 12}),
     _unit("purchase-execution-chain-table", "采购执行/应付", "table", "采购订单执行链路", "采购从订单、收料、入库、退料、应付、开票、付款到特殊冲销需要同屏核查。", ["kingdee-purchase-execution"], {}, {"po": ["purchase_order_id", "order_id"], "supplier": ["supplier"], "sku": ["sku", "product"], "ordered": ["ordered_qty", "quantity"], "received": ["received_qty", "received_amount"], "stockin": ["stockin_qty", "stockin_amount"], "return": ["material_return_qty", "material_return_amount"], "ap": ["ap_amount"], "invoice": ["invoice_amount"], "payment": ["payment_amount"]}, signals=["supplier", "received_qty", "stockin_qty", "ap_amount"], options={"aggregation": "count", "tableColumnLimit": 10, "topN": 100}),
     _unit("purchase-stockin-progress-rank", "采购执行/应付", "bar", "供应商入库进度排行", "用收料或入库数量观察供应商交付，适合采购跟催。", ["kingdee-purchase-execution", "kingdee-purchase-stockin"], {"measure": ["stockin_qty", "received_qty"], "dimension": ["supplier", "purchaser"]}, {"date": ["purchase_date"]}, options={"aggregation": "sum", "valueFormat": "compact", "barOrientation": "horizontal", "topN": 15}),
-    _unit("purchase-return-material-rank", "采购执行/应付", "bar", "采购退料排行", "退料数量或金额能暴露供应商质量、规格和到货异常。", ["kingdee-purchase-execution"], {"measure": ["material_return_amount", "material_return_qty", "defective_qty"], "dimension": ["supplier", "sku", "product"]}, options={"aggregation": "sum", "valueFormat": "currency", "barOrientation": "horizontal", "topN": 15}),
+    _unit("purchase-return-material-rank", "采购执行/应付", "bar", "采购退料排行", "退料数量或金额能暴露供应商质量、规格和到货异常。", ["kingdee-purchase-execution"], {"measure": ["material_return_amount", "material_return_qty", "defective_qty"], "dimension": ["supplier", "sku", "product"]}, anchors=["supplier", "purchase_order_id", "purchaser", "purchase_date", "received_qty", "stockin_qty"], options={"aggregation": "sum", "valueFormat": "currency", "barOrientation": "horizontal", "topN": 15}),
     _unit("payable-payment-kpi", "采购执行/应付", "metric", "已付/应付金额", "采购财务链路先看应付、付款和预付款规模。", ["kingdee-purchase-execution", "wsgjp-webstore-erp"], {"measure": ["payment_amount", "ap_amount", "prepaid_amount"]}, {"date": ["purchase_date"]}, options={"aggregation": "sum", "valueFormat": "currency"}),
     _unit("purchase-payment-reconcile-table", "采购执行/应付", "table", "应付付款勾稽明细", "把应付单、发票、付款、预付和特殊冲销放在采购订单下核对。", ["kingdee-purchase-execution"], {}, {"po": ["purchase_order_id", "order_id"], "supplier": ["supplier"], "ap": ["ap_amount"], "invoice": ["invoice_amount"], "payment": ["payment_amount"], "prepaid": ["prepaid_amount"], "writeoff": ["special_writeoff_amount", "writeoff_amount"], "status": ["bill_status", "settlement_status"]}, signals=["ap_amount", "payment_amount", "supplier"], options={"aggregation": "count", "tableColumnLimit": 9, "topN": 100}),
     _unit("purchaser-performance-rank", "采购执行/应付", "bar", "采购员执行排行", "按采购员看采购金额、入库数量或延期，帮助采购负责人分配跟催。", ["kingdee-purchase-execution"], {"measure": ["purchase_amount", "stockin_qty", "delay_days"], "dimension": ["purchaser"]}, options={"aggregation": "sum", "valueFormat": "currency", "barOrientation": "horizontal", "topN": 12}),
@@ -1123,7 +1125,7 @@ def _normalize(value: Any) -> str:
 
 
 def _is_short_ascii_token(value: str) -> bool:
-    return bool(re.fullmatch(r"[a-z0-9]+", value)) and len(value) < 3
+    return bool(re.fullmatch(r"[a-z0-9]+", value)) and len(value) < 4
 
 
 def _is_ambiguous_ascii_field_token(value: str) -> bool:
@@ -1131,6 +1133,7 @@ def _is_ambiguous_ascii_field_token(value: str) -> bool:
         "amount",
         "code",
         "cost",
+        "customer",
         "date",
         "id",
         "name",
@@ -1307,6 +1310,13 @@ def _resolve_unit_for_table(unit: dict[str, Any], table: dict[str, Any], fields:
 
     matched: dict[str, str] = {}
     score = 0
+    anchors = unit.get("anchors", [])
+    if anchors:
+        anchor_field, anchor_score = _find_field(columns, anchors)
+        if not anchor_field:
+            return None
+        matched["anchor"] = anchor_field
+        score += anchor_score + 40
     for role, groups in unit.get("required", {}).items():
         field, field_score = _find_field(columns, groups)
         if not field:
@@ -1467,6 +1477,7 @@ def build_erp_unit_library_catalog_payload(*, include_units: bool = True) -> dic
                 "title": item["title"],
                 "required": item["required"],
                 "optional": item["optional"],
+                "anchors": item.get("anchors", []),
                 "sources": item["sources"],
             }
             for item in ERP_DASHBOARD_UNITS

@@ -5,6 +5,7 @@ import sqlite3
 from typing import Any, Callable
 
 from bi_cli_core import source_label
+from relationship_command_service import relationship_record_payload
 
 
 def list_tables_command(
@@ -19,7 +20,7 @@ def list_tables_command(
         tables = rows_to_dicts(
             connection.execute(
                 """
-                SELECT table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at
+                SELECT table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at
                 FROM table_registry
                 WHERE workspace_id = ?
                 ORDER BY display_name
@@ -82,17 +83,18 @@ def inspect_table_command(
                 (table_key, workspace_id),
             )
         )
-        relationships = rows_to_dicts(
-            connection.execute(
+        relationships = [
+            relationship_record_payload(row)
+            for row in connection.execute(
                 """
-                SELECT relation_key, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence
+                SELECT *
                 FROM relationships
                 WHERE workspace_id = ? AND (left_table_key = ? OR right_table_key = ?)
                 ORDER BY relation_key
                 """,
                 (workspace_id, table_key, table_key),
             )
-        )
+        ]
         import_policy = saved_import_policy(connection, table_key)
         import_jobs = rows_to_dicts(
             connection.execute(
@@ -121,6 +123,8 @@ def inspect_table_command(
             "row_count": registry["row_count"],
             "column_count": registry["column_count"],
             "created_at": registry["created_at"],
+            "data_version": registry["data_version"],
+            "updated_at": registry["updated_at"],
         },
         "columns": columns,
         "fieldConfig": field_rows,

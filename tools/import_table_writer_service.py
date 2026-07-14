@@ -13,6 +13,8 @@ from import_policy import (
     record_unique_key,
     sanitize_unique_fields,
 )
+from relationship_command_service import relationship_record_payload, relationship_validation_snapshot
+from relationship_tools import build_relationship_preview
 
 
 def should_create_metric_for_measure(measure: str) -> bool:
@@ -22,6 +24,154 @@ def should_create_metric_for_measure(measure: str) -> bool:
 
 def default_metric_dimension(profile: dict[str, Any]) -> str | None:
     return next((dimension for dimension in profile["dimensions"] if not str(dimension).startswith("__")), None)
+
+
+def upsert_table_registry_record(
+    connection: sqlite3.Connection,
+    *,
+    workspace_id: str,
+    table_key: str,
+    display_name: str,
+    physical_table: str,
+    source_file: str,
+    row_count: int,
+    column_count: int,
+) -> int:
+    current = connection.execute(
+        "SELECT created_at, data_version FROM table_registry WHERE workspace_id = ? AND table_key = ?",
+        (workspace_id, table_key),
+    ).fetchone()
+    timestamp = now_iso()
+    created_at = str(current["created_at"]) if current else timestamp
+    data_version = int(current["data_version"] or 1) + 1 if current else 1
+    connection.execute(
+        """
+        INSERT INTO table_registry(
+          table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count,
+          created_at, data_version, updated_at
+        ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(workspace_id, table_key) DO UPDATE SET
+          display_name = excluded.display_name,
+          physical_table = excluded.physical_table,
+          source_file = excluded.source_file,
+          row_count = excluded.row_count,
+          column_count = excluded.column_count,
+          data_version = excluded.data_version,
+          updated_at = excluded.updated_at
+        """,
+        (
+            table_key,
+            workspace_id,
+            display_name,
+            physical_table,
+            source_file,
+            row_count,
+            column_count,
+            created_at,
+            data_version,
+            timestamp,
+        ),
+    )
+    return data_version
+
+
+def revalidate_relationships_for_table(
+    connection: sqlite3.Connection,
+    *,
+    workspace_id: str,
+    table_key: str,
+) -> list[dict[str, Any]]:
+    relationships = connection.execute(
+        """
+        SELECT * FROM relationships
+        WHERE workspace_id = ? AND (left_table_key = ? OR right_table_key = ?)
+        ORDER BY relation_key
+        """,
+        (workspace_id, table_key, table_key),
+    ).fetchall()
+    receipts: list[dict[str, Any]] = []
+    for relationship in relationships:
+        payload = relationship_record_payload(relationship)
+        try:
+            left = connection.execute(
+                "SELECT * FROM table_registry WHERE workspace_id = ? AND table_key = ?",
+                (workspace_id, relationship["left_table_key"]),
+            ).fetchone()
+            right = connection.execute(
+                "SELECT * FROM table_registry WHERE workspace_id = ? AND table_key = ?",
+                (workspace_id, relationship["right_table_key"]),
+            ).fetchone()
+            if not left or not right:
+                raise ValueError("relationship-table-missing")
+            left_columns = [
+                str(row[1])
+                for row in connection.execute(f"PRAGMA table_info({quote_identifier(left['physical_table'])})")
+            ]
+            right_columns = [
+                str(row[1])
+                for row in connection.execute(f"PRAGMA table_info({quote_identifier(right['physical_table'])})")
+            ]
+            preview = build_relationship_preview(
+                connection,
+                left["physical_table"],
+                right["physical_table"],
+                left_columns,
+                right_columns,
+                payload["fieldMappings"],
+                join_type=relationship["join_type"],
+                sample_limit=20,
+                quote_identifier=quote_identifier,
+                filters=payload.get("filters") or [],
+                preaggregation=payload.get("preaggregation") or None,
+            )
+            validation = relationship_validation_snapshot(preview)
+            validation["dataVersions"] = {
+                str(left["table_key"]): int(left["data_version"] or 1),
+                str(right["table_key"]): int(right["data_version"] or 1),
+            }
+            validation["revalidatedAfterImport"] = table_key
+            connection.execute(
+                """
+                UPDATE relationships
+                SET confidence = ?, validation_json = ?, updated_at = ?
+                WHERE workspace_id = ? AND relation_key = ?
+                """,
+                (
+                    preview["metrics"]["confidence"],
+                    json.dumps(validation, ensure_ascii=False),
+                    now_iso(),
+                    workspace_id,
+                    relationship["relation_key"],
+                ),
+            )
+            receipts.append({
+                "relationKey": relationship["relation_key"],
+                "status": validation["status"],
+                "blockers": validation["blockers"],
+                "dataVersions": validation["dataVersions"],
+            })
+        except (KeyError, TypeError, ValueError, sqlite3.Error) as error:
+            validation = payload.get("validation") if isinstance(payload.get("validation"), dict) else {}
+            blockers = list(dict.fromkeys([*(validation.get("blockers") or []), "revalidation-failed"]))
+            validation = {
+                **validation,
+                "schema": "aibi-relationship-validation/v1",
+                "status": "stale",
+                "blockers": blockers,
+                "staleReason": str(error),
+                "revalidatedAfterImport": table_key,
+                "validatedAt": now_iso(),
+            }
+            connection.execute(
+                "UPDATE relationships SET validation_json = ?, updated_at = ? WHERE workspace_id = ? AND relation_key = ?",
+                (json.dumps(validation, ensure_ascii=False), now_iso(), workspace_id, relationship["relation_key"]),
+            )
+            receipts.append({
+                "relationKey": relationship["relation_key"],
+                "status": "stale",
+                "blockers": blockers,
+            })
+    return receipts
 
 
 def create_metrics_for_profile(
@@ -82,12 +232,20 @@ def import_csv_as_table(
     connection.executemany(insert_sql, [[str(row.get(header, "")) for header in headers] for row in rows])
 
     display_source = source_label(path)
-    connection.execute(
-        """
-        INSERT OR REPLACE INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (table_key, workspace_id, display_name, physical_table, display_source, len(rows), len(headers), now_iso()),
+    data_version = upsert_table_registry_record(
+        connection,
+        workspace_id=workspace_id,
+        table_key=table_key,
+        display_name=display_name,
+        physical_table=physical_table,
+        source_file=display_source,
+        row_count=len(rows),
+        column_count=len(headers),
+    )
+    relationship_revalidations = revalidate_relationships_for_table(
+        connection,
+        workspace_id=workspace_id,
+        table_key=table_key,
     )
     source_run_id = unique_key(f"source_run_{table_key}")
     evidence = [
@@ -135,6 +293,8 @@ def import_csv_as_table(
         "displayName": display_name,
         "sourceRunId": source_run_id,
         "profile": profile,
+        "dataVersion": data_version,
+        "relationshipRevalidations": relationship_revalidations,
     }
 
 
@@ -153,13 +313,23 @@ def update_table_metadata_after_write(
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> str:
     workspace_id = active_workspace_id(connection)
-    connection.execute(
-        """
-        INSERT OR REPLACE INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at)
-        VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-        """,
-        (table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, now_iso()),
+    data_version = upsert_table_registry_record(
+        connection,
+        workspace_id=workspace_id,
+        table_key=table_key,
+        display_name=display_name,
+        physical_table=physical_table,
+        source_file=source_file,
+        row_count=row_count,
+        column_count=column_count,
     )
+    relationship_revalidations = revalidate_relationships_for_table(
+        connection,
+        workspace_id=workspace_id,
+        table_key=table_key,
+    )
+    result["dataVersion"] = data_version
+    result["relationshipRevalidations"] = relationship_revalidations
     source_run_id = unique_key(f"source_run_{table_key}")
     evidence = [
         "source-profile-generic.json",

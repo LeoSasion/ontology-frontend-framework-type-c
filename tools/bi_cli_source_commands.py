@@ -20,10 +20,17 @@ from bi_cli_io_services import (
 )
 from bi_cli_schema import active_workspace_id, open_db, registry_for_table, table_columns, upsert_navigation_module
 from connector_command_service import (
+    connector_by_key_or_name,
     list_connectors_command as list_connectors_command_service,
     remove_connector_command as remove_connector_command_service,
     save_connector_command as save_connector_command_service,
     sync_connector_command as sync_connector_command_service,
+)
+from connector_adapter_service import (
+    discover_connector_command as discover_connector_command_service,
+    list_connector_adapters_command as list_connector_adapters_command_service,
+    plan_connector_sync_command as plan_connector_sync_command_service,
+    preview_connector_command as preview_connector_command_service,
 )
 from evidence_receipts import (
     build_source_intelligence_dashboard_candidate,
@@ -347,6 +354,36 @@ def sync_connector_command(args: argparse.Namespace) -> dict[str, Any]:
         saved_import_policy=saved_import_policy,
         merge_import_into_table=merge_import_into_table,
         import_csv_as_table=import_csv_as_table,
+    )
+
+
+def list_connector_adapters_command(args: argparse.Namespace) -> dict[str, Any]:
+    return list_connector_adapters_command_service(args)
+
+
+def discover_connector_command(args: argparse.Namespace) -> dict[str, Any]:
+    return discover_connector_command_service(
+        args,
+        open_db=open_db,
+        connector_by_key_or_name=connector_by_key_or_name,
+    )
+
+
+def preview_connector_command(args: argparse.Namespace) -> dict[str, Any]:
+    return preview_connector_command_service(
+        args,
+        open_db=open_db,
+        connector_by_key_or_name=connector_by_key_or_name,
+    )
+
+
+def plan_connector_sync_command(args: argparse.Namespace) -> dict[str, Any]:
+    return plan_connector_sync_command_service(
+        args,
+        open_db=open_db,
+        connector_by_key_or_name=connector_by_key_or_name,
+        registry_for_table=registry_for_table,
+        saved_import_policy=saved_import_policy,
     )
 
 

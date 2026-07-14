@@ -46,7 +46,6 @@ from agent_prompt_resolution import (
 )
 from agent_recommended_commands import build_agent_recommended_commands
 from bi_cli_core import (
-    B_PROJECT_ROOT,
     DB_PATH,
     DUCKDB_PATH,
     ROOT,
@@ -72,7 +71,10 @@ from platform_analytics_knowledge import (
     requires_verified_analysis_plan,
 )
 from query_plan_receipt_service import create_query_plan_receipt, get_query_receipt, query_receipts_command
+from semantic_query_planner import BLOCKING_STATUSES, build_workspace_semantic_plan
+from semantic_query_execution import execute_workspace_semantic_query, semantic_query_command as semantic_query_command_service
 from evidence_export_service import export_evidence_command
+from analysis_export_service import export_analysis_command
 from confirmed_query_service import (
     confirm_query_command,
     confirmed_queries_command,
@@ -80,6 +82,20 @@ from confirmed_query_service import (
     recall_confirmed_queries,
 )
 from analysis_run_service import analysis_runs_command, create_analysis_run, validate_branch_parent
+from analysis_unit_service import (
+    analysis_unit_build_command,
+    analysis_unit_verify_command,
+    analysis_units_command,
+    attach_analysis_unit,
+    chart_adapt_command,
+)
+from job_command_service import job_cancel_command, job_recover_command, jobs_command
+from source_intelligence_job_service import (
+    job_process_exit_command,
+    source_intelligence_job_create_command,
+    source_intelligence_job_run_command,
+)
+from workflow_command_service import capability_contracts_command, context_budget_command, workflow_plan_command
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -155,17 +171,20 @@ from bi_cli_source_commands import (
     build_delete_source_plan,
     build_import_preview,
     delete_source_command,
+    discover_connector_command,
     execute_import_commit,
     import_commit_command,
     import_folder_command,
     inspect_table_command,
     list_connectors_command,
+    list_connector_adapters_command,
     list_import_jobs_command,
     list_tables_command,
     preferences_command,
     preferences_payload,
     preview_import_command,
     preview_import_folder_command,
+    preview_connector_command,
     remaining_table_key_after_delete,
     remove_connector_command,
     remove_import_job_command,
@@ -176,6 +195,7 @@ from bi_cli_source_commands import (
     source_intelligence_command,
     source_intelligence_runs_command,
     source_run_command,
+    plan_connector_sync_command,
     sync_connector_command,
     theme_palettes_command,
 )
@@ -248,7 +268,7 @@ from bi_cli_widget_commands import (
     widget_recommendations_for_table,
     write_business_dashboard,
 )
-from bi_cli_misc_commands import b_cli_capabilities_command, update_field_command
+from bi_cli_misc_commands import cli_capabilities_command, update_field_command
 from bi_cli_semantic_metric_commands import (
     add_metric_command,
     build_metric_add_plan,
@@ -1937,7 +1957,45 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 *recalled_fields,
             ]
         ).strip()
-        selected_dashboard, dashboard_confidence = select_dashboard(dashboards, prompt, intents.wants_dashboard or intents.wants_widget)
+        selected_dashboard, dashboard_confidence = select_dashboard(
+            dashboards,
+            prompt,
+            intents.wants_dashboard or intents.wants_widget,
+        )
+        semantic_selected_table_key = (
+            str(selected_table["table_key"])
+            if selected_table and table_confidence in {"explicit", "knowledge-rule"}
+            else (
+                str(selected_dashboard.get("default_table_key") or "")
+                if selected_dashboard and dashboard_confidence == "explicit"
+                else ""
+            )
+        )
+        semantic_plan = build_workspace_semantic_plan(
+            connection,
+            workspace_id,
+            prompt,
+            selected_table_key=semantic_selected_table_key,
+            table_columns=table_columns,
+        )
+        semantic_execution = None
+        semantic_targets = semantic_plan.get("joinPlan", {}).get("targets") or []
+        if platform_match is None and semantic_plan["status"] == "ready" and semantic_targets:
+            semantic_execution = execute_workspace_semantic_query(
+                connection,
+                workspace_id,
+                prompt,
+                selected_table_key=semantic_selected_table_key,
+                limit=50,
+                table_columns=table_columns,
+                quote_identifier=quote_relationship_identifier,
+                build_relationship_query=build_relationship_query,
+                semantic_plan=semantic_plan,
+            )
+        semantic_execution_blocked = bool(semantic_execution and not semantic_execution.get("executed"))
+        semantic_blocked = (
+            semantic_plan["status"] in BLOCKING_STATUSES or semantic_execution_blocked
+        ) and platform_match is None
         single_chart_dashboard_create = intents.wants_widget and selected_dashboard is None
         dashboard_action = None
         dashboard_action_confidence = "missing"
@@ -2000,6 +2058,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             read_only=read_only,
         )
         if verified_analysis_gap:
+            should_create_draft = False
+        if semantic_blocked:
             should_create_draft = False
         action_payload = build_agent_action_payload(
             prompt=prompt,
@@ -2074,7 +2134,72 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action)
             )
         )
-        if widget_clarification and isinstance(widget_action, dict):
+        if semantic_execution and semantic_execution.get("executed"):
+            relationship_query = semantic_execution["relationshipQuery"]
+            semantic_rows = relationship_rows_for_chart_service(relationship_query)
+            execution_measure = semantic_execution["executionPlan"]["measure"]
+            metric_name = f"{execution_measure['aggregation']}({execution_measure['field']})"
+            top_row = semantic_rows[0] if semantic_rows else {}
+            top_value = float(top_row.get("value") or 0)
+            top_label = str(top_row.get("label") or "")
+            answer_card = {
+                "kind": "semantic-relationship-analysis",
+                "title": localized_value("受控跨表分析", "Controlled cross-table analysis"),
+                "summary": localized_value(
+                    f"{top_label or '当前结果'} 的 {metric_name} 为 {format_answer_number(top_value)}；结果来自已验证关系与固定执行计划。",
+                    f"{top_label or 'Current result'} has {metric_name} {format_answer_number(top_value)} from a validated relationship and fixed execution plan.",
+                ),
+                "confidence": "validated-execution-plan",
+                "metrics": [{
+                    "label": localized_value(metric_name, metric_name),
+                    "value": format_answer_number(top_value),
+                    "rawValue": top_value,
+                    "unit": "value",
+                }],
+                "rows": semantic_rows,
+                "query": semantic_execution["query"],
+                "executionPlan": semantic_execution["executionPlan"],
+                "evidenceRefs": [
+                    {"type": "queryRuntime", **semantic_execution["query"]["runtime"]},
+                    {"type": "semanticQueryPlan", "status": semantic_plan["status"]},
+                    {"type": "semanticExecutionPlan", "planHash": semantic_execution["executionPlan"]["planHash"]},
+                    *[
+                        {"type": "relationship", "relationKey": relationship["relationKey"]}
+                        for relationship in semantic_execution["executionPlan"].get("relationships", [])
+                    ],
+                ],
+                "nextActions": [localized_value("打开证据核对字段、粒度和关系版本", "Open evidence to review fields, grain, and relationship versions")],
+            }
+        if semantic_blocked:
+            semantic_unresolved = semantic_plan["fieldResolution"].get("unresolved") or []
+            execution_blockers = semantic_execution.get("executionPlan", {}).get("blockers") if semantic_execution else []
+            status_summary = {
+                "needs-clarification": "检测到多个字段候选，请先明确数据表或业务口径。",
+                "needs-relationship": "所需字段分布在多张表，但当前工作区没有可审阅的已保存关系路径。",
+                "needs-validation": "已找到关系路径，但至少一跳置信度或方向未通过规划门槛。",
+            }.get(
+                str(semantic_plan["status"]),
+                f"语义计划已形成，但受控执行仍被阻断：{', '.join(execution_blockers or ['execution-plan-blocked'])}。",
+            )
+            answer_card = {
+                "kind": "clarification",
+                "title": {"zh": "需要确认字段或跨表路径", "en": "Field or join path needs review"},
+                "summary": {"zh": status_summary, "en": "The semantic query plan is blocked until its field or relationship gap is resolved."},
+                "confidence": "blocked",
+                "metrics": [],
+                "rows": [],
+                "clarification": {
+                    "kind": "semantic-execution-plan" if semantic_execution_blocked else "semantic-plan",
+                    "status": "blocked" if semantic_execution_blocked else semantic_plan["status"],
+                    "bindings": semantic_unresolved,
+                },
+                "executionPlan": semantic_execution.get("executionPlan") if semantic_execution else None,
+                "evidenceRefs": [{"type": "semanticQueryPlan", "status": semantic_plan["status"]}],
+                "nextActions": [
+                    {"zh": "选择明确的数据表与字段，或先预览并保存可靠关系。", "en": "Choose an explicit table and field, or preview and save a reliable relationship first."}
+                ],
+            }
+        elif widget_clarification and isinstance(widget_action, dict):
             answer_card = build_widget_clarification_answer_card(widget_action)
         context_refs = [
             {"type": "contextTerm", "termKey": item["term_key"], "name": item["canonical_name"]}
@@ -2110,23 +2235,38 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     evidence_keys.add(key)
             answer_card["evidenceRefs"] = evidence_refs
         answer_query = answer_card.get("query") if isinstance(answer_card.get("query"), dict) else None
+        receipt_unresolved = (
+            semantic_plan["fieldResolution"].get("unresolved")
+            or [
+                {
+                    "type": "semantic-plan",
+                    "status": semantic_plan["status"],
+                    "joinPlan": semantic_plan["joinPlan"],
+                }
+            ]
+            if semantic_blocked
+            else ([] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")])
+        )
         query_receipt = create_query_plan_receipt(
             connection,
             workspace_id=workspace_id,
             request_text=prompt,
             source_table_key=str(answer_query.get("table")) if answer_query and answer_query.get("table") else (selected_table["table_key"] if selected_table else None),
-            status="executed" if answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
+            status="executed" if not semantic_blocked and answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
             group=str(answer_query.get("group")) if answer_query and answer_query.get("group") else None,
             measure=str(answer_query.get("measure")) if answer_query and answer_query.get("measure") else None,
             aggregation=str(answer_query.get("aggregation")) if answer_query and answer_query.get("aggregation") else None,
             filters=list(answer_query.get("filters") or []) if answer_query else [],
             joins=list(answer_query.get("joins") or []) if answer_query else [],
+            semantic_plan=semantic_plan,
+            execution_plan=semantic_execution.get("executionPlan") if semantic_execution else None,
             knowledge_rule=answer_card.get("knowledgeRule") if isinstance(answer_card.get("knowledgeRule"), dict) else None,
             runtime=answer_query.get("runtime") if answer_query else None,
             evidence_refs=list(answer_card.get("evidenceRefs", [])),
-            unresolved=[] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")],
+            unresolved=receipt_unresolved,
             context_refs=context_refs,
             action_key=action_key if should_create_draft else None,
+            result_rows=list(answer_card.get("rows") or []),
             now_iso=now_iso,
         )
         answer_card["queryPlanReceipt"] = query_receipt
@@ -2224,6 +2364,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         ],
         "answerCard": answer_card,
         "queryPlanReceipt": query_receipt,
+        "semanticPlan": semantic_plan,
+        "executionPlan": semantic_execution.get("executionPlan") if semantic_execution else None,
         "analysisRun": analysis_run,
         "context": {
             "matchedTermCount": len(context_matches["terms"]),
@@ -2456,6 +2598,12 @@ def main() -> int:
             result = cli_contract_command(args, parser)
         elif args.command == "list-commands":
             result = list_commands_command(args, parser)
+        elif args.command == "capability-contracts":
+            result = capability_contracts_command(args, parser)
+        elif args.command == "workflow-plan":
+            result = workflow_plan_command(args, parser)
+        elif args.command == "context-budget":
+            result = context_budget_command(args)
         elif args.command == "status":
             result = status_command(args)
         elif args.command == "quality-doctor":
@@ -2470,12 +2618,50 @@ def main() -> int:
             result = query_receipts_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "export-evidence":
             result = export_evidence_command(args, open_db=open_db, active_workspace_id=active_workspace_id, root=ROOT, now_iso=now_iso)
+        elif args.command == "export-analysis":
+            result = export_analysis_command(args, open_db=open_db, active_workspace_id=active_workspace_id, root=ROOT)
         elif args.command == "confirmed-queries":
             result = confirmed_queries_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "confirm-query":
             result = confirm_query_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-runs":
             result = analysis_runs_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "analysis-unit-build":
+            result = analysis_unit_build_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "analysis-units":
+            result = analysis_units_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "analysis-unit-verify":
+            result = analysis_unit_verify_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "chart-adapt":
+            result = chart_adapt_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "jobs":
+            result = jobs_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "job-cancel":
+            result = job_cancel_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "job-recover":
+            result = job_recover_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "source-intelligence-job-create":
+            result = source_intelligence_job_create_command(
+                args,
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                now_iso=now_iso,
+            )
+        elif args.command == "source-intelligence-job-run":
+            result = source_intelligence_job_run_command(
+                args,
+                source_intelligence_command=source_intelligence_command,
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                now_iso=now_iso,
+            )
+        elif args.command == "job-process-exit":
+            result = job_process_exit_command(
+                args,
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                now_iso=now_iso,
+            )
         elif args.command == "workspace-create":
             result = workspace_create_command(args)
         elif args.command == "workspace-select":
@@ -2508,8 +2694,8 @@ def main() -> int:
             result = navigation_operation_command(args)
         elif args.command == "dashboard-widget-catalog":
             result = dashboard_widget_catalog_command(args)
-        elif args.command == "b-cli-capabilities":
-            result = b_cli_capabilities_command(args)
+        elif args.command == "cli-capabilities":
+            result = cli_capabilities_command(args)
         elif args.command == "recommend-widgets":
             result = recommend_widgets_command(args)
         elif args.command == "add-recommended-widgets":
@@ -2552,6 +2738,14 @@ def main() -> int:
             result = sync_connector_command(args)
         elif args.command == "remove-connector":
             result = remove_connector_command(args)
+        elif args.command == "list-connector-adapters":
+            result = list_connector_adapters_command(args)
+        elif args.command == "discover-connector":
+            result = discover_connector_command(args)
+        elif args.command == "preview-connector":
+            result = preview_connector_command(args)
+        elif args.command == "plan-connector-sync":
+            result = plan_connector_sync_command(args)
         elif args.command == "infer-semantics":
             result = infer_semantics_command(args)
         elif args.command == "list-semantics":
@@ -2620,6 +2814,16 @@ def main() -> int:
             result = remove_relationship_command(args)
         elif args.command == "query-relationship":
             result = query_relationship_command(args)
+        elif args.command == "semantic-query":
+            args.prompt = " ".join(args.prompt)
+            result = semantic_query_command_service(
+                args,
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                table_columns=table_columns,
+                quote_identifier=quote_relationship_identifier,
+                build_relationship_query=build_relationship_query,
+            )
         elif args.command == "formula-preview":
             result = formula_preview_command(args)
         elif args.command == "list-formulas":
@@ -2640,6 +2844,8 @@ def main() -> int:
             result = action_drafts_command(args)
         else:
             raise ValueError(f"Unknown command: {args.command}")
+        if args.command in {"query", "ask", "semantic-query"}:
+            result = attach_analysis_unit(result, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         result = enrich_cli_output(result, args, parser)
         dump(result)
         return 0 if result.get("ok", False) else 1

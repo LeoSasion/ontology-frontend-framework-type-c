@@ -50,6 +50,9 @@ export type RelationshipSaveOptions = {
   rightTable: string;
   leftField: string;
   rightField: string;
+  fieldMappings?: Array<{ leftField: string; rightField: string }>;
+  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
+  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
   joinType?: string;
   limit?: number;
   confirm?: boolean;

@@ -122,15 +122,29 @@ export function buildConnectorSaveReceipt({
   };
 }
 
-export function buildConnectorSyncReceipt(connector: DataConnectorConfig, confirm: boolean): WorkbenchOperationReceipt {
+export function buildConnectorSyncReceipt(connector: DataConnectorConfig, confirm: boolean, result: Record<string, unknown> = {}): WorkbenchOperationReceipt {
   const target = String(connector.config?.targetTableKey ?? "-");
+  const syncPlan = result.syncPlan && typeof result.syncPlan === "object" && !Array.isArray(result.syncPlan)
+    ? result.syncPlan as Record<string, unknown>
+    : null;
+  const connectorSync = result.connectorSync && typeof result.connectorSync === "object" && !Array.isArray(result.connectorSync)
+    ? result.connectorSync as Record<string, unknown>
+    : null;
+  const adapter = connectorSync?.adapter && typeof connectorSync.adapter === "object" && !Array.isArray(connectorSync.adapter)
+    ? connectorSync.adapter as Record<string, unknown>
+    : null;
+  const adapterId = String(syncPlan?.adapterId ?? adapter?.adapterId ?? "-");
+  const planFingerprint = String(result.planFingerprint ?? adapter?.planFingerprint ?? "");
+  const resource = syncPlan?.resource && typeof syncPlan.resource === "object" && !Array.isArray(syncPlan.resource)
+    ? syncPlan.resource as Record<string, unknown>
+    : null;
   return {
     title: confirm ? biText("同步已确认", "Sync confirmed") : biText("同步影响已预演", "Sync impact previewed"),
     detail: confirm
       ? biText(`连接“${connector.name}”会写入 ${target}，完成后可继续生成证据摘要。`, `Connection "${connector.name}" writes into ${target}. Create an evidence summary after it completes.`)
-      : biText(`连接“${connector.name}”只做了预演，确认前不会写入 ${target}。`, `Connection "${connector.name}" was previewed only. Nothing writes to ${target} before confirmation.`),
+      : biText(`连接“${connector.name}”已通过只读 Adapter 检查；确认前不会写入 ${target}。`, `Connection "${connector.name}" passed the read-only Adapter check. Nothing writes to ${target} before confirmation.`),
     nextStep: confirm ? biText("同步后检查数据表，再更新看板或证据摘要。", "After sync, check the table, then refresh dashboards or evidence summaries.") : biText("确认来源和目标表正确后再同步。", "Confirm source and target table before syncing."),
-    technical: `connector=${connector.connectorKey}; target=${target}; confirm=${confirm}; status=${connector.status}`,
+    technical: `connector=${connector.connectorKey}; target=${target}; confirm=${confirm}; status=${connector.status}; adapter=${adapterId}; source=${String(resource?.label ?? "-")}; plan=${planFingerprint.slice(0, 12) || "-"}`,
     tone: confirm ? "ok" : "warn",
   };
 }

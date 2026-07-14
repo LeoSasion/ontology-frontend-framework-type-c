@@ -83,10 +83,20 @@ export function previewRelationship(options: {
   rightTable: string;
   leftField: string;
   rightField: string;
+  fieldMappings?: Array<{ leftField: string; rightField: string }>;
+  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
+  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
   joinType?: string;
   limit?: number;
 }) {
   return fetchJson<RelationshipPreviewPayload>("/api/relationships/preview", emptyRelationshipPreview, {
+    method: "POST",
+    body: JSON.stringify(options),
+  });
+}
+
+export function runSemanticQuery(options: { prompt: string; table?: string; limit?: number }) {
+  return fetchJsonStrict<Record<string, unknown>>("/api/semantic-query", {
     method: "POST",
     body: JSON.stringify(options),
   });
@@ -106,12 +116,14 @@ export function queryRelationship(options: {
   rightTable?: string;
   leftField?: string;
   rightField?: string;
+  fieldMappings?: Array<{ leftField: string; rightField: string }>;
   joinType?: string;
   group?: string;
   groupFields?: string[];
   measure?: string;
   aggregation?: string;
-  filters?: Array<{ side?: string; field: string; operator: string; value?: string }>;
+  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
+  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
   limit?: number;
   sortBy?: string;
   sortDirection?: string;
@@ -127,6 +139,9 @@ export function saveRelationship(options: {
   rightTable: string;
   leftField: string;
   rightField: string;
+  fieldMappings?: Array<{ leftField: string; rightField: string }>;
+  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
+  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
   joinType?: string;
   limit?: number;
   confirm?: boolean;

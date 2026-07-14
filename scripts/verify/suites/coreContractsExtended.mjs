@@ -135,8 +135,9 @@ export function appendCoreContractExtendedChecks(context) {
           !biCliRuntimeSource.includes("def source_label(path: Path | str)") &&
           biCliCoreSource.includes("def quote_identifier(name: str)") &&
           biCliCoreSource.includes("def source_label(path: Path | str)") &&
-          biCliCoreSource.includes("A_PROJECT_ROOT") &&
-          biCliCoreSource.includes("B_PROJECT_ROOT"),
+          biCliCoreSource.includes('ROOT = Path(__file__).resolve().parents[1]') &&
+          !biCliCoreSource.includes("A_PROJECT_ROOT") &&
+          !biCliCoreSource.includes("B_PROJECT_ROOT"),
       },
     {
         label: "verify-compact-output-default",
@@ -235,7 +236,8 @@ export function appendCoreContractExtendedChecks(context) {
           sourceReadModelServiceSource.includes("SELECT field_name, role, usage, confidence") &&
           sourceReadModelServiceSource.includes("SELECT metric_key, label, measure, aggregation, dimension, time_field, value_format") &&
           sourceReadModelServiceSource.includes("SELECT view_key, name, tag_name, is_default, sort_order, created_by, agent_managed") &&
-          sourceReadModelServiceSource.includes("SELECT relation_key, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence") &&
+          sourceReadModelServiceSource.includes("SELECT *") &&
+          sourceReadModelServiceSource.includes("relationship_record_payload(row)") &&
           sourceReadModelServiceSource.includes("SELECT job_key, workspace_id, source_file, mode, status, row_count, created_at") &&
           sourceReadModelServiceSource.includes("\"fieldConfig\"") &&
           sourceReadModelServiceSource.includes("\"importJobs\"") &&
@@ -319,10 +321,11 @@ export function appendCoreContractExtendedChecks(context) {
           byLabel["cli-save-connector-confirm"].parsed?.confirmed === true &&
           byLabel["cli-list-connectors"].parsed?.connectors?.some((connector) => connector.connectorKey === "verify_file_connector") &&
           byLabel["cli-sync-connector-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-sync-connector-dry-run"].parsed?.proposedSync?.sourceExists === true &&
+          byLabel["cli-sync-connector-dry-run"].parsed?.syncPlan?.adapterId === "local-tabular/v1" &&
+          byLabel["cli-sync-connector-dry-run"].parsed?.sideEffects?.businessDatabaseWrite === false &&
           byLabel["cli-sync-connector-confirm"].parsed?.confirmed === true &&
           byLabel["cli-sync-connector-confirm"].parsed?.connectorSync?.importResult?.tableKey === "orders" &&
-          byLabel["cli-sync-external-connector-blocked"].parsed?.blocked === true &&
+          byLabel["cli-sync-external-connector-blocked"].parsed?.ok === false &&
           byLabel["cli-remove-connector-dry-run"].parsed?.requiresConfirmation === true,
       },
     {

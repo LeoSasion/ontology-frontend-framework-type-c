@@ -77,7 +77,6 @@ B_DASHBOARD_WIDGET_CATALOG = [
 
 def build_dashboard_widget_catalog_payload(
     *,
-    b_project_root: Path,
     metadata_store: Path,
     latest_source_intelligence_run: dict[str, Any] | None,
     workspace_counts: dict[str, int],
@@ -85,13 +84,11 @@ def build_dashboard_widget_catalog_payload(
     return {
         "ok": True,
         "source": {
-            "project": "Widget catalog reference",
-            "path": str(b_project_root),
-            "filesReadOnly": True,
+            "project": "AIBI-C",
             "contractSource": [
-                "frontend/src/types.ts DashboardWidget",
-                "frontend/src/dashboardModel.ts widget restore/filter/layout helpers",
-                "bi_cli.py add-widget/add-relationship-widget/query-table command surface",
+                "src/types.ts DashboardWidget",
+                "src/dashboardCanvasModel.ts widget restore/filter/layout helpers",
+                "tools/bi_cli.py add-widget/add-relationship-widget/query-table command surface",
             ],
         },
         "integration": {

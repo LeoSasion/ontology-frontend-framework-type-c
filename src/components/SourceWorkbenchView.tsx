@@ -18,6 +18,7 @@ import { Icon } from "./Icons";
 import { SourceWorkbenchHeader } from "./SourceWorkbenchHeader";
 import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel";
 import { SourceWorkbenchImportPanel } from "./SourceWorkbenchImportPanel";
+import { SourceJobRuntimePanel } from "./SourceJobRuntimePanel";
 
 type SourceWorkbenchViewProps = SourceWorkbenchProps & ReturnType<typeof useSourceWorkbenchState>;
 
@@ -145,6 +146,8 @@ export function SourceWorkbenchView({
 
       <div className="workbenchGrid">
         {!hasData ? <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} /> : null}
+
+        {hasData ? <SourceJobRuntimePanel /> : null}
 
         {hasData && !sourceProfileComplete ? <div className="importSuccessNextStep" data-testid="import-success-next-step">
           <Icon name={sourceProfileError || sourceProfileRunning ? "evidence" : "check"} />

@@ -101,6 +101,8 @@ export interface WorkbenchTable {
   row_count: number;
   column_count: number;
   created_at?: string;
+  data_version?: number;
+  updated_at?: string;
 }
 
 export interface FieldConfig {
@@ -177,9 +179,26 @@ export interface RelationshipRecord {
   right_table_key: string;
   left_field: string;
   right_field: string;
+  fieldMappings?: Array<{ leftField: string; rightField: string }>;
+  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: unknown; enabled?: boolean }>;
+  preaggregation?: { side?: "right"; groupFields?: string[]; measures?: Array<{ field: string; aggregation: string }> };
   join_type: string;
   confidence: number;
+  validation?: {
+    schema?: string;
+    status?: string;
+    blockers?: string[];
+    metrics?: Record<string, number | string | boolean | null>;
+    warnings?: string[];
+    filters?: Array<Record<string, unknown>>;
+    preaggregation?: Record<string, unknown>;
+    dataVersions?: Record<string, number>;
+    revalidatedAfterImport?: string;
+    staleReason?: string;
+    validatedAt?: string;
+  };
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface RelationshipRecommendation {
@@ -344,6 +363,8 @@ export interface RelationshipPreviewPayload {
   relationshipPreview: {
     joinType: string;
     mappings: Array<Record<string, string>>;
+    filters?: Array<Record<string, unknown>>;
+    preaggregation?: Record<string, unknown> | null;
     metrics: Record<string, number>;
     warnings: string[];
     rows: Array<Record<string, unknown>>;

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { writeCostMonitorFixtures } from "./verify/fixtures.mjs";
 import { createVerifyRuntime, finishVerify, hasCssRule } from "./verify/runtime.mjs";
 import { readProjectJsonIfExists, readVerifySourceCatalog } from "./verify/sourceCatalog.mjs";
@@ -338,7 +339,12 @@ const verifyDashboardModulesFilters = JSON.stringify([
   { id: "verify_bulk_filter", field: "channel", operator: "equals", value: "Douyin", enabled: true },
 ]);
 
-const fileViolations = walk(root).filter((file) => forbiddenPatterns.some((pattern) => pattern.test(file)));
+const repositoryFiles = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+  cwd: root,
+  encoding: "utf8",
+  windowsHide: true,
+}).stdout.split(/\r?\n/).filter(Boolean);
+const fileViolations = repositoryFiles.filter((file) => forbiddenPatterns.some((pattern) => pattern.test(file)));
 const checks = [
   {
     label: "data-policy-no-real-business-files",
@@ -430,7 +436,7 @@ const checks = [
   run("cli-cost-monitor-import-policy", "python", ["tools/bi_cli.py", "--json", "import-commit", verifyPolicyPath, "--table", "verify_cost_policy", "--name", "验证保单明细", "--mode", "create", "--yes"]),
   run("cli-cost-monitor-dashboard-draft", "python", ["tools/bi_cli.py", "--json", "business-dashboard", "--op", "draft", "--template", "cost-monitor", "--table", "verify_cost_funds", "--limit", "24"]),
   run("cli-cost-monitor-dashboard-create-dry-run", "python", ["tools/bi_cli.py", "--json", "business-dashboard", "--op", "create", "--template", "cost-monitor", "--table", "verify_cost_funds", "--limit", "24"]),
-  run("cli-b-cli-capabilities", "python", ["tools/bi_cli.py", "--json", "b-cli-capabilities"]),
+  run("cli-capabilities", "python", ["tools/bi_cli.py", "--json", "cli-capabilities"]),
   run("cli-set-import-policy-dry-run", "python", ["tools/bi_cli.py", "--json", "set-import-policy", "--table", "orders", "--unique-fields", "order_id", "--conflict-rule", "fill-empty"]),
   run("cli-set-import-policy-confirm", "python", ["tools/bi_cli.py", "--json", "set-import-policy", "--table", "orders", "--unique-fields", "order_id", "--conflict-rule", "fill-empty", "--yes"]),
   run("cli-list-import-jobs", "python", ["tools/bi_cli.py", "--json", "list-import-jobs", "--limit", "5"]),
@@ -443,7 +449,7 @@ const checks = [
   run("cli-list-connectors", "python", ["tools/bi_cli.py", "--json", "list-connectors"]),
   run("cli-sync-connector-dry-run", "python", ["tools/bi_cli.py", "--json", "sync-connector", "--connector", "verify_file_connector"]),
   run("cli-sync-connector-confirm", "python", ["tools/bi_cli.py", "--json", "sync-connector", "--connector", "verify_file_connector", "--yes"]),
-  run("cli-sync-external-connector-blocked", "python", ["tools/bi_cli.py", "--json", "sync-connector", "--connector", "verify_erp_connector", "--yes"]),
+  runExpectedFailure("cli-sync-external-connector-blocked", "python", ["tools/bi_cli.py", "--json", "sync-connector", "--connector", "verify_erp_connector", "--yes"]),
   run("cli-remove-connector-dry-run", "python", ["tools/bi_cli.py", "--json", "remove-connector", "--connector", "verify_file_connector"]),
   run("cli-preferences", "python", ["tools/bi_cli.py", "--json", "preferences"]),
   run("cli-preferences-dry-run", "python", ["tools/bi_cli.py", "--json", "preferences", "--theme-key", "D1"]),
@@ -525,7 +531,6 @@ const checks = [
   run("cli-agent-semantic-draft", "python", ["tools/bi_cli.py", "--json", "ask", "把 orders 的 channel 字段设为维度"]),
   run("cli-agent-english-generic-dashboard-draft", "python", ["tools/bi_cli.py", "--json", "ask", "Draft a business dashboard without writing directly"]),
   run("cli-agent-missing-dashboard", "python", ["tools/bi_cli.py", "--json", "ask", "在资金仪表盘增加一个税收指标卡"]),
-  run("old-project-status", "node", ["scripts/verify-old-projects-readonly.mjs"]),
 ];
 
 const readOnlyAgentCheck = run("cli-agent-read-only-explain-no-draft", "python", [

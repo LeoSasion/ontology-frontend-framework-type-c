@@ -14,6 +14,31 @@ def _receipt_key(workspace_id: str, request_text: str, created_at: str) -> str:
     return f"query_receipt_{hashlib.sha256(material.encode('utf-8')).hexdigest()[:20]}"
 
 
+def _canonical_value(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {str(key): _canonical_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_canonical_value(item) for item in value]
+    if isinstance(value, float) and value.is_integer():
+        return int(value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    return str(value)
+
+
+def _result_fingerprint(rows: list[Any]) -> str:
+    material = json.dumps(_canonical_value(_result_projection(rows)), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _result_projection(rows: list[Any]) -> list[dict[str, Any]]:
+    return [
+        {str(key): _canonical_value(value) for key, value in row.items() if not isinstance(value, (dict, list, tuple, set))}
+        for row in rows
+        if isinstance(row, dict)
+    ]
+
+
 def create_query_plan_receipt(
     connection: sqlite3.Connection,
     *,
@@ -26,12 +51,15 @@ def create_query_plan_receipt(
     aggregation: str | None = None,
     filters: list[Any] | None = None,
     joins: list[Any] | None = None,
+    semantic_plan: dict[str, Any] | None = None,
+    execution_plan: dict[str, Any] | None = None,
     knowledge_rule: dict[str, Any] | None = None,
     runtime: dict[str, Any] | None = None,
     evidence_refs: list[Any] | None = None,
     unresolved: list[Any] | None = None,
     context_refs: list[Any] | None = None,
     action_key: str | None = None,
+    result_rows: list[Any] | None = None,
     now_iso: Callable[[], str],
 ) -> dict[str, Any]:
     created_at = now_iso()
@@ -43,6 +71,16 @@ def create_query_plan_receipt(
     unresolved = list(unresolved or [])
     filters = list(filters or [])
     joins = list(joins or [])
+    result_binding = None
+    if isinstance(result_rows, list):
+        projected_rows = _result_projection(result_rows)
+        result_binding = {
+            "resultFingerprint": _result_fingerprint(result_rows),
+            "rowCount": len(projected_rows),
+            "columns": sorted({str(key) for row in projected_rows for key in row}),
+            "projection": "scalar-result-fields-only",
+            "snapshotStored": False,
+        }
     plan = {
         "schema": "aibi-query-plan-receipt/v1",
         "receiptKey": receipt_key,
@@ -59,12 +97,15 @@ def create_query_plan_receipt(
             "aggregation": aggregation,
             "filters": filters,
             "joins": joins,
+            "semanticPlan": semantic_plan if isinstance(semantic_plan, dict) else None,
+            "executionPlan": execution_plan if isinstance(execution_plan, dict) else None,
             "knowledgeRule": knowledge_rule,
         },
         "runtime": {
             "engine": runtime.get("engine"),
             "database": runtime.get("database"),
             "compiledSql": runtime.get("compiledSql"),
+            "executionPlanHash": runtime.get("executionPlanHash"),
             "sqlIntent": "whitelist aggregate query; no user SQL accepted",
         },
         "validation": {
@@ -73,6 +114,7 @@ def create_query_plan_receipt(
             "executed": status == "executed",
             "blocked": status == "blocked",
         },
+        "resultBinding": result_binding,
         "contextRefs": context_refs,
         "evidenceRefs": evidence_refs,
         "unresolved": unresolved,

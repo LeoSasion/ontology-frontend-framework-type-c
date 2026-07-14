@@ -35,6 +35,7 @@ import {
 import type { AppNavigationTarget } from "./appNavigationModel";
 import type { AppSection } from "./appSections";
 import { actionErrorResult, normalizeQuery } from "./appWorkspaceModel";
+import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 import {
   refreshStatusAndWorkbench,
   refreshStatusWorkbenchDashboards,
@@ -42,6 +43,8 @@ import {
   refreshWorkbench,
 } from "./appRefreshModel";
 import type { SourceIntelligenceRunOptions } from "./sourceIntelligenceRunModel";
+import { fetchAnalysisJobs } from "./apiJobs";
+import type { AnalysisJob } from "./typesJobs";
 import type {
   ActionDraft,
   DashboardPayload,
@@ -76,6 +79,17 @@ function resultString(result: Record<string, unknown>, ...keys: string[]) {
     if (typeof value === "string" && value.trim()) return value;
   }
   return undefined;
+}
+
+const TERMINAL_JOB_STATUSES = new Set(["succeeded", "failed", "canceled"]);
+
+function waitForJobPoll(milliseconds: number) {
+  return new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function jobFailureMessage(job: AnalysisJob) {
+  const detail = job.error?.message ?? job.error?.reason ?? job.error?.code;
+  return String(detail || (job.status === "canceled" ? "任务已取消。" : "Source Intelligence 任务未完成。"));
 }
 
 export function useAppDataActions({
@@ -199,6 +213,7 @@ export function useAppDataActions({
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
     setSection("sources");
+    return result;
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
   const handleRemoveConnector = useCallback(async (options: Parameters<typeof removeConnector>[0]) => {
@@ -336,12 +351,12 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection]);
 
-  const handleRelationshipPreview = useCallback(async (options: { leftTable: string; rightTable: string; leftField: string; rightField: string; joinType?: string; limit?: number }) => {
+  const handleRelationshipPreview = useCallback(async (options: RelationshipSaveOptions) => {
     setRelationshipPreview(await previewRelationship(options));
     setSection("sources");
   }, [setRelationshipPreview, setSection]);
 
-  const handleRelationshipSave = useCallback(async (options: { leftTable: string; rightTable: string; leftField: string; rightField: string; joinType?: string; limit?: number; confirm?: boolean }) => {
+  const handleRelationshipSave = useCallback(async (options: RelationshipSaveOptions) => {
     const result = await saveRelationship(options);
     setRelationshipPreview(result);
     if (options.confirm) {
@@ -394,9 +409,42 @@ export function useAppDataActions({
     }
     const requestId = sourceIntelligenceRequestRef.current + 1;
     sourceIntelligenceRequestRef.current = requestId;
-    const request = { ...sourceOptions, inputs, workspaceId: activeWorkspaceId };
+    const request = { ...sourceOptions, async: true, inputs, workspaceId: activeWorkspaceId };
     try {
-      const result = await runSourceIntelligence(request);
+      const accepted = await runSourceIntelligence(request);
+      if (!("job" in accepted)) {
+        const result = accepted;
+        if (sourceIntelligenceRequestRef.current !== requestId || result.workspaceId !== activeWorkspaceId) return result;
+        setLastActionResult(result);
+        const refreshed = await refreshStatusAndWorkbench();
+        if (sourceIntelligenceRequestRef.current !== requestId || refreshed.status.workspace.id !== result.workspaceId) return result;
+        setWorkbench(refreshed.workbench);
+        setStatus(refreshed.status);
+        if (!stayOnPage) {
+          navigateTo({
+            section: "dashboards",
+            allowLocked: true,
+            tableKey: result.tableKey ?? refreshed.workbench.tables[0]?.table_key,
+            sourceRunKey: result.runKey,
+          });
+        }
+        return result;
+      }
+
+      let job = accepted.job;
+      setLastActionResult(accepted as unknown as Record<string, unknown>);
+      while (!TERMINAL_JOB_STATUSES.has(job.status)) {
+        await waitForJobPoll(1200);
+        const payload = await fetchAnalysisJobs({ jobKey: job.jobKey });
+        if (!payload.job) throw new Error(`任务状态不可用：${job.jobKey}`);
+        job = payload.job;
+        if (sourceIntelligenceRequestRef.current !== requestId) return accepted as unknown as Record<string, unknown>;
+        setLastActionResult({ ok: true, action: "source-intelligence-job", job });
+      }
+      if (job.status !== "succeeded" || !job.result || typeof job.result !== "object" || Array.isArray(job.result)) {
+        throw new Error(jobFailureMessage(job));
+      }
+      const result = job.result as Record<string, unknown> & { workspaceId?: string; tableKey?: string; runKey?: string };
       if (sourceIntelligenceRequestRef.current !== requestId || result.workspaceId !== activeWorkspaceId) return result;
       setLastActionResult(result);
       const refreshed = await refreshStatusAndWorkbench();
@@ -407,7 +455,7 @@ export function useAppDataActions({
         navigateTo({
           section: "dashboards",
           allowLocked: true,
-          tableKey: result.tableKey ?? refreshed.workbench.tables[0]?.table_key,
+          tableKey: result.tableKey || refreshed.workbench.tables[0]?.table_key,
           sourceRunKey: result.runKey,
         });
       }

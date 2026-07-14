@@ -181,6 +181,9 @@ def build_relationship_save_plan(
     right_field: str,
     join_type: str = "left",
     limit: int = 20,
+    mappings: list[dict[str, str]] | None = None,
+    filters: list[dict[str, Any]] | None = None,
+    preaggregation: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return build_relationship_save_plan_service(
         connection,
@@ -190,6 +193,9 @@ def build_relationship_save_plan(
         right_field,
         join_type,
         limit,
+        mappings=mappings,
+        filters=filters,
+        preaggregation=preaggregation,
         registry_for_table=registry_for_table,
         table_columns=table_columns,
         build_relationship_preview=build_relationship_preview,

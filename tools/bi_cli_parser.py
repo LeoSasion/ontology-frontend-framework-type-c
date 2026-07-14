@@ -63,6 +63,21 @@ def build_parser() -> argparse.ArgumentParser:
     list_commands.add_argument("--mutation-mode")
     list_commands.add_argument("--writes", choices=["yes", "no", "any"], default="any")
 
+    capability_contracts = sub.add_parser("capability-contracts", description="List deterministic capability, permission, confirmation, job, and evidence contracts.")
+    capability_contracts.add_argument("--command", dest="command_name", default="")
+    capability_contracts.add_argument("--domain", default="")
+
+    workflow_plan = sub.add_parser("workflow-plan", description="Build one deterministic workflow stage for a registered capability.")
+    workflow_plan.add_argument("target_command")
+    workflow_plan.add_argument("--entrypoint", choices=["cli", "api", "agent", "job"], default="cli")
+    workflow_plan.add_argument("--workspace", required=True)
+    workflow_plan.add_argument("--input-json", default="{}")
+    workflow_plan.add_argument("--confirmed", action="store_true")
+
+    context_budget = sub.add_parser("context-budget", description="Compact context while preserving critical evidence references.")
+    context_budget.add_argument("--segments-json", required=True)
+    context_budget.add_argument("--max-chars", type=int, default=12_000)
+
     sub.add_parser("status")
     sub.add_parser("quality-doctor")
 
@@ -99,6 +114,11 @@ def build_parser() -> argparse.ArgumentParser:
     export_evidence.add_argument("--receipt", required=True)
     export_evidence.add_argument("--output", default="")
 
+    export_analysis = sub.add_parser("export-analysis", description="Export one receipt-bound Analysis Unit as deterministic Excel and report artifacts without requerying.")
+    export_analysis.add_argument("--receipt", required=True)
+    export_analysis.add_argument("--unit", required=True)
+    export_analysis.add_argument("--output", default="")
+
     confirmed_queries = sub.add_parser("confirmed-queries")
     confirmed_queries.add_argument("--status", default="", choices=["", "candidate", "confirmed", "stale", "deprecated"])
     confirmed_queries.add_argument("--limit", type=int, default=20)
@@ -111,6 +131,67 @@ def build_parser() -> argparse.ArgumentParser:
     analysis_runs = sub.add_parser("analysis-runs")
     analysis_runs.add_argument("--run", default="")
     analysis_runs.add_argument("--limit", type=int, default=30)
+
+    analysis_unit_build = sub.add_parser("analysis-unit-build", description="Freeze a bounded verified result snapshot against an existing Query Receipt.")
+    analysis_unit_build.add_argument("--receipt", required=True)
+    analysis_unit_build.add_argument("--kind", default="auto", choices=["auto", "metric", "comparison", "trend", "composition", "ranking", "anomaly"])
+    analysis_unit_build.add_argument("--rows-json", required=True)
+    analysis_unit_build.add_argument("--title", default="")
+    analysis_unit_build.add_argument("--preferred-chart", default="", choices=["", "metric", "bar", "line", "pie", "table"])
+
+    analysis_units = sub.add_parser("analysis-units", description="List or inspect workspace-scoped Analysis Units.")
+    analysis_units.add_argument("--unit", default="")
+    analysis_units.add_argument("--receipt", default="")
+    analysis_units.add_argument("--limit", type=int, default=30)
+
+    analysis_unit_verify = sub.add_parser("analysis-unit-verify", description="Recalculate an Analysis Unit from its frozen snapshot and compare fingerprints.")
+    analysis_unit_verify.add_argument("--unit", required=True)
+
+    chart_adapt = sub.add_parser("chart-adapt", description="Choose a whitelisted chart from a validated Analysis Unit shape.")
+    chart_adapt.add_argument("--unit", required=True)
+    chart_adapt.add_argument("--preferred-chart", default="", choices=["", "metric", "bar", "line", "pie", "table"])
+
+    jobs = sub.add_parser("jobs", description="List durable analysis jobs and ordered runtime events.")
+    jobs.add_argument("--job", default="")
+    jobs.add_argument("--status", action="append", default=[])
+    jobs.add_argument("--limit", type=int, default=50)
+    jobs.add_argument("--include-events", action="store_true")
+    jobs.add_argument("--events-after", type=int, default=0)
+    jobs.add_argument("--event-limit", type=int, default=200)
+
+    job_cancel = sub.add_parser("job-cancel", description="Request cooperative cancellation for an active analysis job.")
+    job_cancel.add_argument("job")
+    job_cancel.add_argument("--reason", default="user-requested")
+    job_cancel.add_argument("--yes", action="store_true")
+
+    job_recover = sub.add_parser("job-recover", description="Close interrupted jobs after a confirmed local runtime restart.")
+    job_recover.add_argument("--all", action="store_true")
+    job_recover.add_argument("--yes", action="store_true")
+
+    source_job_create = sub.add_parser(
+        "source-intelligence-job-create",
+        description="Create a durable, queued Source Intelligence job.",
+    )
+    source_job_create.add_argument("inputs", nargs="+")
+    source_job_create.add_argument("--workspace", default="")
+    source_job_create.add_argument("--output-dir")
+    source_job_create.add_argument("--label")
+
+    source_job_run = sub.add_parser(
+        "source-intelligence-job-run",
+        description="Run one previously queued Source Intelligence job.",
+    )
+    source_job_run.add_argument("--job", required=True)
+    source_job_run.add_argument("--workspace", default="")
+
+    job_process_exit = sub.add_parser(
+        "job-process-exit",
+        description="Reconcile an owned worker process exit with durable job state.",
+    )
+    job_process_exit.add_argument("--job", required=True)
+    job_process_exit.add_argument("--workspace", default="")
+    job_process_exit.add_argument("--exit-code", type=int)
+    job_process_exit.add_argument("--signal", default="")
 
     workspace_create = sub.add_parser("workspace-create")
     workspace_create.add_argument("--name", required=True)
@@ -175,7 +256,7 @@ def build_parser() -> argparse.ArgumentParser:
     navigation_op.add_argument("--yes", action="store_true")
 
     sub.add_parser("dashboard-widget-catalog")
-    sub.add_parser("b-cli-capabilities")
+    sub.add_parser("cli-capabilities")
 
     recommend_widgets = sub.add_parser("recommend-widgets")
     recommend_widgets.add_argument("--table")
@@ -335,6 +416,7 @@ def build_parser() -> argparse.ArgumentParser:
     save_connector.add_argument("--conflict-rule", default="overwrite", choices=["overwrite", "fill-empty", "skip-existing"])
     save_connector.add_argument("--schedule", default="manual")
     save_connector.add_argument("--notes", default="")
+    save_connector.add_argument("--credential-ref", default=None)
     save_connector.add_argument("--yes", action="store_true")
 
     sync_connector = sub.add_parser("sync-connector")
@@ -345,6 +427,18 @@ def build_parser() -> argparse.ArgumentParser:
     remove_connector = sub.add_parser("remove-connector")
     remove_connector.add_argument("--connector", required=True)
     remove_connector.add_argument("--yes", action="store_true")
+
+    sub.add_parser("list-connector-adapters")
+
+    discover_connector = sub.add_parser("discover-connector")
+    discover_connector.add_argument("--connector", required=True)
+
+    preview_connector = sub.add_parser("preview-connector")
+    preview_connector.add_argument("--connector", required=True)
+    preview_connector.add_argument("--limit", type=int, default=20)
+
+    plan_connector_sync = sub.add_parser("plan-connector-sync")
+    plan_connector_sync.add_argument("--connector", required=True)
 
     infer_semantics = sub.add_parser("infer-semantics")
     infer_semantics.add_argument("--table", default="")
@@ -551,16 +645,26 @@ def build_parser() -> argparse.ArgumentParser:
     relationship = sub.add_parser("relationship-preview")
     relationship.add_argument("--left-table", required=True)
     relationship.add_argument("--right-table", required=True)
-    relationship.add_argument("--left-field", required=True)
-    relationship.add_argument("--right-field", required=True)
+    relationship.add_argument("--left-field", default="")
+    relationship.add_argument("--right-field", default="")
+    relationship.add_argument("--map", action="append", default=[])
+    relationship.add_argument("--map-json", action="append", default=[])
+    relationship.add_argument("--filter", action="append", default=[])
+    relationship.add_argument("--filter-json", action="append", default=[])
+    relationship.add_argument("--preaggregate-json", default="")
     relationship.add_argument("--join-type", default="left", choices=["left", "inner"])
     relationship.add_argument("--limit", type=int, default=20)
 
     relationship_save = sub.add_parser("relationship-save")
     relationship_save.add_argument("--left-table", required=True)
     relationship_save.add_argument("--right-table", required=True)
-    relationship_save.add_argument("--left-field", required=True)
-    relationship_save.add_argument("--right-field", required=True)
+    relationship_save.add_argument("--left-field", default="")
+    relationship_save.add_argument("--right-field", default="")
+    relationship_save.add_argument("--map", action="append", default=[])
+    relationship_save.add_argument("--map-json", action="append", default=[])
+    relationship_save.add_argument("--filter", action="append", default=[])
+    relationship_save.add_argument("--filter-json", action="append", default=[])
+    relationship_save.add_argument("--preaggregate-json", default="")
     relationship_save.add_argument("--join-type", default="left", choices=["left", "inner"])
     relationship_save.add_argument("--limit", type=int, default=20)
     relationship_save.add_argument("--yes", action="store_true")
@@ -580,14 +684,23 @@ def build_parser() -> argparse.ArgumentParser:
     query_relationship.add_argument("--right-table")
     query_relationship.add_argument("--left-field")
     query_relationship.add_argument("--right-field")
+    query_relationship.add_argument("--map", action="append", default=[])
+    query_relationship.add_argument("--map-json", action="append", default=[])
     query_relationship.add_argument("--join-type", default="left", choices=["left", "inner"])
     query_relationship.add_argument("--group", action="append", default=[])
     query_relationship.add_argument("--measure", default="")
     query_relationship.add_argument("--agg", default="count", choices=sorted(SAFE_AGGREGATIONS))
     query_relationship.add_argument("--filter", action="append", default=[])
+    query_relationship.add_argument("--filter-json", action="append", default=[])
+    query_relationship.add_argument("--preaggregate-json", default="")
     query_relationship.add_argument("--limit", type=int, default=50)
     query_relationship.add_argument("--sort-by", default="metric", choices=["metric", "dimension"])
     query_relationship.add_argument("--sort-direction", default="desc", choices=["asc", "desc"])
+
+    semantic_query = sub.add_parser("semantic-query")
+    semantic_query.add_argument("prompt", nargs="+")
+    semantic_query.add_argument("--table", default="")
+    semantic_query.add_argument("--limit", type=int, default=50)
 
     formula = sub.add_parser("formula-preview")
     formula.add_argument("expression")

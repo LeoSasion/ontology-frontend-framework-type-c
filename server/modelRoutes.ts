@@ -9,8 +9,65 @@ type ModelRoutesOptions = {
   url: URL;
 };
 
+export function appendRelationshipMappingArgs(args: string[], body: Record<string, unknown>) {
+  const mappings = Array.isArray(body.fieldMappings)
+    ? body.fieldMappings
+    : Array.isArray(body.mappings)
+      ? body.mappings
+      : [];
+  const validMappings = mappings.filter((item): item is Record<string, unknown> => Boolean(
+    item && typeof item === "object" && !Array.isArray(item) && item.leftField && item.rightField,
+  ));
+  if (validMappings.length) {
+    for (const mapping of validMappings) {
+      args.push("--map-json", JSON.stringify({ leftField: String(mapping.leftField), rightField: String(mapping.rightField) }));
+    }
+    return;
+  }
+  args.push(
+    "--left-field",
+    String(body.leftField ?? ""),
+    "--right-field",
+    String(body.rightField ?? ""),
+  );
+}
+
+export function appendRelationshipFilterArgs(args: string[], body: Record<string, unknown>) {
+  if (!Array.isArray(body.filters)) return;
+  for (const filter of body.filters) {
+    if (!filter || typeof filter !== "object" || Array.isArray(filter)) continue;
+    const value = filter as Record<string, unknown>;
+    if (!value.field || !value.operator) continue;
+    args.push("--filter-json", JSON.stringify({
+      phase: value.phase === "pre" ? "pre" : "post",
+      side: String(value.side ?? ""),
+      field: String(value.field),
+      operator: String(value.operator),
+      value: value.value ?? "",
+      enabled: value.enabled !== false,
+    }));
+  }
+}
+
+export function appendRelationshipPreaggregationArg(args: string[], body: Record<string, unknown>) {
+  const value = body.preaggregation;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    args.push("--preaggregate-json", JSON.stringify(value));
+  }
+}
+
 export async function handleModelApi(options: ModelRoutesOptions) {
   const { cli, request, response, url } = options;
+
+  if (url.pathname === "/api/semantic-query" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["semantic-query", String(body.prompt ?? "")];
+    if (body.table) args.push("--table", String(body.table));
+    if (body.limit) args.push("--limit", String(body.limit));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
 
   if (url.pathname === "/api/relationships/preview" && request.method === "POST") {
     const body = await readBody(request);
@@ -20,11 +77,10 @@ export async function handleModelApi(options: ModelRoutesOptions) {
       String(body.leftTable ?? ""),
       "--right-table",
       String(body.rightTable ?? ""),
-      "--left-field",
-      String(body.leftField ?? ""),
-      "--right-field",
-      String(body.rightField ?? ""),
     ];
+    appendRelationshipMappingArgs(args, body);
+    appendRelationshipFilterArgs(args, body);
+    appendRelationshipPreaggregationArg(args, body);
     if (body.joinType) args.push("--join-type", String(body.joinType));
     if (body.limit) args.push("--limit", String(body.limit));
     const result = await cli(args);
@@ -58,11 +114,8 @@ export async function handleModelApi(options: ModelRoutesOptions) {
         String(body.leftTable ?? ""),
         "--right-table",
         String(body.rightTable ?? ""),
-        "--left-field",
-        String(body.leftField ?? ""),
-        "--right-field",
-        String(body.rightField ?? ""),
       );
+      appendRelationshipMappingArgs(args, body);
       if (body.joinType) args.push("--join-type", String(body.joinType));
     }
     if (Array.isArray(body.groupFields)) body.groupFields.map(String).forEach((group) => args.push("--group", group));
@@ -72,7 +125,8 @@ export async function handleModelApi(options: ModelRoutesOptions) {
     if (body.limit) args.push("--limit", String(body.limit));
     if (body.sortBy) args.push("--sort-by", String(body.sortBy));
     if (body.sortDirection) args.push("--sort-direction", String(body.sortDirection));
-    appendCliFilters(args, body.filters, { includeSide: true });
+    appendRelationshipFilterArgs(args, body);
+    appendRelationshipPreaggregationArg(args, body);
     const result = await cli(args);
     sendJson(response, result.ok === false ? 400 : 200, result);
     return true;
@@ -95,11 +149,10 @@ export async function handleModelApi(options: ModelRoutesOptions) {
       String(body.leftTable ?? ""),
       "--right-table",
       String(body.rightTable ?? ""),
-      "--left-field",
-      String(body.leftField ?? ""),
-      "--right-field",
-      String(body.rightField ?? ""),
     ];
+    appendRelationshipMappingArgs(args, body);
+    appendRelationshipFilterArgs(args, body);
+    appendRelationshipPreaggregationArg(args, body);
     if (body.joinType) args.push("--join-type", String(body.joinType));
     if (body.limit) args.push("--limit", String(body.limit));
     if (body.confirm === true) args.push("--yes");

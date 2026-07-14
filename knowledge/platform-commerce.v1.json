@@ -4,10 +4,10 @@
   "version": 1,
   "title": "国内电商订单、售后与物流分析规则",
   "source": {
-    "kind": "curated-research-pack",
-    "reference": "AIBI-B/data/platform-research",
-    "asOf": "2026-07-12",
-    "boundary": "字段与业务规则来自公开资料摘要；运行时答案必须由当前工作区数据计算。"
+    "kind": "aibi-c-curated-public-methods",
+    "reference": "docs/agent-knowledge-packs.md",
+    "asOf": "2026-07-13",
+    "boundary": "分析方法在 AIBI-C 内独立维护；合成数据只用于回归，生产答案必须由当前工作区数据计算。"
   },
   "principles": [
     "先确认主单、子单、售后单、包裹、出库单和版本记录的粒度，再计算指标。",

@@ -174,7 +174,7 @@ export function appendSourceContractChecks(context) {
           apiClientSource.includes("let lastError: unknown = null") &&
           apiClientSource.includes("throw lastError") &&
           apiClientSource.includes("throw new Error(`Local API request failed for ${path}: ${message}`)") &&
-          apiSourceApiSource.includes("return fetchJsonStrict<SourceIntelligenceRunResult>(\"/api/source-intelligence/run\"") &&
+          apiSourceApiSource.includes("return fetchJsonStrict<SourceIntelligenceRunResponse>(\"/api/source-intelligence/run\"") &&
           appDataActionsSource.includes("const { stayOnPage = false, inputs = [], ...sourceOptions }") &&
           appDataActionsSource.includes("const hasInputs = inputs.length > 0") &&
           appDataActionsSource.includes("请先在数据源工作台选择本地文件或文件夹") &&
@@ -428,7 +428,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportControllerSource.includes("buildImportPolicyReceipt({") &&
           sourceWorkbenchConnectorControllerSource.includes('from "./sourceWorkbenchReceiptModel"') &&
           sourceWorkbenchConnectorControllerSource.includes("buildConnectorSaveReceipt({") &&
-          sourceWorkbenchConnectorControllerSource.includes("buildConnectorSyncReceipt(connector, confirm)") &&
+          sourceWorkbenchConnectorControllerSource.includes("buildConnectorSyncReceipt(connector, confirm, result)") &&
           sourceWorkbenchConnectorControllerSource.includes("buildConnectorRemoveReceipt(connector)") &&
           !sourceWorkbenchSource.includes('title: biText("文件检查已完成"') &&
           !sourceWorkbenchSource.includes('title: confirm ? biText("导入已确认"') &&
@@ -481,7 +481,7 @@ export function appendSourceContractChecks(context) {
           sourceIntelligenceRunModelSource.includes("export type SourceIntelligenceRunOptions") &&
           !sourceIntelligenceRunModelSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA") &&
           !sourceIntelligenceRunModelSource.includes("aTestdata0305") &&
-          apiSourceApiSource.includes('SourceIntelligenceRunRequest, SourceIntelligenceRunResult') &&
+          apiSourceApiSource.includes('SourceIntelligenceRunRequest, SourceIntelligenceRunResponse') &&
           !appDataActionsSource.includes("aTestdata0305SourceIntelligenceRequest()") &&
           !homeOverviewSource.includes("aTestdata0305SourceIntelligenceOptions({") &&
           evidenceViewSource.includes("type { SourceIntelligenceRunOptions }") &&
@@ -713,17 +713,17 @@ export function appendSourceContractChecks(context) {
     {
         label: "b-bi-cli-bridge-core-areas",
         ok: ["source-management", "query-runtime", "saved-views", "dashboard-pages", "dashboard-widgets", "filters", "performance-indexes", "relationships", "import", "field-metric-formula", "connectors-preferences", "config-portability"].every((area) =>
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === area && capability.status === "active")
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === area && capability.status === "active")
         ) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "dashboard-widgets" && capability.hybridCommands?.includes("add-relationship-widget") && capability.hybridCommands?.includes("save-dashboard-modules") && capability.hybridCommands?.includes("business-dashboard")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "filters" && capability.hybridCommands?.includes("remove-stale-filters")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "performance-indexes" && capability.hybridCommands?.includes("recommend-indexes") && capability.hybridCommands?.includes("create-index")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "relationships" && capability.hybridCommands?.includes("recommend-relationships") && capability.hybridCommands?.includes("query-relationship")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "import" && capability.hybridCommands?.includes("set-import-policy") && capability.hybridCommands?.includes("list-import-jobs")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "field-metric-formula" && capability.hybridCommands?.includes("infer-semantics") && capability.hybridCommands?.includes("set-semantic") && capability.hybridCommands?.includes("infer-metrics") && capability.hybridCommands?.includes("query-metric")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "connectors-preferences" && capability.hybridCommands?.includes("save-connector") && capability.hybridCommands?.includes("sync-connector") && capability.hybridCommands?.includes("preferences") && capability.hybridCommands?.includes("theme-palettes")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "config-portability" && capability.hybridCommands?.includes("validate-config") && capability.hybridCommands?.includes("export-config") && capability.hybridCommands?.includes("apply-config")) &&
-          byLabel["cli-b-cli-capabilities"].parsed?.source?.executionPolicy?.includes("Do not execute external BI CLIs"),
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "dashboard-widgets" && capability.commands?.includes("add-relationship-widget") && capability.commands?.includes("save-dashboard-modules") && capability.commands?.includes("business-dashboard")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "filters" && capability.commands?.includes("remove-stale-filters")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "performance-indexes" && capability.commands?.includes("recommend-indexes") && capability.commands?.includes("create-index")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "relationships" && capability.commands?.includes("recommend-relationships") && capability.commands?.includes("query-relationship")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "import" && capability.commands?.includes("set-import-policy") && capability.commands?.includes("list-import-jobs")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "field-metric-formula" && capability.commands?.includes("infer-semantics") && capability.commands?.includes("set-semantic") && capability.commands?.includes("infer-metrics") && capability.commands?.includes("query-metric")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "connectors-preferences" && capability.commands?.includes("save-connector") && capability.commands?.includes("sync-connector") && capability.commands?.includes("preferences") && capability.commands?.includes("theme-palettes")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "config-portability" && capability.commands?.includes("validate-config") && capability.commands?.includes("export-config") && capability.commands?.includes("apply-config")) &&
+          byLabel["cli-capabilities"].parsed?.source?.executionPolicy?.includes("AIBI-C commands"),
       },
   );
   appendSourceContractExtendedChecks(context);

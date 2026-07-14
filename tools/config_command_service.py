@@ -86,12 +86,23 @@ def config_row_for_export(table_name: str, row: sqlite3.Row) -> dict[str, Any]:
 def prepare_config_rows_for_restore(connection: sqlite3.Connection, table_name: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     if table_name != "data_connectors" or not rows or not table_exists(connection, table_name):
         return rows
-    existing_rows = connection.execute("SELECT connector_key, config_json, schedule_json, last_sync_result_json FROM data_connectors").fetchall()
-    existing_by_key = {str(row["connector_key"]): dict(row) for row in existing_rows}
+    existing_rows = connection.execute(
+        "SELECT workspace_id, connector_key, config_json, schedule_json, last_sync_result_json FROM data_connectors"
+    ).fetchall()
+    existing_by_key = {
+        (str(row["workspace_id"]), str(row["connector_key"])): dict(row)
+        for row in existing_rows
+    }
     prepared: list[dict[str, Any]] = []
     for row in rows:
         next_row = dict(row)
-        existing = existing_by_key.get(str(next_row.get("connector_key") or ""), {})
+        existing = existing_by_key.get(
+            (
+                str(next_row.get("workspace_id") or "default"),
+                str(next_row.get("connector_key") or ""),
+            ),
+            {},
+        )
         for column in ("config_json", "schedule_json", "last_sync_result_json"):
             if column not in next_row:
                 continue

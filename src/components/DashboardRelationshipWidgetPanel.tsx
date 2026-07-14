@@ -1,4 +1,5 @@
 import type { RelationshipRecord } from "../types";
+import { relationshipRecordMappingLabel, relationshipSafetyFacts } from "../dashboardCanvasRelationshipModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 
@@ -38,7 +39,12 @@ export function DashboardRelationshipWidgetPanel({
       {selectedRelationship ? (
         <div className="relationshipWidgetHint">
           <strong>{selectedRelationship.left_table_key} → {selectedRelationship.right_table_key}</strong>
-          <span>{selectedRelationship.left_field} = {selectedRelationship.right_field}</span>
+          <span>{relationshipRecordMappingLabel(selectedRelationship)}</span>
+          <span>
+            {biText("安全状态", "Safety")}: {relationshipSafetyFacts(selectedRelationship).status}
+            {relationshipSafetyFacts(selectedRelationship).filterCount ? ` · ${biText("过滤", "filters")} ${relationshipSafetyFacts(selectedRelationship).filterCount}` : ""}
+            {relationshipSafetyFacts(selectedRelationship).preaggregationMeasureCount ? ` · ${biText("预聚合", "pre-aggregations")} ${relationshipSafetyFacts(selectedRelationship).preaggregationMeasureCount}` : ""}
+          </span>
         </div>
       ) : (
         <p className="emptyFilterHint"><Bilingual zh="先在数据源关系里保存一条关系，再放入看板。" en="Save a source relationship first, then place it on the dashboard." /></p>

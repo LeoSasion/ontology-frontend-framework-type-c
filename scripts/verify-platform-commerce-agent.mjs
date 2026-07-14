@@ -2,16 +2,18 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { writePlatformCommerceFixtures } from "./platform-commerce-fixtures.mjs";
 
 function option(name) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? String(process.argv[index + 1] ?? "").trim() : "";
 }
 
-const researchRoot = resolve(option("--root") || "C:/Users/Administrator/Documents/AIBI-B/data/platform-research");
-const templatesDir = join(researchRoot, "templates");
 const reportDir = option("--report-dir") ? resolve(option("--report-dir")) : "";
 const verifyDir = mkdtempSync(join(tmpdir(), "aibi-platform-commerce-"));
+const templatesDir = join(verifyDir, "fixtures");
+const validationSource = "generated:AIBI-C/scripts/platform-commerce-fixtures.mjs";
+const generatedFixtures = writePlatformCommerceFixtures(templatesDir);
 const env = {
   ...process.env,
   AIBI_HYBRID_DB_PATH: join(verifyDir, "runtime.sqlite"),
@@ -21,18 +23,18 @@ const env = {
 };
 
 const imports = [
-  ["douyin_orders_synthetic.xlsx", "douyin_orders", "抖音订单"],
-  ["douyin_aftersales_synthetic.xlsx", "douyin_aftersales", "抖音售后"],
-  ["douyin_logistics_synthetic.xlsx", "douyin_logistics", "抖音物流"],
-  ["taobao_trades_synthetic.xlsx", "taobao_trades", "淘宝主单"],
-  ["taobao_order_items_synthetic.xlsx", "taobao_order_items", "淘宝子单"],
-  ["taobao_refunds_synthetic.xlsx", "taobao_refunds", "淘宝退款"],
-  ["taobao_logistics_synthetic.xlsx", "taobao_logistics", "淘宝物流"],
-  ["jushuitan_orders_versioned_synthetic.xlsx", "jushuitan_orders", "聚水潭订单版本"],
-  ["jushuitan_order_items_synthetic.xlsx", "jushuitan_order_items", "聚水潭订单商品"],
-  ["jushuitan_outbounds_synthetic.xlsx", "jushuitan_outbounds", "聚水潭销售出库"],
-  ["jushuitan_aftersales_synthetic.xlsx", "jushuitan_aftersales", "聚水潭售后"],
-  ["jushuitan_logistics_synthetic.xlsx", "jushuitan_logistics", "聚水潭物流"],
+  ["douyin_orders_synthetic.csv", "douyin_orders", "抖音订单"],
+  ["douyin_aftersales_synthetic.csv", "douyin_aftersales", "抖音售后"],
+  ["douyin_logistics_synthetic.csv", "douyin_logistics", "抖音物流"],
+  ["taobao_trades_synthetic.csv", "taobao_trades", "淘宝主单"],
+  ["taobao_order_items_synthetic.csv", "taobao_order_items", "淘宝子单"],
+  ["taobao_refunds_synthetic.csv", "taobao_refunds", "淘宝退款"],
+  ["taobao_logistics_synthetic.csv", "taobao_logistics", "淘宝物流"],
+  ["jushuitan_orders_versioned_synthetic.csv", "jushuitan_orders", "聚水潭订单版本"],
+  ["jushuitan_order_items_synthetic.csv", "jushuitan_order_items", "聚水潭订单商品"],
+  ["jushuitan_outbounds_synthetic.csv", "jushuitan_outbounds", "聚水潭销售出库"],
+  ["jushuitan_aftersales_synthetic.csv", "jushuitan_aftersales", "聚水潭售后"],
+  ["jushuitan_logistics_synthetic.csv", "jushuitan_logistics", "聚水潭物流"],
 ];
 
 const cases = [
@@ -200,7 +202,7 @@ function markdown(receipt) {
     "# 三平台 Agent 答案准确性验证",
     "",
     `- 日期：${receipt.generatedAt.slice(0, 10)}`,
-    `- 资料：${receipt.researchRoot}`,
+    `- 验证输入：${receipt.validationSource}`,
     `- 结果：${receipt.passed}/${receipt.total} 通过`,
     `- 知识包：${receipt.knowledgePack}`,
     "",
@@ -279,7 +281,8 @@ try {
     schema: "aibi-platform-commerce-agent-verify/v1",
     generatedBy: "scripts/verify-platform-commerce-agent.mjs",
     generatedAt: `${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai" }).replace(" ", "T")}+08:00`,
-    researchRoot,
+    validationSource,
+    generatedFixtures,
     knowledgePack: "knowledge/platform-commerce.v1.json",
     modelIndependent: true,
     baseline: {

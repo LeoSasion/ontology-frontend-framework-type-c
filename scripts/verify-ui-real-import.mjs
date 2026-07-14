@@ -24,22 +24,20 @@ import {
 } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
-const knownRealDataFolders = [
-  "C:\\Users\\Administrator\\Documents\\财务报表\\真实数据",
-  "C:\\Users\\Administrator\\Documents\\财务报表_bak\\真实数据",
-];
-const fallbackFolder = knownRealDataFolders.find((folder) => existsSync(folder)) ?? knownRealDataFolders[0];
-const configuredPath = process.env.AIBI_REAL_IMPORT_PATH ?? process.env.AIBI_REAL_IMPORT_FILE ?? process.env.AIBI_REAL_IMPORT_FOLDER ?? fallbackFolder;
+const defaultValidationInput = resolve("validation-inputs/orders.csv");
+const configuredPath = process.env.AIBI_REAL_IMPORT_PATH ?? process.env.AIBI_REAL_IMPORT_FILE ?? process.env.AIBI_REAL_IMPORT_FOLDER ?? defaultValidationInput;
+const requireRealInput = process.argv.includes("--require-real");
 const configuredMode = process.env.AIBI_REAL_IMPORT_MODE;
 const detectedMode = existsSync(configuredPath) && statSync(configuredPath).isDirectory() ? "folder" : "file";
 const importTarget = { mode: configuredMode === "folder" || configuredMode === "file" ? configuredMode : detectedMode, path: configuredPath };
 const importFolder = importTarget.mode === "folder" ? importTarget.path : dirname(importTarget.path);
 const importFile = importTarget.mode === "file" ? importTarget.path : join(importFolder, "源数据-05月", "保单明细-5月.csv");
 const datasetLabel = process.env.AIBI_REAL_IMPORT_LABEL ?? basename(importTarget.path).replace(/\.[^.]+$/, "") ?? "真实数据";
-const datasetDomain = process.env.AIBI_REAL_IMPORT_DOMAIN ?? (knownRealDataFolders.some((folder) => resolve(folder) === resolve(importTarget.path)) ? "financial-commerce" : "unspecified-real-domain");
+const datasetDomain = process.env.AIBI_REAL_IMPORT_DOMAIN ?? (resolve(importTarget.path) === defaultValidationInput ? "aibi-c-validation" : "external-user-data");
 const minimumFolderGroups = Math.max(1, Number(process.env.AIBI_REAL_IMPORT_MIN_GROUPS ?? 1));
-const knownFinancialBaseline = importTarget.mode === "folder" && knownRealDataFolders.some((folder) => resolve(folder) === resolve(importTarget.path));
+const knownFinancialBaseline = false;
 const nonProductionPathPattern = /[\\/](fixtures|testdata|validation-inputs)[\\/]/i;
+const forbiddenProjectPathPattern = /[\\/](AIBI-B|AIBI项目杂交|AIBI|财务报表(?:_bak)?)(?:[\\/]|$)/i;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-import-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
 const evidenceViewports = [
@@ -199,6 +197,7 @@ let workspace = null;
 let counts = null;
 let importedTable = null;
 let importedTables = [];
+let chartPromptText = "";
 let dashboards = null;
 let actions = null;
 
@@ -206,7 +205,8 @@ try {
   checks.push(
     check("real-import-target-exists", existsSync(importTarget.path), { importTarget, importFile, importFolder }),
     check("real-import-folder-or-file-mode", importTarget.mode === "folder" || existsSync(importFile), { importTarget, importFile, importFolder }),
-    check("real-import-uses-production-data", !nonProductionPathPattern.test(importTarget.path), { importTarget, datasetDomain }),
+    check("import-does-not-read-another-project", !forbiddenProjectPathPattern.test(importTarget.path), { importTarget, datasetDomain }),
+    check("real-import-uses-production-data-when-required", !requireRealInput || !nonProductionPathPattern.test(importTarget.path), { importTarget, datasetDomain, requireRealInput }),
     check("real-import-domain-declared", datasetDomain !== "unspecified-real-domain", { datasetDomain, datasetLabel }),
   );
   if (!existsSync(importTarget.path)) {
@@ -317,6 +317,10 @@ try {
       const workbenchAfterImport = await getWorkbench();
       importedTables = workbenchAfterImport.tables ?? [];
       importedTable = workbenchAfterImport.tables?.[0] ?? null;
+      const chartMeasure = (workbenchAfterImport.metrics ?? []).find((metric) => metric.table_key === importedTable?.table_key)?.measure
+        ?? (workbenchAfterImport.fields ?? []).find((field) => field.table_key === importedTable?.table_key && field.role === "measure")?.field_name
+        ?? "";
+      chartPromptText = chartMeasure ? `请用 ${chartMeasure} 生成一个指标卡` : "";
       const rowCountsByName = Object.fromEntries(importedTables.map((table) => [table.display_name, table.row_count]));
       checks.push(
         check("api-import-created-table", Number(importStatus.status.counts?.tables ?? 0) > 0, { counts: importStatus.status.counts }),
@@ -331,18 +335,11 @@ try {
         ), { importTarget, rowCountsByName, importedTables: importedTables.map((table) => ({ table_key: table.table_key, display_name: table.display_name, row_count: table.row_count })) }),
       );
 
-      let importResultReady = null;
-      for (let attempt = 0; attempt < 4; attempt += 1) {
-        const retry = attempt ? `&retry=${Date.now()}-${attempt}` : "";
-        await navigate(browser.client, `${baseUrl}/?section=sources${retry}`);
-        importResultReady = await waitFor(browser.client, () => {
-          const result = document.querySelector('[data-testid="import-success-next-step"]');
-          const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
-          return { ok: Boolean(result) && !error, hasResult: Boolean(result), hasError: Boolean(error) };
-        }, null, { timeoutMs: 30000, intervalMs: 500 });
-        if (importResultReady.ok) break;
-        await new Promise((resolveDelay) => setTimeout(resolveDelay, 500 * (attempt + 1)));
-      }
+      const importResultReady = await waitFor(browser.client, () => {
+        const result = document.querySelector('[data-testid="import-success-next-step"]');
+        const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
+        return { ok: Boolean(result) && !error, hasResult: Boolean(result), hasError: Boolean(error) };
+      }, null, { timeoutMs: 180000, intervalMs: 500 });
       const afterImportState = await evaluate(browser.client, realFlowState, null, 10000);
       const importNextStepText = await evaluate(browser.client, () => document.querySelector('[data-testid="import-success-next-step"]')?.textContent ?? "", null, 10000);
       const expectedConnectedRows = importedTables.reduce((total, table) => total + Number(table.row_count ?? 0), 0);
@@ -457,18 +454,19 @@ try {
         check("ui-full-dashboard-beta-collapsed", firstChartEntry.betaCollapsed, firstChartEntry),
       );
 
-      const chartPromptValue = await setNativeValue(browser.client, '[data-testid="dashboard-ai-chart-prompt"]', "看支付保费总额");
+      checks.push(check("api-first-chart-measure-resolved", Boolean(chartPromptText), { chartPromptText }));
+      const chartPromptValue = await setNativeValue(browser.client, '[data-testid="dashboard-ai-chart-prompt"]', chartPromptText);
       const chartPromptReady = await waitForUi(browser.client, "chart prompt ready", () => {
         const prompt = document.querySelector('[data-testid="dashboard-ai-chart-prompt"]');
         const chartButton = document.querySelector('[data-testid="dashboard-task-explain"]');
         return {
-          ok: Boolean(prompt && chartButton) && prompt.value === "看支付保费总额" && !chartButton.disabled,
+          ok: Boolean(prompt && chartButton) && prompt.value.length > 0 && !chartButton.disabled,
           promptValue: prompt?.value ?? "",
           chartDisabled: Boolean(chartButton?.disabled),
         };
       }, 10000);
       checks.push(
-        check("ui-first-chart-prompt-filled-by-user", chartPromptValue.ok && chartPromptReady.ok, { chartPromptValue, chartPromptReady }),
+        check("ui-first-chart-prompt-filled-by-user", chartPromptValue.ok && chartPromptValue.value === chartPromptText && chartPromptReady.ok, { chartPromptText, chartPromptValue, chartPromptReady }),
       );
 
       const chartClick = await click(browser.client, '[data-testid="dashboard-task-explain"]');
@@ -554,13 +552,17 @@ try {
       counts = dashboardStatus.status.counts;
       dashboards = dashboardStatus.dashboards;
       actions = await getActions(12);
-      const confirmedQueryResponse = await fetch(`${apiBaseUrl}/api/confirmed-queries?status=candidate&limit=10`);
-      const confirmedQueryPayload = await confirmedQueryResponse.json();
-      const firstChartCandidate = confirmedQueryPayload.confirmedQueries?.find((item) => item.originating_action_key === singleChartDraft?.action_key);
+      const confirmedQueryState = await waitForApi(async () => {
+        const response = await fetch(`${apiBaseUrl}/api/confirmed-queries?status=candidate&limit=10`);
+        const payload = await response.json();
+        const candidate = payload.confirmedQueries?.find((item) => item.originating_action_key === singleChartDraft?.action_key);
+        return { ok: response.ok && candidate?.status === "candidate", responseOk: response.ok, candidate };
+      }, { timeoutMs: 45000, intervalMs: 1000, label: "first chart confirmed-query candidate" });
+      const firstChartCandidate = confirmedQueryState.candidate;
       checks.push(
         check("api-single-chart-dashboard-created", dashboardStatus.ok, { counts, dashboards: dashboards.dashboards }),
         check("api-single-chart-draft-cleared-after-confirm", !actions.actionDrafts?.some((draft) => draft.action_key === singleChartDraft?.action_key), { pendingCount: actions.pendingCount ?? actions.actionDrafts?.length ?? 0 }),
-        check("api-first-chart-creates-confirmed-query-candidate", confirmedQueryResponse.ok && firstChartCandidate?.status === "candidate", { firstChartCandidate }),
+        check("api-first-chart-creates-confirmed-query-candidate", confirmedQueryState.ok, { firstChartCandidate }),
       );
 
       const dashboardPage = await waitForUi(browser.client, "confirmed single chart dashboard", () => {

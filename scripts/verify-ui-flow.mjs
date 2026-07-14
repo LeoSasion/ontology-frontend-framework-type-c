@@ -252,6 +252,51 @@ try {
     );
     steps.push({ section: "sources", state: sourcesPage.state });
 
+    const expertClick = await click(browser.client, '[data-testid="source-expert-toggle"]');
+    const relationshipSafetyReady = await waitFor(browser.client, () => ({
+      ok: Boolean(document.querySelector('[data-testid="relationship-safety-controls"]')),
+      loading: Boolean(document.querySelector('[data-testid="source-advanced-loading"]')),
+    }), null, { timeoutMs: 12000, intervalMs: 250 });
+    const relationshipSafetyOpen = await click(browser.client, '[data-testid="relationship-safety-controls"] > summary');
+    const relationshipSafetyState = await evaluate(browser.client, () => {
+      const panel = document.querySelector('[data-testid="relationship-safety-controls"]');
+      return {
+        open: panel instanceof HTMLDetailsElement && panel.open,
+        selectCount: panel?.querySelectorAll("select").length ?? 0,
+        inputCount: panel?.querySelectorAll("input").length ?? 0,
+      };
+    });
+    const relationshipSafetyEdit = await evaluate(browser.client, () => {
+      const panel = document.querySelector('[data-testid="relationship-safety-controls"]');
+      const selects = panel?.querySelectorAll("select") ?? [];
+      const filterField = selects[0];
+      const preaggregationMeasure = selects[2];
+      const setFirstBusinessOption = (select) => {
+        if (!(select instanceof HTMLSelectElement) || select.options.length < 2) return false;
+        select.value = select.options[1].value;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        return true;
+      };
+      return { filterChanged: setFirstBusinessOption(filterField), preaggregationChanged: setFirstBusinessOption(preaggregationMeasure) };
+    });
+    const relationshipSafetyApplied = await waitFor(browser.client, () => {
+      const panel = document.querySelector('[data-testid="relationship-safety-controls"]');
+      const selects = panel?.querySelectorAll("select") ?? [];
+      const input = panel?.querySelector("input");
+      return {
+        ok: Boolean(input && !input.disabled && selects[3] instanceof HTMLSelectElement && !selects[3].disabled),
+        filterValue: selects[0] instanceof HTMLSelectElement ? selects[0].value : "",
+        measureValue: selects[2] instanceof HTMLSelectElement ? selects[2].value : "",
+      };
+    }, null, { timeoutMs: 4000, intervalMs: 100 });
+    checks.push(
+      check("ui-source-expert-controls-open", expertClick.ok && relationshipSafetyReady.ok, { expertClick, relationshipSafetyReady }),
+      check("ui-relationship-safety-controls-lazy-load", relationshipSafetyReady.ok && !relationshipSafetyReady.loading, relationshipSafetyReady),
+      check("ui-relationship-safety-controls-interactive", relationshipSafetyOpen.ok && relationshipSafetyState.open && relationshipSafetyState.selectCount >= 4 && relationshipSafetyState.inputCount >= 1, relationshipSafetyState),
+      check("ui-relationship-safety-policy-editable", relationshipSafetyEdit.filterChanged && relationshipSafetyEdit.preaggregationChanged && relationshipSafetyApplied.ok, { relationshipSafetyEdit, relationshipSafetyApplied }),
+    );
+    steps.push({ section: "sources-relationship-safety", state: relationshipSafetyState });
+
     const agentPage = await waitForSection(browser.client, "agent", "agent-task-packet");
     checks.push(
       check("ui-agent-ready", agentPage.ready.ok, { ready: agentPage.ready }),

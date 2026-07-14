@@ -57,7 +57,7 @@ export function SourceWorkbenchConnectorPanel({
         </div>
         <div className="connectorBusinessLead" data-testid="connector-business-lead">
           <strong>{connectorEditingKey ? biText("正在编辑已有连接", "Editing an existing connection") : biText("把常用文件或系统保存成可复用入口", "Save a common file or system as a reusable entry")}</strong>
-          <span>{biText("保存只记录连接配置；同步数据仍然需要先预览，再确认。", "Saving only records the connection setup. Data sync still needs preview before confirmation.")}</span>
+          <span>{biText("保存只记录连接配置；同步前先由只读 Adapter 检查来源，写入仍需单独确认。", "Saving only records the connection setup. A read-only Adapter checks the source before sync, and writes still need separate confirmation.")}</span>
         </div>
         <div className="formGrid connectorPrimaryForm">
           <label>

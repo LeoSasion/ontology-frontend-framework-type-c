@@ -15,8 +15,6 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = ROOT / "data" / "local"
 DB_PATH = Path(os.environ.get("AIBI_HYBRID_DB_PATH", DEFAULT_DATA_DIR / "aibi_hybrid.sqlite"))
 DUCKDB_PATH = Path(os.environ.get("AIBI_HYBRID_DUCKDB_PATH", DEFAULT_DATA_DIR / "aibi_hybrid.duckdb"))
-A_PROJECT_ROOT = Path(os.environ.get("AIBI_PROJECT_A_PATH", r"C:\Users\Administrator\Documents\AIBI"))
-B_PROJECT_ROOT = Path(os.environ.get("AIBI_PROJECT_B_PATH", r"C:\Users\Administrator\Documents\财务报表"))
 _UNIQUE_COUNTER = itertools.count()
 
 

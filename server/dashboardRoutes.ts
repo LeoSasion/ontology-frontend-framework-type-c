@@ -142,8 +142,8 @@ export async function handleDashboardApi(options: DashboardRoutesOptions) {
     return true;
   }
 
-  if (url.pathname === "/api/b-cli/capabilities" && request.method === "GET") {
-    const result = await cli(["b-cli-capabilities"]);
+  if (url.pathname === "/api/cli/capabilities" && request.method === "GET") {
+    const result = await cli(["cli-capabilities"]);
     sendJson(response, 200, result);
     return true;
   }

@@ -1,15 +1,27 @@
+import { lazy, Suspense } from "react";
 import type { AgentAskResult } from "../types";
 import { confidenceText, evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
 import { formatBusinessValue } from "../businessPresentation";
 import { Bilingual, biText } from "./Bilingual";
+
+const AgentProviderNarrative = lazy(() => import("./AgentProviderNarrative").then((module) => ({ default: module.AgentProviderNarrative })));
+const AgentSemanticPlan = lazy(() => import("./AgentSemanticPlan").then((module) => ({ default: module.AgentSemanticPlan })));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
   answerEvidenceSteps: AnswerEvidenceStep[];
   answerQuery: Record<string, unknown> | null;
   onAskCandidate?: (prompt: string) => void;
+  onSelectSemanticCandidates?: (candidates: import("../typesAgent").SemanticFieldCandidate[]) => void;
+  providerResponse?: AgentAskResult["llm"]["response"];
+  semanticPlan?: AgentAskResult["semanticPlan"];
+  executionPlan?: AgentAskResult["executionPlan"];
+  tableNameByKey?: Map<string, string>;
   queryRuntimeRef?: Record<string, unknown>;
   runtimeEngine: string;
+  onExportAnalysis?: () => void;
+  analysisExportStatus?: "idle" | "exporting" | "ready" | "error";
+  analysisExportMessage?: string;
 };
 
 function widgetTypeText(widgetType?: string) {
@@ -21,6 +33,15 @@ function widgetTypeText(widgetType?: string) {
   return biText("柱状图", "bar chart");
 }
 
+function analysisKindText(kind?: string) {
+  if (kind === "metric") return biText("指标", "metric");
+  if (kind === "trend") return biText("趋势", "trend");
+  if (kind === "composition") return biText("构成", "composition");
+  if (kind === "ranking") return biText("排名", "ranking");
+  if (kind === "anomaly") return biText("异常", "anomaly");
+  return biText("比较", "comparison");
+}
+
 function rowFieldValues(rows: Array<Record<string, unknown>>, role: string) {
   return rows
     .filter((row) => String(row.role ?? "") === role)
@@ -28,7 +49,7 @@ function rowFieldValues(rows: Array<Record<string, unknown>>, role: string) {
     .filter(Boolean);
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, onAskCandidate, queryRuntimeRef, runtimeEngine }: AgentAnswerCardProps) {
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, executionPlan, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
@@ -58,6 +79,16 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
         </div>
         <span className="statusPill compact">{confidenceText(answerCard.confidence)}</span>
       </div>
+      {providerResponse?.summary ? (
+        <Suspense fallback={null}>
+          <AgentProviderNarrative response={providerResponse} />
+        </Suspense>
+      ) : null}
+      {semanticPlan && semanticPlan.status !== "not-applicable" ? (
+        <Suspense fallback={null}>
+          <AgentSemanticPlan executionPlan={executionPlan} onSelectCandidates={onSelectSemanticCandidates} plan={semanticPlan} tableNameByKey={tableNameByKey} />
+        </Suspense>
+      ) : null}
       <div className="agentAnswerMetrics">
         {answerCard.metrics.map((metric, index) => (
           <div key={`${pairText(metric.label)}-${index}`}>
@@ -100,6 +131,44 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
                   </button>
                 ))}
               </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      {answerCard.analysisUnitRef && answerCard.chartAdapter ? (
+        <div className={`agentAnalysisUnitStrip ${answerCard.chartAdapter.status}`} data-testid="agent-analysis-unit-strip">
+          <div>
+            <span className="storyMode"><Bilingual zh="可复算分析单元" en="Recomputable analysis unit" /></span>
+            <strong>
+              {analysisKindText(answerCard.analysisUnitRef.kind)}
+              {answerCard.chartAdapter.status === "ready" && answerCard.chartAdapter.chartType
+                ? ` · ${widgetTypeText(answerCard.chartAdapter.chartType)}`
+                : ` · ${biText("图表已阻断", "chart blocked")}`}
+            </strong>
+            <small>{answerCard.analysisUnitRef.unitKey} · {answerCard.analysisUnitRef.resultFingerprint.slice(0, 12)}</small>
+          </div>
+          <details>
+            <summary>{biText("查看适配依据", "View adaptation rationale")}</summary>
+            <ul>
+              {(answerCard.chartAdapter.status === "ready"
+                ? answerCard.chartAdapter.rationale
+                : answerCard.chartAdapter.blockers).map((item) => <li key={item}>{item}</li>)}
+            </ul>
+          </details>
+          {answerCard.analysisUnitRef.status === "ready" ? (
+            <div className="agentAnalysisUnitExport">
+              <button
+                className="miniButton"
+                data-testid="agent-analysis-export"
+                disabled={!onExportAnalysis || analysisExportStatus === "exporting"}
+                onClick={onExportAnalysis}
+                type="button"
+              >
+                {analysisExportStatus === "exporting"
+                  ? biText("正在导出…", "Exporting…")
+                  : biText("导出 Excel + 报告", "Export Excel + report")}
+              </button>
+              {analysisExportMessage ? <small className={analysisExportStatus}>{analysisExportMessage}</small> : null}
             </div>
           ) : null}
         </div>

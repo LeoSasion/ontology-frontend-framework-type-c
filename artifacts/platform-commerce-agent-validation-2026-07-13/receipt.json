@@ -2,8 +2,94 @@
   "ok": true,
   "schema": "aibi-platform-commerce-agent-verify/v1",
   "generatedBy": "scripts/verify-platform-commerce-agent.mjs",
-  "generatedAt": "2026-07-13T02:16:58+08:00",
-  "researchRoot": "C:\\Users\\Administrator\\Documents\\AIBI-B\\data\\platform-research",
+  "generatedAt": "2026-07-13T06:10:32+08:00",
+  "validationSource": "generated:AIBI-C/scripts/platform-commerce-fixtures.mjs",
+  "generatedFixtures": [
+    {
+      "file": "douyin_orders_synthetic.csv",
+      "table": "douyin_orders",
+      "name": "抖音订单",
+      "rows": 9,
+      "columns": 7
+    },
+    {
+      "file": "douyin_aftersales_synthetic.csv",
+      "table": "douyin_aftersales",
+      "name": "抖音售后",
+      "rows": 5,
+      "columns": 8
+    },
+    {
+      "file": "douyin_logistics_synthetic.csv",
+      "table": "douyin_logistics",
+      "name": "抖音物流",
+      "rows": 5,
+      "columns": 5
+    },
+    {
+      "file": "taobao_trades_synthetic.csv",
+      "table": "taobao_trades",
+      "name": "淘宝主单",
+      "rows": 5,
+      "columns": 4
+    },
+    {
+      "file": "taobao_order_items_synthetic.csv",
+      "table": "taobao_order_items",
+      "name": "淘宝子单",
+      "rows": 6,
+      "columns": 5
+    },
+    {
+      "file": "taobao_refunds_synthetic.csv",
+      "table": "taobao_refunds",
+      "name": "淘宝退款",
+      "rows": 4,
+      "columns": 5
+    },
+    {
+      "file": "taobao_logistics_synthetic.csv",
+      "table": "taobao_logistics",
+      "name": "淘宝物流",
+      "rows": 4,
+      "columns": 4
+    },
+    {
+      "file": "jushuitan_orders_versioned_synthetic.csv",
+      "table": "jushuitan_orders",
+      "name": "聚水潭订单版本",
+      "rows": 10,
+      "columns": 5
+    },
+    {
+      "file": "jushuitan_order_items_synthetic.csv",
+      "table": "jushuitan_order_items",
+      "name": "聚水潭订单商品",
+      "rows": 6,
+      "columns": 3
+    },
+    {
+      "file": "jushuitan_outbounds_synthetic.csv",
+      "table": "jushuitan_outbounds",
+      "name": "聚水潭销售出库",
+      "rows": 9,
+      "columns": 6
+    },
+    {
+      "file": "jushuitan_aftersales_synthetic.csv",
+      "table": "jushuitan_aftersales",
+      "name": "聚水潭售后",
+      "rows": 6,
+      "columns": 4
+    },
+    {
+      "file": "jushuitan_logistics_synthetic.csv",
+      "table": "jushuitan_logistics",
+      "name": "聚水潭物流",
+      "rows": 5,
+      "columns": 4
+    }
+  ],
   "knowledgePack": "knowledge/platform-commerce.v1.json",
   "modelIndependent": true,
   "baseline": {
@@ -20,73 +106,73 @@
   },
   "imports": [
     {
-      "file": "douyin_orders_synthetic.xlsx",
+      "file": "douyin_orders_synthetic.csv",
       "table": "douyin_orders",
       "ok": true,
       "error": ""
     },
     {
-      "file": "douyin_aftersales_synthetic.xlsx",
+      "file": "douyin_aftersales_synthetic.csv",
       "table": "douyin_aftersales",
       "ok": true,
       "error": ""
     },
     {
-      "file": "douyin_logistics_synthetic.xlsx",
+      "file": "douyin_logistics_synthetic.csv",
       "table": "douyin_logistics",
       "ok": true,
       "error": ""
     },
     {
-      "file": "taobao_trades_synthetic.xlsx",
+      "file": "taobao_trades_synthetic.csv",
       "table": "taobao_trades",
       "ok": true,
       "error": ""
     },
     {
-      "file": "taobao_order_items_synthetic.xlsx",
+      "file": "taobao_order_items_synthetic.csv",
       "table": "taobao_order_items",
       "ok": true,
       "error": ""
     },
     {
-      "file": "taobao_refunds_synthetic.xlsx",
+      "file": "taobao_refunds_synthetic.csv",
       "table": "taobao_refunds",
       "ok": true,
       "error": ""
     },
     {
-      "file": "taobao_logistics_synthetic.xlsx",
+      "file": "taobao_logistics_synthetic.csv",
       "table": "taobao_logistics",
       "ok": true,
       "error": ""
     },
     {
-      "file": "jushuitan_orders_versioned_synthetic.xlsx",
+      "file": "jushuitan_orders_versioned_synthetic.csv",
       "table": "jushuitan_orders",
       "ok": true,
       "error": ""
     },
     {
-      "file": "jushuitan_order_items_synthetic.xlsx",
+      "file": "jushuitan_order_items_synthetic.csv",
       "table": "jushuitan_order_items",
       "ok": true,
       "error": ""
     },
     {
-      "file": "jushuitan_outbounds_synthetic.xlsx",
+      "file": "jushuitan_outbounds_synthetic.csv",
       "table": "jushuitan_outbounds",
       "ok": true,
       "error": ""
     },
     {
-      "file": "jushuitan_aftersales_synthetic.xlsx",
+      "file": "jushuitan_aftersales_synthetic.csv",
       "table": "jushuitan_aftersales",
       "ok": true,
       "error": ""
     },
     {
-      "file": "jushuitan_logistics_synthetic.xlsx",
+      "file": "jushuitan_logistics_synthetic.csv",
       "table": "jushuitan_logistics",
       "ok": true,
       "error": ""
@@ -107,8 +193,8 @@
       },
       "actual": {
         "退款商品金额": 441,
-        "退款运费": 6,
-        "退款税费": 0,
+        "退款运费": 5,
+        "退款税费": 1,
         "成功退款记录数": 4,
         "退款成功总额": 447
       },
@@ -514,10 +600,10 @@
         "华东仓/顺丰速运包裹数": 2,
         "华南仓/圆通速递包裹数": 2,
         "华南仓/顺丰速运包裹数": 2,
-        "华东仓/中通快递订单数": 1,
+        "华东仓/中通快递订单数": 2,
         "华东仓/京东快递订单数": 1,
         "华东仓/顺丰速运订单数": 2,
-        "华南仓/圆通速递订单数": 1,
+        "华南仓/圆通速递订单数": 2,
         "华南仓/顺丰速运订单数": 2,
         "一单多包裹率": 0.28571429
       },

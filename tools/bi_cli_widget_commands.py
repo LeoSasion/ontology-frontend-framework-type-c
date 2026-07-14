@@ -5,8 +5,8 @@ import json
 import sqlite3
 from typing import Any
 
-from bi_cli_capabilities import B_BI_CLI_CAPABILITY_MAP
-from bi_cli_core import B_PROJECT_ROOT, DB_PATH, now_iso, quote_identifier, slug, unique_key
+from bi_cli_capabilities import BI_CLI_CAPABILITY_MAP
+from bi_cli_core import DB_PATH, now_iso, quote_identifier, slug, unique_key
 from bi_cli_dashboard_commands import dashboard_layout, filter_value_required, normalize_filter_rule
 from bi_cli_evidence_bundles import write_evidence_bundle
 from bi_cli_io_services import parse_json_object, rows_to_dicts
@@ -96,7 +96,6 @@ def dashboard_widget_catalog_command(args: argparse.Namespace) -> dict[str, Any]
         relationship_count = connection.execute("SELECT COUNT(*) FROM relationships WHERE workspace_id = ?", (workspace_id,)).fetchone()[0]
         metric_count = connection.execute("SELECT COUNT(*) FROM metric_definitions WHERE workspace_id = ?", (workspace_id,)).fetchone()[0]
     payload = build_dashboard_widget_catalog_payload(
-        b_project_root=B_PROJECT_ROOT,
         metadata_store=DB_PATH,
         latest_source_intelligence_run=latest_run,
         workspace_counts={

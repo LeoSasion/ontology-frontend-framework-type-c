@@ -40,6 +40,26 @@ function Get-ProcessCommandLine {
   return ""
 }
 
+function Stop-OwnedDescendants {
+  param(
+    [int]$ParentProcessId,
+    [string]$RepositoryMarker,
+    [System.Collections.Generic.List[string]]$StoppedEntries,
+    [System.Collections.Generic.List[string]]$SkippedEntries
+  )
+  $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $ParentProcessId" -ErrorAction SilentlyContinue)
+  foreach ($child in $children) {
+    Stop-OwnedDescendants -ParentProcessId ([int]$child.ProcessId) -RepositoryMarker $RepositoryMarker -StoppedEntries $StoppedEntries -SkippedEntries $SkippedEntries
+    $normalizedCommand = Normalize-TextPath -Value ([string]$child.CommandLine)
+    if ($normalizedCommand.Contains($RepositoryMarker)) {
+      Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue
+      $StoppedEntries.Add("owned child pid $($child.ProcessId)")
+    } else {
+      $SkippedEntries.Add("child pid $($child.ProcessId) outside this repo")
+    }
+  }
+}
+
 $stopped = New-Object System.Collections.Generic.List[string]
 $skipped = New-Object System.Collections.Generic.List[string]
 $repoMarker = Normalize-TextPath -Value $repoRoot
@@ -62,6 +82,7 @@ foreach ($port in @($ApiPort, $UiPort)) {
     $commandLine = Get-ProcessCommandLine -ProcessId $listenerProcessId
     $normalizedCommand = Normalize-TextPath -Value $commandLine
     if ($normalizedCommand.Contains($repoMarker)) {
+      Stop-OwnedDescendants -ParentProcessId $listenerProcessId -RepositoryMarker $repoMarker -StoppedEntries $stopped -SkippedEntries $skipped
       Stop-Process -Id $listenerProcessId -Force
       $stopped.Add("port $port pid $listenerProcessId")
     } else {

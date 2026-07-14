@@ -288,8 +288,12 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           developmentRoadmapDocSource.includes("## 当前队列") &&
           !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
           !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
-          developmentRoadmapDocSource.includes("本地升级与回滚") &&
-          developmentRoadmapDocSource.includes("整套行业看板 Beta 晋级条件") &&
+          implementationStatusSource.includes("| Verifiable analysis units | Stable initial |") &&
+          implementationStatusSource.includes("| Safe read-only connector adapter | Stable initial |") &&
+          !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
+          !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
+          !developmentRoadmapDocSource.includes("安全只读 Connector Adapter") &&
+          developmentRoadmapDocSource.includes("### 1. 整套行业看板 Beta 晋级条件") &&
           developmentRoadmapDocSource.includes("## 明确暂时不做") &&
           !developmentRoadmapDocSource.includes("已完成") &&
           !developmentRoadmapDocSource.includes("npm run"),

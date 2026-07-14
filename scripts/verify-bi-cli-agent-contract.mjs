@@ -53,7 +53,17 @@ const contract = byLabel["contract-json"].parsed?.contract;
 const contractCommands = Array.isArray(contract?.commands) ? contract.commands : [];
 const sourceIntelligenceContract = contractCommands.find((command) => command.name === "source-intelligence");
 const businessDashboardContract = contractCommands.find((command) => command.name === "business-dashboard");
-const trustCommandNames = ["context-pack", "query-receipts", "export-evidence", "confirmed-queries", "analysis-runs"];
+const trustCommandNames = [
+  "context-pack",
+  "query-receipts",
+  "export-evidence",
+  "confirmed-queries",
+  "analysis-runs",
+  "jobs",
+  "capability-contracts",
+  "workflow-plan",
+  "context-budget",
+];
 const trustCommands = trustCommandNames.map((name) => contractCommands.find((command) => command.name === name));
 const previewImport = byLabel["preview-import-evidence-bundle"].parsed;
 const businessDraft = byLabel["business-dashboard-draft-evidence-bundle"].parsed;
@@ -77,6 +87,9 @@ checks.push(
     ok: byLabel["status-envelope"].parsed?.envelope?.schema === "aibi-bi-cli-envelope/v1" &&
       byLabel["status-envelope"].parsed?.command === "status" &&
       Array.isArray(byLabel["status-envelope"].parsed?.artifacts) &&
+      byLabel["status-envelope"].parsed?.capability?.capabilityId === "cli.status" &&
+      byLabel["status-envelope"].parsed?.workflowStage?.capabilityId === "cli.status" &&
+      byLabel["status-envelope"].parsed?.workflowStage?.status === "completed" &&
       byLabel["status-envelope"].parsed?.requiresConfirmation === false,
   },
   {

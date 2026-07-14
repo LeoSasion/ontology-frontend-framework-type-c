@@ -7,6 +7,14 @@ from pathlib import Path
 from typing import Any, Callable
 
 from bi_cli_core import ROOT, now_iso, parse_csv_list, slug, source_label, unique_key
+from connector_adapter_service import (
+    build_sync_plan,
+    public_connector,
+    public_sync_plan,
+    validate_connector_resource,
+    validate_credential_reference,
+)
+from workspace_command_service import active_workspace_id
 
 
 VALID_CONNECTOR_TYPES = {"file", "api", "erp", "database"}
@@ -29,41 +37,32 @@ def normalize_connector_status(value: str | None) -> str:
 
 
 def connector_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
-    return {
-        "connectorKey": row["connector_key"],
-        "name": row["name"],
-        "type": row["connector_type"],
-        "provider": row["provider"],
-        "status": row["status"],
-        "config": json.loads(row["config_json"] or "{}"),
-        "schedule": json.loads(row["schedule_json"] or "{}"),
-        "createdAt": row["created_at"],
-        "updatedAt": row["updated_at"],
-        "lastSyncAt": row["last_sync_at"],
-        "lastSyncStatus": row["last_sync_status"],
-        "lastSyncResult": json.loads(row["last_sync_result_json"] or "null"),
-    }
+    return public_connector(row)
 
 
 def load_connectors(connection: sqlite3.Connection) -> list[dict[str, Any]]:
+    workspace_id = active_workspace_id(connection)
     rows = connection.execute(
         """
         SELECT *
         FROM data_connectors
+        WHERE workspace_id = ?
         ORDER BY updated_at DESC, name
-        """
+        """,
+        (workspace_id,),
     ).fetchall()
     return [connector_row_to_dict(row) for row in rows]
 
 
 def connector_by_key_or_name(connection: sqlite3.Connection, value: str) -> sqlite3.Row | None:
+    workspace_id = active_workspace_id(connection)
     return connection.execute(
         """
         SELECT *
         FROM data_connectors
-        WHERE connector_key = ? OR name = ?
+        WHERE workspace_id = ? AND (connector_key = ? OR name = ?)
         """,
-        (value, value),
+        (workspace_id, value, value),
     ).fetchone()
 
 
@@ -94,13 +93,21 @@ def save_connector_command(args: argparse.Namespace, *, open_db: Callable[[], An
     connector_key = normalize_connector_key(args.connector or args.name)
     connector_type = normalize_connector_type(args.type)
     connector_status = normalize_connector_status(args.status)
+    endpoint = str(args.endpoint or "").strip()
+    credential_reference = validate_credential_reference(getattr(args, "credential_ref", None))
+    if connector_type == "file":
+        if credential_reference:
+            raise ValueError("Local file connectors cannot declare credentials.")
+        if endpoint:
+            validate_connector_resource(endpoint, require_exists=False)
     config = {
-        "endpoint": str(args.endpoint or "").strip(),
+        "endpoint": endpoint,
         "importMode": str(args.import_mode or "auto"),
         "targetTableKey": str(args.target_table or "").strip(),
         "uniqueFields": parse_csv_list(args.unique_fields),
         "conflictRule": str(args.conflict_rule or "overwrite"),
         "notes": str(args.notes or "").strip(),
+        "credentialRef": credential_reference,
     }
     schedule = {"mode": str(args.schedule or "manual")}
     now = now_iso()
@@ -110,13 +117,22 @@ def save_connector_command(args: argparse.Namespace, *, open_db: Callable[[], An
         "type": connector_type,
         "provider": str(args.provider or "").strip(),
         "status": connector_status,
-        "config": config,
+        "config": {
+            **{key: value for key, value in config.items() if key != "credentialRef"},
+            "credentialConfigured": bool(credential_reference),
+        },
         "schedule": schedule,
         "updatedAt": now,
     }
     with open_db() as connection:
+        workspace_id = active_workspace_id(connection)
         current_row = connector_by_key_or_name(connection, connector_key)
         current = connector_row_to_dict(current_row) if current_row else None
+        if current_row and not credential_reference:
+            current_raw_config = json.loads(current_row["config_json"] or "{}")
+            if current_raw_config.get("credentialRef"):
+                config["credentialRef"] = current_raw_config["credentialRef"]
+                proposed["config"]["credentialConfigured"] = True
         if not args.yes:
             return {
                 "ok": True,
@@ -130,13 +146,14 @@ def save_connector_command(args: argparse.Namespace, *, open_db: Callable[[], An
         connection.execute(
             """
             INSERT OR REPLACE INTO data_connectors(
-              connector_key, name, connector_type, provider, status, config_json,
+              connector_key, workspace_id, name, connector_type, provider, status, config_json,
               schedule_json, created_at, updated_at, last_sync_at, last_sync_status, last_sync_result_json
             )
-            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 connector_key,
+                workspace_id,
                 proposed["name"],
                 connector_type,
                 proposed["provider"],
@@ -169,7 +186,10 @@ def remove_connector_command(args: argparse.Namespace, *, open_db: Callable[[], 
                 "removedConnector": connector,
                 "message": "Only connector configuration will be removed; imported tables and source files are not deleted.",
             }
-        connection.execute("DELETE FROM data_connectors WHERE connector_key = ?", (connector["connectorKey"],))
+        connection.execute(
+            "DELETE FROM data_connectors WHERE connector_key = ? AND workspace_id = ?",
+            (connector["connectorKey"], connector["workspaceId"]),
+        )
         connection.commit()
     return {"ok": True, "confirmed": True, "removedConnector": connector}
 
@@ -196,62 +216,31 @@ def sync_connector_command(
                 "connector": connector,
                 "reason": "Connector is paused. Pass --allow-paused after review to sync it.",
             }
-        config = connector["config"]
+        config = json.loads(row["config_json"] or "{}")
         endpoint = str(config.get("endpoint") or "").strip()
         target_table = str(config.get("targetTableKey") or "").strip() or normalize_connector_key(connector["name"])
         import_mode = str(config.get("importMode") or "auto")
         unique_fields = [str(item) for item in config.get("uniqueFields") or []]
         conflict_rule = str(config.get("conflictRule") or "overwrite")
-        proposed = {
-            "connectorKey": connector["connectorKey"],
-            "type": connector["type"],
-            "provider": connector["provider"],
-            "endpoint": endpoint,
-            "targetTableKey": target_table,
-            "importMode": import_mode,
-            "uniqueFields": unique_fields,
-            "conflictRule": conflict_rule,
-        }
         if connector["type"] != "file":
-            result = {
-                "ok": True,
-                "blocked": True,
-                "dryRun": not args.yes,
-                "requiresConfirmation": not args.yes,
-                "connector": connector,
-                "proposedSync": proposed,
-                "reason": "External API, ERP, and database connectors are registered but not executed by this local hybrid runtime yet.",
-                "evidence": ["b-connector-config-model", "aibi-no-external-sync-without-executor-receipt"],
-            }
-            if args.yes:
-                timestamp = now_iso()
-                connection.execute(
-                    """
-                    UPDATE data_connectors
-                    SET last_sync_at = ?, last_sync_status = 'blocked', last_sync_result_json = ?, updated_at = ?
-                    WHERE connector_key = ?
-                    """,
-                    (timestamp, json.dumps(result, ensure_ascii=False), timestamp, connector["connectorKey"]),
-                )
-                connection.commit()
-            return result
-        source_path = resolve_connector_endpoint(endpoint)
-        source_exists = source_path.exists()
+            return public_sync_plan(build_sync_plan(
+                row,
+                connection=connection,
+                registry_for_table=registry_for_table,
+                saved_import_policy=saved_import_policy,
+            ))
+        adapter_plan = build_sync_plan(
+            row,
+            connection=connection,
+            registry_for_table=registry_for_table,
+            saved_import_policy=saved_import_policy,
+        )
+        public_plan = public_sync_plan(adapter_plan)
+        if adapter_plan.get("blocked"):
+            return public_plan
         if not args.yes:
-            preview = None
-            if source_exists:
-                headers, rows = read_table_file(source_path)
-                preview = {"rowCount": len(rows), "columnCount": len(headers), "columns": headers[:12]}
-            return {
-                "ok": True,
-                "dryRun": True,
-                "requiresConfirmation": True,
-                "connector": connector,
-                "proposedSync": {**proposed, "sourceFile": source_label(source_path), "sourceExists": source_exists, "preview": preview},
-                "evidence": ["b-file-connector", "import-preview", "aibi-action-confirmation-boundary"],
-            }
-        if not source_exists:
-            raise FileNotFoundError(source_path)
+            return public_plan
+        source_path = adapter_plan["_sourcePath"]
         registry = registry_for_table(connection, target_table)
         mode = "merge" if import_mode == "auto" and registry else "create" if import_mode == "auto" else import_mode
         if mode == "merge":
@@ -279,15 +268,20 @@ def sync_connector_command(
             "importResult": import_result,
             "syncedAt": now_iso(),
             "mode": mode,
+            "adapter": {
+                "adapterId": adapter_plan["syncPlan"]["adapterId"],
+                "planFingerprint": adapter_plan["planFingerprint"],
+                "resourceFingerprint": adapter_plan["syncPlan"]["resource"]["sha256"],
+            },
             "evidence": ["b-file-connector", "source-profile", "field-semantics", "metric-sql-plan", "query-runtime"],
         }
         connection.execute(
             """
             UPDATE data_connectors
             SET last_sync_at = ?, last_sync_status = 'success', last_sync_result_json = ?, updated_at = ?
-            WHERE connector_key = ?
+            WHERE connector_key = ? AND workspace_id = ?
             """,
-            (result["syncedAt"], json.dumps(result, ensure_ascii=False), result["syncedAt"], connector["connectorKey"]),
+            (result["syncedAt"], json.dumps(result, ensure_ascii=False), result["syncedAt"], connector["connectorKey"], connector["workspaceId"]),
         )
         connection.commit()
         refreshed = connector_row_to_dict(connector_by_key_or_name(connection, connector["connectorKey"]))

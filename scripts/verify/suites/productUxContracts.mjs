@@ -60,7 +60,6 @@ export function appendProductUxContractChecks(context) {
     sourceWorkbenchActionPanelSource,
     stylesSource,
     typesAgentSource,
-    verifyAAdversarialSource,
   } = context;
   const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
   const inspectorFeatureSource = `${inspectorPanelSource}\n${inspectorContextPanelSource}\n${inspectorTaskQueuePanelSource}\n${inspectorEvidenceDetailsSource}`;
@@ -427,7 +426,7 @@ export function appendProductUxContractChecks(context) {
           settingsAcceptanceEvidencePanelSource.includes("看板阅读和编辑动作集中可验收") &&
           settingsAcceptanceEvidencePanelSource.includes("新手路径已收敛") &&
           settingsAcceptanceEvidencePanelSource.includes("docs/implementation-status.md") &&
-          settingsAcceptanceEvidencePanelSource.includes("python tools/bi_cli.py --json b-cli-capabilities") &&
+          settingsAcceptanceEvidencePanelSource.includes("python tools/bi_cli.py --json cli-capabilities") &&
           settingsAcceptanceEvidencePanelSource.includes('data-testid={`settings-closure-technical-${item.key}`}') &&
           settingsAcceptanceEvidencePanelSource.includes("empty-workspace-data-boundary") &&
           settingsAcceptanceEvidencePanelSource.includes("frontend-b-widget-acceptance-gallery") &&
@@ -459,30 +458,6 @@ export function appendProductUxContractChecks(context) {
           !sourceIntelligenceRunModelSource.includes("aTestdata0305") &&
           !metricSemanticRepairActionsSource.includes("debug sample") &&
           appDataActionsSource.includes("请先在数据源工作台选择本地文件或文件夹"),
-      },
-    {
-        label: "a-adversarial-source-intelligence-harness",
-        ok: packageJson.scripts["verify:a-adversarial"] === "node scripts/verify-a-adversarial-source-intelligence.mjs" &&
-          existsSync(join(root, "scripts", "verify-a-adversarial-source-intelligence.mjs")) &&
-          verifyAAdversarialSource.includes("AIBI-skills") &&
-          verifyAAdversarialSource.includes("source-intelligence-experience.md") &&
-          verifyAAdversarialSource.includes("ADV-CN-012-二手车") &&
-          verifyAAdversarialSource.includes("ADV-CN-011-教培课包") &&
-          verifyAAdversarialSource.includes("ADV-CN-013-跨境仓配") &&
-          verifyAAdversarialSource.includes("ADV-LONG-021-私域会员储值履约") &&
-          verifyAAdversarialSource.includes("ADV-ERP-072-旺店通订单明细利润物流差异") &&
-          verifyAAdversarialSource.includes("ADV-ERP-072-聚水潭订单出库售后对账") &&
-          verifyAAdversarialSource.includes("ADV-ERP-072-金蝶销售出库应收勾稽") &&
-          verifyAAdversarialSource.includes("ADV-ERP-072-采购库存周转供应商履约") &&
-          verifyAAdversarialSource.includes("batch-072-cn-erp-adversarial") &&
-          verifyAAdversarialSource.includes("erp-adversarial-2026-07-05-b072") &&
-          verifyAAdversarialSource.includes("erp-batch-manifest-available") &&
-          verifyAAdversarialSource.includes("erp-long-cycle-summary-available") &&
-          verifyAAdversarialSource.includes("experience-keeps-workspace-boundary") &&
-          verifyAAdversarialSource.includes("adversarial-gap-boundary") &&
-          verifyAAdversarialSource.includes("metricSqlExecutableCount < manifest?.metricSqlPlanCount") &&
-          verifyAAdversarialSource.includes("output-stays-outside-project-a") &&
-          readmeSource.includes("npm run verify"),
       },
     {
         label: "frontend-b-widget-acceptance-gallery",

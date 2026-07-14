@@ -21,8 +21,8 @@ import {
   type CheckedItem,
 } from "../agentPanelModel";
 import { businessIdentifier } from "../businessPresentation";
+import { fetchJsonStrict } from "../apiClient";
 import { lazyWithRetry } from "../lazyWithRetry";
-import { AgentAnswerCard } from "./AgentAnswerCard";
 import type { AgentCanAnswerSuggestion } from "./AgentCanAnswerPanel";
 import { AgentContextPlanPanel } from "./AgentContextPlanPanel";
 import { AgentPendingChangesPanel } from "./AgentPendingChangesPanel";
@@ -31,6 +31,7 @@ import { AgentTaskPacket } from "./AgentTaskPacket";
 import { Bilingual, biText, useLanguage } from "./Bilingual";
 
 const AgentTrustAdvancedPanel = lazyWithRetry(() => import("./AgentTrustAdvancedPanel"));
+const AgentAnswerCard = lazyWithRetry(() => import("./AgentAnswerCard").then((module) => ({ default: module.AgentAnswerCard })));
 const AgentCanAnswerPanel = lazyWithRetry(() => import("./AgentCanAnswerPanel").then((module) => ({ default: module.AgentCanAnswerPanel })));
 const AgentEvidenceAuditPanels = lazyWithRetry(() => import("./AgentEvidenceAuditPanels").then((module) => ({ default: module.AgentEvidenceAuditPanels })));
 
@@ -60,8 +61,13 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   const [promptTouched, setPromptTouched] = useState(false);
   const [isAsking, setIsAsking] = useState(false);
   const [runningActionKey, setRunningActionKey] = useState<string | null>(null);
+  const [analysisExport, setAnalysisExport] = useState<{ status: "idle" | "exporting" | "ready" | "error"; message: string }>({ status: "idle", message: "" });
   const resultRequest = result.queryPlanReceipt?.request ?? result.answerCard?.queryPlanReceipt?.request ?? "";
   const visibleResultRequest = businessPromptText(resultRequest, workbench);
+
+  useEffect(() => {
+    setAnalysisExport({ status: "idle", message: "" });
+  }, [result.answerCard?.analysisUnitRef?.unitKey]);
 
   useEffect(() => {
     if (!promptTouched) {
@@ -80,6 +86,29 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       await onAsk(normalizedPrompt);
     } finally {
       setIsAsking(false);
+    }
+  }
+
+  async function exportVerifiedAnalysis() {
+    const receiptKey = result.queryPlanReceipt?.receiptKey ?? result.answerCard?.queryPlanReceipt?.receiptKey ?? "";
+    const unitKey = result.answerCard?.analysisUnitRef?.unitKey ?? "";
+    if (!receiptKey || !unitKey) return;
+    setAnalysisExport({ status: "exporting", message: biText("正在生成 Excel 与报告…", "Generating Excel and report…") });
+    try {
+      const payload = await fetchJsonStrict<{ analysisExport?: { archivePath?: string; archiveSha256?: string } }>("/api/exports/analysis", {
+        method: "POST",
+        body: JSON.stringify({ queryReceiptKey: receiptKey, unitKey }),
+      });
+      const path = String(payload.analysisExport?.archivePath ?? "");
+      const hash = String(payload.analysisExport?.archiveSha256 ?? "").slice(0, 12);
+      setAnalysisExport({
+        status: "ready",
+        message: path
+          ? biText(`已导出到 ${path}${hash ? ` · ${hash}` : ""}`, `Exported to ${path}${hash ? ` · ${hash}` : ""}`)
+          : biText("导出已完成", "Export completed"),
+      });
+    } catch (error) {
+      setAnalysisExport({ status: "error", message: error instanceof Error ? error.message : String(error) });
     }
   }
 
@@ -177,12 +206,27 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     },
   ] : [];
   const llmAudit = result.llm.audit;
+  const providerUsed = result.llm.mode === "provider";
   const llmAuditItems = [
     {
       key: "provider",
       label: biText("回答方式", "Answer mode"),
-      value: llmModeText(result.llm.configured),
-      tone: result.llm.configured ? "ok" : "neutral",
+      value: llmModeText(providerUsed),
+      tone: providerUsed ? "ok" : "neutral",
+    },
+    {
+      key: "model",
+      label: biText("模型", "Model"),
+      value: String(llmAudit?.model ?? biText("未调用", "Not called")),
+      tone: providerUsed ? "ok" : "neutral",
+    },
+    {
+      key: "usage",
+      label: biText("本次用量", "Usage"),
+      value: typeof llmAudit?.usage?.totalTokens === "number"
+        ? `${llmAudit.usage.totalTokens} tokens`
+        : biText("未调用模型", "No model call"),
+      tone: providerUsed ? "ok" : "neutral",
     },
     {
       key: "boundary",
@@ -418,7 +462,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         </div>
         <div className="statusPill">
           <span className="dot ok" />
-          <span>{llmModeText(result.llm.configured)}</span>
+          <span>{llmModeText(providerUsed)}</span>
         </div>
       </div>
 
@@ -431,17 +475,32 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       />
 
       {result.answerCard ? (
-        <AgentAnswerCard
-          answerCard={result.answerCard}
-          answerEvidenceSteps={answerEvidenceSteps}
-          answerQuery={answerQuery}
-          onAskCandidate={(candidatePrompt) => {
-            setPromptTouched(true);
-            void submit(candidatePrompt);
-          }}
-          queryRuntimeRef={queryRuntimeRef}
-          runtimeEngine={runtimeEngine}
-        />
+        <Suspense fallback={null}>
+          <AgentAnswerCard
+            answerCard={result.answerCard}
+            answerEvidenceSteps={answerEvidenceSteps}
+            answerQuery={answerQuery}
+            providerResponse={result.llm.response}
+            semanticPlan={result.semanticPlan}
+            executionPlan={result.executionPlan}
+            tableNameByKey={tableNameByKey}
+            onAskCandidate={(candidatePrompt) => {
+              setPromptTouched(true);
+              void submit(candidatePrompt);
+            }}
+            onSelectSemanticCandidates={(candidates) => {
+              const original = result.queryPlanReceipt?.request ?? "";
+              const bindings = candidates.map((candidate) => `${candidate.tableName || tableNameByKey.get(candidate.tableKey) || candidate.tableKey}的 ${candidate.field}`).join("，使用");
+              setPromptTouched(true);
+              void submit(`${original}，使用${bindings}`);
+            }}
+            onExportAnalysis={() => void exportVerifiedAnalysis()}
+            analysisExportStatus={analysisExport.status}
+            analysisExportMessage={analysisExport.message}
+            queryRuntimeRef={queryRuntimeRef}
+            runtimeEngine={runtimeEngine}
+          />
+        </Suspense>
       ) : null}
 
       {pendingDrafts.length > 0 || activeActionResult ? (

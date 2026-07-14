@@ -146,7 +146,6 @@ const textSourceFiles = {
   devScriptSource: ["scripts", "dev.mjs"],
   verifyUiFlowSource: ["scripts", "verify-ui-flow.mjs"],
   verifyUiRealImportSource: ["scripts", "verify-ui-real-import.mjs"],
-  verifyAAdversarialSource: ["scripts", "verify-a-adversarial-source-intelligence.mjs"],
   indexHtmlSource: ["index.html"],
   topBarSource: ["src", "components", "TopBar.tsx"],
   sourceWorkbenchSource: ["src", "components", "SourceWorkbench.tsx"],
@@ -292,7 +291,6 @@ const textSourceFiles = {
   workspaceCommandServiceSource: ["tools", "workspace_command_service.py"],
   preferencesThemeCommandServiceSource: ["tools", "preferences_theme_command_service.py"],
   implementationStatusSource: ["docs", "implementation-status.md"],
-  referenceProjectGapAnalysisSource: ["docs", "reference-project-gap-analysis.md"],
 };
 
 const jsonSourceFiles = {

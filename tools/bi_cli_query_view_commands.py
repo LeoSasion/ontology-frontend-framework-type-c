@@ -69,6 +69,7 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
             aggregation=args.agg,
             runtime=runtime,
             evidence_refs=[{"type": "queryRuntime", "compiledSql": runtime.get("compiledSql")}],
+            result_rows=rows,
             now_iso=now_iso,
         )
         connection.commit()

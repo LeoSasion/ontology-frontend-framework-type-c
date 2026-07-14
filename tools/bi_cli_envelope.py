@@ -3,6 +3,9 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
+from capability_contract_service import build_capability_contract
+from workflow_stage_service import build_workflow_stage
+
 from bi_cli_contracts import command_semantics
 
 
@@ -157,6 +160,9 @@ def enrich_cli_output(result: dict[str, Any], args: argparse.Namespace, parser: 
         "artifactCount": len(result.get("artifacts") or []),
         "evidenceCount": len(result.get("evidence") or []),
     }
+    capability = build_capability_contract(command, semantics)
+    result.setdefault("capability", capability)
+    result.setdefault("workflowStage", build_workflow_stage(command=command, args=args, result=result, capability=capability))
     return result
 
 
@@ -185,4 +191,7 @@ def error_output(command: str, error: Exception) -> dict[str, Any]:
         "artifactCount": 0,
         "evidenceCount": 0,
     }
+    capability = build_capability_contract(command)
+    result["capability"] = capability
+    result["workflowStage"] = build_workflow_stage(command=command, args={}, result=result, capability=capability)
     return result

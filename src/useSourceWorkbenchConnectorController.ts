@@ -101,8 +101,8 @@ export function useSourceWorkbenchConnectorController({
   }
 
   async function runConnectorSyncAction(connector: DataConnectorConfig, confirm: boolean) {
-    await onSyncConnector({ connector: connector.connectorKey, confirm });
-    setConnectorOperationReceipt(buildConnectorSyncReceipt(connector, confirm));
+    const result = await onSyncConnector({ connector: connector.connectorKey, confirm });
+    setConnectorOperationReceipt(buildConnectorSyncReceipt(connector, confirm, result));
   }
 
   async function runConnectorRemoveAction(connector: DataConnectorConfig) {

@@ -110,7 +110,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
             "dashboards": connection.execute("SELECT COUNT(*) FROM dashboards WHERE workspace_id = ?", (active_id,)).fetchone()[0],
             "actionDrafts": count_pending_action_drafts(connection, workspace_id=active_id),
             "sourceIntelligenceRuns": count_source_intelligence_runs(connection, workspace_id=active_id),
-            "connectors": connection.execute("SELECT COUNT(*) FROM data_connectors").fetchone()[0],
+            "connectors": connection.execute("SELECT COUNT(*) FROM data_connectors WHERE workspace_id = ?", (active_id,)).fetchone()[0],
         }
         workspace = dict(connection.execute("SELECT * FROM workspaces WHERE id = ?", (active_id,)).fetchone())
         workspace["isActive"] = True
@@ -318,4 +318,4 @@ def workspace_rename_command(args: argparse.Namespace) -> dict[str, Any]:
 def workspace_delete_command(args: argparse.Namespace) -> dict[str, Any]:
     return workspace_delete_command_service(args, open_db=open_db, duckdb_path=DUCKDB_PATH)
 
-
+

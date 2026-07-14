@@ -21,6 +21,7 @@ export {
   previewRelationship,
   queryMetric,
   queryRelationship,
+  runSemanticQuery,
   recommendIndexes,
   recommendRelationships,
   saveFormula,
@@ -57,6 +58,6 @@ export function getQualityDoctor() {
   return fetchJson<Record<string, unknown>>("/api/quality/doctor", { ok: false });
 }
 
-export function getBBiCliCapabilities() {
-  return fetchJson<Record<string, unknown>>("/api/b-cli/capabilities", { ok: false });
+export function getCliCapabilities() {
+  return fetchJson<Record<string, unknown>>("/api/cli/capabilities", { ok: false });
 }

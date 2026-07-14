@@ -42,6 +42,9 @@ export function relationshipSaveOptions(recommendation: RelationshipRecommendati
     rightTable: payload.rightTable,
     leftField: payload.leftField,
     rightField: payload.rightField,
+    fieldMappings: payload.fieldMappings,
+    filters: current.filters,
+    preaggregation: current.preaggregation,
     joinType: payload.joinType ?? "left",
     limit: current.limit ?? payload.limit ?? 20,
   };

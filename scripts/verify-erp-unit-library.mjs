@@ -1,71 +1,6 @@
-import { existsSync, mkdtempSync } from "node:fs";
-import { readFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
-const root = process.cwd();
-const aProjectRoot = process.env.AIBI_PROJECT_A_PATH || "C:\\Users\\Administrator\\Documents\\AIBI";
-const outputRoot = mkdtempSync(join(tmpdir(), "aibi-erp-unit-library-"));
-
-const erpCases = [
-  { key: "wangdian", workspace: "ADV-ERP-072-旺店通订单明细利润物流差异", expected: ["SKU", "利润", "运费", "退款"] },
-  { key: "jushuitan", workspace: "ADV-ERP-072-聚水潭订单出库售后对账", expected: ["出库", "售后", "店铺", "退款"] },
-  { key: "kingdee", workspace: "ADV-ERP-072-金蝶销售出库应收勾稽", expected: ["应收", "出库", "客户", "订单"] },
-  { key: "procurement", workspace: "ADV-ERP-072-采购库存周转供应商履约", expected: ["采购", "库存", "供应商", "周转"] },
-];
-
-function normalizePath(value) {
-  return resolve(value).replaceAll("\\", "/").toLowerCase();
-}
-
-function parseJson(stdout) {
-  const raw = String(stdout ?? "");
-  const start = raw.indexOf("{");
-  if (start < 0) return null;
-  try {
-    return JSON.parse(raw.slice(start));
-  } catch {
-    return null;
-  }
-}
-
-async function readJson(path) {
-  try {
-    return JSON.parse(await readFile(path, "utf8"));
-  } catch {
-    return null;
-  }
-}
-
-function runPython(args, env, timeout = 120000) {
-  return spawnSync("python", ["tools/bi_cli.py", "--json", ...args], {
-    cwd: root,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      ...env,
-      PYTHONIOENCODING: "utf-8",
-    },
-    timeout,
-    windowsHide: true,
-  });
-}
-
-function runPythonSnippet(source, timeout = 120000) {
-  return spawnSync("python", ["-c", source], {
-    cwd: root,
-    encoding: "utf8",
-    env: {
-      ...process.env,
-      PYTHONIOENCODING: "utf-8",
-    },
-    timeout,
-    windowsHide: true,
-  });
-}
-
-const publicScenarioRun = runPythonSnippet(String.raw`
+const python = String.raw`
 import json
 import re
 import sys
@@ -83,7 +18,7 @@ def slug(value):
     return text or "x"
 
 
-public_scenarios = [
+scenarios = [
     {
         "key": "retail-pos-member",
         "category": "零售门店/POS",
@@ -123,30 +58,42 @@ public_scenarios = [
 ]
 
 catalog = build_erp_unit_library_catalog_payload(include_units=False)
+checks = [
+    {
+        "label": "catalog-is-rich-and-generic",
+        "ok": catalog.get("unitCount", 0) >= 150
+        and catalog.get("referenceCount", 0) >= 45
+        and catalog.get("fieldAliasGroupCount", 0) >= 240
+        and "not a fixed" in str(catalog.get("selectionPolicy", "")),
+        "detail": {
+            "unitCount": catalog.get("unitCount"),
+            "referenceCount": catalog.get("referenceCount"),
+            "fieldAliasGroupCount": catalog.get("fieldAliasGroupCount"),
+        },
+    }
+]
 receipts = []
-for scenario in public_scenarios:
+for scenario in scenarios:
     table = {"table_key": scenario["key"], "display_name": scenario["key"]}
     fields = {"columns": scenario["fields"]}
     payload = build_erp_dashboard_unit_templates([table], {scenario["key"]: fields}, limit=36, slug=slug)
-    selected_keys = [item.get("preset", {}).get("erpUnitKey") for item in payload.get("templates", [])]
-    candidate_keys = []
+    selected = [item.get("preset", {}).get("erpUnitKey") for item in payload.get("templates", [])]
+    candidates = []
     for unit in ERP_DASHBOARD_UNITS:
-        resolved = _resolve_unit_for_table(unit, table, fields, slug)
-        if resolved:
-            candidate_keys.append(str(unit["key"]))
-    expected = scenario["expected"]
-    candidate_hits = [key for key in expected if key in candidate_keys]
-    selected_hits = [key for key in expected if key in selected_keys]
-    checks = [
+        if _resolve_unit_for_table(unit, table, fields, slug):
+            candidates.append(str(unit["key"]))
+    candidate_hits = [key for key in scenario["expected"] if key in candidates]
+    selected_hits = [key for key in scenario["expected"] if key in selected]
+    scenario_checks = [
         {
             "label": "expected-units-are-candidates",
-            "ok": len(candidate_hits) == len(expected),
-            "detail": f"hits={candidate_hits}; expected={expected}",
+            "ok": len(candidate_hits) == len(scenario["expected"]),
+            "detail": {"hits": candidate_hits, "expected": scenario["expected"]},
         },
         {
             "label": "at-least-two-expected-units-selected",
-            "ok": len(selected_hits) >= min(2, len(expected)),
-            "detail": f"selected_hits={selected_hits}; selected={selected_keys[:12]}",
+            "ok": len(selected_hits) >= min(2, len(scenario["expected"])),
+            "detail": {"selectedHits": selected_hits, "selected": selected[:12]},
         },
         {
             "label": "category-coverage-includes-scenario",
@@ -156,170 +103,35 @@ for scenario in public_scenarios:
     ]
     receipts.append({
         **scenario,
-        "candidateUnitCount": len(candidate_keys),
-        "selectedUnitCount": len(selected_keys),
-        "candidateHits": candidate_hits,
-        "selectedHits": selected_hits,
-        "checks": checks,
-        "failedChecks": [check for check in checks if not check["ok"]],
+        "candidateUnitCount": len(candidates),
+        "selectedUnitCount": len(selected),
+        "checks": scenario_checks,
     })
+    checks.extend({"scenario": scenario["key"], **check} for check in scenario_checks)
 
-failed_checks = [
-    {"scope": item["key"], **check}
-    for item in receipts
-    for check in item["failedChecks"]
-]
-result = {
-    "ok": not failed_checks,
+failed = [check for check in checks if not check["ok"]]
+print(json.dumps({
+    "ok": not failed,
+    "schema": "aibi-c-erp-unit-library-verify/v1",
+    "generatedBy": "scripts/verify-erp-unit-library.mjs",
+    "scenarioCount": len(scenarios),
     "catalog": catalog,
-    "scenarioCount": len(public_scenarios),
     "scenarios": receipts,
-    "failedChecks": failed_checks,
-}
-print(json.dumps(result, ensure_ascii=False, indent=2))
-sys.exit(0 if result["ok"] else 1)
-`);
-const publicScenarioParsed = parseJson(publicScenarioRun.stdout);
+    "failedChecks": failed,
+}, ensure_ascii=False, indent=2))
+sys.exit(0 if not failed else 1)
+`;
 
-const caseReceipts = [];
-for (const item of erpCases) {
-  const sourcesDir = join(aProjectRoot, "workspaces", item.workspace, "sources");
-  const caseOutputDir = join(outputRoot, item.key);
-  const env = {
-    AIBI_HYBRID_DB_PATH: join(caseOutputDir, "verify.sqlite"),
-    AIBI_HYBRID_DUCKDB_PATH: join(caseOutputDir, "verify.duckdb"),
-  };
-  const sourceRun = runPython(["source-intelligence", sourcesDir, "--label", `verify-erp-units-${item.key}`, "--output-dir", caseOutputDir], env);
-  const sourceParsed = parseJson(sourceRun.stdout);
-  const manifest = sourceParsed?.manifest ?? await readJson(join(caseOutputDir, "source-intelligence-manifest.json"));
-  const libraryRun = runPython(["erp-unit-library", "--select", "--summary", "--limit", "36"], env);
-  const libraryParsed = parseJson(libraryRun.stdout);
-  const draftRun = runPython(["business-dashboard", "--template", "erp-units", "--op", "draft", "--limit", "24"], env);
-  const draftParsed = parseJson(draftRun.stdout);
-  const agentRun = runPython(["ask", `基于当前 ${item.expected.join("/")} ERP 数据生成一张经营看板，让 Agent 自己选择需要的组件`], env);
-  const agentParsed = parseJson(agentRun.stdout);
-  const agentDraftsRun = runPython(["action-drafts", "--limit", "20"], env);
-  const agentDraftsParsed = parseJson(agentDraftsRun.stdout);
-  const selected = libraryParsed?.selection?.erpUnitLibrary;
-  const draftLibrary = draftParsed?.draft?.erpUnitLibrary;
-  const agentDashboardDraft = agentDraftsParsed?.actionDrafts?.find((draft) => draft?.action_key === agentParsed?.actionDraft?.actionKey);
-  const agentDraftLibrary = agentDashboardDraft?.payload?.dashboardDraft?.erpUnitLibrary;
-  const checks = [
-    {
-      label: "source-folder-exists",
-      ok: existsSync(sourcesDir),
-      detail: sourcesDir,
-    },
-    {
-      label: "output-stays-outside-project-a",
-      ok: !normalizePath(caseOutputDir).startsWith(normalizePath(aProjectRoot)),
-      detail: caseOutputDir,
-    },
-    {
-      label: "source-intelligence-ok",
-      ok: sourceRun.status === 0 && sourceParsed?.ok === true && manifest?.sourceCount > 0 && manifest?.semanticConfirmationCount > 0,
-      detail: `status=${sourceRun.status}; sources=${manifest?.sourceCount}; semantics=${manifest?.semanticConfirmationCount}`,
-    },
-    {
-      label: "unit-library-rich",
-      ok: libraryRun.status === 0 &&
-        libraryParsed?.catalog?.unitCount >= 150 &&
-        libraryParsed?.catalog?.referenceCount >= 45 &&
-        libraryParsed?.catalog?.fieldAliasGroupCount >= 240 &&
-        libraryParsed?.catalog?.selectionPolicy?.includes("not a fixed"),
-      detail: `units=${libraryParsed?.catalog?.unitCount}; references=${libraryParsed?.catalog?.referenceCount}; aliases=${libraryParsed?.catalog?.fieldAliasGroupCount}`,
-    },
-    {
-      label: "unit-selection-present",
-      ok: selected?.selectedUnitCount > 0 &&
-        selected?.candidateUnitCount >= selected?.selectedUnitCount &&
-        Number.isFinite(selected?.unavailableUnitCount) &&
-        Array.isArray(selected?.omittedUnitHints) &&
-        selected.omittedUnitHints.every((hint) => Array.isArray(hint?.neededFields)) &&
-        Array.isArray(libraryParsed?.selection?.templates) &&
-        libraryParsed.selection.templates.some((unit) => unit?.preset?.matchedFields && Object.keys(unit.preset.matchedFields).length > 0),
-      detail: `selected=${selected?.selectedUnitCount}; candidates=${selected?.candidateUnitCount}; unavailable=${selected?.unavailableUnitCount}`,
-    },
-    {
-      label: "business-dashboard-erp-units-draft",
-      ok: draftRun.status === 0 &&
-        draftParsed?.ok === true &&
-        draftParsed?.draft?.templateKey === "erp-units" &&
-        draftParsed?.draft?.widgets?.length > 0 &&
-        draftLibrary?.selectedUnitCount > 0 &&
-        Array.isArray(draftLibrary?.categoryCoverage),
-      detail: `widgets=${draftParsed?.draft?.widgets?.length}; selected=${draftLibrary?.selectedUnitCount}; gaps=${draftLibrary?.unavailableUnitCount}`,
-    },
-    {
-      label: "agent-routes-to-erp-units-dashboard-draft",
-      ok: agentRun.status === 0 &&
-        agentParsed?.ok === true &&
-        agentParsed?.requiresConfirmation === true &&
-        agentParsed?.actionDraft?.kind === "dashboard.create" &&
-        agentDraftsRun.status === 0 &&
-        agentDashboardDraft?.payload?.dashboardDraft?.templateKey === "erp-units" &&
-        agentDraftLibrary?.selectedUnitCount > 0 &&
-        Array.isArray(agentDraftLibrary?.omittedUnitHints) &&
-        Array.isArray(agentDraftLibrary?.categoryCoverage),
-      detail: `status=${agentRun.status}; kind=${agentParsed?.actionDraft?.kind}; template=${agentDashboardDraft?.payload?.dashboardDraft?.templateKey}; selected=${agentDraftLibrary?.selectedUnitCount}`,
-    },
-  ];
-  caseReceipts.push({
-    ...item,
-    sourcesDir,
-    outputDir: caseOutputDir,
-    manifest: manifest
-      ? {
-          sourceCount: manifest.sourceCount,
-          tableCount: manifest.tableCount,
-          semanticConfirmationCount: manifest.semanticConfirmationCount,
-          relationshipCount: manifest.relationshipCount,
-          metricSqlPlanCount: manifest.metricSqlPlanCount,
-          metricSqlExecutableCount: manifest.metricSqlExecutableCount,
-        }
-      : null,
-    selectedUnitCount: selected?.selectedUnitCount ?? 0,
-    candidateUnitCount: selected?.candidateUnitCount ?? 0,
-    unavailableUnitCount: selected?.unavailableUnitCount ?? 0,
-    omittedUnitHintCount: selected?.omittedUnitHints?.length ?? 0,
-    widgetCount: draftParsed?.draft?.widgets?.length ?? 0,
-    checks,
-    failedChecks: checks.filter((check) => !check.ok),
-  });
-}
+const result = spawnSync("python", ["-c", python], {
+  cwd: process.cwd(),
+  encoding: "utf8",
+  env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+  timeout: 120000,
+  windowsHide: true,
+  maxBuffer: 32 * 1024 * 1024,
+});
 
-const failedChecks = caseReceipts.flatMap((receipt) => receipt.failedChecks.map((check) => ({
-  scope: receipt.key,
-  workspace: receipt.workspace,
-  ...check,
-})));
-if (publicScenarioRun.status !== 0 || publicScenarioParsed?.ok !== true) {
-  failedChecks.push({
-    scope: "public-erp-scenarios",
-    label: "public-scenario-units",
-    ok: false,
-    detail: `status=${publicScenarioRun.status}; failed=${JSON.stringify(publicScenarioParsed?.failedChecks ?? [])}; stderr=${publicScenarioRun.stderr}`,
-  });
-}
-
-const receipt = {
-  ok: failedChecks.length === 0,
-  generatedBy: "scripts/verify-erp-unit-library.mjs",
-  aProjectRoot,
-  outputRoot,
-  publicScenarios: publicScenarioParsed,
-  cases: caseReceipts,
-  totals: {
-    sourceCount: caseReceipts.reduce((sum, item) => sum + (item.manifest?.sourceCount ?? 0), 0),
-    semanticConfirmationCount: caseReceipts.reduce((sum, item) => sum + (item.manifest?.semanticConfirmationCount ?? 0), 0),
-    selectedUnitCount: caseReceipts.reduce((sum, item) => sum + item.selectedUnitCount, 0),
-    candidateUnitCount: caseReceipts.reduce((sum, item) => sum + item.candidateUnitCount, 0),
-    unavailableUnitCount: caseReceipts.reduce((sum, item) => sum + item.unavailableUnitCount, 0),
-    omittedUnitHintCount: caseReceipts.reduce((sum, item) => sum + item.omittedUnitHintCount, 0),
-    widgetCount: caseReceipts.reduce((sum, item) => sum + item.widgetCount, 0),
-  },
-  failedChecks,
-};
-
-console.log(JSON.stringify(receipt, null, 2));
-if (!receipt.ok) process.exit(1);
+if (result.stdout) process.stdout.write(result.stdout);
+if (result.stderr) process.stderr.write(result.stderr);
+if (result.error) throw result.error;
+if (result.status !== 0) process.exitCode = result.status ?? 1;

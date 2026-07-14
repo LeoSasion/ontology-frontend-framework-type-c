@@ -210,9 +210,9 @@ def delete_source_command(
                 """
                 UPDATE data_connectors
                 SET status = 'paused', config_json = ?, updated_at = ?
-                WHERE connector_key = ?
+                WHERE connector_key = ? AND workspace_id = ?
                 """,
-                (json.dumps(config, ensure_ascii=False), now_iso(), connector["connectorKey"]),
+                (json.dumps(config, ensure_ascii=False), now_iso(), connector["connectorKey"], workspace_id),
             )
         replacement = plan["nextDefaultTableKey"] or None
         connection.execute(

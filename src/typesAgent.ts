@@ -7,10 +7,30 @@ export interface AgentAskResult {
   llm: {
     configured: boolean;
     mode: "provider" | "deterministic-fallback" | string;
+    response?: {
+      summary: string;
+      rationale: string[];
+      clarification: string | null;
+      nextActions: string[];
+      citedEvidence: string[];
+      certainty: "grounded" | "needs_clarification" | string;
+    } | null;
     audit?: {
       provider?: string;
+      model?: string;
       configured?: boolean;
+      enabled?: boolean;
       mode?: string;
+      status?: string;
+      runId?: string;
+      attempts?: number;
+      durationMs?: number;
+      requestHash?: string;
+      usage?: {
+        promptTokens?: number | null;
+        completionTokens?: number | null;
+        totalTokens?: number | null;
+      } | null;
       serverSideOnly?: boolean;
       secretExposed?: boolean;
       contextBoundary?: string;
@@ -53,13 +73,18 @@ export interface AgentAskResult {
   };
   plan: string[];
   queryPlanReceipt?: QueryPlanReceipt;
+  semanticPlan?: SemanticQueryPlan;
+  executionPlan?: SemanticQueryExecutionPlan | null;
   analysisRun?: AnalysisRun;
+  analysisUnit?: AnalysisUnit;
+  chartAdapter?: ChartAdapter;
   context?: {
     matchedTermCount: number;
     matchedRuleCount: number;
     terms: Array<{ termKey: string; name: string; definition: string }>;
     rules: Array<{ ruleKey: string; title: string; statement: string }>;
     confirmedQueries: Array<{ queryKey: string; question: string; matchScore: number }>;
+    knowledgeRules?: Array<{ packId: string; ruleId: string; title: string; grain: string }>;
   };
   answerCard?: {
     kind: string;
@@ -74,6 +99,7 @@ export interface AgentAskResult {
     }>;
     rows: Array<Record<string, unknown>>;
     query?: Record<string, unknown>;
+    executionPlan?: SemanticQueryExecutionPlan | null;
     clarification?: {
       kind: string;
       widgetType?: string;
@@ -81,10 +107,14 @@ export interface AgentAskResult {
       dashboardKey?: string;
       candidateMeasures?: string[];
       candidateDimensions?: string[];
+      status?: string;
+      bindings?: SemanticFieldBinding[];
     };
     evidenceRefs: Array<Record<string, unknown>>;
     nextActions: Array<{ zh: string; en: string }>;
     queryPlanReceipt?: QueryPlanReceipt;
+    analysisUnitRef?: Pick<AnalysisUnit, "unitKey" | "kind" | "status" | "resultFingerprint">;
+    chartAdapter?: ChartAdapter;
   };
   recommendedCommands: string[];
   requiresConfirmation: boolean;
@@ -105,6 +135,39 @@ export interface AgentAskResult {
   sourcePipelineContract: SourcePipelineContract;
 }
 
+export interface ChartAdapter {
+  schema: "aibi-chart-adapter/v1" | string;
+  status: "ready" | "blocked" | string;
+  unitKey: string;
+  queryReceiptKey: string;
+  chartType?: "metric" | "bar" | "line" | "pie" | "table" | null;
+  allowedChartTypes: string[];
+  config: Record<string, unknown>;
+  rationale: string[];
+  blockers: string[];
+  inputFingerprint: string;
+}
+
+export interface AnalysisUnit {
+  schema: "aibi-analysis-unit/v1" | string;
+  unitKey: string;
+  workspaceId: string;
+  queryReceiptKey: string;
+  kind: "metric" | "comparison" | "trend" | "composition" | "ranking" | "anomaly" | string;
+  status: "ready" | "blocked" | string;
+  title: string;
+  definitionFingerprint: string;
+  resultFingerprint: string;
+  grain: Record<string, unknown>;
+  shape: Record<string, unknown>;
+  rows: Array<Record<string, unknown>>;
+  calculation: Record<string, unknown>;
+  validation: { status: string; blockers: string[]; warnings: string[]; checks: Record<string, boolean> };
+  chartAdapter: ChartAdapter;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface QueryPlanReceipt {
   schema: "aibi-query-plan-receipt/v1" | string;
   receiptKey: string;
@@ -121,19 +184,133 @@ export interface QueryPlanReceipt {
     aggregation?: string | null;
     filters: Array<Record<string, unknown>>;
     joins: Array<Record<string, unknown>>;
+    semanticPlan?: SemanticQueryPlan | null;
+    executionPlan?: SemanticQueryExecutionPlan | null;
   };
   runtime: {
     engine?: string | null;
     database?: string | null;
     compiledSql?: string | null;
+    executionPlanHash?: string | null;
     sqlIntent: string;
   };
   validation: Record<string, boolean>;
+  resultBinding?: {
+    resultFingerprint: string;
+    rowCount: number;
+    columns: string[];
+    projection?: "scalar-result-fields-only" | string;
+    snapshotStored: boolean;
+  } | null;
   contextRefs: Array<Record<string, unknown>>;
   evidenceRefs: Array<Record<string, unknown>>;
   unresolved: unknown[];
   actionKey?: string | null;
   createdAt: string;
+}
+
+export interface SemanticFieldCandidate {
+  id: string;
+  tableKey: string;
+  tableName: string;
+  field: string;
+  role: string;
+  aggregation?: string;
+  confidence: number;
+  source: string;
+  matchedAlias: string;
+}
+
+export interface SemanticFieldBinding {
+  mention: string;
+  status: "resolved" | "ambiguous" | string;
+  selected?: SemanticFieldCandidate | null;
+  candidates: SemanticFieldCandidate[];
+  reason: string;
+}
+
+export interface SemanticRelationshipPath {
+  tables: string[];
+  safeForPlanning: boolean;
+  risks: string[];
+  hops: Array<{
+    relationKey: string;
+    relationshipLeftTable?: string;
+    relationshipRightTable?: string;
+    fromTable: string;
+    toTable: string;
+    direction: string;
+    joinType: string;
+    fieldMappings: Array<{ leftField: string; rightField: string }>;
+    filters?: Array<Record<string, unknown>>;
+    preaggregation?: Record<string, unknown>;
+    validationStatus?: string;
+    dataVersions?: Record<string, number>;
+    currentDataVersions?: Record<string, number>;
+    relationshipUpdatedAt?: string;
+    risk: {
+      safeForPlanning: boolean;
+      risks: string[];
+      confidence: number;
+      requiresCurrentPreview: boolean;
+      composite: boolean;
+    };
+  }>;
+}
+
+export interface SemanticQueryPlan {
+  schema: "aibi-semantic-query-plan/v1" | string;
+  status: "not-applicable" | "ready" | "needs-clarification" | "needs-relationship" | "needs-validation" | string;
+  autoExecutable: false;
+  fieldResolution: {
+    status: string;
+    bindings: SemanticFieldBinding[];
+    selected: SemanticFieldCandidate[];
+    unresolved: SemanticFieldBinding[];
+  };
+  grain: {
+    dimensions: SemanticFieldCandidate[];
+    measures: SemanticFieldCandidate[];
+    otherFields: SemanticFieldCandidate[];
+    tables: string[];
+  };
+  joinPlan: {
+    rootTable: string;
+    requiredTables: string[];
+    targets: Array<{
+      targetTable: string;
+      paths: SemanticRelationshipPath[];
+      selectedPath?: SemanticRelationshipPath | null;
+    }>;
+    maxHops: number;
+  };
+  executionBoundary: string;
+}
+
+export interface SemanticQueryExecutionPlan {
+  schema: "aibi-semantic-query-execution-plan/v1" | string;
+  status: "ready" | "blocked" | string;
+  autoExecutable: boolean;
+  blockers: string[];
+  semanticPlanStatus: string;
+  rootTable?: string | null;
+  planHash: string;
+  relationships?: Array<NonNullable<SemanticQueryExecutionPlan["relationship"]>>;
+  relationship?: {
+    relationKey: string;
+    leftTable: string;
+    rightTable: string;
+    joinType: string;
+    direction: string;
+    fieldMappings: Array<{ leftField: string; rightField: string }>;
+    filters: Array<Record<string, unknown>>;
+    preaggregation: Record<string, unknown>;
+    dataVersions: Record<string, number>;
+    updatedAt: string;
+  };
+  groups?: Array<{ side: "left" | "right"; tableKey: string; field: string }>;
+  measure?: { side: "left" | "right"; tableKey: string; field: string; aggregation: string };
+  finalGrain?: string[];
 }
 
 export interface AnalysisRun {

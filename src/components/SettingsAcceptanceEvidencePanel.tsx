@@ -21,7 +21,7 @@ const closureItems = [
     titleEn: "Local BI operations are part of this workspace",
     detailZh: "导入、视图、看板、筛选、关系、公式、连接和安全恢复都走当前项目的沙箱与确认机制。",
     detailEn: "Import, views, dashboards, filters, relationships, formulas, connectors, and safe restore now use this workspace sandbox and confirmation flow.",
-    command: "python tools/bi_cli.py --json b-cli-capabilities",
+    command: "python tools/bi_cli.py --json cli-capabilities",
     proof: "b-bi-cli-bridge-core-areas",
   },
   {

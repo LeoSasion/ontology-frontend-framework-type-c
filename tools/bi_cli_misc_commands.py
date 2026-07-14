@@ -3,21 +3,19 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
-from bi_cli_capabilities import B_BI_CLI_CAPABILITY_MAP
-from bi_cli_core import B_PROJECT_ROOT, DB_PATH, DUCKDB_PATH
+from bi_cli_capabilities import BI_CLI_CAPABILITY_MAP
+from bi_cli_core import DB_PATH, DUCKDB_PATH
 from bi_cli_schema import active_workspace_id, open_db, registry_for_table, table_columns
 
-def b_cli_capabilities_command(args: argparse.Namespace) -> dict[str, Any]:
-    active = [item for item in B_BI_CLI_CAPABILITY_MAP if item["status"] in {"active", "contract-active"}]
-    pending = [item for item in B_BI_CLI_CAPABILITY_MAP if item["status"] == "pending"]
+def cli_capabilities_command(args: argparse.Namespace) -> dict[str, Any]:
+    active = [item for item in BI_CLI_CAPABILITY_MAP if item["status"] in {"active", "contract-active"}]
+    pending = [item for item in BI_CLI_CAPABILITY_MAP if item["status"] == "pending"]
     return {
         "ok": True,
         "source": {
-            "project": "External BI reference",
-            "path": str(B_PROJECT_ROOT),
-            "entrypoint": str(B_PROJECT_ROOT / "bi_cli.py"),
-            "filesReadOnly": True,
-            "executionPolicy": "Do not execute external BI CLIs or mutate external databases from this app; map supported commands into the current workspace.",
+            "project": "AIBI-C",
+            "entrypoint": "python tools/bi_cli.py --json <command>",
+            "executionPolicy": "Execute only AIBI-C commands against the active AIBI-C workspace with existing read and confirmation boundaries.",
         },
         "target": {
             "project": "AIBI-C",
@@ -28,11 +26,11 @@ def b_cli_capabilities_command(args: argparse.Namespace) -> dict[str, Any]:
         "summary": {
             "activeAreas": len(active),
             "pendingAreas": len(pending),
-            "capabilityAreas": len(B_BI_CLI_CAPABILITY_MAP),
+            "capabilityAreas": len(BI_CLI_CAPABILITY_MAP),
         },
-        "capabilities": B_BI_CLI_CAPABILITY_MAP,
+        "capabilities": BI_CLI_CAPABILITY_MAP,
         "guardrails": [
-            "External source directories are read-only references.",
+            "No command reads another project working tree or database.",
             "Import commit, dashboard write, relationship save, index creation, delete, overwrite, and external sync require dry-run or explicit confirmation.",
             "Dashboard widget generation uses the shared widget catalog instead of ad hoc frontend-only shapes.",
         ],

@@ -342,15 +342,16 @@ export function appendCoreContractChecks(context) {
           connectorCommandServiceSource.includes("def sync_connector_command(") &&
           connectorCommandServiceSource.includes("def remove_connector_command(") &&
           connectorCommandServiceSource.includes("INSERT OR REPLACE INTO data_connectors(") &&
-          connectorCommandServiceSource.includes("DELETE FROM data_connectors WHERE connector_key = ?") &&
-          connectorCommandServiceSource.includes("last_sync_status = 'blocked'") &&
+          connectorCommandServiceSource.includes("DELETE FROM data_connectors WHERE connector_key = ? AND workspace_id = ?") &&
+          connectorCommandServiceSource.includes("build_sync_plan(") &&
+          connectorCommandServiceSource.includes("public_sync_plan(") &&
           connectorCommandServiceSource.includes("last_sync_status = 'success'") &&
           !biCliRuntimeSource.includes("INSERT OR REPLACE INTO data_connectors(") &&
           !biCliRuntimeSource.includes("DELETE FROM data_connectors WHERE connector_key = ?") &&
           byLabel["cli-save-connector-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-save-connector-confirm"].parsed?.confirmed === true &&
           byLabel["cli-sync-connector-confirm"].parsed?.connectorSync?.importResult?.tableKey === "orders" &&
-          byLabel["cli-sync-external-connector-blocked"].parsed?.blocked === true &&
+          byLabel["cli-sync-external-connector-blocked"].parsed?.ok === false &&
           byLabel["cli-remove-connector-dry-run"].parsed?.requiresConfirmation === true,
       },
     {
@@ -423,7 +424,9 @@ export function appendCoreContractChecks(context) {
           importTableWriterServiceSource.includes("def default_metric_dimension(") &&
           importTableWriterServiceSource.includes('not text.startswith("__")') &&
           importTableWriterServiceSource.includes("CREATE TABLE") &&
-          importTableWriterServiceSource.includes("INSERT OR REPLACE INTO table_registry(") &&
+          importTableWriterServiceSource.includes("def upsert_table_registry_record(") &&
+          importTableWriterServiceSource.includes("ON CONFLICT(workspace_id, table_key) DO UPDATE SET") &&
+          importTableWriterServiceSource.includes("def revalidate_relationships_for_table(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO source_runs(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO field_semantics(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO import_jobs(") &&
@@ -484,7 +487,9 @@ export function appendCoreContractChecks(context) {
           relationshipCommandServiceSource.includes("def build_relationship_save_plan(") &&
           relationshipCommandServiceSource.includes("def execute_relationship_save(") &&
           relationshipCommandServiceSource.includes("def relationship_save_command(") &&
-          relationshipCommandServiceSource.includes("INSERT OR REPLACE INTO relationships(relation_key, workspace_id, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence, created_at)") &&
+          relationshipCommandServiceSource.includes("mappings_json, filters_json, preaggregation_json, join_type, confidence, validation_json, created_at, updated_at") &&
+          relationshipCommandServiceSource.includes("def relationship_record_payload(") &&
+          relationshipCommandServiceSource.includes("def relationship_validation_snapshot(") &&
           relationshipCommandServiceSource.includes("DELETE FROM relationships WHERE relation_key = ? AND workspace_id = ?") &&
           relationshipCommandServiceSource.includes("relationship whitelist join") &&
           relationshipCommandServiceSource.includes("sample-overlap:") &&
@@ -494,7 +499,7 @@ export function appendCoreContractChecks(context) {
           relationshipCommandServiceSource.includes("join_multiplier > 5") &&
           biCliRuntimeSource.includes("recommend_relationships_for_connection_service(") &&
           biCliRuntimeSource.includes("recommend_relationships_command_service(") &&
-          !biCliRuntimeSource.includes("INSERT OR REPLACE INTO relationships(relation_key, workspace_id, name, left_table_key, right_table_key, left_field, right_field, join_type, confidence, created_at)") &&
+          !biCliRuntimeSource.includes("mappings_json, filters_json, preaggregation_json, join_type, confidence, validation_json, created_at, updated_at") &&
           !biCliRuntimeSource.includes("DELETE FROM relationships WHERE relation_key = ? AND workspace_id = ?") &&
           !biCliRuntimeSource.includes("sample-overlap:") &&
           !biCliRuntimeSource.includes("shared-business-token:") &&

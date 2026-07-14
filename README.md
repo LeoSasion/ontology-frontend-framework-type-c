@@ -1,8 +1,8 @@
 # AIBI-C
 
-本仓库包含 AIBI-C 本地工作台的代码、文档与验证契约。产品定位见 `PRODUCT.md`。
+AIBI-C 是面向本地 CSV/Excel 业务数据的证据型 AI BI 工作台。它用确定性运行时完成导入、语义解析、查询、证据和受控写入；可选模型只负责解释，不拥有数据或系统权限。
 
-## Run
+## 快速开始
 
 ```powershell
 npm ci
@@ -10,9 +10,14 @@ python -m pip install -r requirements.txt
 npm run dev
 ```
 
-打开 `http://127.0.0.1:8686`。`npm run dev` 同时启动本地 API `8787` 和前端 `8686`。环境变量写入仓库根目录 `.env`，可参考 `.env.example`；不要提交 `.env`。
+| 服务 | 地址 | 用途 |
+| --- | --- | --- |
+| UI | `http://127.0.0.1:8686` | Vite 开发界面 |
+| API | `http://127.0.0.1:8787` | 本地 API 与生产构建入口 |
 
-单独调试或管理后台服务：
+环境变量写入根目录 `.env`，模板见 `.env.example`；不得提交 `.env` 或密钥文件。
+
+常用运行命令：
 
 ```powershell
 npm run api
@@ -22,46 +27,46 @@ npm run local:health
 npm run local:stop
 ```
 
-## Verify
+## 验证
 
 ```powershell
+npm run verify:docs
+npm run build
 npm run verify
 npm run preflight -- --skip-ui
 npm run preflight
-npm run verify:ci
 ```
 
-- `npm run verify`：核心、CLI、AI 单图与可信分析契约。
-- `npm run preflight -- --skip-ui`：构建与非 UI 交付检查。
-- `npm run preflight`：本地交付前总入口，包含完整 UI 闭环；追加 `--stop-after` 可在验收后停止服务。
-- `npm run verify:ci`：Windows CI 使用的构建、生产、安全与浏览器检查。
+- `verify:docs` 校验 Markdown 索引、相对链接、唯一标题和仓库守卫内容。
+- `verify` 覆盖隔离、CLI、语义/关系、Job、Workflow、Analysis Unit、导出、Connector、证据和 Provider 回退。
+- `preflight` 是本地交付总入口；不带 `--skip-ui` 时包含真实浏览器闭环。
+- 专项命令只在 [实现状态](docs/implementation-status.md) 维护，避免多处清单漂移。
 
-分场景命令只在 `docs/implementation-status.md` 维护。UI 真实导入通过 `AIBI_REAL_IMPORT_FOLDER` 或 `AIBI_REAL_IMPORT_FILE` 指定外部数据；脚本使用临时工作区并在结束后恢复原工作区。
+## 本地数据与恢复
 
-## Data And Recovery
-
-运行数据保存在本地并被 git 忽略。不要提交真实数据库、业务导出、日志、凭据、截图或验证输出。
+运行数据位于被 Git 忽略的本地目录。备份不包含 `.env`、源文件或凭据。
 
 ```powershell
 npm run local:stop
 npm run backup:local
 npm run restore:local -- --from <backup-directory>
 npm run restore:local -- --from <backup-directory> --confirm
+npm run migrate:local
+npm run migrate:local -- --confirm
 ```
 
-恢复默认只预演影响，`--confirm` 才写入。备份仅包含 SQLite 与 DuckDB 数据库及 SHA-256 清单，不包含 `.env`、源文件或凭据。
+恢复和迁移默认只预演；`--confirm` 才写入。迁移先验证隔离副本并创建校验和恢复点，失败时恢复 SQLite 与 DuckDB 原库。
 
-## Documentation
+## 文档入口
 
-- `PRODUCT.md`：定位、用户、能力分层、边界与非目标。
-- `docs/PRD.md`：当前可执行需求与发布条件。
-- `docs/product-ux-standard.md`：页面职责、渐进交互与确认标准。
-- `docs/product-acceptance-matrix.md`：稳定产品行为的验收矩阵。
-- `docs/implementation-status.md`：当前能力、限制、架构与验证入口。
-- `docs/agent-knowledge-packs.md`：模型无关业务知识、查询证据和扩展约束。
-- `docs/development-roadmap.md`：唯一未来开发队列。
-- `docs/README.md`：完整文档地图。
+- [产品定位](PRODUCT.md)
+- [产品需求](docs/PRD.md)
+- [文档总索引](docs/README.md)
+- [当前实现与限制](docs/implementation-status.md)
+- [产品验收矩阵](docs/product-acceptance-matrix.md)
+- [未来开发队列](docs/development-roadmap.md)
+- [验收证据索引](artifacts/README.md)
 
-## Runtime Boundary
+## 当前边界
 
-当前版本是 single-user and local-only。服务只允许回环监听；跨进程前端来源只能通过 `AIBI_CORS_ORIGIN` 配置一个明确来源。公共后端命令入口是 `tools/bi_cli.py`，查询优先使用 DuckDB，必要时回退 SQLite。
+当前版本是 single-user and local-only，只监听回环地址。查询和后台任务使用白名单能力合同，不接受任意 SQL、网络请求、文件操作或进程执行。新工作区为空；真实写入必须经过预演和一次显式确认。完整能力与限制以 [实现状态](docs/implementation-status.md) 为准。

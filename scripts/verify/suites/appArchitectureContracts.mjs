@@ -630,13 +630,14 @@ export function appendAppArchitectureContractChecks(context) {
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboard/widget-catalog"') &&
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboard/widgets"') &&
           serverDashboardRoutesSource.includes('url.pathname === "/api/dashboards/filters"') &&
-          serverDashboardRoutesSource.includes('url.pathname === "/api/b-cli/capabilities"'),
+          serverDashboardRoutesSource.includes('url.pathname === "/api/cli/capabilities"'),
       },
     {
         label: "server-source-routes-boundary",
         ok: existsSync(join(root, "server", "sourceRoutes.ts")) &&
           serverIndexSource.includes('import { handleSourceApi } from "./sourceRoutes"') &&
-          serverIndexSource.includes("await handleSourceApi({ cli, request, response, url })") &&
+          serverIndexSource.includes("await handleSourceApi({") &&
+          serverIndexSource.includes("startSourceIntelligenceJob: (body) => jobRuntime.startSourceIntelligence(body)") &&
           !serverIndexSource.includes('url.pathname === "/api/source-intelligence/run"') &&
           !serverIndexSource.includes('url.pathname === "/api/import/preview"') &&
           !serverIndexSource.includes('url.pathname === "/api/import/commit"') &&
@@ -701,19 +702,21 @@ export function appendAppArchitectureContractChecks(context) {
           serverQueryRoutesSource.includes('from "./cliArgBuilders"') &&
           serverDashboardRoutesSource.includes('from "./cliArgBuilders"') &&
           serverModelRoutesSource.includes('from "./cliArgBuilders"') &&
-          serverModelRoutesSource.includes("appendCliFilters(args, body.filters, { includeSide: true })") &&
+          serverModelRoutesSource.includes("export function appendRelationshipFilterArgs(") &&
+          serverModelRoutesSource.includes("export function appendRelationshipPreaggregationArg(") &&
+          serverModelRoutesSource.includes("appendRelationshipFilterArgs(args, body)") &&
+          serverModelRoutesSource.includes("appendRelationshipPreaggregationArg(args, body)") &&
           serverDashboardRoutesSource.includes("appendCliFilters(args, body.filters)") &&
           serverQueryRoutesSource.includes("appendCliSorts(args, body.sort)") &&
           !serverQueryRoutesSource.includes("for (const filter of body.filters)") &&
           !serverQueryRoutesSource.includes("for (const sort of body.sort)") &&
-          !serverDashboardRoutesSource.includes("for (const filter of body.filters)") &&
-          !serverModelRoutesSource.includes("for (const filter of body.filters)"),
+          !serverDashboardRoutesSource.includes("for (const filter of body.filters)"),
       },
     {
         label: "server-agent-routes-boundary",
         ok: existsSync(join(root, "server", "agentRoutes.ts")) &&
           serverIndexSource.includes('import { handleAgentApi } from "./agentRoutes"') &&
-          serverIndexSource.includes("await handleAgentApi({ cli, request, response, url })") &&
+          serverIndexSource.includes("await handleAgentApi({ cli, request, response, root, url })") &&
           !serverIndexSource.includes('url.pathname === "/api/agent/ask"') &&
           !serverIndexSource.includes('url.pathname === "/api/actions/confirm"') &&
           serverAgentRoutesSource.includes("export async function handleAgentApi(") &&

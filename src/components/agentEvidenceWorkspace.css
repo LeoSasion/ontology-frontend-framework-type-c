@@ -276,6 +276,39 @@
   grid-column: span 2;
 }
 
+.agentProviderNarrative {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface));
+}
+
+.agentProviderNarrative > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agentProviderNarrative p,
+.agentProviderNarrative ul {
+  margin: 0;
+}
+
+.agentProviderNarrative ul {
+  display: grid;
+  gap: 4px;
+  padding-left: 18px;
+  color: var(--bi-muted);
+}
+
+.agentProviderClarification {
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-weight: 700;
+}
+
 .evidenceNextAction {
   display: flex;
   align-items: center;
@@ -529,4 +562,142 @@
 
 .definitionGrid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.agentSemanticPlan {
+  border: 1px solid color-mix(in srgb, var(--line) 76%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bi-surface) 94%, var(--accent-soft));
+}
+
+.agentSemanticPlan.blocked {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+}
+
+.agentSemanticPlan > summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 14px;
+}
+
+.agentSemanticPlan > summary span,
+.agentSemanticPlanGroup > span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.agentSemanticPlanBody {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.agentSemanticPlanGroup,
+.agentSemanticPaths {
+  display: grid;
+  gap: 7px;
+}
+
+.agentSemanticChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.agentSemanticChips span {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+
+.agentSemanticChips.warning span {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+}
+
+.agentSemanticPaths > div {
+  display: grid;
+  gap: 3px;
+}
+
+.agentSemanticPaths small,
+.agentSemanticPlanBody > p {
+  color: var(--muted);
+  margin: 0;
+}
+.agentAnalysisUnitStrip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 24%, var(--bi-border));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--bi-panel));
+}
+
+.agentAnalysisUnitStrip.blocked {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--bi-border));
+  background: color-mix(in srgb, var(--danger) 5%, var(--bi-panel));
+}
+
+.agentAnalysisUnitStrip > div {
+  display: grid;
+  gap: 4px;
+}
+
+.agentAnalysisUnitStrip small {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.agentAnalysisUnitStrip details {
+  max-width: min(48%, 360px);
+}
+
+.agentAnalysisUnitStrip ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.agentAnalysisUnitExport {
+  display: grid;
+  justify-items: end;
+  gap: 0.35rem;
+  min-width: min(20rem, 100%);
+}
+
+.agentAnalysisUnitExport small {
+  max-width: 30rem;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  text-align: right;
+}
+
+.agentAnalysisUnitExport small.ready {
+  color: var(--success);
+}
+
+.agentAnalysisUnitExport small.error {
+  color: var(--danger);
+}
+
+@media (max-width: 760px) {
+  .agentAnalysisUnitStrip {
+    flex-direction: column;
+  }
+
+  .agentAnalysisUnitStrip details {
+    max-width: 100%;
+  }
+
+  .agentAnalysisUnitExport {
+    justify-items: start;
+  }
+
+  .agentAnalysisUnitExport small {
+    text-align: left;
+  }
 }

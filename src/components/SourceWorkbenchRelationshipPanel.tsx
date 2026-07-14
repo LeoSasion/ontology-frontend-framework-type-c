@@ -1,9 +1,12 @@
-import { useMemo, type Dispatch, type SetStateAction } from "react";
+import { lazy, Suspense, useMemo, type Dispatch, type SetStateAction } from "react";
 import type { FieldConfig, RelationshipPreviewPayload, RelationshipRecommendation, RelationshipRecord, WorkbenchTable } from "../types";
 import type { RelationshipSaveOptions } from "../dashboardCanvasContracts";
+import { relationshipRecordMappingLabel, relationshipSafetyFacts } from "../dashboardCanvasRelationshipModel";
 import { confidencePercent, metricValue, numberValue } from "../sourceWorkbenchModel";
 import { Bilingual, biText } from "./Bilingual";
 import { RelationshipAutoModelGraph } from "./RelationshipAutoModelGraph";
+
+const RelationshipSafetyControls = lazy(() => import("./RelationshipSafetyControls"));
 
 type SourceWorkbenchRelationshipPanelProps = {
   showAdvanced: boolean;
@@ -78,6 +81,9 @@ export function SourceWorkbenchRelationshipPanel({
       rightTable: recommendation.rightTableKey,
       leftField: mapping?.leftField ?? relationshipForm.leftField,
       rightField: mapping?.rightField ?? relationshipForm.rightField,
+      fieldMappings: recommendation.fieldMappings,
+      filters: relationshipForm.filters,
+      preaggregation: relationshipForm.preaggregation,
       joinType: recommendation.joinType || "left",
       limit: relationshipForm.limit ?? 10,
     });
@@ -124,7 +130,7 @@ export function SourceWorkbenchRelationshipPanel({
             </label>
             <label>
               <span>{biText("左字段", "Left field")}</span>
-              <select value={relationshipForm.leftField} onChange={(event) => setRelationshipForm((current) => ({ ...current, leftField: event.target.value }))}>
+              <select value={relationshipForm.leftField} onChange={(event) => setRelationshipForm((current) => ({ ...current, leftField: event.target.value, fieldMappings: undefined }))}>
                 {leftFields.map((field) => <option key={field.field_name} value={field.field_name}>{field.field_name}</option>)}
               </select>
             </label>
@@ -136,12 +142,15 @@ export function SourceWorkbenchRelationshipPanel({
             </label>
             <label>
               <span>{biText("右字段", "Right field")}</span>
-              <select value={relationshipForm.rightField} onChange={(event) => setRelationshipForm((current) => ({ ...current, rightField: event.target.value }))}>
+              <select value={relationshipForm.rightField} onChange={(event) => setRelationshipForm((current) => ({ ...current, rightField: event.target.value, fieldMappings: undefined, preaggregation: current.preaggregation ? { ...current.preaggregation, groupFields: [event.target.value] } : undefined }))}>
                 {rightFields.map((field) => <option key={field.field_name} value={field.field_name}>{field.field_name}</option>)}
               </select>
             </label>
           </div>
         </details>
+        <Suspense fallback={null}>
+          <RelationshipSafetyControls relationshipForm={relationshipForm} rightFields={rightFields} setRelationshipForm={setRelationshipForm} />
+        </Suspense>
         <div className="policyStrip">
           <div><strong>{metricValue(relationshipPreview.relationshipPreview.metrics, "overlapKeys")}</strong><span>{biText("可连接键", "linkable keys")}</span></div>
           <div><strong>{metricValue(relationshipPreview.relationshipPreview.metrics, "matchedLeftRows")}</strong><span>{biText("已匹配行", "matched rows")}</span></div>
@@ -197,8 +206,13 @@ export function SourceWorkbenchRelationshipPanel({
         <ul className="metricList">
           {relationships.map((relationship) => (
             <li key={relationship.relation_key}>
-              <strong>{relationship.left_table_key}.{relationship.left_field}</strong>
-              <span>{relationship.right_table_key}.{relationship.right_field} · {confidencePercent(relationship.confidence)}</span>
+              <strong>{relationship.left_table_key} → {relationship.right_table_key}</strong>
+              <span>{relationshipRecordMappingLabel(relationship)} · {confidencePercent(relationship.confidence)}</span>
+              <span>
+                {biText("安全状态", "Safety")}: {relationshipSafetyFacts(relationship).status}
+                {relationshipSafetyFacts(relationship).filterCount ? ` · ${biText("过滤", "filters")} ${relationshipSafetyFacts(relationship).filterCount}` : ""}
+                {relationshipSafetyFacts(relationship).preaggregationMeasureCount ? ` · ${biText("预聚合", "pre-aggregations")} ${relationshipSafetyFacts(relationship).preaggregationMeasureCount}` : ""}
+              </span>
             </li>
           ))}
         </ul>

@@ -11,7 +11,7 @@ const canvasState = source("src/useDashboardCanvasState.ts");
 const widgetManage = source("src/components/DashboardWidgetManagePanel.tsx");
 const agentDock = source("src/components/AgentCommandDock.tsx");
 const platformVerify = source("scripts/verify-platform-commerce-agent.mjs");
-const materialVerify = source("scripts/verify_platform_research_materials.py");
+const fixtureVerify = source("scripts/verify-platform-commerce-fixtures.mjs");
 
 const checks = [
   {
@@ -21,7 +21,7 @@ const checks = [
   {
     label: "compound-relationship-supports-multiple-fields",
     ok: relationship.includes("for mapping in mappings")
-      && materialVerify.includes('["主订单编号", "商品ID", "商家编码"]'),
+      && fixtureVerify.includes('["主订单编号", "商品ID", "商家编码"]'),
   },
   {
     label: "percent-input-normalizes-to-decimal",

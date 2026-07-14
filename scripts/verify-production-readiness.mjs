@@ -13,6 +13,8 @@ const workflow = read(".github/workflows/ci.yml");
 const configService = read("tools/config_command_service.py");
 const backupScript = read("scripts/backup-local-data.mjs");
 const restoreScript = read("scripts/restore-local-data.mjs");
+const migrationScript = read("scripts/migrate-local-data.mjs");
+const schemaSource = read("tools/bi_cli_schema.py");
 const snapshotScript = read("scripts/local-data-snapshot.mjs");
 
 function check(label, ok, detail) {
@@ -31,6 +33,7 @@ const checks = [
   check("config-backup-and-redaction", configService.includes("shutil.copy2(DB_PATH, backup_path)") && configService.includes("redact_secret_value"), "Config restore creates a backup and redacts secret-like values."),
   check("data-backup-manifest", backupScript.includes('schema: "aibi-local-backup/v1"') && snapshotScript.includes("sha256") && snapshotScript.includes("loadLocalEnv") && backupScript.includes("assertLocalServiceStopped"), "Local database backup reads the active local configuration, requires stopped services, and writes checksums."),
   check("data-restore-guard", restoreScript.includes('args.has("--confirm")') && restoreScript.includes("verifyManifestFiles") && restoreScript.includes("createSafetyBackup"), "Restore previews by default, verifies checksums, and preserves current files before writing."),
+  check("schema-migration-guard", migrationScript.includes('args.has("--confirm")') && migrationScript.includes("createSafetyBackup") && migrationScript.includes("originalUnchanged") && schemaSource.includes("CURRENT_SQLITE_SCHEMA_VERSION") && schemaSource.includes("assert_duckdb_schema_compatible"), "Schema upgrades preview on isolated copies, preserve a restore point, and block incompatible SQLite or DuckDB versions."),
   check("ci-browser-smoke", workflow.includes("Verify browser smoke paths") && workflow.includes("npm run verify:ui-visual") && workflow.includes("npm run verify:ui-empty") && workflow.includes("if: always()"), "CI exercises rendered empty and responsive flows and always stops services."),
   check("ci-runtime-security", workflow.includes("Verify server security runtime") && workflow.includes("npm run verify:security-runtime"), "CI validates runtime security headers, CORS, and request limits."),
   check("ci-production-gate", packageJson.scripts?.["verify:ci"]?.includes("npm run verify:production"), "Production readiness is part of the CI command."),
