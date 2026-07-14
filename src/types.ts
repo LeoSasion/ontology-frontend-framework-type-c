@@ -2,12 +2,16 @@ export type { ActionDraft, ActionDraftPayload, AgentAskResult } from "./typesAge
 export type { DashboardFilterPayload, DashboardFilterRule, DashboardPage, DashboardPayload, DashboardWidget, NavigationModule } from "./typesDashboard";
 export type { QueryResult } from "./typesQuery";
 export type {
+  ConnectorAdapterContract,
   DataConnectorConfig,
-  DomainActionHint,
-  DomainFunctionHint,
-  DomainLinkHint,
-  DomainPackRuntime,
-  DomainSemanticHint,
+  CoreActionHint,
+  CoreFunctionHint,
+  CoreLinkHint,
+  CoreSemanticHint,
+  CoreSemanticRuntime,
+  DomainPackManifest,
+  DomainPackReference,
+  WorkspaceDomainPackRuntime,
   EvidenceFocus,
   FieldConfig,
   FolderImportPlan,

@@ -127,9 +127,9 @@ def infer_role(field: str, sample_values: Iterable[Any]) -> tuple[str, str, floa
             continue
     if "date" in name or "time" in name or "日期" in field or "时间" in field:
         return "event_time", "filterable", 0.91
-    if "id" in name or "编号" in field or field.endswith("号"):
+    if any(token in name for token in ("id", "key", "code", "identifier")) or any(token in field for token in ("编号", "编码", "标识")):
         return "identity_key", "joinable", 0.86
-    if any(token in name for token in ["amount", "sales", "revenue", "cost", "quantity"]) or any(token in field for token in ["金额", "销售", "收入", "成本", "数量"]):
+    if any(token in name for token in ["amount", "value", "total", "score", "rate", "quantity", "count"]) or any(token in field for token in ["金额", "数值", "合计", "得分", "比例", "数量", "次数"]):
         return "measure", "aggregatable", 0.88
     if "status" in name or "状态" in field:
         return "status", "filterable", 0.84

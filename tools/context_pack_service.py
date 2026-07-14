@@ -99,6 +99,33 @@ def workspace_schema_fingerprint(
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
+def workspace_data_fingerprint(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    table_key: str | None = None,
+) -> str:
+    params: list[Any] = [workspace_id]
+    where = "workspace_id = ?"
+    if table_key:
+        where += " AND table_key = ?"
+        params.append(table_key)
+    rows = [
+        {
+            "tableKey": row["table_key"],
+            "dataVersion": int(row["data_version"] or 1),
+            "rowCount": int(row["row_count"] or 0),
+            "columnCount": int(row["column_count"] or 0),
+            "updatedAt": str(row["updated_at"] or ""),
+        }
+        for row in connection.execute(
+            f"SELECT table_key, data_version, row_count, column_count, updated_at FROM table_registry WHERE {where} ORDER BY table_key",
+            tuple(params),
+        ).fetchall()
+    ]
+    material = json.dumps(rows, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
 def _scope_overlaps(left_type: str, left_ref: str, right_type: str, right_ref: str) -> bool:
     if left_type == "workspace" or right_type == "workspace":
         return True

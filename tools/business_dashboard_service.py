@@ -4,8 +4,6 @@ import sqlite3
 from typing import Any, Callable
 
 from business_dashboard_templates import (
-    COST_MONITOR_TEMPLATE_KEY,
-    build_cost_monitor_templates,
     source_profile_table_inputs,
     table_fields_by_key,
 )
@@ -16,6 +14,7 @@ from erp_dashboard_unit_library import (
     build_erp_dashboard_unit_templates,
     prompt_prefers_erp_unit_library,
 )
+from domain_pack_service import is_domain_pack_enabled
 
 BUSINESS_TEMPLATE_KEY = "business"
 
@@ -76,18 +75,16 @@ def build_business_analysis_templates(
     slug: Callable[[str], str],
     table_template_fields: Callable[[sqlite3.Connection, str], dict[str, Any]],
     template_key: str = BUSINESS_TEMPLATE_KEY,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
-    if template_key == COST_MONITOR_TEMPLATE_KEY:
-        return build_cost_monitor_templates(
-            connection,
-            table_key,
-            limit,
-            active_workspace_id=active_workspace_id,
-            rows_to_dicts=rows_to_dicts,
-            preferred_table_key=preferred_table_key,
-            table_template_fields=table_template_fields,
-        )
-    workspace_id = active_workspace_id(connection)
+    workspace_id = workspace_id or active_workspace_id(connection)
+    if template_key == ERP_UNIT_LIBRARY_TEMPLATE_KEY and not is_domain_pack_enabled(
+        connection,
+        workspace_id,
+        "erp-units",
+        "dashboardUnits",
+    ):
+        raise ValueError("Domain Pack erp-units is not enabled for the active workspace.")
     table_rows = rows_to_dicts(
         connection.execute(
             "SELECT * FROM table_registry WHERE workspace_id = ? ORDER BY row_count DESC, table_key",
@@ -101,7 +98,7 @@ def build_business_analysis_templates(
         preferred = ""
         if table_key:
             try:
-                preferred = preferred_table_key(connection, table_key)
+                preferred = table_key if any(row.get("table_key") == table_key for row in table_rows) else preferred_table_key(connection, table_key)
             except ValueError:
                 if any(row.get("table_key") == table_key for row in table_rows):
                     preferred = table_key
@@ -115,7 +112,9 @@ def build_business_analysis_templates(
             slug=slug,
         )
     if table_key:
-        table_rows = [row for row in table_rows if row["table_key"] == preferred_table_key(connection, table_key)]
+        table_rows = [row for row in table_rows if row["table_key"] == table_key]
+        if not table_rows:
+            raise ValueError(f"Unknown table in workspace {workspace_id}: {table_key}")
     templates: list[dict[str, Any]] = []
 
     def add_template(category: str, table: dict[str, Any], widget_type: str, title: str, reason: str, options: dict[str, Any]) -> None:
@@ -143,14 +142,14 @@ def build_business_analysis_templates(
         date_field = fields["date"]
         columns = fields["columns"]
         if measure:
-            add_template("经营总览", table, "metric", f"{measure} 核心读数", "把主要金额或数量指标放到第一屏，先确认业务规模。", {
+            add_template("总览", table, "metric", f"{measure} 核心读数", "把主要数值指标放到第一屏，先确认数据规模。", {
                 "measure": measure,
                 "aggregation": "sum",
                 "valueFormat": "compact",
                 "topN": 1,
             })
         if date_field and measure:
-            add_template("经营趋势", table, "line", f"{measure} 趋势", "按时间维度观察波动，先发现异常月份或日期。", {
+            add_template("趋势", table, "line", f"{measure} 趋势", "按时间维度观察波动，定位异常时段。", {
                 "dimension": date_field,
                 "timeGrain": "month",
                 "measure": measure,
@@ -162,7 +161,7 @@ def build_business_analysis_templates(
                 "areaFill": True,
             })
         if dimension and measure:
-            add_template("结构拆解", table, "bar", f"{dimension} {measure} 排行", "用分类排行定位贡献最高或问题最集中的对象。", {
+            add_template("结构", table, "bar", f"{dimension} {measure} 排行", "用分类排行定位数值最高或最集中的对象。", {
                 "dimension": dimension,
                 "measure": measure,
                 "aggregation": "sum",
@@ -172,7 +171,7 @@ def build_business_analysis_templates(
                 "colorPalette": "contrast",
                 "showDataLabel": True,
             })
-            add_template("结构拆解", table, "pie", f"{dimension} 构成", "用占比快速判断是否过度集中。", {
+            add_template("结构", table, "pie", f"{dimension} 构成", "用占比快速判断数据是否集中。", {
                 "dimension": dimension,
                 "measure": measure,
                 "aggregation": "sum",
@@ -202,17 +201,17 @@ def build_business_analysis_templates(
 
     templates.insert(0, {
         "id": "biz_text_decision_notes",
-        "category": "经营总览",
+        "category": "总览",
         "type": "text",
-        "title": "经营复盘结论",
-        "reason": "把结论、异常和下一步动作留在看板里，方便入门用户按结果行动。",
+        "title": "分析摘要",
+        "reason": "把结论、异常和下一步动作留在看板里，方便复核与继续分析。",
         "tableKey": table_rows[0]["table_key"] if table_rows else "",
         "tableName": table_rows[0]["display_name"] if table_rows else "",
         "preset": {
             "type": "text",
-            "title": "经营复盘结论",
+            "title": "分析摘要",
             "subtitle": "说明口径、异常和下一步动作",
-            "textContent": "先看核心读数和趋势，再拆分类排行、构成占比和明细记录。发现异常后，用切片器联动或明细下钻回到原始证据。",
+            "textContent": "先看核心读数和趋势，再检查分类排行、构成占比和明细记录。发现异常后，用筛选或明细下钻回到原始证据。",
             "dataMode": "table",
             "crossFilter": False,
             "drillDown": False,
@@ -243,14 +242,15 @@ def build_business_dashboard_payload(
     build_business_analysis_templates: Callable[..., dict[str, Any]],
     preferred_table_key: Callable[[sqlite3.Connection, str | None], str],
     template_key: str = BUSINESS_TEMPLATE_KEY,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
-    draft = build_business_analysis_templates(connection, table_key, limit, template_key=template_key)
+    draft = build_business_analysis_templates(connection, table_key, limit, template_key=template_key, workspace_id=workspace_id)
     widgets: list[dict[str, Any]] = []
     layout: list[dict[str, Any]] = []
     default_table_key = str(draft.get("defaultTableKey") or next((template["tableKey"] for template in draft["templates"] if template.get("tableKey")), ""))
     if not default_table_key:
         try:
-            default_table_key = preferred_table_key(connection, table_key)
+            default_table_key = str(table_key or "") if workspace_id else preferred_table_key(connection, table_key)
         except ValueError:
             default_table_key = str(table_key or "")
     for index, template in enumerate(draft["templates"]):
@@ -381,13 +381,13 @@ def run_business_dashboard_command(
         if op == "draft":
             return {"ok": True, "draft": payload, "templateCount": len(payload["templates"])}
         if not payload["widgets"]:
-            raise ValueError("No business dashboard templates are available for current sources.")
+            raise ValueError("No analysis dashboard templates are available for current sources.")
         mode = op
         workspace_id = active_workspace_id(connection)
         resolved_dashboard_key = dashboard_key or ("default" if workspace_id == "default" else unique_key("dashboard"))
         if mode == "create":
             resolved_dashboard_key = unique_key("dashboard_biz")
-        dashboard_name = name or ("经营分析看板" if mode == "create" else "经营分析看板")
+        dashboard_name = name or "分析看板"
         if mode == "overwrite":
             row = connection.execute(
                 "SELECT name FROM dashboards WHERE dashboard_key = ? AND workspace_id = ?",
@@ -439,6 +439,7 @@ def run_business_dashboard_command(
 
 def build_agent_dashboard_create_draft(
     connection: sqlite3.Connection,
+    workspace_id: str,
     table_key: str | None,
     prompt: str,
     limit: int = 8,
@@ -448,9 +449,10 @@ def build_agent_dashboard_create_draft(
     build_business_dashboard_payload: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     single_chart = limit == 1
-    if template_key == BUSINESS_TEMPLATE_KEY and prompt_prefers_erp_unit_library(prompt):
+    erp_enabled = is_domain_pack_enabled(connection, workspace_id, "erp-units", "dashboardUnits")
+    if template_key == BUSINESS_TEMPLATE_KEY and erp_enabled and prompt_prefers_erp_unit_library(prompt):
         template_key = ERP_UNIT_LIBRARY_TEMPLATE_KEY
-    payload = build_business_dashboard_payload(connection, table_key, limit, template_key=template_key)
+    payload = build_business_dashboard_payload(connection, table_key, limit, template_key=template_key, workspace_id=workspace_id)
     if single_chart and resolved_widget and isinstance(resolved_widget.get("options"), dict):
         options = dict(resolved_widget["options"])
         widget_type = str(resolved_widget.get("widgetType") or "table")
@@ -500,15 +502,15 @@ def build_agent_dashboard_create_draft(
         }
     else:
         confirmation_summary = {
-            "zh": f"确认后将基于 {default_table_key} 创建可编辑经营看板，包含 {widget_count} 个组件。",
-            "en": f"After confirmation, Agent will create an editable business dashboard from {default_table_key} with {widget_count} widgets.",
+            "zh": f"确认后将基于 {default_table_key} 创建可编辑分析看板，包含 {widget_count} 个组件。",
+            "en": f"After confirmation, Agent will create an editable analysis dashboard from {default_table_key} with {widget_count} widgets.",
         }
     evidence = ["source-profile", "metric-definition", "query-runtime", "dashboard-widget-catalog"]
     if erp_unit_library:
         evidence.append("erp-unit-library")
     return {
-        "source": "single-chart" if single_chart else "business-dashboard",
-        "dashboardName": "Agent 单图分析" if single_chart else "Agent 经营复盘",
+        "source": "single-chart" if single_chart else "analysis-dashboard",
+        "dashboardName": "Agent 单图分析" if single_chart else "Agent 分析看板",
         "defaultTableKey": default_table_key,
         "templateCount": len(payload.get("templates", [])),
         "templateKey": payload.get("templateKey", template_key),

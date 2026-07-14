@@ -94,7 +94,7 @@ export function useAppAgentActions({
   }, [handleAsk, navigateTo]);
 
   const handleDraftDashboard = useCallback(async () => {
-    await handleAsk("帮我基于当前 source intelligence 生成一个可确认的经营看板草案");
+    await handleAsk("帮我基于当前 Source Intelligence 生成一个可确认的分析看板草案");
     navigateTo({ section: "agent" });
   }, [handleAsk, navigateTo]);
 

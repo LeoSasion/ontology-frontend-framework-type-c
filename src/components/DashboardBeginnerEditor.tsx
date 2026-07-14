@@ -178,7 +178,7 @@ export function DashboardBeginnerEditor({
           type="button"
         >
           <Icon name="dashboard" />
-          <Bilingual zh="预演经营模板" en="Preview template" />
+          <Bilingual zh="预演分析模板" en="Preview template" />
         </button>
         <button
           className="primaryButton"

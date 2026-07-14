@@ -205,7 +205,7 @@ export function buildFieldSemanticReadiness(fields: FieldConfig[]) {
   const reviewFields = fields.filter((field) => {
     const missingPurpose = !field.role || !field.usage;
     const lowConfidence = field.confidence < 0.82;
-    const ambiguousNumericId = field.role === "measure" && /id|编号|单号|order|sku/i.test(field.field_name);
+    const ambiguousNumericId = field.role === "measure" && /(^|[_\s-])(id|key|code|uuid|编号|编码)([_\s-]|$)/i.test(field.field_name);
     return missingPurpose || lowConfidence || ambiguousNumericId;
   });
   return {
@@ -227,6 +227,7 @@ export type SourceWorkbenchCollections = {
   importJobs: WorkbenchPayload["importJobs"];
   importPolicies: NonNullable<WorkbenchPayload["importPolicies"]>;
   connectors: NonNullable<WorkbenchPayload["connectors"]>;
+  connectorAdapters: NonNullable<WorkbenchPayload["connectorAdapters"]>;
   rowFormulas: FormulaDefinition[];
   navigationModules: NonNullable<WorkbenchPayload["navigation"]>;
   sourceIntelligenceRuns: WorkbenchPayload["sourceIntelligenceRuns"];
@@ -251,6 +252,7 @@ export function buildSourceWorkbenchCollections(
   const importJobs = Array.isArray(workbench.importJobs) ? workbench.importJobs : [];
   const importPolicies = Array.isArray(workbench.importPolicies) ? workbench.importPolicies : [];
   const connectors = Array.isArray(workbench.connectors) ? workbench.connectors : [];
+  const connectorAdapters = Array.isArray(workbench.connectorAdapters) ? workbench.connectorAdapters : [];
   const rowFormulas = Array.isArray(workbench.formulas) ? workbench.formulas : [];
   const navigationModules = Array.isArray(workbench.navigation) ? workbench.navigation : [];
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
@@ -270,6 +272,7 @@ export function buildSourceWorkbenchCollections(
     importJobs,
     importPolicies,
     connectors,
+    connectorAdapters,
     rowFormulas,
     navigationModules,
     sourceIntelligenceRuns,

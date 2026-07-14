@@ -51,6 +51,12 @@ const run = await withTemporaryWorkspace("codex_connector_adapter", async ({ tem
         const text = lead?.textContent ?? "";
         return { ok: Boolean(lead) && /只读 Adapter|read-only Adapter/.test(text), text };
       }, null, { timeoutMs: 15000, intervalMs: 200 });
+      const adapterOptions = await evaluate(browser.client, () => {
+        const select = document.querySelector('[data-testid="connector-technical-details"] select');
+        return select instanceof HTMLSelectElement
+          ? Array.from(select.options).map((option) => ({ value: option.value, disabled: option.disabled }))
+          : [];
+      });
       const clicked = await click(browser.client, `[data-testid="connector-sync-dry-${connectorKey}"]`);
       const receipt = await waitFor(browser.client, () => {
         const node = document.querySelector('[data-testid="connector-operation-receipt"]');
@@ -63,6 +69,7 @@ const run = await withTemporaryWorkspace("codex_connector_adapter", async ({ tem
       }));
       checks.push(
         check("connector-adapter-boundary-copy-visible", connectorPanel.ok, connectorPanel),
+        check("unavailable-adapters-are-not-presented-as-operable", adapterOptions.length === 1 && adapterOptions[0]?.value === "file" && adapterOptions[0]?.disabled === false, adapterOptions),
         check("connector-adapter-preview-receipt-visible", clicked.ok && receipt.ok, { clicked, receipt }),
         check("connector-adapter-browser-layout-stable", !visibleState.hasFallback && !visibleState.horizontalOverflow, visibleState),
       );

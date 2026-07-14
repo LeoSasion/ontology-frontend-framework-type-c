@@ -348,7 +348,7 @@ def handle_dashboard_create_confirmation(
         )
     proposed_dashboard = {
         "op": "create",
-        "dashboardName": draft.get("dashboardName") or payload.get("dashboardName") or "Agent 经营复盘",
+        "dashboardName": draft.get("dashboardName") or payload.get("dashboardName") or "Agent 分析看板",
         "defaultTableKey": draft.get("defaultTableKey") or payload.get("tableKey"),
         "templateCount": draft.get("templateCount", 0),
         "widgetCount": draft.get("widgetCount", len(draft.get("widgets", []))),

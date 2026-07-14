@@ -64,6 +64,7 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
   const savedViews = Array.isArray(workbench.savedViews) ? workbench.savedViews : [];
   const savedRelationships = Array.isArray(workbench.relationships) ? workbench.relationships : [];
   const relationshipRecommendations = Array.isArray(workbench.relationshipRecommendations) ? workbench.relationshipRecommendations : [];
+  const erpPackEnabled = Boolean(workbench.domainPacks?.enabledDomainPacks.some((pack) => pack.packId === "erp-units"));
   const editableTables = Array.isArray(workbench.tables) ? workbench.tables : [];
   const activeTable = editableTables.find((table) => table.table_key === (focusedTableKey || dashboard.default_table_key))
     ?? editableTables.find((table) => table.table_key === dashboard.default_table_key)
@@ -200,8 +201,8 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
             </h2>
             <p className="panelLead">
               <Bilingual
-                zh="当前工作区没有可用数据表。完成导入后，可以让 AI 一次创建一个图表，也可以使用行业看板 Beta。"
-                en="This workspace has no usable tables. After import, AI can create one chart at a time or use the industry dashboard beta."
+                zh="当前工作区没有可用数据表。完成导入后，可以让 AI 创建单图或基于证据生成分析看板草案。"
+                en="This workspace has no usable tables. After import, AI can create one chart or draft an evidence-backed analysis dashboard."
               />
             </p>
           </div>
@@ -348,6 +349,7 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
               businessCategories={businessCategories}
               businessDraft={businessDraft}
               businessTemplateCount={businessTemplateCount}
+              erpPackEnabled={erpPackEnabled}
               canvasWidthMode={canvasWidthMode}
               dashboardFilters={dashboardFilters}
               dashboardKey={dashboard.dashboard_key}

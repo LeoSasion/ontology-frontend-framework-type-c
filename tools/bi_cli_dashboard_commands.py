@@ -19,7 +19,9 @@ from bi_cli_schema import (
     table_columns,
 )
 from bi_cli_source_commands import resolve_table_registry
+from connector_adapter_service import adapter_contracts
 from dashboard_widget_contracts import B_DASHBOARD_FILTER_OPERATORS
+from domain_pack_service import domain_pack_runtime_context
 from evidence_run_store import list_source_intelligence_runs
 from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, duckdb_status, sync_table_to_duckdb
 from relationship_command_service import (
@@ -674,6 +676,7 @@ def workbench_command(args: argparse.Namespace) -> dict[str, Any]:
             (workspace_id, max(args.limit, 24)),
         ).fetchall()
         source_intelligence_runs = list_source_intelligence_runs(connection, workspace_id=workspace_id, limit=args.limit)
+        domain_packs = domain_pack_runtime_context(connection, workspace_id)
     for table in tables:
         table["source_file"] = source_label(table["source_file"])
     for job in import_jobs:
@@ -701,10 +704,12 @@ def workbench_command(args: argparse.Namespace) -> dict[str, Any]:
         "importJobs": import_jobs,
         "importPolicies": import_policies,
         "connectors": connectors,
+        "connectorAdapters": adapter_contracts(),
         "preferences": preferences,
         "themePalettes": theme_palettes,
         "savedViews": saved_views,
         "sourceIntelligenceRuns": source_intelligence_runs,
+        "domainPacks": domain_packs,
         "fieldRoles": ["identity_key", "event_time", "dimension", "measure", "status"],
         "fieldUsages": ["joinable", "filterable", "groupable", "aggregatable"],
         "safeAggregations": sorted(SAFE_AGGREGATIONS),

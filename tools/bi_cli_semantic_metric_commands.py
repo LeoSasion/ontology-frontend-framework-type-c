@@ -121,7 +121,7 @@ def infer_field_semantic_hybrid(connection: sqlite3.Connection, registry: sqlite
         role = "event_time"
         tags.append("time")
         confidence = 0.9
-    elif any(token in text for token in ("id", "编号", "单号", "编码", "流水号", "交易号", "sku", "sn")):
+    elif any(token in text for token in ("id", "key", "code", "identifier", "编号", "编码", "标识", "主键", "外键")):
         role = "identity_key"
         tags.append("identifier")
         confidence = 0.86 if distinct_ratio < 0.85 else 0.92
@@ -130,17 +130,17 @@ def infer_field_semantic_hybrid(connection: sqlite3.Connection, registry: sqlite
         tags.append("status")
         confidence = 0.82
     elif (
-        any(token in text for token in ("amount", "sales", "price", "cost", "fee", "gmv", "金额", "销售", "收入", "成本", "退款", "价格", "价", "优惠", "补贴", "佣金", "分成", "服务费", "运费", "税费", "实付", "应结", "动账", "抵扣", "支出"))
-        and not any(token in text for token in ("方式", "原因", "类型", "状态", "名称", "姓名", "备注", "标签", "账户", "主体", "方向", "场景"))
+        any(token in text for token in ("amount", "value", "total", "score", "rate", "金额", "数值", "合计", "得分", "比例"))
+        and not any(token in text for token in ("方式", "原因", "类型", "状态", "名称", "姓名", "备注", "标签", "方向", "场景"))
     ) or (numeric_ratio >= 0.9 and distinct_ratio < 0.75):
         role = "measure"
         tags.append("amount" if numeric_ratio >= 0.5 else "numeric")
         confidence = 0.86
-    elif any(token in text for token in ("qty", "quantity", "count", "数量", "件数", "单量")):
+    elif any(token in text for token in ("qty", "quantity", "count", "数量", "件数", "次数")):
         role = "measure"
         tags.append("quantity")
         confidence = 0.8
-    elif any(token in text for token in ("channel", "shop", "category", "type", "source", "name", "渠道", "店", "类目", "分类", "类型", "来源", "地区", "方式", "原因", "名称", "姓名", "备注", "标签", "账户", "主体", "方向", "场景")):
+    elif any(token in text for token in ("category", "type", "group", "class", "source", "name", "label", "description", "分类", "类别", "类型", "分组", "来源", "地区", "方式", "原因", "名称", "备注", "标签", "方向", "场景")):
         role = "dimension"
         tags.append("category")
         confidence = 0.76
@@ -374,7 +374,7 @@ def infer_metrics_for_table(connection: sqlite3.Connection, registry: sqlite3.Ro
         and (field["role"] in {"dimension", "status"} or field["usage"] == "groupable")
     ]
     time_fields = [field["field_name"] for field in fields if field["role"] == "event_time"]
-    default_dimension = next((candidate for candidate in ("channel", "shop", "category", "status", "sku") if candidate in dimensions), dimensions[0] if dimensions else None)
+    default_dimension = dimensions[0] if dimensions else None
     metrics: list[dict[str, Any]] = []
     for field in fields:
         if str(field["field_name"]).startswith("__"):
@@ -552,4 +552,4 @@ def add_metric_command(args: argparse.Namespace) -> dict[str, Any]:
         execute_metric_add_plan=execute_metric_add_plan,
     )
 
-
+

@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { appendCliFilters } from "./cliArgBuilders";
 import {
   pushDashboardWidgetStyleArgs,
-  readBCostMonitorValidation,
   readBody,
   sendJson,
 } from "./serverRuntime";
@@ -11,12 +10,11 @@ type DashboardRoutesOptions = {
   cli: (args: string[]) => Promise<Record<string, unknown>>;
   request: IncomingMessage;
   response: ServerResponse;
-  root: string;
   url: URL;
 };
 
 export async function handleDashboardApi(options: DashboardRoutesOptions) {
-  const { cli, request, response, root, url } = options;
+  const { cli, request, response, url } = options;
 
   if (url.pathname === "/api/dashboard/widget-catalog" && request.method === "GET") {
     const result = await cli(["dashboard-widget-catalog"]);
@@ -61,17 +59,6 @@ export async function handleDashboardApi(options: DashboardRoutesOptions) {
     if (body.confirm === true) args.push("--yes");
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : 200, result);
-    return true;
-  }
-
-  if (url.pathname === "/api/validation/b-cost-monitor" && request.method === "GET") {
-    try {
-      const result = await readBCostMonitorValidation(root);
-      sendJson(response, 200, result);
-    } catch (error) {
-      const message = error instanceof Error && error.message ? error.message : "Cost monitor validation is not available";
-      sendJson(response, 404, { ok: false, error: message });
-    }
     return true;
   }
 
@@ -156,7 +143,7 @@ export async function handleDashboardApi(options: DashboardRoutesOptions) {
 
   if (url.pathname === "/api/dashboards" && request.method === "POST") {
     const body = await readBody(request);
-    const prompt = String(body.prompt ?? "创建一个经营证据看板");
+    const prompt = String(body.prompt ?? "创建一个分析证据看板");
     const result = await cli(["ask", prompt]);
     sendJson(response, 202, result);
     return true;

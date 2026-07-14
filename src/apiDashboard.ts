@@ -34,7 +34,7 @@ export function businessDashboardOperation(options: {
   dashboardKey?: string;
   name?: string;
   table?: string;
-  template?: "business" | "cost-monitor" | "erp-units";
+  template?: "business" | "erp-units";
   limit?: number;
   confirm?: boolean;
 }) {
@@ -42,10 +42,6 @@ export function businessDashboardOperation(options: {
     method: "POST",
     body: JSON.stringify(options),
   });
-}
-
-export function getBCostMonitorValidation() {
-  return fetchJsonStrict<Record<string, unknown>>("/api/validation/b-cost-monitor");
 }
 
 export function dashboardWidgetOperation(options: {

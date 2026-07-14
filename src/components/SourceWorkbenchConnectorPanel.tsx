@@ -1,4 +1,4 @@
-import type { DataConnectorConfig, ImportJob } from "../types";
+import type { ConnectorAdapterContract, DataConnectorConfig, ImportJob } from "../types";
 import type { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { Bilingual, biText } from "./Bilingual";
 
@@ -6,6 +6,7 @@ type SourceWorkbenchConnectorPanelProps = ReturnType<typeof useSourceWorkbenchCo
   showAdvanced: boolean;
   busy: string | null;
   connectors: DataConnectorConfig[];
+  connectorAdapters: ConnectorAdapterContract[];
   importJobs: ImportJob[];
   runBusy: (label: string, action: () => Promise<void>) => Promise<void>;
   onRemoveImportJob: (options: { jobKey: string; confirm?: boolean }) => Promise<void>;
@@ -15,6 +16,7 @@ export function SourceWorkbenchConnectorPanel({
   showAdvanced,
   busy,
   connectors,
+  connectorAdapters,
   importJobs,
   connectorEditingKey,
   connectorName,
@@ -47,13 +49,27 @@ export function SourceWorkbenchConnectorPanel({
   onRemoveImportJob,
 }: SourceWorkbenchConnectorPanelProps) {
   const panelClassName = showAdvanced ? "workbenchPanel advancedPanel" : "workbenchPanel advancedPanel collapsed";
+  const availableAdapters = connectorAdapters.filter((adapter) => adapter.available);
+  const selectedAdapter = connectorAdapters.find((adapter) => adapter.connectorType === connectorType);
+  const selectedAdapterAvailable = selectedAdapter?.available === true;
+  const selectedUnavailableAdapter = selectedAdapter && !selectedAdapter.available ? selectedAdapter : null;
+
+  function connectorTypeLabel(connectorTypeValue: string) {
+    if (connectorTypeValue === "file") return biText("文件", "File");
+    if (connectorTypeValue === "database") return biText("数据库", "Database");
+    return connectorTypeValue.toUpperCase();
+  }
+
+  function adapterAvailableFor(connector: DataConnectorConfig) {
+    return connectorAdapters.some((adapter) => adapter.connectorType === connector.type && adapter.available);
+  }
 
   return (
     <>
       <article className={panelClassName}>
         <div className="tileHeader">
           <h3><Bilingual zh="保存数据连接" en="Save data connection" /></h3>
-          <span>{connectors.length}</span>
+          <span>{connectors.length} · {availableAdapters.length} {biText("个可用 Adapter", "available Adapters")}</span>
         </div>
         <div className="connectorBusinessLead" data-testid="connector-business-lead">
           <strong>{connectorEditingKey ? biText("正在编辑已有连接", "Editing an existing connection") : biText("把常用文件或系统保存成可复用入口", "Save a common file or system as a reusable entry")}</strong>
@@ -79,10 +95,14 @@ export function SourceWorkbenchConnectorPanel({
             <label>
               <span>{biText("类型", "Type")}</span>
               <select value={connectorType} onChange={(event) => setConnectorType(event.target.value)}>
-                <option value="file">{biText("文件", "File")}</option>
-                <option value="api">API</option>
-                <option value="erp">ERP</option>
-                <option value="database">{biText("数据库", "Database")}</option>
+                {availableAdapters.map((adapter) => (
+                  <option key={adapter.adapterId} value={adapter.connectorType}>{connectorTypeLabel(adapter.connectorType)}</option>
+                ))}
+                {selectedUnavailableAdapter ? (
+                  <option disabled value={selectedUnavailableAdapter.connectorType}>
+                    {connectorTypeLabel(selectedUnavailableAdapter.connectorType)} · {biText("未安装 Adapter", "Adapter not installed")}
+                  </option>
+                ) : null}
               </select>
             </label>
             <label>
@@ -123,11 +143,16 @@ export function SourceWorkbenchConnectorPanel({
             </label>
           </div>
         </details>
+        {!selectedAdapterAvailable ? (
+          <p className="quietText" data-testid="connector-adapter-unavailable">
+            {biText("未安装该类型的 Adapter。", "No Adapter is installed for this type.")}
+          </p>
+        ) : null}
         <div className="buttonRow">
-          <button className="secondaryButton" data-testid="connector-save-dry-run-button" disabled={busy === "connector-save-dry"} onClick={() => runBusy("connector-save-dry", () => runConnectorSaveAction(false))} type="button">
+          <button className="secondaryButton" data-testid="connector-save-dry-run-button" disabled={!selectedAdapterAvailable || busy === "connector-save-dry"} onClick={() => runBusy("connector-save-dry", () => runConnectorSaveAction(false))} type="button">
             {biText("预演保存", "Preview save")}
           </button>
-          <button className="primaryButton" data-testid="connector-save-button" disabled={busy === "connector-save"} onClick={() => runBusy("connector-save", () => runConnectorSaveAction(true))} type="button">
+          <button className="primaryButton" data-testid="connector-save-button" disabled={!selectedAdapterAvailable || busy === "connector-save"} onClick={() => runBusy("connector-save", () => runConnectorSaveAction(true))} type="button">
             {biText("保存数据连接", "Save data connection")}
           </button>
           <button className="secondaryButton" onClick={resetConnectorDraft} type="button">
@@ -158,10 +183,10 @@ export function SourceWorkbenchConnectorPanel({
                 <button className="miniButton" data-testid={`connector-load-${connector.connectorKey}`} onClick={() => loadConnector(connector)} type="button">
                   {biText("编辑", "Edit")}
                 </button>
-                <button className="miniButton" data-testid={`connector-sync-dry-${connector.connectorKey}`} disabled={busy === `connector-sync-dry-${connector.connectorKey}`} onClick={() => runBusy(`connector-sync-dry-${connector.connectorKey}`, () => runConnectorSyncAction(connector, false))} type="button">
+                <button className="miniButton" data-testid={`connector-sync-dry-${connector.connectorKey}`} disabled={!adapterAvailableFor(connector) || busy === `connector-sync-dry-${connector.connectorKey}`} onClick={() => runBusy(`connector-sync-dry-${connector.connectorKey}`, () => runConnectorSyncAction(connector, false))} type="button">
                   {biText("预演同步", "Preview sync")}
                 </button>
-                <button className="miniButton" data-testid={`connector-sync-${connector.connectorKey}`} disabled={busy === `connector-sync-${connector.connectorKey}`} onClick={() => runBusy(`connector-sync-${connector.connectorKey}`, () => runConnectorSyncAction(connector, true))} type="button">
+                <button className="miniButton" data-testid={`connector-sync-${connector.connectorKey}`} disabled={!adapterAvailableFor(connector) || busy === `connector-sync-${connector.connectorKey}`} onClick={() => runBusy(`connector-sync-${connector.connectorKey}`, () => runConnectorSyncAction(connector, true))} type="button">
                   {biText("确认同步", "Confirm sync")}
                 </button>
                 <button className="miniButton dangerButton" data-testid={`connector-remove-${connector.connectorKey}`} disabled={busy === `connector-remove-${connector.connectorKey}`} onClick={() => runBusy(`connector-remove-${connector.connectorKey}`, () => runConnectorRemoveAction(connector))} type="button">

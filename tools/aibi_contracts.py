@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 
-DOMAIN_SEMANTIC_HINTS: list[dict[str, Any]] = [
+CORE_SEMANTIC_HINTS: list[dict[str, Any]] = [
     {
         "semantic": "numeric_value",
         "label": "数值字段 / Numeric value",
         "role": "measure",
         "objectTypeId": "source_record",
-        "aliases": ["amount", "value", "total", "金额", "数值", "合计", "net_sales", "refund_amount", "premium"],
+        "aliases": ["amount", "value", "total", "score", "rate", "金额", "数值", "合计", "得分", "比例"],
         "requiredFor": ["total_value", "value_by_category", "value_over_time"],
         "evidenceFiles": ["semantic-field-candidates.json", "metric-sql-compiler.json", "metric-query-results.json"],
     },
@@ -27,7 +27,7 @@ DOMAIN_SEMANTIC_HINTS: list[dict[str, Any]] = [
         "label": "分类字段 / Category",
         "role": "dimension",
         "objectTypeId": "source_record",
-        "aliases": ["category", "type", "group", "channel", "类别", "类型", "分组", "渠道"],
+        "aliases": ["category", "type", "group", "class", "类别", "类型", "分组", "分类"],
         "requiredFor": ["value_by_category"],
         "evidenceFiles": ["semantic-field-candidates.json", "relationship-discovery.json"],
     },
@@ -41,11 +41,11 @@ DOMAIN_SEMANTIC_HINTS: list[dict[str, Any]] = [
         "evidenceFiles": ["semantic-field-candidates.json", "metric-query-results.json"],
     },
     {
-        "semantic": "record_id",
+        "semantic": "identifier",
         "label": "记录标识 / Record ID",
         "role": "identity_key",
         "objectTypeId": "source_record",
-        "aliases": ["id", "key", "code", "record_id", "order_id", "编号", "编码", "单号"],
+        "aliases": ["id", "key", "code", "identifier", "record_id", "编号", "编码", "标识"],
         "requiredFor": ["record_link", "detail_drilldown"],
         "evidenceFiles": ["semantic-field-candidates.json", "relationship-coverage-matrix.json"],
     },
@@ -60,7 +60,7 @@ DOMAIN_SEMANTIC_HINTS: list[dict[str, Any]] = [
     },
 ]
 
-DOMAIN_LINK_HINTS: list[dict[str, Any]] = [
+CORE_LINK_HINTS: list[dict[str, Any]] = [
     {
         "id": "record_to_record",
         "label": "共享记录标识 / Shared record ID",
@@ -83,7 +83,7 @@ DOMAIN_LINK_HINTS: list[dict[str, Any]] = [
     },
 ]
 
-DOMAIN_FUNCTION_HINTS: list[dict[str, Any]] = [
+CORE_FUNCTION_HINTS: list[dict[str, Any]] = [
     {
         "id": "total_value",
         "label": "汇总数值 / Total value",
@@ -116,7 +116,7 @@ DOMAIN_FUNCTION_HINTS: list[dict[str, Any]] = [
     },
 ]
 
-DOMAIN_ACTION_HINTS: list[dict[str, Any]] = [
+CORE_ACTION_HINTS: list[dict[str, Any]] = [
     {
         "id": "dashboard_create",
         "label": "创建看板 / Create dashboard",
@@ -237,23 +237,23 @@ DOMAIN_ACTION_HINTS: list[dict[str, Any]] = [
 ]
 
 
-def domain_pack_runtime() -> dict[str, Any]:
+def core_semantic_runtime() -> dict[str, Any]:
     return {
         "version": 1,
         "generatedBy": "tools/aibi_contracts.py",
-        "domainPackId": "generic-tabular-v1",
+        "coreSemanticId": "generic-tabular-v1",
         "ontologyDomain": "generic_tabular_bi",
         "label": "Generic tabular data / 通用表格数据",
         "summary": {
-            "semanticHintCount": len(DOMAIN_SEMANTIC_HINTS),
-            "linkKeyHintCount": len(DOMAIN_LINK_HINTS),
-            "functionHintCount": len(DOMAIN_FUNCTION_HINTS),
-            "actionGateHintCount": len(DOMAIN_ACTION_HINTS),
+            "semanticHintCount": len(CORE_SEMANTIC_HINTS),
+            "linkKeyHintCount": len(CORE_LINK_HINTS),
+            "functionHintCount": len(CORE_FUNCTION_HINTS),
+            "actionGateHintCount": len(CORE_ACTION_HINTS),
         },
-        "semanticHints": DOMAIN_SEMANTIC_HINTS,
-        "linkKeyHints": DOMAIN_LINK_HINTS,
-        "functionHints": DOMAIN_FUNCTION_HINTS,
-        "actionGateHints": DOMAIN_ACTION_HINTS,
+        "semanticHints": CORE_SEMANTIC_HINTS,
+        "linkKeyHints": CORE_LINK_HINTS,
+        "functionHints": CORE_FUNCTION_HINTS,
+        "actionGateHints": CORE_ACTION_HINTS,
         "evidenceContracts": [
             {"file": "source-profile-generic.json", "stage": "profiler", "required": True},
             {"file": "semantic-field-candidates.json", "stage": "semantic_scorer", "required": True},
@@ -279,7 +279,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "discover_files_ms",
         "inputEvidence": ["CSV", "XLS", "XLSX"],
         "outputEvidence": ["source-profile-generic.json"],
-        "domainPackUsage": ["Tables are treated as source objects before any industry-specific conclusion."],
+        "coreSemanticUsage": ["Tables are treated as source objects before any industry-specific conclusion."],
     },
     {
         "id": "profiler",
@@ -288,7 +288,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "profile_sources_ms",
         "inputEvidence": ["source-profile-generic.json"],
         "outputEvidence": ["source-profile-generic.json"],
-        "domainPackUsage": ["Object primary keys and source table categories inform later semantic matching."],
+        "coreSemanticUsage": ["Object primary keys and source table categories inform later semantic matching."],
     },
     {
         "id": "semantic_scorer",
@@ -297,7 +297,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "apply_user_semantic_confirmations_ms",
         "inputEvidence": ["source-profile-generic.json", "source-user-confirmations.json"],
         "outputEvidence": ["semantic-field-candidates.json", "semantic-confirmation-draft.json"],
-        "domainPackUsage": ["Domain semantic hints provide aliases, roles and required-for bindings."],
+        "coreSemanticUsage": ["Core structural hints provide aliases, roles and required-for bindings."],
     },
     {
         "id": "relationship_discovery",
@@ -306,7 +306,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "discover_relationships_ms",
         "inputEvidence": ["semantic-field-candidates.json", "source-user-confirmations.json"],
         "outputEvidence": ["relationship-discovery.json", "relationship-coverage-matrix.json"],
-        "domainPackUsage": ["Domain link keys define stable join candidates and grain warnings."],
+        "coreSemanticUsage": ["Core structural keys define stable join candidates and grain warnings."],
     },
     {
         "id": "diagnostics",
@@ -315,7 +315,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "diagnostics_ms",
         "inputEvidence": ["semantic-field-candidates.json", "relationship-discovery.json"],
         "outputEvidence": ["data-gap-diagnostics.json", "source-readiness-diagnostics.json", "source-quality-diagnostics.json"],
-        "domainPackUsage": ["Missing domain semantics and relationships become explicit gap requests."],
+        "coreSemanticUsage": ["Missing structural semantics and relationships become explicit gap requests."],
     },
     {
         "id": "metric_compiler",
@@ -324,7 +324,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "compile_metric_sql_ms",
         "inputEvidence": ["semantic-field-candidates.json", "data-gap-diagnostics.json"],
         "outputEvidence": ["metric-sql-compiler.json"],
-        "domainPackUsage": ["Domain function contracts constrain which analyses may compile read-only SQL."],
+        "coreSemanticUsage": ["Core function contracts constrain which analyses may compile read-only SQL."],
     },
     {
         "id": "query_runtime",
@@ -333,7 +333,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "execute_metric_sql_ms",
         "inputEvidence": ["metric-sql-compiler.json"],
         "outputEvidence": ["metric-query-results.json"],
-        "domainPackUsage": ["Function results must come from executable SQL, not from display labels."],
+        "coreSemanticUsage": ["Function results must come from executable SQL, not from display labels."],
     },
     {
         "id": "confirmation_overlay",
@@ -342,7 +342,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "apply_user_confirmations_ms",
         "inputEvidence": ["semantic-confirmation-draft.json", "relationship-coverage-matrix.json", "source-user-confirmations.json"],
         "outputEvidence": ["semantic-field-candidates.json", "relationship-discovery.json"],
-        "domainPackUsage": ["User rejections override domain hints and must be treated as missing evidence."],
+        "coreSemanticUsage": ["User rejections override inferred hints and must be treated as missing evidence."],
     },
     {
         "id": "artifact_contract",
@@ -351,7 +351,7 @@ SOURCE_PIPELINE_STAGES: list[dict[str, Any]] = [
         "timingKey": "build_analysis_requirement_catalog_ms",
         "inputEvidence": ["metric-sql-compiler.json", "metric-query-results.json", "data-gap-diagnostics.json"],
         "outputEvidence": ["analysis-requirement-catalog.json"],
-        "domainPackUsage": ["Only ready function results may become formal artifact charts or decision briefs."],
+        "coreSemanticUsage": ["Only ready function results may become formal artifact charts or decision briefs."],
     },
 ]
 
@@ -361,7 +361,7 @@ def source_pipeline_contract() -> dict[str, Any]:
         "version": 1,
         "status": "ready",
         "generatedBy": "tools/aibi_contracts.py",
-        "domainPackRuntime": domain_pack_runtime(),
+        "coreSemanticRuntime": core_semantic_runtime(),
         "stages": SOURCE_PIPELINE_STAGES,
         "guardrails": [
             "Source Intelligence must preserve source evidence for every semantic, relationship and metric decision.",

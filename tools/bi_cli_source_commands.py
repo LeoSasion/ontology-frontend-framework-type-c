@@ -238,6 +238,8 @@ def source_intelligence_runs_command(args: argparse.Namespace) -> dict[str, Any]
 
 def source_intelligence_command(args: argparse.Namespace) -> dict[str, Any]:
     from source_evidence_engine import source_intelligence
+    from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
+    from domain_pack_service import domain_pack_runtime_context, domain_pack_set_fingerprint
 
     inputs = [Path(item) for item in (args.inputs or [])]
     label = args.label or "source-intelligence-run"
@@ -247,8 +249,14 @@ def source_intelligence_command(args: argparse.Namespace) -> dict[str, Any]:
         workspace_id = str(args.workspace or active_workspace_id(connection)).strip()
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
             raise ValueError(f"Unknown workspace: {workspace_id}")
+        active_domain_pack_context = domain_pack_runtime_context(connection, workspace_id)
+        workspace_fingerprints = {
+            "schema": workspace_schema_fingerprint(connection, workspace_id),
+            "data": workspace_data_fingerprint(connection, workspace_id),
+            "domainPacks": domain_pack_set_fingerprint(active_domain_pack_context),
+        }
     output_dir = Path(args.output_dir) if args.output_dir else default_source_intelligence_output_dir(label)
-    manifest = source_intelligence(inputs, output_dir, None)
+    manifest = source_intelligence(inputs, output_dir, None, active_domain_pack_context, workspace_fingerprints)
     run_key = unique_key("source_intelligence")
     created_at = now_iso()
     with open_db() as connection:
@@ -298,6 +306,7 @@ def source_intelligence_command(args: argparse.Namespace) -> dict[str, Any]:
         "inputRoots": [str(path) for path in inputs],
         "outputDir": str(output_dir),
         "manifest": manifest,
+        "domainPacks": active_domain_pack_context,
         "dashboardCandidate": dashboard_candidate,
         "evidenceFiles": evidence_files,
         "evidenceBundle": evidence_bundle,

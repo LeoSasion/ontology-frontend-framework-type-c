@@ -212,7 +212,6 @@ const textSourceFiles = {
   typesSourceIntelligenceSource: ["src", "typesSourceIntelligence.ts"],
   typesWorkspaceSource: ["src", "typesWorkspace.ts"],
   themeSource: ["src", "theme.ts"],
-  verifyFixturesSource: ["scripts", "verify", "fixtures.mjs"],
   verifySource: ["scripts", "verify.mjs"],
   verifyRuntimeSource: ["scripts", "verify", "runtime.mjs"],
   verifySourceCatalogSource: ["scripts", "verify", "sourceCatalog.mjs"],

@@ -1,7 +1,5 @@
 import { spawn } from "node:child_process";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import { buildActionRecovery } from "../src/actionRecoveryModel";
 
 export type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
@@ -52,7 +50,6 @@ export function sendJson(response: ServerResponse, status: number, body: JsonVal
   response.writeHead(status, headers);
   response.end(JSON.stringify(enrichedErrorBody(body), null, 2));
 }
-
 export function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
   return new Promise((resolveBody, reject) => {
     const maxRequestBodyBytes = configuredMaxRequestBodyBytes();
@@ -163,44 +160,4 @@ export function pushDashboardWidgetStyleArgs(args: string[], body: Record<string
     if (body[key] === true) args.push(enabledFlag);
     if (body[key] === false) args.push(disabledFlag);
   }
-}
-
-export function recordValue(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-export function numberValue(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
-export async function readBCostMonitorValidation(root: string) {
-  const validationPath = join(root, "data", "validation", "b-cost-monitor", "b-cost-monitor-comparison.json");
-  const raw = await readFile(validationPath, "utf8");
-  const payload = JSON.parse(raw) as Record<string, unknown>;
-  const widgets = Array.isArray(payload.widgets) ? payload.widgets.map(recordValue).filter(Boolean) as Array<Record<string, unknown>> : [];
-  const nonTextWidgets = widgets.filter((widget) => widget.chartType !== "text");
-  const rowCounts = recordValue(payload.rowCounts) ?? {};
-  const rowEntries = Object.entries(rowCounts).map(([tableKey, value]) => {
-    const row = recordValue(value) ?? {};
-    const rowsMatch = numberValue(row.dbRows) === numberValue(row.sourceRows);
-    const columnsMatch = numberValue(row.dbColumns) === numberValue(row.sourceColumns);
-    return { tableKey, ...row, rowsMatch, columnsMatch, matches: rowsMatch && columnsMatch };
-  });
-  return {
-    ok: true,
-    ...payload,
-    summary: {
-      sourceCount: Array.isArray(payload.sources) ? payload.sources.length : 0,
-      widgetCount: numberValue(recordValue(payload.dashboard)?.widgetCount) || widgets.length,
-      matchedWidgets: widgets.filter((widget) => widget.matches === true).length,
-      totalWidgets: widgets.length,
-      matchedNonTextWidgets: nonTextWidgets.filter((widget) => widget.matches === true).length,
-      totalNonTextWidgets: nonTextWidgets.length,
-      matchedTables: rowEntries.filter((entry) => entry.matches).length,
-      totalTables: rowEntries.length,
-      formulaNames: Object.keys(recordValue(payload.formulaDefinitions) ?? {}),
-      artifactPath: validationPath,
-    },
-    rowMatches: rowEntries,
-  };
 }

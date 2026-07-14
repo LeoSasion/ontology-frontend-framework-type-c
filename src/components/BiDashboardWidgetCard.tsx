@@ -446,8 +446,6 @@ function aggregationText(value: BiDashboardWidget["aggregation"]) {
 function prettyMeasure(value?: string) {
   if (!value) return biText("指标", "Measure");
   const labels: Record<string, string> = {
-    net_sales: biText("净销售额", "Net sales"),
-    refund_amount: biText("退款金额", "Refund amount"),
     quantity: biText("数量", "Quantity"),
     value: biText("数值", "Value"),
   };

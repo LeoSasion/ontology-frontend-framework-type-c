@@ -74,7 +74,6 @@ export function appendCoreContractExtendedChecks(context) {
     verifyAppArchitectureContractsSource,
     verifyCoreContractsSource,
     verifyDashboardViewContractsSource,
-    verifyFixturesSource,
     verifyProductUxContractsSource,
     verifyRuntimeSource,
     verifySource,
@@ -179,20 +178,18 @@ export function appendCoreContractExtendedChecks(context) {
           verifySourceCatalogSource.includes("read" + "FileSync(join(root, ...pathSegments), \"utf8\")"),
       },
     {
-        label: "verify-fixture-writer-boundary",
-        ok: verifySource.includes('from "./verify/fixtures.mjs"') &&
-          verifySource.includes("writeCostMonitorFixtures(verifyDataDir)") &&
-          !verifySource.includes("write" + "FileSync(") &&
-          verifyFixturesSource.includes("export function writeCostMonitorFixtures(verifyDataDir)") &&
-          verifyFixturesSource.includes("cost-monitor-funds.csv") &&
-          verifyFixturesSource.includes("cost-monitor-policy.csv") &&
-          verifyFixturesSource.includes("write" + "FileSync("),
+        label: "domain-neutrality-regression-boundary",
+        ok: packageJson.scripts["verify:domain-neutrality"] === "python scripts/verify-domain-neutrality.py" &&
+          packageJson.scripts.verify.includes("python scripts/verify-domain-neutrality.py") &&
+          existsSync(join(root, "scripts", "verify-domain-neutrality.py")) &&
+          !verifySource.includes("writeCostMonitorFixtures") &&
+          !verifySource.includes("cost-monitor-funds.csv"),
       },
     {
         label: "source-pipeline-rich-contract",
         ok: Array.isArray(byLabel["cli-preview-import"].parsed?.sourcePipelineContract?.stages) &&
           byLabel["cli-preview-import"].parsed.sourcePipelineContract.stages.every((stage) => stage.id && stage.outputEvidence) &&
-          Array.isArray(byLabel["cli-preview-import"].parsed.sourcePipelineContract.domainPackRuntime?.semanticHints),
+          Array.isArray(byLabel["cli-preview-import"].parsed.sourcePipelineContract.coreSemanticRuntime?.semanticHints),
       },
     {
         label: "import-preview-merge-plan",

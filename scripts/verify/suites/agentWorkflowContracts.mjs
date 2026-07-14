@@ -85,7 +85,7 @@ export function appendAgentWorkflowContractChecks(context) {
           ) &&
           byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.decision === "confirm" &&
-          byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.source === "business-dashboard" &&
+          byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.source === "analysis-dashboard" &&
           byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.widgetCount >= 5 &&
           byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.dashboardDraft?.previewWidgets?.length >= 5 &&
           byLabel["cli-agent-confirm-dashboard"].parsed?.confirmed === true &&
@@ -201,8 +201,8 @@ export function appendAgentWorkflowContractChecks(context) {
         ok: Boolean(
           byLabel["cli-agent-formula-draft"].parsed?.requiresConfirmation === true &&
           byLabel["cli-agent-formula-draft"].parsed?.actionDraft?.kind === "formula.save" &&
-          byLabel["cli-agent-formula-draft"].parsed?.matched?.formula?.name === "客单价" &&
-          byLabel["cli-agent-formula-draft"].parsed?.matched?.formula?.formulaText?.includes("COUNT_DISTINCT") &&
+          byLabel["cli-agent-formula-draft"].parsed?.matched?.formula?.name === "平均值" &&
+          byLabel["cli-agent-formula-draft"].parsed?.matched?.formula?.formulaText?.includes("AVG") &&
           byLabel["cli-agent-confirm-formula-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-agent-confirm-formula-dry-run"].parsed?.decision === "confirm" &&
           byLabel["cli-agent-confirm-formula-dry-run"].parsed?.proposedFormula?.dependencies?.includes("net_sales") &&

@@ -654,6 +654,17 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           manifest_json TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS workspace_domain_packs (
+          workspace_id TEXT NOT NULL,
+          pack_id TEXT NOT NULL,
+          version TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 0,
+          enabled_at TEXT,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, pack_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_workspace_domain_packs_enabled
+          ON workspace_domain_packs(workspace_id, enabled, pack_id);
         CREATE TABLE IF NOT EXISTS context_terms (
           term_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,

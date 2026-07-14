@@ -493,7 +493,7 @@ export function appendCoreContractChecks(context) {
           relationshipCommandServiceSource.includes("DELETE FROM relationships WHERE relation_key = ? AND workspace_id = ?") &&
           relationshipCommandServiceSource.includes("relationship whitelist join") &&
           relationshipCommandServiceSource.includes("sample-overlap:") &&
-          relationshipCommandServiceSource.includes("shared-business-token:") &&
+          relationshipCommandServiceSource.includes("shared-structural-token:") &&
           relationshipCommandServiceSource.includes("actual_confidence < 0.55") &&
           relationshipCommandServiceSource.includes("min_distinct_keys < 3") &&
           relationshipCommandServiceSource.includes("join_multiplier > 5") &&
@@ -518,22 +518,24 @@ export function appendCoreContractChecks(context) {
       },
     {
         label: "semantic-inference-production-guards",
-        ok: biCliRuntimeSource.includes("field == \"__canonical_date\"") &&
-          biCliRuntimeSource.includes("field.startswith(\"__source_\")") &&
-          biCliRuntimeSource.includes("\"filterable,no-groupable\"") &&
-          biCliRuntimeSource.includes("\"联系方式\"") &&
-          biCliRuntimeSource.includes("\"流水号\"") &&
-          biCliRuntimeSource.includes("\"分成\"") &&
-          biCliRuntimeSource.includes('str(field["field_name"]).startswith("__")') &&
-          biCliRuntimeSource.includes("def cleanup_stale_auto_metrics(") &&
-          biCliRuntimeSource.includes("removedStaleAutoMetrics") &&
-          biCliRuntimeSource.includes("source = 'auto'") &&
-          biCliRuntimeSource.includes("substr(measure, 1, 2) = '__'") &&
-          biCliRuntimeSource.includes('not str(field["field_name"]).startswith("__")') &&
-          biCliRuntimeSource.includes("not str(field).startswith(\"__\")") &&
-          semanticTextSource.includes("\"contact_phone\"") &&
+        ok: biCliSemanticMetricCommandsSource.includes("field == \"__canonical_date\"") &&
+          biCliSemanticMetricCommandsSource.includes("field.startswith(\"__source_\")") &&
+          biCliSemanticMetricCommandsSource.includes("\"filterable,no-groupable\"") &&
+          biCliSemanticMetricCommandsSource.includes("\"联系方式\"") &&
+          biCliSemanticMetricCommandsSource.includes("\"identifier\"") &&
+          biCliSemanticMetricCommandsSource.includes("\"status\"") &&
+          !biCliSemanticMetricCommandsSource.includes("\"分成\"") &&
+          biCliSemanticMetricCommandsSource.includes('str(field["field_name"]).startswith("__")') &&
+          biCliSemanticMetricCommandsSource.includes("def cleanup_stale_auto_metrics(") &&
+          biCliSemanticMetricCommandsSource.includes("removedStaleAutoMetrics") &&
+          biCliSemanticMetricCommandsSource.includes("source = 'auto'") &&
+          biCliSemanticMetricCommandsSource.includes("substr(measure, 1, 2) = '__'") &&
+          biCliSemanticMetricCommandsSource.includes('not str(field["field_name"]).startswith("__")') &&
           semanticTextSource.includes("\"source_metadata\"") &&
           semanticTextSource.includes("ATTRIBUTE_SEMANTICS") &&
+          semanticTextSource.includes("def semantic_catalog_for_runtime(") &&
+          semanticTextSource.includes('domain_pack_context') &&
+          semanticTextSource.includes('contributions.get("semanticAliases")') &&
           semanticTextSource.includes("semantic.startswith(\"field_\") and inferred_type == \"number\" and unique_ratio > 0.75"),
       },
     {
@@ -720,18 +722,15 @@ export function appendCoreContractChecks(context) {
           businessDashboardServiceSource.includes("from business_dashboard_templates import (") &&
           businessDashboardTemplatesSource.includes("def source_profile_table_inputs(") &&
           businessDashboardTemplatesSource.includes("def table_fields_by_key(") &&
-          businessDashboardTemplatesSource.includes("def build_cost_monitor_templates(") &&
-          businessDashboardTemplatesSource.includes("COST_MONITOR_NET_FORMULA") &&
+          !businessDashboardTemplatesSource.includes("def build_cost_monitor_templates(") &&
+          !businessDashboardTemplatesSource.includes("COST_MONITOR_NET_FORMULA") &&
           businessDashboardServiceSource.includes("namespaced_dashboard_widget_id") &&
           businessDashboardServiceSource.includes("save_dashboard_with_widgets") &&
           byLabel["cli-business-dashboard-draft"].parsed?.templateCount >= 5 &&
           byLabel["cli-business-dashboard-create-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-business-dashboard-create-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-cost-monitor-dashboard-draft"].parsed?.draft?.templateKey === "cost-monitor" &&
-          byLabel["cli-cost-monitor-dashboard-draft"].parsed?.templateCount >= 20 &&
-          byLabel["cli-cost-monitor-dashboard-draft"].parsed?.draft?.widgets?.some((widget) => widget.title === "动账净额月度趋势") &&
-          byLabel["cli-cost-monitor-dashboard-create-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.source === "business-dashboard",
+          !biCliParserSource.includes('"cost-monitor"') &&
+          byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.source === "analysis-dashboard",
       },
     {
         label: "erp-dashboard-unit-library",
@@ -740,7 +739,8 @@ export function appendCoreContractChecks(context) {
           packageJson.scripts["verify:erp-units"] === "node scripts/verify-erp-unit-library.mjs" &&
           biCliRuntimeSource.includes("from erp_dashboard_unit_library import (") &&
           biCliRuntimeSource.includes('sub.add_parser("erp-unit-library")') &&
-          biCliRuntimeSource.includes('choices=["business", "cost-monitor", ERP_UNIT_LIBRARY_TEMPLATE_KEY]') &&
+          biCliRuntimeSource.includes('choices=["business", ERP_UNIT_LIBRARY_TEMPLATE_KEY]') &&
+          byLabel["cli-enable-erp-domain-pack"].parsed?.enabledDomainPacks?.some((item) => item.packId === "erp-units") &&
           businessDashboardServiceSource.includes("prompt_prefers_erp_unit_library(prompt)") &&
           businessDashboardServiceSource.includes("build_erp_dashboard_unit_templates(") &&
           erpDashboardUnitLibrarySource.includes('ERP_UNIT_LIBRARY_TEMPLATE_KEY = "erp-units"') &&

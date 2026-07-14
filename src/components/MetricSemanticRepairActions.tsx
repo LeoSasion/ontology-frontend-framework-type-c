@@ -36,13 +36,16 @@ function bindingReady(draft: SemanticBindingDraft) {
   return Boolean(draft.tableKey && draft.fieldName && draft.fieldName !== "待选择字段");
 }
 
-function roleAndUsageForSemantic(semantic: string): Pick<SemanticSetOptions, "role" | "usage" | "tags"> {
-  const lower = semantic.toLowerCase();
-  if (lower.includes("date") || lower.endsWith("_at") || lower.includes("time")) {
+function roleAndUsageForSemantic(draft: SemanticBindingDraft): Pick<SemanticSetOptions, "role" | "usage" | "tags"> {
+  const semantic = draft.semantic;
+  if (draft.semanticRole === "time") {
     return { role: "event_time", usage: ["time_filter", "groupable"], tags: [semantic] };
   }
-  if (lower.endsWith("_id") || lower.includes("customer") || lower.includes("sku") || lower.includes("shop")) {
+  if (draft.semanticRole === "identity") {
     return { role: "identity_key", usage: ["joinable", "groupable"], tags: [semantic] };
+  }
+  if (draft.semanticRole === "dimension" || draft.semanticRole === "attribute") {
+    return { role: "dimension", usage: ["groupable", "filterable"], tags: [semantic] };
   }
   return { role: "measure", usage: ["aggregatable"], tags: [semantic] };
 }
@@ -96,7 +99,7 @@ export function MetricSemanticRepairActions({
 
   async function runSemanticAction(draft: SemanticBindingDraft, confirm: boolean) {
     if (!bindingReady(draft)) return;
-    const semanticOptions = roleAndUsageForSemantic(draft.semantic);
+    const semanticOptions = roleAndUsageForSemantic(draft);
     setBusyKey(`${confirm ? "confirm" : "preview"}:${draft.semantic}`);
     try {
       setResult(await onSetSemantic({

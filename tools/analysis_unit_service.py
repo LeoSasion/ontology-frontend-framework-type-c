@@ -529,7 +529,8 @@ def attach_analysis_unit(
             preferred = chart
             break
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        source = receipt.get("source") if isinstance(receipt.get("source"), dict) else {}
+        workspace_id = str(source.get("workspaceId") or active_workspace_id(connection))
         unit = create_analysis_unit(
             connection,
             workspace_id=workspace_id,

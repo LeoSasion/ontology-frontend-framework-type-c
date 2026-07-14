@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from bi_cli_parser import build_parser
-from aibi_contracts import domain_pack_runtime as build_domain_pack_runtime
+from aibi_contracts import core_semantic_runtime as build_core_semantic_runtime
 from aibi_contracts import source_pipeline_contract as build_source_pipeline_contract
 from agent_action_confirmations import (
     confirm_dry_run_response,
@@ -62,13 +62,13 @@ from bi_cli_contracts import build_cli_contract, command_contract_by_name, contr
 from bi_cli_envelope import enrich_cli_output, error_output
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
+from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
+from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
 from platform_analytics_knowledge import (
-    build_verified_analysis_gap,
     execute_platform_knowledge,
     match_platform_knowledge,
     platform_knowledge_context,
     platform_knowledge_pack,
-    requires_verified_analysis_plan,
 )
 from query_plan_receipt_service import create_query_plan_receipt, get_query_receipt, query_receipts_command
 from semantic_query_planner import BLOCKING_STATUSES, build_workspace_semantic_plan
@@ -159,6 +159,8 @@ from bi_cli_io_services import (
 )
 from bi_cli_system_commands import (
     cli_contract_command,
+    domain_pack_set_command,
+    domain_packs_command,
     list_commands_command,
     quality_doctor_command,
     status_command,
@@ -614,8 +616,8 @@ def source_pipeline_contract() -> dict[str, Any]:
     return build_source_pipeline_contract()
 
 
-def domain_pack_runtime() -> dict[str, Any]:
-    return build_domain_pack_runtime()
+def core_semantic_runtime() -> dict[str, Any]:
+    return build_core_semantic_runtime()
 
 
 def ontology_snapshot(connection: sqlite3.Connection) -> dict[str, Any]:
@@ -929,13 +931,18 @@ def default_formula_dimension(connection: sqlite3.Connection, table_key: str, pr
     registry = resolve_table_registry(connection, table_key)
     columns = table_columns(connection, registry["physical_table"])
     normalized_prompt = normalize_match_text(prompt)
+    workspace_id = active_workspace_id(connection)
+    semantic_roles = {
+        str(row["field_name"]): str(row["role"] or "")
+        for row in connection.execute(
+            "SELECT field_name, role FROM field_semantics WHERE table_key = ? AND workspace_id = ?",
+            (table_key, workspace_id),
+        ).fetchall()
+    }
     for column in columns:
         normalized_column = normalize_match_text(column)
-        if normalized_column and normalized_column in normalized_prompt and column not in {"net_sales", "quantity", "order_id"}:
+        if normalized_column and normalized_column in normalized_prompt and semantic_roles.get(column) in {"dimension", "status", "event_time", "identity_key"}:
             return column
-    for candidate in ("channel", "shop", "category", "status"):
-        if candidate in columns:
-            return candidate
     return ""
 
 
@@ -948,23 +955,12 @@ def resolve_prompt_formula_action(
         return None, "missing"
     table_key = str(selected_table["table_key"])
     registry = resolve_table_registry(connection, table_key)
-    columns = set(table_columns(connection, registry["physical_table"]))
     lower = prompt.lower()
     explicit_expression = extract_formula_expression_from_prompt(prompt)
     name = "Agent 公式指标"
     expression = explicit_expression
-    confidence = "explicit" if explicit_expression else "recommended"
-    if any(token in prompt for token in ["客单价", "平均订单"]) or "aov" in lower:
-        if {"net_sales", "order_id"}.issubset(columns):
-            name = "客单价"
-            expression = "SAFE_DIVIDE(SUM([net_sales]), COUNT_DISTINCT([order_id]))"
-            confidence = "recommended"
-    elif any(token in prompt for token in ["销售单价", "件单价", "每件", "单价"]):
-        if {"net_sales", "quantity"}.issubset(columns):
-            name = "销售单价"
-            expression = "SAFE_DIVIDE(SUM([net_sales]), SUM([quantity]))"
-            confidence = "recommended"
-    elif explicit_expression:
+    confidence = "explicit" if explicit_expression else "missing"
+    if explicit_expression:
         label_match = re.search(r"(?:保存|创建|新增|定义|add|save)?\s*([\u4e00-\u9fffA-Za-z0-9_\- ]{2,24})\s*(?:公式|formula|指标)", prompt, re.IGNORECASE)
         if label_match:
             name = label_match.group(1).strip() or name
@@ -998,7 +994,7 @@ def aggregation_from_metric_prompt(prompt: str, measure: str) -> str:
         return "min"
     if any(token in prompt for token in ["去重", "唯一"]) or "distinct" in lower:
         return "count-distinct"
-    if any(token in prompt for token in ["记录数", "订单数", "笔数"]) or "count" in lower or measure == "*":
+    if any(token in prompt for token in ["记录数", "行数", "条数"]) or "count" in lower or measure == "*":
         return "count"
     return "sum"
 
@@ -1024,15 +1020,6 @@ def select_metric_field_from_prompt(connection: sqlite3.Connection, table_key: s
     for column in explicit_columns:
         if semantic_roles.get(column) == "measure":
             return column, "explicit"
-    preferred: list[tuple[list[str], str]] = [
-        (["净销售", "销售额", "收入", "revenue", "sales", "net sales"], "net_sales"),
-        (["退款", "退款额", "refund"], "refund_amount"),
-        (["数量", "件数", "销量", "quantity", "units"], "quantity"),
-        (["成本", "cost"], "cost"),
-    ]
-    for tokens, field in preferred:
-        if field in columns and (any(token in prompt for token in tokens) or any(token in prompt.lower() for token in tokens)):
-            return field, "recommended"
     for column in explicit_columns:
         if semantic_roles.get(column) not in {"dimension", "status", "identity_key", "event_time"}:
             return column, "explicit"
@@ -1343,8 +1330,6 @@ def select_dashboard_filter_field(connection: sqlite3.Connection, dashboard_key:
     for field in available:
         if normalize_match_text(field) in normalized_prompt:
             return field, "explicit"
-    if "channel" in available and any(token in prompt.lower() for token in ["channel", "douyin", "tmall", "jd"]) or ("channel" in available and "渠道" in prompt):
-        return "channel", "recommended"
     for item in fields:
         if item.get("usage") == "filterable":
             return str(item["field_name"]), "fallback"
@@ -1513,10 +1498,6 @@ def view_name_from_prompt(prompt: str, table_name: str) -> str:
             value = match.group(1).strip(" ，,。.!！?？")
             if value:
                 return value
-    if any(token in prompt for token in ["退款", "售后"]):
-        return "退款明细视图"
-    if any(token in prompt for token in ["渠道", "channel"]):
-        return "渠道明细视图"
     return f"{table_name} 常用视图"
 
 
@@ -1608,8 +1589,11 @@ def format_answer_number(value: Any) -> str:
     return f"{number:,.2f}"
 
 
-def answer_table_columns(connection: sqlite3.Connection, table_key: str) -> tuple[sqlite3.Row | None, list[str]]:
-    registry = registry_for_table(connection, table_key)
+def answer_table_columns(connection: sqlite3.Connection, table_key: str, workspace_id: str | None = None) -> tuple[sqlite3.Row | None, list[str]]:
+    registry = connection.execute(
+        "SELECT * FROM table_registry WHERE table_key = ? AND workspace_id = ?",
+        (table_key, workspace_id or active_workspace_id(connection)),
+    ).fetchone()
     if not registry:
         return None, []
     columns = [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(registry['physical_table'])})")]
@@ -1624,8 +1608,9 @@ def safe_answer_aggregate(
     measure: str,
     aggregation: str,
     limit: int = 5,
+    workspace_id: str | None = None,
 ) -> tuple[dict[str, Any] | None, list[dict[str, Any]], str | None]:
-    registry, columns = answer_table_columns(connection, table_key)
+    registry, columns = answer_table_columns(connection, table_key, workspace_id)
     if not registry:
         return None, [], f"Unknown table: {table_key}"
     if group and group not in columns:
@@ -1658,8 +1643,8 @@ def safe_answer_aggregate(
     return runtime, rows, fallback_reason
 
 
-def latest_source_run_ref(connection: sqlite3.Connection, table_key: str) -> dict[str, Any] | None:
-    workspace_id = active_workspace_id(connection)
+def latest_source_run_ref(connection: sqlite3.Connection, table_key: str, workspace_id: str | None = None) -> dict[str, Any] | None:
+    workspace_id = workspace_id or active_workspace_id(connection)
     row = connection.execute(
         """
         SELECT id, table_key, name, source_file, row_count, column_count, created_at
@@ -1673,8 +1658,8 @@ def latest_source_run_ref(connection: sqlite3.Connection, table_key: str) -> dic
     return dict(row) if row else None
 
 
-def metric_ref(connection: sqlite3.Connection, table_key: str, measure: str, aggregation: str, dimension: str | None) -> dict[str, Any] | None:
-    workspace_id = active_workspace_id(connection)
+def metric_ref(connection: sqlite3.Connection, table_key: str, measure: str, aggregation: str, dimension: str | None, workspace_id: str | None = None) -> dict[str, Any] | None:
+    workspace_id = workspace_id or active_workspace_id(connection)
     row = connection.execute(
         """
         SELECT metric_key, label, table_key, measure, aggregation, dimension, value_format
@@ -1698,8 +1683,8 @@ def build_widget_clarification_answer_card(widget_action: dict[str, Any]) -> dic
     measure_hint = candidate_measures[0] if candidate_measures else ""
     dimension_hint = candidate_dimensions[0] if candidate_dimensions else ""
     next_actions = [
-        localized_value("指定指标，例如：用支付金额做柱状图", "Specify a measure, for example: build a bar chart with paid amount"),
-        localized_value("需要分组时补一句：按月份、渠道或状态分组", "If grouping is needed, add: group by month, channel, or status"),
+        localized_value("指定一个数值字段，例如：用数值字段做柱状图", "Specify a numeric field, for example: build a bar chart with a numeric field"),
+        localized_value("需要分组时，请明确写出要使用的分类、时间或状态字段", "For grouping, name the category, time, or status field explicitly"),
     ]
     if measure_hint and dimension_hint:
         next_actions.insert(0, localized_value(
@@ -1741,6 +1726,7 @@ def build_agent_answer_card(
     prompt: str,
     selected_table: dict[str, Any] | None,
     widget_action: dict[str, Any] | None = None,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     if not selected_table:
         return {
@@ -1754,7 +1740,7 @@ def build_agent_answer_card(
             "nextActions": [localized_value("导入本地文件或文件夹", "Import a local file or folder")],
         }
     table_key = selected_table["table_key"]
-    registry, _columns = answer_table_columns(connection, table_key)
+    registry, _columns = answer_table_columns(connection, table_key, workspace_id)
     if not registry:
         return {
             "kind": "gap",
@@ -1810,6 +1796,7 @@ def build_agent_answer_card(
         measure=measure,
         aggregation=aggregation,
         limit=5,
+        workspace_id=workspace_id,
     )
     if runtime is None:
         return {
@@ -1846,10 +1833,10 @@ def build_agent_answer_card(
         {"type": "queryRuntime", "engine": runtime.get("engine"), "compiledSql": runtime.get("compiledSql"), "fallbackReason": fallback_reason},
         {"type": "ontologyFunction", "id": intent},
     ]
-    source_ref = latest_source_run_ref(connection, table_key)
+    source_ref = latest_source_run_ref(connection, table_key, workspace_id)
     if source_ref:
         evidence_refs.insert(0, {"type": "sourceRun", **source_ref})
-    metric = metric_ref(connection, table_key, measure, aggregation, dimension)
+    metric = metric_ref(connection, table_key, measure, aggregation, dimension, workspace_id)
     if metric:
         evidence_refs.insert(1, {"type": "metricDefinition", **metric})
 
@@ -1924,7 +1911,14 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             )
         )
         selected_table, table_confidence = select_agent_table(tables, prompt)
-        platform_match = match_platform_knowledge(connection, workspace_id, prompt)
+        active_domain_pack_context = domain_pack_runtime_context(connection, workspace_id)
+        platform_pack_enabled = is_domain_pack_enabled(
+            connection,
+            workspace_id,
+            "platform-commerce",
+            "agentKnowledge",
+        )
+        platform_match = match_platform_knowledge(connection, workspace_id, prompt) if platform_pack_enabled else None
         verified_analysis_gap = platform_match is None and requires_verified_analysis_plan(prompt)
         if platform_match:
             primary_table_key = str(next(iter(platform_match["roles"].values()))["table_key"])
@@ -2098,6 +2092,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         if should_create_draft and action_kind == "dashboard.create":
             dashboard_create_draft = build_agent_dashboard_create_draft(
                 connection,
+                workspace_id,
                 action_payload.get("tableKey"),
                 resolution_prompt,
                 1 if single_chart_dashboard_create else 8,
@@ -2131,7 +2126,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             else (
                 build_verified_analysis_gap(prompt, selected_table["table_key"] if selected_table else None)
                 if verified_analysis_gap
-                else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action)
+                else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action, workspace_id)
             )
         )
         if semantic_execution and semantic_execution.get("executed"):
@@ -2265,6 +2260,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             evidence_refs=list(answer_card.get("evidenceRefs", [])),
             unresolved=receipt_unresolved,
             context_refs=context_refs,
+            domain_packs=active_domain_pack_context["enabledDomainPacks"],
             action_key=action_key if should_create_draft else None,
             result_rows=list(answer_card.get("rows") or []),
             now_iso=now_iso,
@@ -2392,11 +2388,12 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             ] if platform_match else [],
         },
         "agentKnowledge": {
-            "packId": platform_knowledge_pack()["id"],
-            "version": platform_knowledge_pack()["version"],
+            "packId": platform_match["packId"] if platform_match else None,
+            "version": platform_match["packVersion"] if platform_match else None,
             "matchedRuleId": platform_match["ruleId"] if platform_match else None,
             "modelIndependent": True,
         },
+        "domainPacks": active_domain_pack_context,
         "recommendedCommands": recommended,
         "requiresConfirmation": should_create_draft,
         "actionDraft": {
@@ -2405,7 +2402,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             "status": "draft" if should_create_draft else "read-only",
         },
         "ontology": ontology,
-        "domainPackRuntime": domain_pack_runtime(),
+        "coreSemanticRuntime": core_semantic_runtime(),
         "sourcePipelineContract": source_pipeline_contract(),
     }
 
@@ -2670,6 +2667,10 @@ def main() -> int:
             result = workspace_rename_command(args)
         elif args.command == "workspace-delete":
             result = workspace_delete_command(args)
+        elif args.command == "domain-packs":
+            result = domain_packs_command(args)
+        elif args.command == "domain-pack-set":
+            result = domain_pack_set_command(args)
         elif args.command == "source-run":
             result = source_run_command(args)
         elif args.command == "list-tables":

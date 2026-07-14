@@ -57,8 +57,8 @@ export function buildSourceWorkbenchGuidance({
   const hasImportedTables = tables.length > 0;
   const sourceProfileRunning = busy === "source-intelligence";
   const sourceProfileRunningLabel = biText("正在只读扫描本地路径", "Scanning local paths read-only");
-  const dashboardMeasureName = measureFields.find((field) => /sales|amount|revenue|销售|金额|实收|net/i.test(field.field_name))?.field_name ?? measureFields[0]?.field_name ?? "";
-  const dashboardDimensionName = groupFields.find((field) => /channel|category|shop|渠道|分类|店铺|平台/i.test(field.field_name))?.field_name ?? groupFields[0]?.field_name ?? "";
+  const dashboardMeasureName = measureFields[0]?.field_name ?? "";
+  const dashboardDimensionName = groupFields[0]?.field_name ?? "";
   const dashboardTimeName = selectedFields.find((field) => field.role === "event_time" || /date|time|日期|时间/i.test(field.field_name))?.field_name ?? "";
   const dashboardRecipeReady = sourceProfileComplete && Boolean(dashboardMeasureName && dashboardDimensionName);
   const dashboardRecipeEvidenceCount = 3 + (latestSourceProfile ? 2 : 0) + (relationships.length ? 1 : 0) + Math.min(selectedMetrics.length, 2);
@@ -128,8 +128,8 @@ export function buildSourceWorkbenchGuidance({
       label: biText("这份数据能回答什么", "What can this data answer"),
       detail: biText("先读证据，不创建草案", "Read evidence, no draft"),
       prompt: biText(
-        `基于 ${selectedTableKey} 告诉我当前能回答哪些经营问题，列出证据、字段和缺口，不要创建任何草案`,
-        `Using ${selectedTableKey}, tell me what business questions can be answered now, list evidence, fields, and gaps, and do not create any draft`,
+        `基于 ${selectedTableKey} 告诉我当前能回答哪些分析问题，列出证据、字段和缺口，不要创建任何草案`,
+        `Using ${selectedTableKey}, tell me what analytical questions can be answered now, list evidence, fields, and gaps, and do not create any draft`,
       ),
     },
     {
@@ -138,8 +138,8 @@ export function buildSourceWorkbenchGuidance({
       label: biText("检查还缺什么", "Find missing pieces"),
       detail: biText("按字段、关系、指标说清楚", "Fields, relationships, metrics"),
       prompt: biText(
-        `检查 ${selectedTableKey} 距离可用经营看板还缺什么字段、关系和指标，只给下一步建议`,
-        `Check what fields, relationships, and metrics ${selectedTableKey} still needs for a usable business dashboard, and only give next-step recommendations`,
+        `检查 ${selectedTableKey} 距离可用分析看板还缺什么字段、关系和指标，只给下一步建议`,
+        `Check what fields, relationships, and metrics ${selectedTableKey} still needs for a usable analysis dashboard, and only give next-step recommendations`,
       ),
     },
     {
@@ -148,7 +148,7 @@ export function buildSourceWorkbenchGuidance({
       label: biText("起草看板方案", "Draft dashboard plan"),
       detail: biText("草案确认制，不直接写入", "Draft approval, no direct write"),
       prompt: biText(
-        `基于 ${selectedTableKey} 起草一个经营看板方案，说明会用哪些组件和证据，先不要直接写入`,
+        `基于 ${selectedTableKey} 起草一个分析看板方案，说明会用哪些组件和证据，先不要直接写入`,
         `Draft a business dashboard plan from ${selectedTableKey}, explain widgets and evidence, and do not write directly`,
       ),
     },

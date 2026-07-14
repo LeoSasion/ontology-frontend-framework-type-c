@@ -135,6 +135,7 @@ export function AppMainView({
     handleExportConfig,
     handleSavePreferences,
     handleSaveThemePalette,
+    handleSetDomainPack,
     handleValidateConfig,
   } = settingsActions;
 
@@ -240,6 +241,8 @@ export function AppMainView({
         onExportConfig={handleExportConfig}
         onSavePreferences={handleSavePreferences}
         onSaveThemePalette={handleSaveThemePalette}
+        onSetDomainPack={handleSetDomainPack}
+        status={status}
         onValidateConfig={handleValidateConfig}
         workbench={workbench}
       />

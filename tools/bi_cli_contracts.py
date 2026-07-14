@@ -39,6 +39,8 @@ COMMAND_DOMAINS: dict[str, str] = {
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
     "workspace-delete": "workspace",
+    "domain-packs": "domain-pack",
+    "domain-pack-set": "domain-pack",
     "source-run": "source",
     "list-tables": "source",
     "inspect-table": "source",

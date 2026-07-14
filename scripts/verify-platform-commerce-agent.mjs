@@ -226,9 +226,15 @@ function markdown(receipt) {
 
 const importResults = [];
 const caseResults = [];
+let domainPackActivation = null;
 
 try {
   if (!existsSync(templatesDir)) throw new Error(`Platform research templates not found: ${templatesDir}`);
+  const activation = runCli(["domain-pack-set", "--pack", "platform-commerce", "--state", "enabled", "--yes"]);
+  domainPackActivation = activation.parsed;
+  if (!activation.ok || activation.parsed?.confirmed !== true) {
+    throw new Error(`Platform commerce Domain Pack activation failed: ${activation.parsed?.error ?? activation.stderr}`);
+  }
   for (const [file, table, name] of imports) {
     const input = join(templatesDir, file);
     const result = existsSync(input)
@@ -284,6 +290,7 @@ try {
     validationSource,
     generatedFixtures,
     knowledgePack: "knowledge/platform-commerce.v1.json",
+    domainPackActivation,
     modelIndependent: true,
     baseline: {
       prompt: cases[0].prompt,
@@ -292,6 +299,7 @@ try {
       failure: "record-count aggregation overrode the requested sum and filters were ignored",
     },
     imports: importResults,
+    domainPackActivation,
     total: caseResults.length,
     passed,
     failed: caseResults.length - passed,

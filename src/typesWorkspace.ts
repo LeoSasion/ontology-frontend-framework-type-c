@@ -1,3 +1,5 @@
+import type { WorkspaceDomainPackRuntime } from "./typesDomain";
+
 export type SelectionConfidence = "explicit" | "recommended" | "fallback" | "missing" | "none";
 
 export interface WorkspaceStatus {
@@ -6,6 +8,7 @@ export interface WorkspaceStatus {
   workspaces?: WorkspaceRecord[];
   database?: string;
   queryRuntime?: QueryRuntimeStatus;
+  domainPacks?: WorkspaceDomainPackRuntime;
   counts: {
     tables: number;
     sourceRuns: number;

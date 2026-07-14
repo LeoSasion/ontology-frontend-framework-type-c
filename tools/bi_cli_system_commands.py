@@ -12,6 +12,11 @@ from bi_cli_io_services import metric_sql_doctor_from_run, rows_to_dicts
 from bi_cli_schema import active_workspace_id, open_db, workspace_records
 from evidence_run_store import count_source_intelligence_runs, latest_source_intelligence_summary
 from query_runtime import duckdb_status
+from domain_pack_service import (
+    domain_pack_runtime_context,
+    domain_pack_set_command as domain_pack_set_command_service,
+    domain_packs_command as domain_packs_command_service,
+)
 from workspace_command_service import (
     workspace_create_command as workspace_create_command_service,
     workspace_delete_command as workspace_delete_command_service,
@@ -114,6 +119,8 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
         }
         workspace = dict(connection.execute("SELECT * FROM workspaces WHERE id = ?", (active_id,)).fetchone())
         workspace["isActive"] = True
+        domain_packs = domain_pack_runtime_context(connection, active_id)
+        workspace["enabledDomainPacks"] = domain_packs["enabledDomainPacks"]
         source_runs = rows_to_dicts(
             connection.execute(
                 """
@@ -136,6 +143,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
             "queryRuntime": runtime,
             "counts": counts,
             "sourceRuns": source_runs,
+            "domainPacks": domain_packs,
             "health": {
                 "ok": True,
                 "notes": [
@@ -317,5 +325,13 @@ def workspace_rename_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def workspace_delete_command(args: argparse.Namespace) -> dict[str, Any]:
     return workspace_delete_command_service(args, open_db=open_db, duckdb_path=DUCKDB_PATH)
+
+
+def domain_packs_command(args: argparse.Namespace) -> dict[str, Any]:
+    return domain_packs_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
+
+
+def domain_pack_set_command(args: argparse.Namespace) -> dict[str, Any]:
+    return domain_pack_set_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
 
 

@@ -1,9 +1,9 @@
-import type { DomainPackRuntime, SourcePipelineContract } from "./types";
+import type { CoreSemanticRuntime, SourcePipelineContract } from "./types";
 
-export const domainPackRuntime: DomainPackRuntime = {
+export const coreSemanticRuntime: CoreSemanticRuntime = {
   version: 1,
   generatedBy: "src/contracts.ts",
-  domainPackId: "generic-tabular-v1",
+  coreSemanticId: "generic-tabular-v1",
   ontologyDomain: "generic_tabular_bi",
   label: "Generic tabular data / 通用表格数据",
   summary: {
@@ -18,7 +18,7 @@ export const domainPackRuntime: DomainPackRuntime = {
       label: "数值字段 / Numeric value",
       role: "measure",
       objectTypeId: "source_record",
-      aliases: ["amount", "value", "total", "金额", "数值", "合计", "net_sales", "refund_amount", "premium"],
+      aliases: ["amount", "value", "total", "score", "rate", "金额", "数值", "合计", "得分", "比例"],
       requiredFor: ["total_value", "value_by_category", "value_over_time"],
       evidenceFiles: ["semantic-field-candidates.json", "metric-sql-compiler.json", "metric-query-results.json"],
     },
@@ -36,7 +36,7 @@ export const domainPackRuntime: DomainPackRuntime = {
       label: "分类字段 / Category",
       role: "dimension",
       objectTypeId: "source_record",
-      aliases: ["category", "type", "group", "channel", "类别", "类型", "分组", "渠道"],
+      aliases: ["category", "type", "group", "class", "类别", "类型", "分组", "分类"],
       requiredFor: ["value_by_category"],
       evidenceFiles: ["semantic-field-candidates.json", "relationship-discovery.json"],
     },
@@ -50,11 +50,11 @@ export const domainPackRuntime: DomainPackRuntime = {
       evidenceFiles: ["semantic-field-candidates.json", "metric-query-results.json"],
     },
     {
-      semantic: "record_id",
+      semantic: "identifier",
       label: "记录标识 / Record ID",
       role: "identity_key",
       objectTypeId: "source_record",
-      aliases: ["id", "key", "code", "record_id", "order_id", "编号", "编码", "单号"],
+      aliases: ["id", "key", "code", "identifier", "record_id", "编号", "编码", "标识"],
       requiredFor: ["record_link", "detail_drilldown"],
       evidenceFiles: ["semantic-field-candidates.json", "relationship-coverage-matrix.json"],
     },
@@ -261,7 +261,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
   version: 1,
   status: "ready",
   generatedBy: "src/contracts.ts",
-  domainPackRuntime,
+  coreSemanticRuntime,
   stages: [
     {
       id: "reader",
@@ -270,7 +270,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "discover_files_ms",
       inputEvidence: ["CSV", "XLS", "XLSX"],
       outputEvidence: ["source-profile-generic.json"],
-      domainPackUsage: ["Tables are treated as source objects before any industry-specific conclusion."],
+      coreSemanticUsage: ["Tables are treated as source objects before any industry-specific conclusion."],
     },
     {
       id: "profiler",
@@ -279,7 +279,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "profile_sources_ms",
       inputEvidence: ["source-profile-generic.json"],
       outputEvidence: ["source-profile-generic.json"],
-      domainPackUsage: ["Object primary keys and source table categories inform later semantic matching."],
+      coreSemanticUsage: ["Object primary keys and source table categories inform later semantic matching."],
     },
     {
       id: "semantic_scorer",
@@ -288,7 +288,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "apply_user_semantic_confirmations_ms",
       inputEvidence: ["source-profile-generic.json", "source-user-confirmations.json"],
       outputEvidence: ["semantic-field-candidates.json", "semantic-confirmation-draft.json"],
-      domainPackUsage: ["Domain semantic hints provide aliases, roles and required-for bindings."],
+      coreSemanticUsage: ["Core structural hints provide aliases, roles and required-for bindings."],
     },
     {
       id: "relationship_discovery",
@@ -297,7 +297,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "discover_relationships_ms",
       inputEvidence: ["semantic-field-candidates.json", "source-user-confirmations.json"],
       outputEvidence: ["relationship-discovery.json", "relationship-coverage-matrix.json"],
-      domainPackUsage: ["Domain link keys define stable join candidates and grain warnings."],
+      coreSemanticUsage: ["Core structural keys define stable join candidates and grain warnings."],
     },
     {
       id: "diagnostics",
@@ -306,7 +306,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "diagnostics_ms",
       inputEvidence: ["semantic-field-candidates.json", "relationship-discovery.json"],
       outputEvidence: ["data-gap-diagnostics.json", "source-readiness-diagnostics.json", "source-quality-diagnostics.json"],
-      domainPackUsage: ["Missing domain semantics and relationships become explicit gap requests."],
+      coreSemanticUsage: ["Missing structural semantics and relationships become explicit gap requests."],
     },
     {
       id: "metric_compiler",
@@ -315,7 +315,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "compile_metric_sql_ms",
       inputEvidence: ["semantic-field-candidates.json", "data-gap-diagnostics.json"],
       outputEvidence: ["metric-sql-compiler.json"],
-      domainPackUsage: ["Domain function contracts constrain which analyses may compile read-only SQL."],
+      coreSemanticUsage: ["Core function contracts constrain which analyses may compile read-only SQL."],
     },
     {
       id: "query_runtime",
@@ -324,7 +324,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "execute_metric_sql_ms",
       inputEvidence: ["metric-sql-compiler.json"],
       outputEvidence: ["metric-query-results.json"],
-      domainPackUsage: ["Function results must come from executable SQL, not from display labels."],
+      coreSemanticUsage: ["Function results must come from executable SQL, not from display labels."],
     },
     {
       id: "confirmation_overlay",
@@ -333,7 +333,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "apply_user_confirmations_ms",
       inputEvidence: ["semantic-confirmation-draft.json", "relationship-coverage-matrix.json", "source-user-confirmations.json"],
       outputEvidence: ["semantic-field-candidates.json", "relationship-discovery.json"],
-      domainPackUsage: ["User rejections override domain hints and must be treated as missing evidence."],
+      coreSemanticUsage: ["User rejections override inferred hints and must be treated as missing evidence."],
     },
     {
       id: "artifact_contract",
@@ -342,7 +342,7 @@ export const sourcePipelineContract: SourcePipelineContract = {
       timingKey: "build_analysis_requirement_catalog_ms",
       inputEvidence: ["metric-sql-compiler.json", "metric-query-results.json", "data-gap-diagnostics.json"],
       outputEvidence: ["analysis-requirement-catalog.json"],
-      domainPackUsage: ["Only ready function results may become formal artifact charts or decision briefs."],
+      coreSemanticUsage: ["Only ready function results may become formal artifact charts or decision briefs."],
     },
   ],
   guardrails: [

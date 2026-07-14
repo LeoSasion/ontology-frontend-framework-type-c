@@ -88,6 +88,14 @@ try:
         and all(item.get("available") is False and item.get("permissions", {}).get("network") == "none" for item in unavailable),
         adapter_rows,
     )
+    workbench = run("workbench-adapter-registry", ["workbench"]) ["parsed"] or {}
+    workbench_adapters = workbench.get("connectorAdapters") or []
+    check(
+        "workbench-exposes-the-same-adapter-availability-registry",
+        workbench_adapters == adapter_rows
+        and [item.get("connectorType") for item in workbench_adapters if item.get("available")] == ["file"],
+        workbench_adapters,
+    )
 
     save_preview = run("file-connector-save-preview", [
         "save-connector", "--name", "M11 Local", "--type", "file", "--status", "active",
@@ -230,7 +238,7 @@ try:
     adapter_commands = ["list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync"]
     check(
         "adapter-capabilities-are-read-only",
-        contract.get("commandCount") == 111
+        contract.get("commandCount") == 113
         and all(
             command_contracts.get(command, {}).get("mutationMode") == "read-only"
             and command_contracts.get(command, {}).get("writesBusinessState") is False

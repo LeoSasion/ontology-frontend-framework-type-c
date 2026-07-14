@@ -40,7 +40,7 @@ export type BusinessDashboardOptions = {
   dashboardKey?: string;
   name?: string;
   table?: string;
-  template?: "business" | "cost-monitor" | "erp-units";
+  template?: "business" | "erp-units";
   limit?: number;
   confirm?: boolean;
 };

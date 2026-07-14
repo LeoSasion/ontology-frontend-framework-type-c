@@ -35,9 +35,9 @@ export function InspectorEvidenceDetails({ agent, lastActionResult, preview }: I
         </section>
         <section>
           <span className="eyebrow">{biText("业务语义", "Business semantics")}</span>
-          <h2><Bilingual {...translateName(agent.domainPackRuntime.label)} /></h2>
+          <h2><Bilingual {...translateName(agent.coreSemanticRuntime.label)} /></h2>
           <div className="chipGrid">
-            {agent.domainPackRuntime.semanticHints.map((hint) => <span key={hint.semantic}>{hint.semantic} · {hint.role}</span>)}
+            {agent.coreSemanticRuntime.semanticHints.map((hint) => <span key={hint.semantic}>{hint.semantic} · {hint.role}</span>)}
           </div>
         </section>
         <section>

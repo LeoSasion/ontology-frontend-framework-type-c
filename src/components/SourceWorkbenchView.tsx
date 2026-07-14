@@ -48,6 +48,7 @@ export function SourceWorkbenchView({
   relationshipRecommendations,
   importJobs,
   connectors,
+  connectorAdapters,
   navigationModules,
   sourceIntelligenceRuns,
   fieldRoles,
@@ -170,7 +171,7 @@ export function SourceWorkbenchView({
           </div>
         </div> : null}
 
-        {hasData && sourceProfileComplete ? (
+        {hasData ? (
           <Suspense fallback={<SourceWorkbenchAdvancedLoading />}><SourceWorkbenchActionPanel
             busy={busy}
             recommendedPrimaryAction={recommendedPrimaryAction}
@@ -341,6 +342,7 @@ export function SourceWorkbenchView({
               showAdvanced={showAdvanced}
               busy={busy}
               connectors={connectors}
+              connectorAdapters={connectorAdapters}
               importJobs={importJobs}
               runBusy={runBusy}
               onRemoveImportJob={onRemoveImportJob}

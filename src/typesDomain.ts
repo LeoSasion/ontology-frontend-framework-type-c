@@ -5,19 +5,19 @@ export interface SourcePipelineStageContract {
   timingKey: string;
   inputEvidence: string[];
   outputEvidence: string[];
-  domainPackUsage: string[];
+  coreSemanticUsage: string[];
 }
 
 export interface SourcePipelineContract {
-  version: 1;
+  version: number;
   status?: "ready" | string;
   generatedBy?: string;
-  domainPackRuntime?: DomainPackRuntime;
+  coreSemanticRuntime?: CoreSemanticRuntime;
   stages: SourcePipelineStageContract[];
   guardrails?: string[];
 }
 
-export interface DomainSemanticHint {
+export interface CoreSemanticHint {
   semantic: string;
   label: string;
   role: string;
@@ -27,7 +27,7 @@ export interface DomainSemanticHint {
   evidenceFiles: string[];
 }
 
-export interface DomainLinkHint {
+export interface CoreLinkHint {
   id: string;
   label: string;
   canonicalKey: string;
@@ -38,7 +38,7 @@ export interface DomainLinkHint {
   evidenceFiles: string[];
 }
 
-export interface DomainFunctionHint {
+export interface CoreFunctionHint {
   id: string;
   label: string;
   sourceAnalysisId: string;
@@ -49,7 +49,7 @@ export interface DomainFunctionHint {
   decisionPolicy: string;
 }
 
-export interface DomainActionHint {
+export interface CoreActionHint {
   id: string;
   label: string;
   actionTypeId: string;
@@ -59,17 +59,49 @@ export interface DomainActionHint {
   evidenceFiles: string[];
 }
 
-export interface DomainPackRuntime {
-  version: 1;
+export interface CoreSemanticRuntime {
+  version: number;
   generatedBy?: string;
-  domainPackId: string;
+  coreSemanticId: string;
   ontologyDomain?: string;
   label: string;
   summary?: Record<string, unknown>;
-  semanticHints: DomainSemanticHint[];
-  linkKeyHints: DomainLinkHint[];
-  functionHints: DomainFunctionHint[];
-  actionGateHints: DomainActionHint[];
+  semanticHints: CoreSemanticHint[];
+  linkKeyHints: CoreLinkHint[];
+  functionHints: CoreFunctionHint[];
+  actionGateHints: CoreActionHint[];
   evidenceContracts?: Array<Record<string, unknown>>;
   executionPolicy: string[];
+}
+
+export interface DomainPackReference {
+  packId: string;
+  version: string;
+  fingerprint: string;
+  capabilities: string[];
+}
+
+export interface DomainPackManifest extends DomainPackReference {
+  schema: "aibi-domain-pack/v1" | string;
+  displayName: { zh: string; en: string };
+  description: { zh: string; en: string };
+  compatible: boolean;
+  enabled: boolean;
+  configuredVersion?: string | null;
+  enabledAt?: string | null;
+  updatedAt?: string | null;
+  contributions?: {
+    semanticAliases?: Record<string, string[]>;
+    semanticRoles?: Record<string, string[]>;
+    sourceIntelligence?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
+}
+
+export interface WorkspaceDomainPackRuntime {
+  schema: "aibi-domain-pack-runtime/v1" | string;
+  coreApiVersion: number;
+  workspaceId: string;
+  enabledDomainPacks: DomainPackReference[];
+  availableDomainPacks: DomainPackManifest[];
 }

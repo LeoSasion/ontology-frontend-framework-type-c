@@ -191,7 +191,7 @@ export function SourceWorkbenchActionPanel({
         <strong>{biText("下一步：生成可编辑看板", "Next: create an editable dashboard")}</strong>
         <span>
           {sourceProfileComplete
-            ? biText("证据摘要完整，可直接生成经营看板。", "The evidence summary is complete, so a business dashboard can be generated now.")
+            ? biText("证据摘要完整，可生成分析看板草案。", "The evidence summary is complete, so an analysis dashboard draft can be generated now.")
             : biText("建议先生成证据摘要，再生成看板。", "Create the evidence summary before generating a dashboard.")}
         </span>
         <div className={dashboardRecipeReady ? "sourceDashboardRecipe ready" : "sourceDashboardRecipe"} data-testid="source-dashboard-recipe">
@@ -244,7 +244,7 @@ export function SourceWorkbenchActionPanel({
             data-testid="source-dashboard-agent-draft"
             disabled={!dashboardRecipeReady || busy === "source-dashboard-agent-draft"}
             onClick={() => runBusy("source-dashboard-agent-draft", () => onAsk(biText(
-              `基于 ${selectedTableKey} 和当前证据摘要起草一个经营看板，优先使用 ${dashboardDimensionName}、${dashboardMeasureName}${dashboardTimeName ? `、${dashboardTimeName}` : ""}，说明组件和证据，先不要直接写入`,
+              `基于 ${selectedTableKey} 和当前证据摘要起草一个分析看板，优先使用 ${dashboardDimensionName}、${dashboardMeasureName}${dashboardTimeName ? `、${dashboardTimeName}` : ""}，说明组件和证据，先不要直接写入`,
               `Draft a business dashboard from ${selectedTableKey} and the current evidence summary, prefer ${dashboardDimensionName}, ${dashboardMeasureName}${dashboardTimeName ? `, ${dashboardTimeName}` : ""}, explain widgets and evidence, and do not write directly`,
             )))}
             type="button"

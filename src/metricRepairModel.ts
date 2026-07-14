@@ -5,6 +5,7 @@ type MetricSqlRecord = Record<string, unknown>;
 
 export type SemanticBindingDraft = {
   semantic: string;
+  semanticRole: "identity" | "measure" | "time" | "dimension" | "attribute";
   impactCount: number;
   tableKey: string;
   tableName: string;
@@ -40,21 +41,24 @@ export type MetricRepairPlan = {
   benefitSummary: string;
 };
 
-const semanticAliases: Record<string, string[]> = {
-  paid_gmv: ["paid_gmv", "gmv", "paid", "payment", "pay", "amount", "sales", "revenue", "实付", "支付", "付款", "成交", "销售额", "金额"],
-  inventory_qty: ["inventory", "stock", "qty", "quantity", "库存", "结存", "数量", "件数"],
-  customer_id: ["customer", "buyer", "member", "user", "client", "客户", "买家", "会员", "用户"],
-  order_date: ["order_date", "date", "time", "day", "month", "日期", "时间", "月份", "订单日期"],
-  cost_amount: ["cost", "expense", "fee", "amount", "成本", "费用", "支出", "金额"],
-  refund_amount: ["refund", "return", "amount", "退款", "退货", "退费", "金额"],
-  sku_id: ["sku", "product", "item", "goods", "商品", "货品", "款号", "编码"],
-  shop_id: ["shop", "store", "seller", "店铺", "门店", "商家"],
+const coreSemanticAliases: Record<string, string[]> = {
+  identifier: ["id", "key", "code", "identifier", "编号", "编码", "标识", "唯一键"],
+  numeric_value: ["value", "amount", "total", "score", "rate", "数值", "金额", "合计", "得分", "比例"],
+  quantity: ["quantity", "qty", "count", "数量", "件数", "人数", "次数"],
+  category: ["category", "type", "group", "class", "类别", "类型", "分组", "分类"],
+  status: ["status", "state", "stage", "状态", "阶段", "结果"],
+  event_time: ["date", "time", "month", "event_time", "日期", "时间", "月份", "期间"],
+  text: ["name", "title", "description", "label", "名称", "标题", "描述", "标签"],
 };
 
-const semanticRiskTerms: Record<string, string[]> = {
-  paid_gmv: ["net_sales", "estimated_net_sales", "refund", "return", "net_", "净销售", "净额", "退款", "售后"],
-  refund_amount: ["paid_gmv", "gmv", "gross", "sales", "成交", "销售额"],
-  cost_amount: ["paid_gmv", "gmv", "sales", "revenue", "收入", "销售额"],
+const coreSemanticRoles: Record<string, SemanticBindingDraft["semanticRole"]> = {
+  identifier: "identity",
+  numeric_value: "measure",
+  quantity: "measure",
+  category: "dimension",
+  status: "dimension",
+  event_time: "time",
+  text: "attribute",
 };
 
 function textBag(field: FieldConfig) {
@@ -68,18 +72,53 @@ function textBag(field: FieldConfig) {
   ].filter(Boolean).join(" ").toLowerCase();
 }
 
-function aliasesForSemantic(semantic: string) {
-  return semanticAliases[semantic] ?? semantic.split(/[_\s.-]+/).filter(Boolean);
+function enabledManifestContributions(workbench: WorkbenchPayload) {
+  const enabled = new Set(workbench.domainPacks?.enabledDomainPacks.map((pack) => pack.packId) ?? []);
+  return (workbench.domainPacks?.availableDomainPacks ?? [])
+    .filter((pack) => enabled.has(pack.packId))
+    .map((pack) => pack.contributions)
+    .filter(Boolean);
+}
+
+function aliasesForSemantic(semantic: string, workbench: WorkbenchPayload) {
+  const aliases = [...(coreSemanticAliases[semantic] ?? [])];
+  for (const contributions of enabledManifestContributions(workbench)) {
+    aliases.push(...(contributions?.semanticAliases?.[semantic] ?? []));
+  }
+  return aliases.length ? Array.from(new Set(aliases)) : semantic.split(/[_\s.-]+/).filter(Boolean);
+}
+
+function roleForSemantic(semantic: string, workbench: WorkbenchPayload): SemanticBindingDraft["semanticRole"] {
+  if (coreSemanticRoles[semantic]) return coreSemanticRoles[semantic];
+  for (const contributions of enabledManifestContributions(workbench)) {
+    for (const [role, semantics] of Object.entries(contributions?.semanticRoles ?? {})) {
+      if (semantics.includes(semantic) && ["identity", "measure", "time", "dimension", "attribute"].includes(role)) {
+        return role as SemanticBindingDraft["semanticRole"];
+      }
+    }
+  }
+  return "measure";
+}
+
+function knownSemanticIds(workbench: WorkbenchPayload) {
+  const semantics = new Set(Object.keys(coreSemanticAliases));
+  for (const contributions of enabledManifestContributions(workbench)) {
+    for (const semantic of Object.keys(contributions?.semanticAliases ?? {})) semantics.add(semantic);
+    for (const roleSemantics of Object.values(contributions?.semanticRoles ?? {})) {
+      for (const semantic of roleSemantics) semantics.add(semantic);
+    }
+  }
+  return [...semantics];
 }
 
 function tableNameFor(workbench: WorkbenchPayload, tableKey: string) {
   return workbench.tables.find((table) => table.table_key === tableKey)?.display_name || tableKey || "待确认表";
 }
 
-function scoreFieldForSemantic(field: FieldConfig, semantic: string) {
+function scoreFieldForSemantic(field: FieldConfig, semantic: string, workbench: WorkbenchPayload) {
   const bag = textBag(field);
   const fieldName = field.field_name.toLowerCase();
-  const aliases = aliasesForSemantic(semantic);
+  const aliases = aliasesForSemantic(semantic, workbench);
   const directSemantic = bag.includes(semantic.toLowerCase()) ? 5 : 0;
   const aliasScore = aliases.reduce((score, alias) => {
     const normalizedAlias = alias.toLowerCase();
@@ -93,17 +132,18 @@ function scoreFieldForSemantic(field: FieldConfig, semantic: string) {
   return directSemantic + aliasScore + usageScore + Math.min(1, Math.max(0, field.confidence || 0));
 }
 
-function riskForSemantic(field: FieldConfig, semantic: string) {
+function riskForSemantic(field: FieldConfig, semantic: string, workbench: WorkbenchPayload) {
   const bag = textBag(field);
   const fieldName = field.field_name.toLowerCase();
   const exactSemantic = fieldName === semantic.toLowerCase() || bag.includes(` ${semantic.toLowerCase()} `);
-  const riskyTerms = semanticRiskTerms[semantic] ?? [];
-  const matchedRisk = exactSemantic ? "" : riskyTerms.find((term) => bag.includes(term.toLowerCase()));
-  if (matchedRisk) {
+  const conflictingSemantic = knownSemanticIds(workbench).find((candidate) => (
+    candidate !== semantic && fieldName.includes(candidate.toLowerCase())
+  ));
+  if (conflictingSemantic) {
     return {
       level: "high" as const,
-      penalty: 2.5,
-      reason: `候选字段包含 ${matchedRisk}，可能是净额、退款或派生指标，确认前必须先预演。`,
+      penalty: 2.4,
+      reason: `候选字段同时命中 ${semantic} 与 ${conflictingSemantic}，必须先确认唯一语义。`,
     };
   }
   const derivedTerms = ["ratio", "rate", "mom", "yoy", "delta", "estimated", "calc", "同比", "环比", "比率", "差额", "估算"];
@@ -112,7 +152,7 @@ function riskForSemantic(field: FieldConfig, semantic: string) {
     return {
       level: "medium" as const,
       penalty: 1.2,
-      reason: `候选字段带有 ${derivedTerm} 特征，可能不是原始业务字段。`,
+      reason: `候选字段带有 ${derivedTerm} 特征，可能不是原始字段。`,
     };
   }
   return {
@@ -125,14 +165,15 @@ function riskForSemantic(field: FieldConfig, semantic: string) {
 function bestBindingDraft(semantic: string, impactCount: number, fields: FieldConfig[], workbench: WorkbenchPayload): SemanticBindingDraft {
   const ranked = fields
     .map((field) => {
-      const risk = riskForSemantic(field, semantic);
-      return { field, risk, score: scoreFieldForSemantic(field, semantic) - risk.penalty };
+      const risk = riskForSemantic(field, semantic, workbench);
+      return { field, risk, score: scoreFieldForSemantic(field, semantic, workbench) - risk.penalty };
     })
     .sort((left, right) => right.score - left.score || (right.field.confidence || 0) - (left.field.confidence || 0));
   const winner = ranked[0];
   if (!winner || winner.score < 2.5) {
     return {
       semantic,
+      semanticRole: roleForSemantic(semantic, workbench),
       impactCount,
       tableKey: "",
       tableName: "待确认表",
@@ -146,12 +187,13 @@ function bestBindingDraft(semantic: string, impactCount: number, fields: FieldCo
       requiresPreview: true,
     };
   }
-  const rawConfidence = Math.max(0.35, (winner.score / 10) + (winner.field.confidence || 0) * 0.35 - (winner.risk.level === "high" ? 0.18 : 0));
-  const riskConfidenceCap = winner.risk.level === "high" ? 0.68 : winner.risk.level === "medium" ? 0.76 : 0.98;
+  const rawConfidence = Math.max(0.35, (winner.score / 10) + (winner.field.confidence || 0) * 0.35);
+  const riskConfidenceCap = winner.risk.level === "high" ? 0.62 : winner.risk.level === "medium" ? 0.76 : 0.98;
   const confidence = Math.min(riskConfidenceCap, rawConfidence);
   const requiresPreview = winner.risk.level !== "low" || confidence < 0.72;
   return {
     semantic,
+    semanticRole: roleForSemantic(semantic, workbench),
     impactCount,
     tableKey: winner.field.table_key,
     tableName: tableNameFor(workbench, winner.field.table_key),

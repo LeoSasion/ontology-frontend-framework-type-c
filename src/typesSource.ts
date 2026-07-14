@@ -1,14 +1,17 @@
 import type { NavigationModule } from "./typesDashboard";
-import type { SourcePipelineContract } from "./typesDomain";
+import type { SourcePipelineContract, WorkspaceDomainPackRuntime } from "./typesDomain";
 import type { SourceIntelligenceRunSummary } from "./typesSourceIntelligence";
 import type { QueryRuntimeStatus } from "./typesWorkspace";
 
 export type {
-  DomainActionHint,
-  DomainFunctionHint,
-  DomainLinkHint,
-  DomainPackRuntime,
-  DomainSemanticHint,
+  CoreActionHint,
+  CoreFunctionHint,
+  CoreLinkHint,
+  CoreSemanticHint,
+  CoreSemanticRuntime,
+  DomainPackManifest,
+  DomainPackReference,
+  WorkspaceDomainPackRuntime,
   SourcePipelineContract,
   SourcePipelineStageContract,
 } from "./typesDomain";
@@ -261,6 +264,19 @@ export interface DataConnectorConfig {
   lastSyncResult?: Record<string, unknown> | null;
 }
 
+export interface ConnectorAdapterContract {
+  schema: "aibi-connector-adapter/v1" | string;
+  adapterId: string;
+  connectorType: string;
+  available: boolean;
+  operations: string[];
+  permissions?: Record<string, unknown>;
+  limits?: Record<string, unknown>;
+  credentials?: Record<string, unknown>;
+  persistence?: Record<string, unknown>;
+  reason?: string;
+}
+
 export interface SavedView {
   view_key: string;
   name: string;
@@ -340,10 +356,12 @@ export interface WorkbenchPayload {
   importJobs: ImportJob[];
   importPolicies?: ImportPolicy[];
   connectors?: DataConnectorConfig[];
+  connectorAdapters?: ConnectorAdapterContract[];
   preferences?: UserPreferencesConfig;
   themePalettes?: ThemePaletteConfig[];
   savedViews: SavedView[];
   sourceIntelligenceRuns: SourceIntelligenceRunSummary[];
+  domainPacks?: WorkspaceDomainPackRuntime;
   fieldRoles: string[];
   fieldUsages: string[];
   safeAggregations: string[];

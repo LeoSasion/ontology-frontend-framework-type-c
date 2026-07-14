@@ -9,6 +9,7 @@ from bi_cli_core import now_iso, quote_identifier, workspace_slug
 
 
 WORKSPACE_SCOPED_TABLES = [
+    "workspace_domain_packs",
     "context_rules",
     "context_terms",
     "confirmed_queries",
@@ -68,6 +69,19 @@ def workspace_records(
     rows = rows_to_dicts(connection.execute("SELECT * FROM workspaces ORDER BY created_at"))
     for row in rows:
         row["isActive"] = row["id"] == current
+        enabled_rows = connection.execute(
+            """
+            SELECT pack_id, version
+            FROM workspace_domain_packs
+            WHERE workspace_id = ? AND enabled = 1
+            ORDER BY pack_id
+            """,
+            (row["id"],),
+        ).fetchall()
+        row["enabledDomainPacks"] = [
+            {"packId": item["pack_id"], "version": item["version"]}
+            for item in enabled_rows
+        ]
     return rows
 
 

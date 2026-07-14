@@ -1,5 +1,5 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
-import { applyConfig, exportConfig, savePreferences, saveThemePalette, validateConfig } from "./api";
+import { applyConfig, exportConfig, savePreferences, saveThemePalette, setDomainPack, validateConfig } from "./api";
 import { refreshStatusWorkbenchDashboards, refreshWorkbench } from "./appRefreshModel";
 import type { AppSection } from "./components/Sidebar";
 import type { DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
@@ -52,11 +52,25 @@ export function useAppSettingsActions({ setDashboards, setLastActionResult, setS
     return result;
   }, [setDashboards, setLastActionResult, setSection, setStatus, setWorkbench]);
 
+  const handleSetDomainPack = useCallback(async (options: Parameters<typeof setDomainPack>[0]) => {
+    const result = await setDomainPack(options);
+    setLastActionResult(result);
+    if (options.confirm) {
+      const refreshed = await refreshStatusWorkbenchDashboards();
+      setStatus(refreshed.status);
+      setWorkbench(refreshed.workbench);
+      setDashboards(refreshed.dashboards);
+    }
+    setSection("settings");
+    return result;
+  }, [setDashboards, setLastActionResult, setSection, setStatus, setWorkbench]);
+
   return {
     handleApplyConfig,
     handleExportConfig,
     handleSavePreferences,
     handleSaveThemePalette,
+    handleSetDomainPack,
     handleValidateConfig,
   };
 }

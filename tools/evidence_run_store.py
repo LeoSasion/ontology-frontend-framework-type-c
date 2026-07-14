@@ -4,7 +4,33 @@ import json
 import sqlite3
 from typing import Any
 
+from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
+from domain_pack_service import domain_pack_runtime_context, domain_pack_set_fingerprint
 from evidence_receipts import source_intelligence_file_coverage
+
+
+def _run_freshness(connection: sqlite3.Connection, workspace_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+    current = {
+        "schema": workspace_schema_fingerprint(connection, workspace_id),
+        "data": workspace_data_fingerprint(connection, workspace_id),
+        "domainPacks": domain_pack_set_fingerprint(domain_pack_runtime_context(connection, workspace_id)),
+    }
+    captured = {
+        "schema": str(manifest.get("workspaceSchemaFingerprint") or ""),
+        "data": str(manifest.get("workspaceDataFingerprint") or ""),
+        "domainPacks": str(manifest.get("domainPackFingerprint") or ""),
+    }
+    missing = [key for key, value in captured.items() if not value]
+    mismatches = [key for key in current if captured.get(key) and captured[key] != current[key]]
+    status = "unknown" if missing else "stale" if mismatches else "current"
+    return {
+        "status": status,
+        "usableForPlanning": status == "current",
+        "missingFingerprints": missing,
+        "mismatches": mismatches,
+        "captured": captured,
+        "current": current,
+    }
 
 
 def save_source_intelligence_run(
@@ -64,7 +90,14 @@ def list_source_intelligence_runs(connection: sqlite3.Connection, *, workspace_i
     for row in rows:
         item = dict(row)
         item["inputRoots"] = json.loads(item.pop("input_roots_json"))
-        item["fileCoverage"] = source_intelligence_file_coverage(item)
+        manifest = json.loads(str(item.pop("manifest_json") or "{}"))
+        manifest = manifest if isinstance(manifest, dict) else {}
+        item["sourceFingerprint"] = str(manifest.get("sourceFingerprint") or "")
+        item["enabledDomainPacks"] = list(manifest.get("enabledDomainPacks") or [])
+        item["freshness"] = _run_freshness(connection, workspace_id, manifest)
+        item["fileCoverage"] = source_intelligence_file_coverage({**item, "manifest_json": json.dumps(manifest, ensure_ascii=False)})
+        if not item["freshness"]["usableForPlanning"]:
+            item["fileCoverage"]["complete"] = False
         item["isInternal"] = internal_source_intelligence_run(item)
         runs.append(item)
     if include_internal:
@@ -111,7 +144,7 @@ def internal_source_intelligence_run(row: dict[str, Any]) -> bool:
     return any(token in output_dir for token in ["tmp-inspect", "aibi-hybrid-verify", "workspace-isolation"])
 
 
-def source_intelligence_summary_payload(row: sqlite3.Row) -> dict[str, Any]:
+def source_intelligence_summary_payload(row: sqlite3.Row, connection: sqlite3.Connection | None = None) -> dict[str, Any]:
     item = dict(row)
     try:
         item["inputRoots"] = json.loads(str(item.pop("input_roots_json") or "[]"))
@@ -123,6 +156,10 @@ def source_intelligence_summary_payload(row: sqlite3.Row) -> dict[str, Any]:
         manifest = {}
     if isinstance(manifest, dict):
         item["manifestInputRoots"] = manifest.get("inputRoots") if isinstance(manifest.get("inputRoots"), list) else []
+        item["sourceFingerprint"] = str(manifest.get("sourceFingerprint") or "")
+        item["enabledDomainPacks"] = list(manifest.get("enabledDomainPacks") or [])
+        if connection is not None:
+            item["freshness"] = _run_freshness(connection, str(item.get("workspace_id") or "default"), manifest)
     return item
 
 
@@ -141,10 +178,11 @@ def latest_source_intelligence_summary(connection: sqlite3.Connection, *, worksp
     ).fetchall()
     if not rows:
         return None
-    summaries = [source_intelligence_summary_payload(row) for row in rows]
+    summaries = [source_intelligence_summary_payload(row, connection) for row in rows]
     if include_internal:
-        return summaries[0]
-    return next((item for item in summaries if not internal_source_intelligence_run(item)), summaries[0])
+        return next((item for item in summaries if item.get("freshness", {}).get("usableForPlanning")), summaries[0])
+    visible = [item for item in summaries if not internal_source_intelligence_run(item)] or summaries[:1]
+    return next((item for item in visible if item.get("freshness", {}).get("usableForPlanning")), visible[0])
 
 
 def source_intelligence_run_manifest(run: sqlite3.Row) -> dict[str, Any]:

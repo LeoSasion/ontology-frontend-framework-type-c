@@ -6,12 +6,13 @@ from typing import Any, Callable
 
 from evidence_profile_runtime.semantic_text import SEMANTIC_ALIASES
 
-DEFAULT_DOMAIN_PACK_RUNTIME: dict[str, Any] = {
+
+DEFAULT_CORE_SEMANTIC_RUNTIME: dict[str, Any] = {
     "version": 2,
-    "domainPackId": "aibi-generic-tabular",
-    "ontologyDomain": "generic-tabular",
-    "label": "Generic tabular data / 通用表格数据",
-    "generatedBy": "tools/evidence_profile_runtime/domain_pack_runtime.py",
+    "coreSemanticId": "core-structural-v1",
+    "ontologyDomain": "core-structural",
+    "label": "Core structural semantics / 通用结构语义",
+    "generatedBy": "tools/evidence_profile_runtime/core_semantic_runtime.py",
     "loadStatus": "fallback_static",
     "semanticHints": [
         {"semantic": semantic, "aliases": aliases[:8]}
@@ -46,28 +47,20 @@ SOURCE_PIPELINE_CONTRACT: dict[str, Any] = {
 }
 
 
-def load_domain_pack_runtime(
-    domain_pack_runtime_path: Path | None,
+def load_core_semantic_runtime(
+    core_semantic_runtime_path: Path | None,
     *,
     default_runtime_file: dict[str, Any] | None = None,
     rel_path: Callable[[Path], str] | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    if domain_pack_runtime_path and domain_pack_runtime_path.exists():
+    if core_semantic_runtime_path and core_semantic_runtime_path.exists():
         try:
-            loaded = json.loads(domain_pack_runtime_path.read_text(encoding="utf-8"))
+            loaded = json.loads(core_semantic_runtime_path.read_text(encoding="utf-8"))
             if isinstance(loaded, dict):
-                runtime = {**DEFAULT_DOMAIN_PACK_RUNTIME, **loaded, "loadedFrom": str(domain_pack_runtime_path)}
-                return runtime, {**SOURCE_PIPELINE_CONTRACT, "domainPackRuntime": runtime}
+                runtime = {**DEFAULT_CORE_SEMANTIC_RUNTIME, **loaded, "loadedFrom": str(core_semantic_runtime_path)}
+                return runtime, {**SOURCE_PIPELINE_CONTRACT, "coreSemanticRuntime": runtime}
         except (OSError, json.JSONDecodeError):
             pass
-    runtime = dict(default_runtime_file or DEFAULT_DOMAIN_PACK_RUNTIME)
+    runtime = dict(default_runtime_file or DEFAULT_CORE_SEMANTIC_RUNTIME)
     runtime.setdefault("loadedFrom", None)
-    return runtime, {**SOURCE_PIPELINE_CONTRACT, "domainPackRuntime": runtime}
-
-
-def merge_semantic_catalog_with_domain_pack(catalog: dict[str, Any], runtime: dict[str, Any]) -> dict[str, Any]:
-    merged = dict(catalog)
-    for item in runtime.get("semanticHints", []):
-        if isinstance(item, dict) and item.get("semantic"):
-            merged.setdefault(str(item["semantic"]), {}).setdefault("aliases", item.get("aliases", []))
-    return merged
+    return runtime, {**SOURCE_PIPELINE_CONTRACT, "coreSemanticRuntime": runtime}

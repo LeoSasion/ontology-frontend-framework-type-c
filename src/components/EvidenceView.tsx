@@ -317,7 +317,7 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
             <article>
               <h3><Bilingual zh="动作边界" en="Action boundaries" /></h3>
               <div className="evidenceActionList">
-                {agent.domainPackRuntime.actionGateHints.slice(0, 6).map((action) => (
+                {agent.coreSemanticRuntime.actionGateHints.slice(0, 6).map((action) => (
                   <div key={action.id}>
                     <strong>{actionBoundaryBusinessLabel(action)}</strong>
                     <span>{actionBoundaryBusinessDetail(action)}</span>
@@ -352,7 +352,7 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
                   <pre>{JSON.stringify(agent.ontology.objects, null, 2)}</pre>
                   <pre>{JSON.stringify(agent.ontology.functions, null, 2)}</pre>
                   <pre>{JSON.stringify(agent.ontology.links, null, 2)}</pre>
-                  <pre>{JSON.stringify(agent.domainPackRuntime.actionGateHints, null, 2)}</pre>
+                  <pre>{JSON.stringify(agent.coreSemanticRuntime.actionGateHints, null, 2)}</pre>
                 </div>
               </details>
             </article>

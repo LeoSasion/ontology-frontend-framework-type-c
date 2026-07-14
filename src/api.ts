@@ -1,12 +1,12 @@
 import { fetchJson } from "./apiClient";
 
 export { askAgent, askAgentReadOnly, confirmAction, getActionDrafts } from "./apiAgent";
+export { getDomainPacks, setDomainPack } from "./apiDomainPacks";
 export {
   businessDashboardOperation,
   dashboardFilterOperation,
   dashboardOperation,
   dashboardWidgetOperation,
-  getBCostMonitorValidation,
   getDashboardWidgetCatalog,
   recommendDashboardWidgets,
   saveDashboardModules,

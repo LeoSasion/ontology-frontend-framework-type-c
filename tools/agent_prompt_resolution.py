@@ -94,14 +94,14 @@ def resolve_agent_prompt_intents(prompt: str) -> AgentPromptIntents:
     wants_import = any(token in prompt for token in ["导入", "上传"]) or "import" in lower
     wants_relationship = any(token in prompt for token in ["关联", "关系"]) or "join" in lower
     wants_index = prompt_mentions_index(prompt)
-    wants_formula = any(token in lower for token in ["formula", "aov"]) or any(token in prompt for token in ["公式", "计算字段", "客单价", "销售单价", "件单价"])
+    wants_formula = any(token in lower for token in ["formula", "calculated field", "derived field"]) or any(token in prompt for token in ["公式", "计算字段", "派生字段"])
     wants_view = prompt_mentions_view_save(prompt)
     wants_widget = prompt_mentions_widget_add(prompt)
     wants_dashboard_filter = prompt_mentions_dashboard_filter(prompt)
     wants_metric = (
         bool(re.search(r"(新增|添加|创建|定义|保存|做成).{0,64}指标", prompt))
         or bool(re.search(r"\b(add|create|define|save)\s+(a\s+|an\s+)?(metric|kpi)\b", lower))
-        or any(token in prompt for token in ["指标口径", "经营指标"])
+        or "指标口径" in prompt
         or any(token in lower for token in ["metric definition", "new metric", "kpi definition"])
     ) and "指标卡" not in prompt
     wants_semantic = any(token in lower for token in ["semantic", "dimension", "measure", "metric", "identity_key", "event_time"]) or any(

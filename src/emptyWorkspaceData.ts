@@ -1,4 +1,4 @@
-import { domainPackRuntime, sourcePipelineContract } from "./contracts";
+import { coreSemanticRuntime, sourcePipelineContract } from "./contracts";
 import { defaultThemePalettes, defaultUserPreferences } from "./defaultThemeData";
 import type {
   ActionDraftPayload,
@@ -122,6 +122,13 @@ export const emptyWorkbenchPayload: WorkbenchPayload = {
   themePalettes: defaultThemePalettes,
   savedViews: [],
   sourceIntelligenceRuns: [],
+  domainPacks: {
+    schema: "aibi-domain-pack-runtime/v1",
+    coreApiVersion: 1,
+    workspaceId: "default",
+    enabledDomainPacks: [],
+    availableDomainPacks: [],
+  },
   fieldRoles: ["measure", "dimension", "event_time", "identity_key", "status"],
   fieldUsages: ["aggregatable", "groupable", "filterable", "joinable", "display"],
   safeAggregations: ["sum", "count", "avg", "min", "max"],
@@ -198,7 +205,7 @@ export const emptyAgentResult: AgentAskResult = {
     actions: ["import.commit", "dashboard.create", "relationship.save", "formula.save", "view.save", "semantic.set"],
     evidenceFiles: [],
   },
-  domainPackRuntime,
+  coreSemanticRuntime,
   sourcePipelineContract,
 };
 

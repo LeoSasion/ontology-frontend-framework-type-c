@@ -59,7 +59,7 @@ export function buildHomeReadiness(options: {
   if (!dashboardCount) {
     return {
       label: biText("生成首个图表", "Create first chart"),
-      detail: biText("证据摘要已经生成，可以创建可编辑经营看板。", "The evidence summary is ready. Create an editable business dashboard."),
+      detail: biText("证据摘要已经生成，可以创建可编辑分析看板。", "The evidence summary is ready. Create an editable analysis dashboard."),
       next: "dashboards" as AppSection,
     };
   }

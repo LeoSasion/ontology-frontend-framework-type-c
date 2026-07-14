@@ -38,7 +38,7 @@ const routeRules: RouteRule[] = [
     section: "dashboards",
     reasonZh: "打开看板和图表编辑",
     reasonEn: "Open dashboards and chart editing",
-    keywords: [/看板/, /仪表盘/, /图表/, /组件/, /柱状图/, /折线图/, /饼图/, /费用监控/, /经营复盘/, /dashboard/, /board/, /chart/, /widget/, /cost monitor/],
+    keywords: [/看板/, /仪表盘/, /图表/, /组件/, /柱状图/, /折线图/, /饼图/, /dashboard/, /board/, /chart/, /widget/],
   },
   {
     section: "evidence",

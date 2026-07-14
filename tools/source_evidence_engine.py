@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import time
 from collections import defaultdict
@@ -10,10 +11,10 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from evidence_profile_runtime.domain_pack_runtime import (
-    DEFAULT_DOMAIN_PACK_RUNTIME,
+from evidence_profile_runtime.core_semantic_runtime import (
+    DEFAULT_CORE_SEMANTIC_RUNTIME,
     SOURCE_PIPELINE_CONTRACT,
-    load_domain_pack_runtime,
+    load_core_semantic_runtime,
 )
 from evidence_profile_runtime.file_readers import discover_source_files, read_source_tables
 from evidence_profile_runtime.semantic_text import (
@@ -25,6 +26,7 @@ from evidence_profile_runtime.semantic_text import (
     normalize_identity_value,
     normalized_key,
     semantic_role,
+    semantic_catalog_for_runtime,
     token_overlap_score,
 )
 from evidence_profile_runtime.sql_helpers import json_ready, quote_ident
@@ -93,7 +95,7 @@ def table_public_payload(table: dict[str, Any], fields: list[dict[str, Any]]) ->
     }
 
 
-def profile_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def profile_tables(tables: list[dict[str, Any]], semantic_catalog: dict[str, Any]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     table_profiles: list[dict[str, Any]] = []
     field_candidates: list[dict[str, Any]] = []
     for table in tables:
@@ -102,8 +104,17 @@ def profile_tables(tables: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], 
         for column in frame.columns:
             series = frame[column]
             stats = value_profile(series)
-            semantic, confidence, reason = infer_semantic(str(column), str(table["tableLabel"]))
-            role, usage = semantic_role(semantic, str(stats["type"]), float(stats["uniqueRatio"]))
+            semantic, confidence, reason = infer_semantic(
+                str(column),
+                str(table["tableLabel"]),
+                semantic_catalog["aliases"],
+            )
+            role, usage = semantic_role(
+                semantic,
+                str(stats["type"]),
+                float(stats["uniqueRatio"]),
+                semantic_catalog["roles"],
+            )
             field = {
                 "tableKey": table["tableKey"],
                 "tableLabel": table["tableLabel"],
@@ -145,15 +156,21 @@ def field_values(table: dict[str, Any], field_name: str, limit: int = 400) -> se
     return values
 
 
-def discover_relationships(tables: list[dict[str, Any]], fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def discover_relationships(
+    tables: list[dict[str, Any]],
+    fields: list[dict[str, Any]],
+    semantic_catalog: dict[str, Any],
+) -> list[dict[str, Any]]:
+    identity_semantics = semantic_catalog["roles"]["identity"]
+    dimension_semantics = semantic_catalog["roles"]["dimension"]
     tables_by_key = {table["tableKey"]: table for table in tables}
     groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for field in fields:
         semantic = str(field["semantic"])
         normalized = str(field["normalizedName"])
-        if semantic in IDENTITY_SEMANTICS:
+        if semantic in identity_semantics:
             groups[f"semantic:{semantic}"].append(field)
-        if any(token in normalized for token in ["id", "key", "no", "code", "号", "单", "编码"]):
+        if any(token in normalized for token in ["id", "key", "no", "code", "编号", "编码", "标识"]):
             groups[f"name:{normalized}"].append(field)
 
     relationships: list[dict[str, Any]] = []
@@ -200,8 +217,8 @@ def discover_relationships(tables: list[dict[str, Any]], fields: list[dict[str, 
         for left_key, right_key in zip(table_keys, table_keys[1:]):
             left_options = fields_by_table.get(left_key, [])
             right_options = fields_by_table.get(right_key, [])
-            left = first_field(left_options, IDENTITY_SEMANTICS, None) or first_field(left_options, DIMENSION_SEMANTICS, None) or (left_options[0] if left_options else None)
-            right = first_field(right_options, IDENTITY_SEMANTICS, None) or first_field(right_options, DIMENSION_SEMANTICS, None) or (right_options[0] if right_options else None)
+            left = first_field(left_options, identity_semantics, None) or first_field(left_options, dimension_semantics, None) or (left_options[0] if left_options else None)
+            right = first_field(right_options, identity_semantics, None) or first_field(right_options, dimension_semantics, None) or (right_options[0] if right_options else None)
             if not left or not right:
                 continue
             relationships.append(
@@ -279,20 +296,28 @@ def blocked_plan(plan_id: str, label: str, required: list[str], available: set[s
     }
 
 
-def build_metric_plans(tables: list[dict[str, Any]], fields: list[dict[str, Any]], relationships: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_metric_plans(
+    tables: list[dict[str, Any]],
+    fields: list[dict[str, Any]],
+    relationships: list[dict[str, Any]],
+    semantic_catalog: dict[str, Any],
+) -> list[dict[str, Any]]:
+    time_semantics = semantic_catalog["roles"]["time"]
+    measure_semantics = semantic_catalog["roles"]["measure"]
+    dimension_semantics = semantic_catalog["roles"]["dimension"]
     grouped = fields_for_table(fields)
     plans: list[dict[str, Any]] = []
     for table in tables:
         table_key = table["tableKey"]
         local_fields = grouped.get(table_key, [])
-        date_field = first_field(local_fields, TIME_SEMANTICS, None)
+        date_field = first_field(local_fields, time_semantics, None)
         measure_fields = [
             field for field in local_fields
-            if field["semantic"] in MEASURE_SEMANTICS or field["role"] == "measure"
+            if field["semantic"] in measure_semantics or field["role"] == "measure"
         ][:4]
         dimension_fields = [
             field for field in local_fields
-            if field["semantic"] in DIMENSION_SEMANTICS or field["role"] in {"dimension", "identity"}
+            if field["semantic"] in dimension_semantics or field["role"] in {"dimension", "identity"}
         ][:3]
 
         plans.append(build_executable_plan(
@@ -332,15 +357,11 @@ def build_metric_plans(tables: list[dict[str, Any]], fields: list[dict[str, Any]
                 ))
 
     available_semantics = {str(field["semantic"]) for field in fields}
-    blocked_requirements = [
-        ("net_sales_reconciliation", "净销售对账", ["paid_gmv", "refund_amount", "order_id"]),
-        ("gross_margin", "毛利测算", ["paid_gmv", "cost_amount", "sku"]),
-        ("refund_rate", "退款率", ["paid_gmv", "refund_amount"]),
-        ("inventory_turnover", "库存周转", ["inventory_qty", "paid_gmv", "sku"]),
-        ("supplier_fulfillment", "供应商履约", ["supplier", "inventory_qty", "paid_at"]),
-        ("cross_table_profit", "跨表利润归因", ["paid_gmv", "cost_amount", "verified_relationship"]),
-    ]
-    for plan_id, label, required in blocked_requirements:
+    blocked_requirements = semantic_catalog["blockedRequirements"]
+    for requirement in blocked_requirements:
+        plan_id = str(requirement["analysisId"])
+        label = str(requirement["label"])
+        required = list(requirement["required"])
         plan = blocked_plan(plan_id, label, required, available_semantics)
         if relationships and plan_id != "cross_table_profit" and not plan["missingRealSemantics"]:
             continue
@@ -574,20 +595,48 @@ def empty_user_confirmation_state() -> dict[str, Any]:
     }
 
 
-def source_intelligence(input_paths: list[Path], output_dir: Path, domain_pack_runtime_path: Path | None = None) -> dict[str, Any]:
+def source_intelligence(
+    input_paths: list[Path],
+    output_dir: Path,
+    core_semantic_runtime_path: Path | None = None,
+    domain_pack_context: dict[str, Any] | None = None,
+    workspace_fingerprints: dict[str, str] | None = None,
+) -> dict[str, Any]:
     stage_timings: dict[str, int] = {}
     files = timed(stage_timings, "discover_files_ms", lambda: discover_source_files(input_paths))
     if not files:
         raise SystemExit("No CSV/XLSX sources found")
     output_dir.mkdir(parents=True, exist_ok=True)
-    domain_pack_runtime, source_pipeline_contract = load_domain_pack_runtime(
-        domain_pack_runtime_path,
-        default_runtime_file=DEFAULT_DOMAIN_PACK_RUNTIME,
+    core_semantic_runtime, source_pipeline_contract = load_core_semantic_runtime(
+        core_semantic_runtime_path,
+        default_runtime_file=DEFAULT_CORE_SEMANTIC_RUNTIME,
     )
+    semantic_catalog = semantic_catalog_for_runtime(domain_pack_context)
+    enabled_domain_packs = list((domain_pack_context or {}).get("enabledDomainPacks") or [])
+    core_semantic_runtime = {
+        **core_semantic_runtime,
+        "semanticHints": [
+            {"semantic": semantic, "aliases": aliases[:8]}
+            for semantic, aliases in sorted(semantic_catalog["aliases"].items())
+        ],
+        "enabledDomainPacks": enabled_domain_packs,
+    }
+    source_pipeline_contract = {**source_pipeline_contract, "coreSemanticRuntime": core_semantic_runtime}
     tables, reader_warnings = timed(stage_timings, "read_sources_ms", lambda: read_source_tables(files))
-    table_profiles, field_candidates = timed(stage_timings, "profile_sources_ms", lambda: profile_tables(tables))
-    relationships = timed(stage_timings, "discover_relationships_ms", lambda: discover_relationships(tables, field_candidates))
-    metric_sql_plans = timed(stage_timings, "compile_metric_sql_ms", lambda: build_metric_plans(tables, field_candidates, relationships))
+    source_fingerprint_material = [
+        {
+            "tableKey": str(table.get("tableKey") or ""),
+            "sheetName": str(table.get("sheetName") or ""),
+            "sha256": str(table.get("sha256") or ""),
+        }
+        for table in tables
+    ]
+    source_fingerprint = hashlib.sha256(
+        json.dumps(source_fingerprint_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    table_profiles, field_candidates = timed(stage_timings, "profile_sources_ms", lambda: profile_tables(tables, semantic_catalog))
+    relationships = timed(stage_timings, "discover_relationships_ms", lambda: discover_relationships(tables, field_candidates, semantic_catalog))
+    metric_sql_plans = timed(stage_timings, "compile_metric_sql_ms", lambda: build_metric_plans(tables, field_candidates, relationships, semantic_catalog))
     metric_query_results = timed(stage_timings, "execute_metric_sql_ms", lambda: execute_metric_sql(metric_sql_plans, tables))
     data_gaps = timed(stage_timings, "diagnostics_ms", lambda: build_data_gaps(field_candidates, relationships, metric_sql_plans))
     generated_at = now_iso()
@@ -627,7 +676,12 @@ def source_intelligence(input_paths: list[Path], output_dir: Path, domain_pack_r
         "relationshipCoverageKeyCount": len(relationship_coverage_matrix["keys"]),
         "userConfirmationSummary": user_confirmations["summary"],
         "stageTimingsMs": stage_timings,
-        "domainPackRuntime": domain_pack_runtime,
+        "sourceFingerprint": source_fingerprint,
+        "workspaceSchemaFingerprint": str((workspace_fingerprints or {}).get("schema") or ""),
+        "workspaceDataFingerprint": str((workspace_fingerprints or {}).get("data") or ""),
+        "domainPackFingerprint": str((workspace_fingerprints or {}).get("domainPacks") or ""),
+        "coreSemanticRuntime": core_semantic_runtime,
+        "enabledDomainPacks": enabled_domain_packs,
         "sourcePipelineContract": source_pipeline_contract,
         "outputs": OUTPUTS,
         "principles": [
@@ -641,7 +695,7 @@ def source_intelligence(input_paths: list[Path], output_dir: Path, domain_pack_r
     source_profile_payload = {
         "version": 2,
         "generatedAt": generated_at,
-        "domainPackRuntime": domain_pack_runtime,
+        "coreSemanticRuntime": core_semantic_runtime,
         "sourcePipelineContract": source_pipeline_contract,
         "tables": table_profiles,
         "skippedTables": [],
@@ -703,12 +757,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Profile CSV/XLSX sources and write AIBI-C evidence receipts.")
     parser.add_argument("inputs", nargs="*", type=Path)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT)
-    parser.add_argument("--domain-pack-runtime", type=Path)
+    parser.add_argument("--core-semantic-runtime", type=Path)
     args = parser.parse_args()
     if not args.inputs:
         parser.error("At least one source path is required.")
     inputs = args.inputs
-    manifest = source_intelligence(inputs, args.output_dir, args.domain_pack_runtime)
+    manifest = source_intelligence(inputs, args.output_dir, args.core_semantic_runtime)
     print(json.dumps(json_ready(manifest), ensure_ascii=False, indent=2))
 
 

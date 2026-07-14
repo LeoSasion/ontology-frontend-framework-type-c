@@ -47,6 +47,31 @@ export async function handleWorkspaceApi({ cli, port, request, response, url }: 
     return true;
   }
 
+  if (url.pathname === "/api/domain-packs" && request.method === "GET") {
+    const args = ["domain-packs"];
+    const workspace = url.searchParams.get("workspace");
+    if (workspace) args.push("--workspace", workspace);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/domain-packs" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "domain-pack-set",
+      "--pack",
+      String(body.packId ?? body.pack ?? ""),
+      "--state",
+      String(body.state ?? ""),
+    ];
+    if (body.workspaceId ?? body.workspace) args.push("--workspace", String(body.workspaceId ?? body.workspace));
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/workbench" && request.method === "GET") {
     const limit = url.searchParams.get("limit") ?? "12";
     const result = await cli(["workbench", "--limit", limit]);

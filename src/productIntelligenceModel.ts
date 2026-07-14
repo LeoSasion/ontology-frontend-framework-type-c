@@ -15,7 +15,7 @@ export type ScenarioPack = {
   title: string;
   detail: string;
   prompt: string;
-  template?: "business" | "cost-monitor";
+  template?: "business" | "erp-units";
   readiness: ProductSignalTone;
   facts: string[];
 };

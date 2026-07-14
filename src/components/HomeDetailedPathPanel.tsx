@@ -71,7 +71,7 @@ export function HomeDetailedPathPanel({
         <article className="nextStep">
           <div className="stepIcon"><Icon name="dashboard" /></div>
           <div>
-            <h3><Bilingual zh="2. 生成经营看板" en="2. Create business dashboard" /></h3>
+            <h3><Bilingual zh="2. 生成分析看板" en="2. Create analysis dashboard" /></h3>
             <p>
               <Bilingual
                 zh="使用系统的 metric、bar、line、pie、table、text、slicer 组件能力，并在看板里保留证据与动作边界。"
@@ -155,7 +155,7 @@ export function HomeDetailedPathPanel({
             <button
               className="miniButton"
               disabled={busy === "ask"}
-              onClick={() => runBusy("ask", () => onAsk(biText("帮我生成经营看板并说明证据", "Create a business dashboard and explain the evidence")), "agent")}
+              onClick={() => runBusy("ask", () => onAsk(biText("帮我生成分析看板并说明证据", "Create an analysis dashboard and explain the evidence")), "agent")}
               type="button"
             >
               {biText("让 Agent 起草", "Ask Agent")}

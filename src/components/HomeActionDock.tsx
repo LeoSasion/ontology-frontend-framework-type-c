@@ -22,7 +22,7 @@ export function HomeActionDock({
         <strong><Bilingual zh="导入或扫描数据" en="Import or scan data" /></strong>
         <small>{hasData ? biText(`${tableCount} 张表可用`, `${tableCount} tables ready`) : biText("选择文件或文件夹，先检查再确认", "Choose files or folders, preview first")}</small>
       </button>
-      <button className="homeActionCard" data-testid="home-action-cost-monitor" disabled={!hasData} onClick={() => onOpenStep("chart")} type="button">
+      <button className="homeActionCard" data-testid="home-action-chart" disabled={!hasData} onClick={() => onOpenStep("chart")} type="button">
         <span className="homeActionIcon"><Icon name="dashboard" /></span>
         <strong><Bilingual zh="生成一个图表" en="Create one chart" /></strong>
         <small>{hasData ? biText("到仪表盘页说需求", "Open dashboards and describe it") : biText("导入数据后可用", "Available after import")}</small>

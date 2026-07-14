@@ -129,7 +129,7 @@ function recoveryByCategory(category: ActionRecoveryCategory): Omit<ActionRecove
       safeState: text("看板未写入", "Dashboard not written"),
       steps: [
         text("确认目标看板名称和当前表。", "Confirm the target dashboard name and active table."),
-        text("先使用预览或 ERP 单元预演，检查会生成哪些组件。", "Use preview or ERP unit preview first to inspect proposed widgets."),
+        text("先使用预览检查会生成哪些组件。", "Use preview first to inspect proposed widgets."),
         text("缺字段时不要强行写入，先补数据或让 Agent 重新选择组件。", "When fields are missing, do not force a write; add data or ask Agent to reselect widgets."),
       ],
       targetSection: "dashboards",

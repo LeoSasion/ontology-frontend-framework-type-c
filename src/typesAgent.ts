@@ -1,4 +1,4 @@
-import type { DomainPackRuntime, SourcePipelineContract } from "./typesSource";
+import type { CoreSemanticRuntime, SourcePipelineContract } from "./typesSource";
 import type { SelectionConfidence } from "./typesWorkspace";
 
 export interface AgentAskResult {
@@ -131,7 +131,7 @@ export interface AgentAskResult {
     actions: string[];
     evidenceFiles: string[];
   };
-  domainPackRuntime: DomainPackRuntime;
+  coreSemanticRuntime: CoreSemanticRuntime;
   sourcePipelineContract: SourcePipelineContract;
 }
 
@@ -177,6 +177,7 @@ export interface QueryPlanReceipt {
     workspaceId: string;
     tableKey?: string | null;
     schemaFingerprint: string;
+    dataFingerprint: string;
   };
   selection: {
     group?: string | null;
@@ -203,6 +204,8 @@ export interface QueryPlanReceipt {
     snapshotStored: boolean;
   } | null;
   contextRefs: Array<Record<string, unknown>>;
+  domainPacks?: Array<{ packId: string; version: string; fingerprint: string; capabilities?: string[] }>;
+  domainPackFingerprint?: string;
   evidenceRefs: Array<Record<string, unknown>>;
   unresolved: unknown[];
   actionKey?: string | null;

@@ -66,13 +66,13 @@ function assertPageState() {
     home: {
       actionDock: Boolean(get("home-action-dock")),
       importAction: Boolean(get("home-action-import")),
-      chartActionEnabled: Boolean(get("home-action-cost-monitor")) && !disabled("home-action-cost-monitor"),
+      chartActionEnabled: Boolean(get("home-action-chart")) && !disabled("home-action-chart"),
     },
     sources: {
       entry: visible("source-intelligence-folder-entry"),
       importPreview: visible("import-preview-button"),
       coverageItems: visibleCount('[data-testid="source-coverage-item"]'),
-      dashboardNextAction: visible("source-next-dashboard") || visible("source-dashboard-next-action"),
+      dashboardNextAction: visible("source-next-dashboard") || visible("source-dashboard-next-action") || visible("beginner-plan-refresh-profile"),
       sourceError: visible("source-intelligence-error"),
     },
     dashboards: {
@@ -193,7 +193,7 @@ try {
     );
     steps.push({ section: "home", state: home.state });
 
-    const dashboardClick = await click(browser.client, '[data-testid="home-action-cost-monitor"]');
+    const dashboardClick = await click(browser.client, '[data-testid="home-action-chart"]');
     checks.push(check("ui-home-dashboard-click-fired", dashboardClick.ok, dashboardClick));
     const dashboardAfterClick = await waitFor(browser.client, () => {
       const text = document.body?.innerText || "";
@@ -241,7 +241,7 @@ try {
     );
     steps.push({ section: "evidence", state: evidencePage.state });
 
-    const sourcesPage = await waitForSection(browser.client, "sources", "source-dashboard-next-action");
+    const sourcesPage = await waitForSection(browser.client, "sources", "beginner-import-plan");
     checks.push(
       check("ui-sources-ready", sourcesPage.ready.ok, { ready: sourcesPage.ready }),
       check("ui-sources-profile-entry-hidden-after-profile", !sourcesPage.state.sources.entry),

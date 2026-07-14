@@ -56,7 +56,7 @@ export function AgentTaskPacket({ currentDraft, fallbackKind, dashboardDraft, da
           <div className="agentDashboardDraftLead">
             <div>
               <span className="storyMode"><Bilingual zh="将创建的看板" en="Dashboard to create" /></span>
-              <strong>{stringField(dashboardDraft, "dashboardName") || biText("Agent 经营复盘", "Agent business review")}</strong>
+              <strong>{stringField(dashboardDraft, "dashboardName") || biText("Agent 分析看板", "Agent analysis dashboard")}</strong>
               <p>{pairText(dashboardDraft.confirmationSummary as { zh: string; en: string } | undefined)}</p>
             </div>
             <div className="agentDashboardDraftStats">

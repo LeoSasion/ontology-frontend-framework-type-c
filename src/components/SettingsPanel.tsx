@@ -1,7 +1,7 @@
 import "./settingsPanel.css";
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getUserPreferences, makeThemeCopy, resolveThemePalette } from "../theme";
-import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload } from "../types";
+import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload, WorkspaceStatus } from "../types";
 import { Bilingual } from "./Bilingual";
 import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePanel";
 import { SettingsConfigPortabilityPanel } from "./SettingsConfigPortabilityPanel";
@@ -9,17 +9,20 @@ import { SettingsSandboxBoundaryPanel } from "./SettingsSandboxBoundaryPanel";
 import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePreferencePanel";
 
 const TrustContextSettingsPanel = lazy(() => import("./TrustContextSettingsPanel"));
+const SettingsDomainPackPanel = lazy(() => import("./SettingsDomainPackPanel").then((module) => ({ default: module.SettingsDomainPackPanel })));
 
 type SettingsPanelProps = {
   workbench: WorkbenchPayload;
+  status: WorkspaceStatus;
   onSavePreferences: (options: { preferences: Partial<UserPreferencesConfig>; confirm?: boolean }) => Promise<void>;
   onSaveThemePalette: (options: { action?: "save" | "upsert" | "delete"; theme?: Partial<ThemePaletteConfig>; themeKey?: string; confirm?: boolean }) => Promise<void>;
   onValidateConfig: () => Promise<Record<string, unknown>>;
   onExportConfig: () => Promise<Record<string, unknown>>;
   onApplyConfig: (options: { input: string; confirm?: boolean }) => Promise<Record<string, unknown>>;
+  onSetDomainPack: (options: { packId: string; state: "enabled" | "disabled"; workspaceId?: string; confirm?: boolean }) => Promise<Record<string, unknown>>;
 };
 
-export function SettingsPanel({ workbench, onSavePreferences, onSaveThemePalette, onValidateConfig, onExportConfig, onApplyConfig }: SettingsPanelProps) {
+export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThemePalette, onValidateConfig, onExportConfig, onApplyConfig, onSetDomainPack }: SettingsPanelProps) {
   const preferences = useMemo(() => getUserPreferences(workbench), [workbench]);
   const palettes = useMemo(() => Array.isArray(workbench.themePalettes) ? workbench.themePalettes.filter((theme) => theme.enabled) : [], [workbench.themePalettes]);
   const activeTheme = useMemo(() => resolveThemePalette(workbench, preferences), [preferences, workbench]);
@@ -27,6 +30,7 @@ export function SettingsPanel({ workbench, onSavePreferences, onSaveThemePalette
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [configInput, setConfigInput] = useState("");
   const [configResult, setConfigResult] = useState<Record<string, unknown> | null>(null);
+  const [domainPackResult, setDomainPackResult] = useState<Record<string, unknown> | null>(null);
 
   useEffect(() => {
     setDraftPreferences(preferences);
@@ -90,6 +94,16 @@ export function SettingsPanel({ workbench, onSavePreferences, onSaveThemePalette
     }
   }
 
+  async function setDomainPackState(options: { packId: string; state: "enabled" | "disabled"; workspaceId?: string; confirm?: boolean }) {
+    const key = `domain-pack-${options.packId}-${options.state}`;
+    setBusyKey(key);
+    try {
+      setDomainPackResult(await onSetDomainPack(options));
+    } finally {
+      setBusyKey(null);
+    }
+  }
+
   return (
     <section className="mainPanel settingsPanel" aria-labelledby="settings-title">
       <div className="settingsHeader">
@@ -123,6 +137,15 @@ export function SettingsPanel({ workbench, onSavePreferences, onSaveThemePalette
           preferenceChanged={preferenceChanged}
           preferences={preferences}
         />
+
+        <Suspense fallback={<div className="settingsLoading"><Bilingual zh="正在加载领域包设置…" en="Loading domain pack settings…" /></div>}>
+          <SettingsDomainPackPanel
+            busyKey={busyKey}
+            onSetDomainPack={setDomainPackState}
+            result={domainPackResult}
+            runtime={status.domainPacks}
+          />
+        </Suspense>
 
         <details className="progressiveDetails settingsProgressiveDetails" data-testid="settings-sandbox-details">
           <summary><Bilingual zh="写入保护和沙盒边界" en="Write protection and sandbox boundaries" /></summary>

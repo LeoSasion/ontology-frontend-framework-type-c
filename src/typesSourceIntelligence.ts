@@ -12,6 +12,14 @@ export interface SourceIntelligenceRunSummary {
   metric_sql_executable_count: number;
   created_at: string;
   inputRoots: string[];
+  sourceFingerprint?: string;
+  enabledDomainPacks?: Array<{ packId: string; version: string; fingerprint: string; capabilities?: string[] }>;
+  freshness?: {
+    status: "current" | "stale" | "unknown" | string;
+    usableForPlanning: boolean;
+    missingFingerprints: string[];
+    mismatches: string[];
+  };
   isInternal?: boolean;
   fileCoverage?: {
     sourceProfilePath: string;

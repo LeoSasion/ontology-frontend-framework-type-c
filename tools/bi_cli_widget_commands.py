@@ -52,6 +52,7 @@ from dashboard_widget_proposal_service import (
     build_dashboard_widget_proposal as build_dashboard_widget_proposal_service,
 )
 from erp_dashboard_unit_library import build_erp_dashboard_unit_templates, build_erp_unit_library_catalog_payload
+from domain_pack_service import is_domain_pack_enabled
 from evidence_run_store import latest_source_intelligence_summary
 from query_runtime import SAFE_AGGREGATIONS
 from relationship_command_service import (
@@ -95,6 +96,7 @@ def dashboard_widget_catalog_command(args: argparse.Namespace) -> dict[str, Any]
             widget_count = 0
         relationship_count = connection.execute("SELECT COUNT(*) FROM relationships WHERE workspace_id = ?", (workspace_id,)).fetchone()[0]
         metric_count = connection.execute("SELECT COUNT(*) FROM metric_definitions WHERE workspace_id = ?", (workspace_id,)).fetchone()[0]
+        erp_units_enabled = is_domain_pack_enabled(connection, workspace_id, "erp-units", "dashboardUnits")
     payload = build_dashboard_widget_catalog_payload(
         metadata_store=DB_PATH,
         latest_source_intelligence_run=latest_run,
@@ -105,7 +107,8 @@ def dashboard_widget_catalog_command(args: argparse.Namespace) -> dict[str, Any]
             "metrics": metric_count,
         },
     )
-    payload["erpUnitLibrary"] = build_erp_unit_library_catalog_payload(include_units=False)
+    if erp_units_enabled:
+        payload["erpUnitLibrary"] = build_erp_unit_library_catalog_payload(include_units=False)
     return payload
 
 
@@ -502,7 +505,7 @@ def save_dashboard_modules_command(args: argparse.Namespace) -> dict[str, Any]:
         layout["widgetLayout"] = layout_items
         layout["canvasWidthMode"] = args.canvas_width_mode
         layout["globalFilters"] = filters
-        dashboard_name = args.name or (dashboard["name"] if dashboard else ("经营证据看板" if args.dashboard == "default" else args.dashboard))
+        dashboard_name = args.name or (dashboard["name"] if dashboard else ("分析证据看板" if args.dashboard == "default" else args.dashboard))
         proposed = {
             "dashboardKey": args.dashboard,
             "dashboardName": dashboard_name,
@@ -552,18 +555,35 @@ def template_widget_layout(widget_type: str, index: int) -> dict[str, Any]:
     return template_widget_layout_service(widget_type, index)
 
 
-def table_template_fields(connection: sqlite3.Connection, table_key: str) -> dict[str, Any]:
+def table_template_fields(connection: sqlite3.Connection, table_key: str, workspace_id: str | None = None) -> dict[str, Any]:
+    resolved_workspace_id = workspace_id or active_workspace_id(connection)
+    registry_lookup = lambda conn, key: conn.execute(
+        "SELECT * FROM table_registry WHERE table_key = ? AND workspace_id = ?",
+        (key, resolved_workspace_id),
+    ).fetchone()
+    fields_by_usage = lambda conn, key, usage: [
+        row["field_name"] for row in conn.execute(
+            "SELECT field_name FROM field_semantics WHERE table_key = ? AND usage = ? AND workspace_id = ? ORDER BY confidence DESC, field_name",
+            (key, usage, resolved_workspace_id),
+        ).fetchall()
+    ]
+    fields_by_role = lambda conn, key, role: [
+        row["field_name"] for row in conn.execute(
+            "SELECT field_name FROM field_semantics WHERE table_key = ? AND role = ? AND workspace_id = ? ORDER BY confidence DESC, field_name",
+            (key, role, resolved_workspace_id),
+        ).fetchall()
+    ]
     return table_template_fields_service(
         connection,
         table_key,
-        registry_for_table=registry_for_table,
+        registry_for_table=registry_lookup,
         table_columns=table_columns,
-        field_names_by_usage=field_names_by_usage,
-        field_names_by_role=field_names_by_role,
+        field_names_by_usage=fields_by_usage,
+        field_names_by_role=fields_by_role,
     )
 
 
-def build_business_analysis_templates(connection: sqlite3.Connection, table_key: str | None = None, limit: int = 12, template_key: str = "business") -> dict[str, Any]:
+def build_business_analysis_templates(connection: sqlite3.Connection, table_key: str | None = None, limit: int = 12, template_key: str = "business", workspace_id: str | None = None) -> dict[str, Any]:
     return build_business_analysis_templates_service(
         connection,
         table_key,
@@ -572,12 +592,13 @@ def build_business_analysis_templates(connection: sqlite3.Connection, table_key:
         rows_to_dicts=rows_to_dicts,
         preferred_table_key=preferred_table_key,
         slug=slug,
-        table_template_fields=table_template_fields,
+        table_template_fields=lambda conn, key: table_template_fields(conn, key, workspace_id),
         template_key=template_key,
+        workspace_id=workspace_id,
     )
 
 
-def build_business_dashboard_payload(connection: sqlite3.Connection, table_key: str | None = None, limit: int = 10, template_key: str = "business") -> dict[str, Any]:
+def build_business_dashboard_payload(connection: sqlite3.Connection, table_key: str | None = None, limit: int = 10, template_key: str = "business", workspace_id: str | None = None) -> dict[str, Any]:
     return build_business_dashboard_payload_service(
         connection,
         table_key,
@@ -585,6 +606,7 @@ def build_business_dashboard_payload(connection: sqlite3.Connection, table_key: 
         build_business_analysis_templates=build_business_analysis_templates,
         preferred_table_key=preferred_table_key,
         template_key=template_key,
+        workspace_id=workspace_id,
     )
 
 
@@ -657,11 +679,21 @@ def business_dashboard_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def erp_unit_library_command(args: argparse.Namespace) -> dict[str, Any]:
-    catalog = build_erp_unit_library_catalog_payload(include_units=not args.summary)
-    if not args.select:
-        return {"ok": True, "catalog": catalog}
     with open_db() as connection:
         workspace_id = active_workspace_id(connection)
+        enabled = is_domain_pack_enabled(connection, workspace_id, "erp-units", "dashboardUnits")
+        if not enabled:
+            return {
+                "ok": True,
+                "available": False,
+                "packId": "erp-units",
+                "reason": "domain-pack-not-enabled",
+                "catalog": None,
+                "selection": None,
+            }
+        catalog = build_erp_unit_library_catalog_payload(include_units=not args.summary)
+        if not args.select:
+            return {"ok": True, "available": True, "packId": "erp-units", "catalog": catalog}
         table_rows = rows_to_dicts(
             connection.execute(
                 "SELECT * FROM table_registry WHERE workspace_id = ? ORDER BY row_count DESC, table_key",
@@ -696,6 +728,7 @@ def erp_unit_library_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def build_agent_dashboard_create_draft(
     connection: sqlite3.Connection,
+    workspace_id: str,
     table_key: str | None,
     prompt: str,
     limit: int = 8,
@@ -704,6 +737,7 @@ def build_agent_dashboard_create_draft(
 ) -> dict[str, Any]:
     return build_agent_dashboard_create_draft_service(
         connection,
+        workspace_id,
         table_key,
         prompt,
         limit,

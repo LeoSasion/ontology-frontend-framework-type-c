@@ -210,6 +210,15 @@ def build_parser() -> argparse.ArgumentParser:
     workspace_delete.add_argument("workspace")
     workspace_delete.add_argument("--yes", action="store_true")
 
+    domain_packs = sub.add_parser("domain-packs", description="List validated Domain Packs and the current workspace activation state.")
+    domain_packs.add_argument("--workspace", default="")
+
+    domain_pack_set = sub.add_parser("domain-pack-set", description="Preview or confirm one workspace-scoped Domain Pack state change.")
+    domain_pack_set.add_argument("--pack", required=True)
+    domain_pack_set.add_argument("--state", required=True, choices=["enabled", "disabled"])
+    domain_pack_set.add_argument("--workspace", default="")
+    domain_pack_set.add_argument("--yes", action="store_true")
+
     source_run = sub.add_parser("source-run")
     source_run.add_argument("source_run_id")
 
@@ -285,7 +294,7 @@ def build_parser() -> argparse.ArgumentParser:
     business_dashboard.add_argument("--dashboard", default="default")
     business_dashboard.add_argument("--name", default="")
     business_dashboard.add_argument("--table")
-    business_dashboard.add_argument("--template", default="business", choices=["business", "cost-monitor", ERP_UNIT_LIBRARY_TEMPLATE_KEY])
+    business_dashboard.add_argument("--template", default="business", choices=["business", ERP_UNIT_LIBRARY_TEMPLATE_KEY])
     business_dashboard.add_argument("--limit", type=int, default=10)
     business_dashboard.add_argument("--yes", action="store_true")
 

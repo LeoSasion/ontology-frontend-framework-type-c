@@ -33,6 +33,7 @@ type DashboardAdvancedWidgetWorkbenchProps = {
   businessCategories: Array<Record<string, unknown>>;
   businessDraft: Record<string, unknown> | null;
   businessTemplateCount: number;
+  erpPackEnabled: boolean;
   canvasWidthMode: DashboardCanvasWidthMode;
   dashboardFilters: DashboardFilterRule[];
   dashboardKey: string;
@@ -86,6 +87,7 @@ export function DashboardAdvancedWidgetWorkbench({
   businessCategories,
   businessDraft,
   businessTemplateCount,
+  erpPackEnabled,
   canvasWidthMode,
   dashboardFilters,
   dashboardKey,
@@ -164,6 +166,7 @@ export function DashboardAdvancedWidgetWorkbench({
           businessCategories={businessCategories}
           businessDraft={businessDraft}
           businessTemplateCount={businessTemplateCount}
+          erpPackEnabled={erpPackEnabled}
           dashboardKey={dashboardKey}
           defaultTableKey={defaultTableKey}
           onBusinessTemplate={onBusinessTemplate}

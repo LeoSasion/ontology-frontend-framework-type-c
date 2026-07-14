@@ -28,7 +28,7 @@ export function TopBar({ activeSection, status, apiMode }: TopBarProps) {
     <div className={activeSection === "home" || activeSection === "agent" ? "topBarStack" : "topBarStack workbenchTopBar"}>
       <header className="topBar">
         <div>
-          <p className="kicker">{biText("经营分析助手", "Business analysis assistant")}</p>
+          <p className="kicker">{biText("可信分析助手", "Trusted analysis assistant")}</p>
           <h1>
             <Bilingual {...headline} />
           </h1>

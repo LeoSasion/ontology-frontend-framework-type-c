@@ -107,10 +107,13 @@ export function useDashboardCanvasState({
 
   useEffect(() => {
     const available = dashboardWidgets.map((widget) => widget.widget_key);
-    setWidgetOrder((current) => [
-      ...current.filter((key) => available.includes(key)),
-      ...available.filter((key) => !current.includes(key)),
-    ]);
+    setWidgetOrder((current) => {
+      const next = [
+        ...current.filter((key) => available.includes(key)),
+        ...available.filter((key) => !current.includes(key)),
+      ];
+      return current.length === next.length && current.every((key, index) => key === next[index]) ? current : next;
+    });
     setSelectedWidgetKey((current) => available.includes(current) ? current : available[0] ?? "");
   }, [dashboard.dashboard_key, dashboardWidgets]);
 

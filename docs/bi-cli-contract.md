@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `111`
+Command count: `113`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -16,6 +16,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `connector` | 8 |
 | `context` | 6 |
 | `dashboard` | 19 |
+| `domain-pack` | 2 |
 | `evidence` | 7 |
 | `formula` | 4 |
 | `import` | 7 |
@@ -39,9 +40,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 49 |
+| `dry-run-confirm` | 50 |
 | `evidence-receipt` | 8 |
-| `read-only` | 46 |
+| `read-only` | 47 |
 | `runtime-receipt` | 3 |
 
 ## Commands
@@ -83,6 +84,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `delete-source` | `source` | `dry-run-confirm` | `yes` | `no` | `source`, `--yes` |
 | `delete-view` | `view` | `dry-run-confirm` | `yes` | `no` | `--view`, `--yes` |
 | `discover-connector` | `connector` | `read-only` | `no` | `no` | `--connector` |
+| `domain-pack-set` | `domain-pack` | `dry-run-confirm` | `yes` | `no` | `--pack`, `--state`, `--workspace`, `--yes` |
+| `domain-packs` | `domain-pack` | `read-only` | `no` | `no` | `--workspace` |
 | `erp-unit-library` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--limit`, `--select`, `--summary` |
 | `export-analysis` | `evidence` | `artifact-export` | `no` | `no` | `--receipt`, `--unit`, `--output` |
 | `export-config` | `config` | `runtime-receipt` | `no` | `no` | `output` |

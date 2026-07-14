@@ -6,7 +6,8 @@ import json
 import sqlite3
 from typing import Any, Callable
 
-from context_pack_service import workspace_schema_fingerprint
+from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
+from domain_pack_service import domain_pack_set_fingerprint
 
 
 def _receipt_key(workspace_id: str, request_text: str, created_at: str) -> str:
@@ -58,6 +59,7 @@ def create_query_plan_receipt(
     evidence_refs: list[Any] | None = None,
     unresolved: list[Any] | None = None,
     context_refs: list[Any] | None = None,
+    domain_packs: list[dict[str, Any]] | None = None,
     action_key: str | None = None,
     result_rows: list[Any] | None = None,
     now_iso: Callable[[], str],
@@ -65,9 +67,12 @@ def create_query_plan_receipt(
     created_at = now_iso()
     receipt_key = _receipt_key(workspace_id, request_text, created_at)
     schema_fingerprint = workspace_schema_fingerprint(connection, workspace_id, source_table_key)
+    data_fingerprint = workspace_data_fingerprint(connection, workspace_id, source_table_key)
     runtime = runtime if isinstance(runtime, dict) else {}
     evidence_refs = list(evidence_refs or [])
     context_refs = list(context_refs or [])
+    domain_packs = list(domain_packs or [])
+    domain_pack_fingerprint = domain_pack_set_fingerprint({"enabledDomainPacks": domain_packs})
     unresolved = list(unresolved or [])
     filters = list(filters or [])
     joins = list(joins or [])
@@ -90,6 +95,7 @@ def create_query_plan_receipt(
             "workspaceId": workspace_id,
             "tableKey": source_table_key,
             "schemaFingerprint": schema_fingerprint,
+            "dataFingerprint": data_fingerprint,
         },
         "selection": {
             "group": group,
@@ -116,6 +122,8 @@ def create_query_plan_receipt(
         },
         "resultBinding": result_binding,
         "contextRefs": context_refs,
+        "domainPacks": domain_packs,
+        "domainPackFingerprint": domain_pack_fingerprint,
         "evidenceRefs": evidence_refs,
         "unresolved": unresolved,
         "actionKey": action_key,

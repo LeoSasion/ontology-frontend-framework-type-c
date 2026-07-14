@@ -373,7 +373,7 @@ export function appendDashboardViewContractChecks(context) {
           erpUnitLibraryViewModelSource.includes("export function buildErpGapUnlocks") &&
           erpUnitLibraryViewModelSource.includes("export function collectNeededFieldsFromErpHints") &&
           dashboardBusinessTemplatePanelSource.includes("summarizeMatchedFields(widget.matchedFields)") &&
-          dashboardBusinessTemplatePanelSource.includes("Business dashboard generated"),
+          dashboardBusinessTemplatePanelSource.includes("Analysis dashboard generated"),
       },
     {
         label: "dashboard-widget-recommendation-panel-component-boundary",

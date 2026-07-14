@@ -10,6 +10,7 @@ type DashboardBusinessTemplatePanelProps = {
   businessDraft: Record<string, unknown> | null;
   businessCategories: Array<Record<string, unknown>>;
   businessTemplateCount: number;
+  erpPackEnabled: boolean;
   savedDashboardKey?: unknown;
   savedDashboardModules?: unknown;
   savedTemplateCount?: unknown;
@@ -48,6 +49,7 @@ export function DashboardBusinessTemplatePanel({
   businessDraft,
   businessCategories,
   businessTemplateCount,
+  erpPackEnabled,
   savedDashboardKey,
   savedDashboardModules,
   savedTemplateCount,
@@ -75,13 +77,13 @@ export function DashboardBusinessTemplatePanel({
   return (
     <article className="widgetActionPanel businessTemplatePanel" data-testid="business-template-panel">
       <div className="tileHeader compact">
-        <h3><Bilingual zh="经营模板" en="Business templates" /></h3>
+        <h3><Bilingual zh="分析模板" en="Analysis templates" /></h3>
         <span>{defaultTableKey}</span>
       </div>
       <p className="emptyFilterHint">
         <Bilingual
-          zh="按字段语义和公开 ERP 单元自动组合经营总览、趋势、结构拆解、切片器和明细核查。先预演，再选择新建或覆盖。"
-          en="Build an executive dashboard from field semantics and public ERP units: overview, trend, breakdown, slicer, and detail widgets. Preview first, then create or overwrite."
+          zh={erpPackEnabled ? "按字段证据与已启用的 ERP 单元组合看板。先预演，再选择新建或覆盖。" : "按当前字段证据组合通用总览、趋势、结构、筛选和明细组件。先预演，再选择新建或覆盖。"}
+          en={erpPackEnabled ? "Build from field evidence and the enabled ERP unit pack. Preview before creating or overwriting." : "Build generic overview, trend, breakdown, filter, and detail widgets from current field evidence. Preview before creating or overwriting."}
         />
       </p>
       <div className="dashboardOps">
@@ -95,17 +97,7 @@ export function DashboardBusinessTemplatePanel({
           <Icon name="evidence" />
           <Bilingual zh="预演模板" en="Preview" />
         </button>
-        <button
-          className="secondaryButton"
-          data-testid="cost-monitor-dashboard-preview"
-          disabled={busy === "cost-monitor-template-preview"}
-          onClick={() => onBusinessTemplate("cost-monitor-template-preview", { op: "draft", table: defaultTableKey, template: "cost-monitor", limit: 24 })}
-          type="button"
-        >
-          <Icon name="dashboard" />
-          <Bilingual zh="费用监控" en="Cost monitor" />
-        </button>
-        <button
+        {erpPackEnabled ? <button
           className="secondaryButton"
           data-testid="erp-unit-dashboard-preview"
           disabled={busy === "erp-unit-template-preview"}
@@ -114,7 +106,7 @@ export function DashboardBusinessTemplatePanel({
         >
           <Icon name="evidence" />
           <Bilingual zh="ERP 单元" en="ERP units" />
-        </button>
+        </button> : null}
         <button
           className="primaryButton"
           data-testid="business-dashboard-create"
@@ -293,7 +285,7 @@ export function DashboardBusinessTemplatePanel({
         <div className="businessTemplateResult" data-testid="business-template-result">
           <div className="businessTemplateResultHeader">
             <div>
-              <strong>{biText("经营看板已生成", "Business dashboard generated")}</strong>
+              <strong>{biText("分析看板已生成", "Analysis dashboard generated")}</strong>
               <span>{String(savedDashboardKey)}</span>
             </div>
           </div>

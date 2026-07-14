@@ -35,7 +35,7 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
     if (body.parentRunKey) args.push("--parent-run", String(body.parentRunKey));
     if (body.branchLabel) args.push("--branch-label", String(body.branchLabel));
-    args.push(prompt || "生成经营分析计划");
+    args.push(prompt || "生成分析计划");
     const deterministicResult = await cli(args);
     const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
     sendJson(response, 200, result);

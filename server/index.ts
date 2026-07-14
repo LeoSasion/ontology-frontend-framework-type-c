@@ -78,6 +78,7 @@ function actionForApiPath(url: URL) {
   if (url.pathname.includes("analysis-unit") || url.pathname.includes("chart-adapt")) return "analysis";
   if (url.pathname.includes("jobs")) return "job";
   if (url.pathname.includes("context")) return "context";
+  if (url.pathname.includes("domain-packs")) return "domain-pack";
   if (url.pathname.includes("preferences") || url.pathname.includes("theme") || url.pathname.includes("config")) return "settings";
   if (url.pathname.includes("workspace")) return "workspace";
   return "api";
@@ -93,7 +94,7 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
     return;
   }
 
-  if (await handleDashboardApi({ cli, request, response, root, url })) {
+  if (await handleDashboardApi({ cli, request, response, url })) {
     return;
   }
 

@@ -104,20 +104,14 @@ def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
 def normalize_relation_field_name(value: str) -> str:
     text = re.sub(r"[\s_\-\.]+", "", str(value or "").strip().lower())
     replacements = {
-        "订单编号": "orderid",
-        "订单号": "orderid",
-        "单号": "orderid",
-        "退款单号": "refundid",
-        "商品编码": "sku",
-        "商家编码": "sku",
-        "商品id": "sku",
-        "sku编码": "sku",
-        "渠道": "channel",
-        "店铺": "shop",
+        "唯一标识符": "identifier",
+        "唯一标识": "identifier",
+        "主键": "primarykey",
+        "外键": "foreignkey",
     }
     for source, target in replacements.items():
         text = text.replace(source, target)
-    for suffix in ("key", "code", "number", "no", "编号", "编码", "号"):
+    for suffix in ("identifier", "key", "code", "number", "no", "编号", "编码", "标识"):
         if text.endswith(suffix) and len(text) > len(suffix) + 2:
             text = text[: -len(suffix)]
     return text
@@ -157,9 +151,9 @@ def relation_candidate_fields(
             reasons.append("identity-key")
         if usage == "joinable":
             reasons.append("semantic-joinable")
-        if any(token in text for token in ("id", "key", "code", "sku", "order", "订单", "编号", "编码", "单号")):
+        if any(token in text for token in ("id", "key", "code", "identifier", "编号", "编码", "标识", "主键", "外键")):
             reasons.append("name-keyword")
-        if any(tag in {"product", "talent", "order", "refund", "channel"} for tag in tags):
+        if any(tag in {"identifier", "identity", "joinable", "primary-key", "foreign-key"} for tag in tags):
             reasons.append("semantic-tag")
         if reasons:
             candidates.append(
@@ -187,11 +181,11 @@ def relationship_name_score(left_field: str, right_field: str) -> tuple[int, lis
     elif left_name and right_name and (left_name in right_name or right_name in left_name):
         score += 42
         reasons.append("field-name-contains")
-    common_tokens = ("order", "refund", "sku", "product", "channel", "shop", "订单", "售后", "商品", "渠道", "店铺")
-    shared = [token for token in common_tokens if token in left_name and token in right_name]
+    structural_tokens = ("id", "key", "code", "identifier", "编号", "编码", "标识", "主键", "外键")
+    shared = [token for token in structural_tokens if token in left_name and token in right_name]
     if shared:
         score += min(28, 10 * len(shared))
-        reasons.append(f"shared-business-token:{','.join(shared[:3])}")
+        reasons.append(f"shared-structural-token:{','.join(shared[:3])}")
     return score, reasons
 
 

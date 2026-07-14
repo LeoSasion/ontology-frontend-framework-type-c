@@ -385,7 +385,8 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
           sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm"}') &&
           !sourceWorkbenchActionPanelSource.includes("不可读或未预检时不能确认导入") &&
-          sourceWorkbenchSource.includes("hasData && sourceProfileComplete ? (") &&
+          sourceWorkbenchSource.includes("{hasData ? (") &&
+          !sourceWorkbenchSource.includes("hasData && sourceProfileComplete ? (") &&
           sourceWorkbenchSource.includes('data-testid="source-evidence-details"') &&
           stylesSource.includes(".beginnerImportGuard") &&
           stylesSource.includes(".sourceGuideDetails") &&
@@ -704,7 +705,7 @@ export function appendSourceContractChecks(context) {
           byLabel["cli-list-semantics"].parsed?.semantics?.some((semantic) => semantic.field === "sku" && semantic.source === "manual") &&
           byLabel["cli-infer-metrics-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-infer-metrics-confirm"].parsed?.saved >= 4 &&
-          byLabel["cli-list-metrics"].parsed?.metrics?.some((metric) => metric.metricKey === "orders_net_sales_sum" && metric.dimension === "channel") &&
+          byLabel["cli-list-metrics"].parsed?.metrics?.some((metric) => metric.metricKey === "orders_net_sales_sum" && metric.measure === "net_sales" && metric.dimension) &&
           byLabel["cli-add-metric-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-add-metric-confirm"].parsed?.confirmed === true &&
           byLabel["cli-add-metric-confirm"].parsed?.savedMetric?.metricKey === "verify_avg_net_sales" &&

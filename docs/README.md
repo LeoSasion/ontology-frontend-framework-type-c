@@ -15,6 +15,7 @@
 | [实现状态](implementation-status.md) | 当前能力、已知限制、架构归属和验证入口 |
 | [未来开发队列](development-roadmap.md) | 尚未交付事项、优先级和退出条件 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、粒度、关系路径与执行阻塞 |
+| [通用领域扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Connector Adapter、工作区启停、迁移和隔离合同 |
 | [Agent 知识包](agent-knowledge-packs.md) | 模型无关业务规则、证据和扩展要求 |
 | [Agent Provider](agent-provider-runtime.md) | 可选外部模型的数据边界、降级和验证 |
 | [ERP 看板单元库](erp-dashboard-unit-library.md) | Beta 单元选择、遗漏和晋级边界 |

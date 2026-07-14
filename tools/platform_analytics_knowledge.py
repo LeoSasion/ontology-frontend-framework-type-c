@@ -114,8 +114,8 @@ def match_platform_knowledge(
         percent_pattern = str(intent.get("percentPattern") or "")
         percent_match = re.search(percent_pattern, prompt, re.IGNORECASE) if percent_pattern else None
         return {
-            "packId": pack["id"],
-            "packVersion": pack["version"],
+            "packId": "platform-commerce",
+            "packVersion": "1.0.0",
             "ruleId": intent["id"],
             "title": intent["title"],
             "grain": intent["grain"],

@@ -68,8 +68,8 @@ function emptyWorkspaceState() {
       actionDock: isVisible("home-action-dock"),
       activationPanel: isVisible("product-activation-panel"),
       importAction: isVisible("product-activation-step-data"),
-      chartActionVisible: isVisible("home-action-cost-monitor"),
-      chartActionDisabled: disabled("home-action-cost-monitor"),
+      chartActionVisible: isVisible("home-action-chart"),
+      chartActionDisabled: disabled("home-action-chart"),
     },
     sources: {
       importEntry: isVisible("source-intelligence-folder-entry"),

@@ -88,6 +88,15 @@ function executeDomain(fixture, iteration) {
   const explicitConfirm = actionKey ? runCli(env, ["confirm-action", actionKey, "--yes"]) : { ok: false, parsed: null };
   checks.push(check("explicit-single-chart-confirms-once", explicitConfirm.ok && explicitConfirm.parsed?.confirmed === true && (explicitConfirm.parsed?.addedWidget || explicitConfirm.parsed?.savedDashboardModules === 1), explicitConfirm.parsed));
 
+  const packEnable = runCli(env, [
+    "domain-pack-set", "--pack", "erp-units", "--state", "enabled", "--yes",
+  ]);
+  checks.push(check(
+    "erp-domain-pack-is-explicitly-enabled",
+    packEnable.ok && packEnable.parsed?.enabledDomainPacks?.some((item) => item?.packId === "erp-units"),
+    packEnable.parsed ?? packEnable.stderr,
+  ));
+
   const betaDraft = runCli(env, [
     "business-dashboard", "--op", "draft", "--table", tableKey,
     "--template", "erp-units", "--limit", "12",

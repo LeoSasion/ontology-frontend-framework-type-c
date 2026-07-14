@@ -1,0 +1,24 @@
+{
+  "schema": "aibi-domain-pack/v1",
+  "packId": "erp-units",
+  "version": "1.0.0",
+  "displayName": {
+    "zh": "ERP 看板单元",
+    "en": "ERP dashboard units"
+  },
+  "description": {
+    "zh": "按字段证据选择制造、库存、采购、履约与财务分析单元。",
+    "en": "Evidence-driven manufacturing, inventory, procurement, fulfillment, and finance dashboard units."
+  },
+  "coreCompatibility": {
+    "min": 1,
+    "max": 1
+  },
+  "capabilities": [
+    "dashboardUnits",
+    "relationshipHints"
+  ],
+  "artifacts": {
+    "unitLibrary": "tools/erp_dashboard_unit_library.py"
+  }
+}

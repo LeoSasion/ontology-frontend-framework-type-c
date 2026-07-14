@@ -33,7 +33,7 @@ BI_CLI_CAPABILITY_MAP = [
         "area": "dashboard-widgets",
         "compatibilityCommands": ["recommend-widgets", "add-recommended-widgets", "add-widget", "add-relationship-widget", "set-widget", "copy-widget", "remove-widget", "saveDashboardModules", "businessDashboardTemplates"],
         "commands": ["dashboard-widget-catalog", "recommend-widgets", "add-recommended-widgets", "add-widget", "add-relationship-widget", "set-widget", "copy-widget", "remove-widget", "save-dashboard-modules", "business-dashboard", "dashboard-op", "ask"],
-        "integration": "mapped-to-hybrid-sqlite-dashboard-widgets-layout-bulk-module-save-business-dashboard-templates-and-erp-unit-library-with-dry-run-boundary",
+        "integration": "mapped-to-hybrid-sqlite-dashboard-widgets-layout-bulk-module-save-analysis-templates-and-domain-pack-registry-with-dry-run-boundary",
         "status": "active",
     },
     {

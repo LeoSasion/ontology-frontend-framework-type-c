@@ -555,6 +555,66 @@
   font-weight: 760;
 }
 
+.settingsDomainPackPanel,
+.domainPackList {
+  display: grid;
+  gap: 10px;
+}
+
+.domainPackCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 12px;
+}
+
+.domainPackCard.enabled {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.domainPackCard > div:first-child,
+.domainPackCapabilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.domainPackCard strong,
+.domainPackCard p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.domainPackCard span,
+.domainPackCard p,
+.domainPackCapabilities small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.domainPackCapabilities small {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+
+.domainPackConfirmation {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--amber) 6%, var(--surface));
+  padding: 12px;
+}
+
 @container settings-panel (max-width: 980px) {
   .settingsGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -586,6 +646,10 @@
   .settingsSandboxGrid,
   .closureGrid,
   .configMigrationSteps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .domainPackCard {
     grid-template-columns: minmax(0, 1fr);
   }
 }

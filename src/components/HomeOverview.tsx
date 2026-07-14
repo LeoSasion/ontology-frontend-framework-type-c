@@ -47,7 +47,7 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
   const latestDashboardDraft = agent.requiresConfirmation && agent.actionDraft?.status === "draft" ? agent.actionDraft : null;
   const dashboardProposal = objectRecord(dashboardPlan?.proposed);
   const dashboardDraft = objectRecord(dashboardPlan?.draft);
-  const dashboardPlanTitle = stringValue(dashboardProposal?.dashboardName) || biText("经营分析看板", "Business dashboard");
+  const dashboardPlanTitle = stringValue(dashboardProposal?.dashboardName) || biText("分析看板", "Analysis dashboard");
   const dashboardPlanKey = stringValue(dashboardPlan?.createdDashboardKey) || stringValue(dashboardPlan?.savedDashboardKey) || stringValue(dashboardProposal?.dashboardKey);
   const dashboardPlanTable = stringValue(dashboardProposal?.defaultTableKey) || stringValue(dashboardDraft?.defaultTableKey) || mainTable?.table_key || "-";
   const dashboardPlanWidgetCount = numberValue(dashboardProposal?.widgetCount) || numberValue(dashboardPlan?.templateCount) || numberValue(dashboardPlan?.savedDashboardModules);
@@ -110,7 +110,7 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
   async function runDashboardTemplate(confirm: boolean) {
     const result = await onBusinessDashboardOperation({
       op: confirm ? "create" : "draft",
-      name: biText("经营分析看板", "Business dashboard"),
+      name: biText("分析看板", "Analysis dashboard"),
       table: mainTable?.table_key,
       limit: 10,
       confirm,
@@ -136,7 +136,7 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
         name: pack.title,
         table: mainTable?.table_key,
         template: pack.template,
-        limit: pack.template === "cost-monitor" ? 24 : 10,
+        limit: pack.template === "erp-units" ? 24 : 10,
         confirm: false,
       });
       setDashboardPlan(result);
@@ -154,7 +154,7 @@ export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, 
     <section className="mainPanel overviewPanel" aria-labelledby="overview-title">
       <div className="overviewHero">
         <div>
-          <p className="kicker">{biText("经营起步台", "Operating start")}</p>
+          <p className="kicker">{biText("分析起步台", "Analysis start")}</p>
           <h2 id="overview-title">
             <Bilingual zh="从一条业务路径进入，不在首页重复配置" en="Use one business path instead of repeated setup" />
           </h2>

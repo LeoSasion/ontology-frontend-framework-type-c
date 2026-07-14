@@ -27,7 +27,6 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     appMainViewSource,
     appWorkspaceActionsSource,
     appWorkspaceModelSource,
-    bCostMonitorComparison,
     biCliCapabilitiesSource,
     biCliDashboardCommandsSource,
     biCliIoServicesSource,
@@ -149,7 +148,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !homeOverviewSource.includes('className="operatingSummaryGrid"') &&
           homeActionDockSource.includes('data-testid="home-action-dock"') &&
           homeActionDockSource.includes('data-testid="home-action-import"') &&
-          homeActionDockSource.includes('data-testid="home-action-cost-monitor"') &&
+          homeActionDockSource.includes('data-testid="home-action-chart"') &&
           homeActionDockSource.includes('data-testid="home-action-ask"') &&
           homeActionDockSource.includes('data-testid="home-action-confirm"') &&
           !homeOverviewSource.includes("HomeRealDataValidationPanel") &&
@@ -293,10 +292,10 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("安全只读 Connector Adapter") &&
-          developmentRoadmapDocSource.includes("### 1. 整套行业看板 Beta 晋级条件") &&
+          developmentRoadmapDocSource.includes("### P1. 领域包注册表与工作区配置") &&
+          developmentRoadmapDocSource.includes("### P5. 扩展性与发布验收") &&
           developmentRoadmapDocSource.includes("## 明确暂时不做") &&
-          !developmentRoadmapDocSource.includes("已完成") &&
-          !developmentRoadmapDocSource.includes("npm run"),
+          developmentRoadmapDocSource.includes("npm run preflight"),
       },
     {
         label: "preflight-delegates-to-stable-verification-entrypoints",
@@ -319,7 +318,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           homeDetailedPathPanelSource.includes("onSourceIntelligenceRun: () => Promise<Record<string, unknown> | void>") &&
           homeDetailedPathPanelSource.includes("查看更多数据源、通用看板和 Agent 路径") &&
           homeDetailedPathPanelSource.includes("预览看板草案") &&
-          homeDetailedPathPanelSource.includes("帮我生成经营看板并说明证据"),
+          homeDetailedPathPanelSource.includes("帮我生成分析看板并说明证据"),
       },
     {
         label: "frontend-state-driven-landing",
@@ -661,13 +660,14 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     {
         label: "frontend-metric-repair-model",
         ok: metricRepairModelSource.includes("export function buildMetricRepairPlan") &&
-          metricRepairModelSource.includes("const semanticAliases") &&
+          metricRepairModelSource.includes("const coreSemanticAliases") &&
           metricRepairModelSource.includes("SemanticBindingDraft") &&
           metricRepairModelSource.includes("EvidenceGapItem") &&
           metricRepairModelSource.includes("rerunInputs") &&
           metricRepairModelSource.includes("benefitSummary") &&
           metricRepairModelSource.includes("manifestInputRoots") &&
-          metricRepairModelSource.includes("semanticRiskTerms") &&
+          metricRepairModelSource.includes("knownSemanticIds") &&
+          metricRepairModelSource.includes("enabledManifestContributions") &&
           metricRepairModelSource.includes("riskForSemantic") &&
           metricRepairModelSource.includes("riskConfidenceCap") &&
           metricRepairModelSource.includes("preview-required") &&

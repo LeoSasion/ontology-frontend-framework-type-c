@@ -14,7 +14,7 @@ export const B_WIDGET_READING_PURPOSES: Record<BiDashboardWidget["type"], Widget
   },
   bar: {
     title: { zh: "再看排行", en: "Compare ranks" },
-    detail: { zh: "柱状图找出渠道、品类或对象之间的差距。", en: "Bar charts expose gaps across channels, categories, or objects." },
+    detail: { zh: "柱状图找出分类或对象之间的差距。", en: "Bar charts expose gaps across categories or objects." },
     action: { zh: "点柱子下钻", en: "Click a bar to drill down" },
   },
   line: {
@@ -54,7 +54,7 @@ export const B_WIDGET_ACCEPTANCE_ITEMS = [
   {
     key: "bar",
     label: { zh: "看排行", en: "Compare ranks" },
-    detail: { zh: "找出渠道、品类或对象之间的差距。", en: "Find gaps across channels, categories, or objects." },
+    detail: { zh: "找出分类或对象之间的差距。", en: "Find gaps across categories or objects." },
     technical: { zh: "柱状图：分类排行、横/纵方向、排序、标签和配色。", en: "Bar widget: category ranking, orientation, sort, labels, and palette." },
   },
   {

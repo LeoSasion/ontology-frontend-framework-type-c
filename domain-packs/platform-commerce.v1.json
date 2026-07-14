@@ -1,0 +1,62 @@
+{
+  "schema": "aibi-domain-pack/v1",
+  "packId": "platform-commerce",
+  "version": "1.0.0",
+  "displayName": {
+    "zh": "平台电商分析",
+    "en": "Platform commerce analytics"
+  },
+  "description": {
+    "zh": "抖音、淘宝/天猫和聚水潭导出的高风险口径、关系与分析规则。",
+    "en": "High-risk metric, relationship, and analysis rules for supported commerce exports."
+  },
+  "coreCompatibility": {
+    "min": 1,
+    "max": 1
+  },
+  "capabilities": [
+    "agentKnowledge",
+    "relationshipHints",
+    "sourceIntelligence"
+  ],
+  "artifacts": {
+    "knowledge": "knowledge/platform-commerce.v1.json"
+  },
+  "contributions": {
+    "semanticAliases": {
+      "order_id": ["order_id", "orderid", "订单号", "子订单", "主订单", "交易单号", "订单编号"],
+      "refund_id": ["refund_id", "售后单", "退款单", "退货单", "售后编号"],
+      "transaction_id": ["流水号", "transaction", "payment_id", "settlement_id", "资金流水"],
+      "sku": ["sku", "商家编码", "商品编码", "规格编码", "货品编号"],
+      "product_id": ["商品id", "产品id", "货品id", "product_id", "item_id", "goods_id"],
+      "customer_id": ["customer", "member", "会员", "客户", "买家", "用户id", "客户id"],
+      "supplier": ["supplier", "供应商", "厂家", "供货商"],
+      "warehouse": ["warehouse", "仓库", "库房"],
+      "channel": ["channel", "平台", "渠道", "店铺", "shop", "store"],
+      "paid_at": ["paid_at", "pay_time", "付款时间", "支付时间", "下单时间", "订单日期", "order_date"],
+      "refund_at": ["refund_at", "售后时间", "退款时间", "申请时间", "退货时间"],
+      "paid_gmv": ["gross_sales", "gmv", "支付金额", "实付", "应付", "订单金额", "商品总价", "销售额", "成交金额"],
+      "net_sales": ["net_sales", "净销售", "实际收入", "结算收入"],
+      "refund_amount": ["refund_amount", "退款金额", "退货金额", "售后金额", "售后应退"],
+      "cost_amount": ["cost", "成本", "商品成本", "采购金额", "采购价", "运费", "物流费", "服务费"],
+      "settlement_amount": ["settlement", "结算", "入账", "出账", "账户金额", "收支金额", "佣金", "分成"],
+      "inventory_qty": ["inventory", "库存", "可售", "在库", "结存", "库存数量"]
+    },
+    "semanticRoles": {
+      "identity": ["order_id", "refund_id", "transaction_id", "sku", "product_id", "customer_id", "supplier", "warehouse"],
+      "measure": ["paid_gmv", "net_sales", "refund_amount", "cost_amount", "settlement_amount", "inventory_qty"],
+      "time": ["paid_at", "refund_at"],
+      "dimension": ["channel", "supplier", "warehouse", "sku", "product_id", "customer_id"]
+    },
+    "sourceIntelligence": {
+      "blockedRequirements": [
+        {"analysisId": "net_sales_reconciliation", "label": "净销售对账", "required": ["paid_gmv", "refund_amount", "order_id"]},
+        {"analysisId": "gross_margin", "label": "毛利测算", "required": ["paid_gmv", "cost_amount", "sku"]},
+        {"analysisId": "refund_rate", "label": "退款率", "required": ["paid_gmv", "refund_amount"]},
+        {"analysisId": "inventory_turnover", "label": "库存周转", "required": ["inventory_qty", "paid_gmv", "sku"]},
+        {"analysisId": "supplier_fulfillment", "label": "供应商履约", "required": ["supplier", "inventory_qty", "paid_at"]},
+        {"analysisId": "cross_table_profit", "label": "跨表利润归因", "required": ["paid_gmv", "cost_amount", "verified_relationship"]}
+      ]
+    }
+  }
+}

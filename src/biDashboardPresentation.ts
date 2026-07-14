@@ -40,9 +40,6 @@ export function formatWidgetValue(value: number, widget: BiDashboardWidget): str
   if (widget.valueFormat === "compact") return formatChineseUnit(value, decimalPlaces);
   if (widget.valueFormat === "currency") return `¥${formatChineseUnit(value, decimalPlaces)}`;
   if (widget.valueFormat === "percent") return `${formatPlainNumber(value * 100, decimalPlaces)}%`;
-  if (widget.measure && /金额|费用|收入|营收|成交|销售|支付|退款|佣金|成本|利润|amount|sales|revenue|cost|profit/i.test(widget.measure)) {
-    return formatChineseUnit(value, decimalPlaces);
-  }
   return widget.aggregation === "count" ? formatPlainNumber(value, 0) : formatChineseUnit(value, decimalPlaces);
 }
 

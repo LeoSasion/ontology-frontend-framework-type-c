@@ -28,7 +28,6 @@ export function appendAppArchitectureContractChecks(context) {
     appMainViewSource,
     appWorkspaceActionsSource,
     appWorkspaceModelSource,
-    bCostMonitorComparison,
     biCliCapabilitiesSource,
     biCliDashboardCommandsSource,
     biCliIoServicesSource,
@@ -248,23 +247,23 @@ export function appendAppArchitectureContractChecks(context) {
           !typesSource.includes("export interface SourceFieldProfile") &&
           !typesSource.includes("export interface WorkbenchPayload") &&
           !typesSource.includes("export interface ImportPreview") &&
-          !typesSource.includes("export interface DomainPackRuntime") &&
+          !typesSource.includes("export interface WorkspaceDomainPackRuntime") &&
           !typesSourceContractsSource.includes("export interface SourceIntelligenceRunSummary") &&
           !typesSourceContractsSource.includes("export interface EvidenceFocus") &&
-          !typesSourceContractsSource.includes("export interface DomainPackRuntime"),
+          !typesSourceContractsSource.includes("export interface WorkspaceDomainPackRuntime"),
       },
     {
         label: "types-domain-contract-boundary",
         ok: existsSync(join(root, "src", "typesDomain.ts")) &&
-          typesSourceContractsSource.includes('import type { SourcePipelineContract } from "./typesDomain"') &&
+          typesSourceContractsSource.includes('import type { SourcePipelineContract, WorkspaceDomainPackRuntime } from "./typesDomain"') &&
           typesSourceContractsSource.includes('} from "./typesDomain"') &&
           typesDomainSource.includes("export interface SourcePipelineStageContract") &&
           typesDomainSource.includes("export interface SourcePipelineContract") &&
-          typesDomainSource.includes("export interface DomainSemanticHint") &&
-          typesDomainSource.includes("export interface DomainLinkHint") &&
-          typesDomainSource.includes("export interface DomainFunctionHint") &&
-          typesDomainSource.includes("export interface DomainActionHint") &&
-          typesDomainSource.includes("export interface DomainPackRuntime"),
+          typesDomainSource.includes("export interface CoreSemanticHint") &&
+          typesDomainSource.includes("export interface CoreLinkHint") &&
+          typesDomainSource.includes("export interface CoreFunctionHint") &&
+          typesDomainSource.includes("export interface CoreActionHint") &&
+          typesDomainSource.includes("export interface WorkspaceDomainPackRuntime"),
       },
     {
         label: "types-query-agent-facade-boundary",
@@ -565,26 +564,13 @@ export function appendAppArchitectureContractChecks(context) {
           !sourceWorkbenchModelSource.includes("export function numberValue(value: unknown)"),
       },
     {
-        label: "b-cost-monitor-comparison-artifact",
-        ok: bCostMonitorComparison === null ||
-          (bCostMonitorComparison?.dashboard?.key === "xlsx_cost_monitor_20260609" &&
-            bCostMonitorComparison?.dashboard?.widgetCount === 23 &&
-            bCostMonitorComparison?.sources?.length === 10 &&
-            Object.values(bCostMonitorComparison?.rowCounts ?? {}).length === 4 &&
-            Object.values(bCostMonitorComparison?.rowCounts ?? {}).every((row) => row.dbRows === row.sourceRows && row.dbColumns === row.sourceColumns) &&
-            bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").length === 22 &&
-            bCostMonitorComparison?.widgets?.filter((widget) => widget.chartType !== "text").every((widget) => widget.matches === true) &&
-            bCostMonitorComparison?.formulaDefinitions?.["动账净额"]?.includes("出账") &&
-            bCostMonitorComparison?.formulaDefinitions?.["收入"]?.includes("订单实付应结")),
-      },
-    {
-        label: "api-b-cost-monitor-validation-route",
-        ok: serverDashboardRoutesSource.includes('url.pathname === "/api/validation/b-cost-monitor"') &&
-          serverDashboardRoutesSource.includes("readBCostMonitorValidation(root)") &&
-          serverRuntimeSource.includes("b-cost-monitor-comparison.json") &&
-          serverRuntimeSource.includes("matchedNonTextWidgets") &&
-          apiSource.includes("getBCostMonitorValidation") &&
-          apiDashboardSource.includes('"/api/validation/b-cost-monitor"'),
+        label: "retired-cost-monitor-surface-absent",
+        ok: !serverDashboardRoutesSource.includes("b-cost-monitor") &&
+          !serverRuntimeSource.includes("b-cost-monitor") &&
+          !serverRuntimeSource.includes("readBCostMonitorValidation") &&
+          !apiSource.includes("getBCostMonitorValidation") &&
+          !apiDashboardSource.includes("b-cost-monitor") &&
+          !biCliParserSource.includes('"cost-monitor"'),
       },
     {
         label: "server-runtime-boundary",
@@ -603,7 +589,7 @@ export function appendAppArchitectureContractChecks(context) {
           serverRuntimeSource.includes("export function readBody(") &&
           serverRuntimeSource.includes("export function runCli(") &&
           serverRuntimeSource.includes("export function pushDashboardWidgetStyleArgs(") &&
-          serverRuntimeSource.includes("export async function readBCostMonitorValidation("),
+          !serverRuntimeSource.includes("readBCostMonitorValidation"),
       },
     {
         label: "server-static-boundary",
@@ -622,7 +608,7 @@ export function appendAppArchitectureContractChecks(context) {
         label: "server-dashboard-routes-boundary",
         ok: existsSync(join(root, "server", "dashboardRoutes.ts")) &&
           serverIndexSource.includes('import { handleDashboardApi } from "./dashboardRoutes"') &&
-          serverIndexSource.includes("await handleDashboardApi({ cli, request, response, root, url })") &&
+          serverIndexSource.includes("await handleDashboardApi({ cli, request, response, url })") &&
           !serverIndexSource.includes('url.pathname === "/api/dashboard/widget-catalog"') &&
           !serverIndexSource.includes('url.pathname === "/api/dashboards"') &&
           !serverIndexSource.includes('url.pathname === "/api/validation/b-cost-monitor"') &&
