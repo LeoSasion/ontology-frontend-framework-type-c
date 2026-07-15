@@ -153,6 +153,7 @@ def query_relationship_command(args: argparse.Namespace) -> dict[str, Any]:
         registry_for_table=registry_for_table,
         table_columns=table_columns,
         parse_relationship_field_ref=parse_relationship_field_ref,
+        build_relationship_preview=build_relationship_preview,
         build_relationship_query=build_relationship_query,
         quote_relationship_identifier=quote_relationship_identifier,
     )
@@ -166,6 +167,7 @@ def relationship_preview_command(args: argparse.Namespace) -> dict[str, Any]:
     return relationship_preview_command_service(
         args,
         open_db=open_db,
+        active_workspace_id=active_workspace_id,
         registry_for_table=registry_for_table,
         table_columns=table_columns,
         build_relationship_preview=build_relationship_preview,
@@ -184,6 +186,7 @@ def build_relationship_save_plan(
     mappings: list[dict[str, str]] | None = None,
     filters: list[dict[str, Any]] | None = None,
     preaggregation: dict[str, Any] | None = None,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     return build_relationship_save_plan_service(
         connection,
@@ -196,6 +199,7 @@ def build_relationship_save_plan(
         mappings=mappings,
         filters=filters,
         preaggregation=preaggregation,
+        workspace_id=workspace_id,
         registry_for_table=registry_for_table,
         table_columns=table_columns,
         build_relationship_preview=build_relationship_preview,
@@ -203,14 +207,25 @@ def build_relationship_save_plan(
     )
 
 
-def execute_relationship_save(connection: sqlite3.Connection, proposed: dict[str, Any]) -> dict[str, Any]:
-    return execute_relationship_save_service(connection, proposed, active_workspace_id=active_workspace_id)
+def execute_relationship_save(
+    connection: sqlite3.Connection,
+    proposed: dict[str, Any],
+    *,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    return execute_relationship_save_service(
+        connection,
+        proposed,
+        active_workspace_id=active_workspace_id,
+        workspace_id=workspace_id,
+    )
 
 
 def relationship_save_command(args: argparse.Namespace) -> dict[str, Any]:
     return relationship_save_command_service(
         args,
         open_db=open_db,
+        active_workspace_id=active_workspace_id,
         build_relationship_save_plan=build_relationship_save_plan,
         execute_relationship_save=execute_relationship_save,
     )

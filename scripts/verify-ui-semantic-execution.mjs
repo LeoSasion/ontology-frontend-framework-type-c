@@ -6,20 +6,42 @@ import { apiBaseUrl, fetchJson, postJson, withTemporaryWorkspace } from "./ui-ve
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-semantic-execution-"));
+const regionsFile = join(screenshotDir, "regions.csv");
 const sitesFile = join(screenshotDir, "sites.csv");
 const assetsFile = join(screenshotDir, "assets.csv");
 const observationsFile = join(screenshotDir, "observations.csv");
-writeFileSync(sitesFile, "site_id,region,status\nS1,North,active\nS2,South,active\nS3,North,inactive\n", "utf8");
-writeFileSync(assetsFile, "asset_id,site_id,status\nA1,S1,available\nA2,S2,maintenance\nA3,S3,available\n", "utf8");
-writeFileSync(observationsFile, "asset_id,status,reading_value,observed_at\nA1,valid,18,2026-07-01\nA2,valid,26,2026-07-02\nA3,pending,40,2026-07-03\n", "utf8");
+writeFileSync(regionsFile, "region_id,region_name\nR1,North\nR2,South\n", "utf8");
+writeFileSync(sitesFile, "site_id,region_id,status\nS1,R1,active\nS2,R2,active\nS3,R1,inactive\n", "utf8");
+writeFileSync(assetsFile, "asset_id,site_id,owner_id,status\nA1,S1,O1,available\nA2,S2,O2,maintenance\nA3,S3,O3,available\n", "utf8");
+writeFileSync(observationsFile, "observation_id,asset_id,owner_id,status,reading_value,observed_at\nOB1,A1,O1,valid,18,2026-07-01\nOB2,A2,O2,valid,26,2026-07-02\nOB3,A3,O3,pending,40,2026-07-03\n", "utf8");
+const selectedRelationKeys = [
+  "regions_sites_region_id_region_id",
+  "sites_assets_site_id_site_id",
+  "assets_observations_asset_id_asset_id",
+];
+const alternateRelationKey = "assets_observations_owner_id_owner_id";
+const baseSemanticPrompt = "按地区表的 region_name 汇总观测表的 reading_value";
+const prompt = `${baseSemanticPrompt}，使用关系路径 ${selectedRelationKeys.join(" > ")}`;
 const checks = [];
 let browserIssues = [];
 
 const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ temporaryWorkspaceId }) => {
+  await postJson("/api/import/commit", { filePath: regionsFile, table: "regions", name: "地区表", mode: "create", confirm: true });
   await postJson("/api/import/commit", { filePath: sitesFile, table: "sites", name: "站点表", mode: "create", confirm: true });
   await postJson("/api/import/commit", { filePath: assetsFile, table: "assets", name: "资产表", mode: "create", confirm: true });
   await postJson("/api/import/commit", { filePath: observationsFile, table: "observations", name: "观测表", mode: "create", confirm: true });
-  const firstSaved = await postJson("/api/relationships/save", {
+  const regionSitesSaved = await postJson("/api/relationships/save", {
+    workspaceId: temporaryWorkspaceId,
+    leftTable: "regions",
+    rightTable: "sites",
+    leftField: "region_id",
+    rightField: "region_id",
+    fieldMappings: [{ leftField: "region_id", rightField: "region_id" }],
+    joinType: "left",
+    confirm: true,
+  });
+  const siteAssetsSaved = await postJson("/api/relationships/save", {
+    workspaceId: temporaryWorkspaceId,
     leftTable: "sites",
     rightTable: "assets",
     leftField: "site_id",
@@ -28,7 +50,8 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     joinType: "left",
     confirm: true,
   });
-  const secondSaved = await postJson("/api/relationships/save", {
+  const assetObservationsSaved = await postJson("/api/relationships/save", {
+    workspaceId: temporaryWorkspaceId,
     leftTable: "assets",
     rightTable: "observations",
     leftField: "asset_id",
@@ -37,11 +60,37 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     joinType: "left",
     confirm: true,
   });
-  const prompt = "按站点表的 region 汇总 reading_value";
-  const directQuery = await postJson("/api/semantic-query", { prompt, table: "sites", limit: 20 });
+  const ownerObservationsSaved = await postJson("/api/relationships/save", {
+    workspaceId: temporaryWorkspaceId,
+    leftTable: "assets",
+    rightTable: "observations",
+    leftField: "owner_id",
+    rightField: "owner_id",
+    fieldMappings: [{ leftField: "owner_id", rightField: "owner_id" }],
+    joinType: "left",
+    confirm: true,
+  });
+  const pathClarification = await postJson("/api/agent/explain", { prompt: baseSemanticPrompt, workspaceId: temporaryWorkspaceId });
+  const directQuery = await postJson("/api/semantic-query", { prompt, table: "regions", limit: 20 });
   const apiAnswer = await postJson("/api/agent/explain", { prompt, workspaceId: temporaryWorkspaceId });
   const undefinedRatio = await postJson("/api/agent/explain", { prompt: "请计算健康率", workspaceId: temporaryWorkspaceId });
   const workflowReadback = await fetchJson(`/api/workflow/agent-graph?turn=${encodeURIComponent(apiAnswer.agentTurn?.turnKey ?? "")}&workspaceId=${encodeURIComponent(temporaryWorkspaceId)}`);
+  if (
+    apiAnswer.queryPlanReceipt?.status !== "executed"
+    || apiAnswer.analysisUnit?.status !== "ready"
+    || apiAnswer.analysisUnit?.queryReceiptKey !== apiAnswer.queryPlanReceipt?.receiptKey
+  ) {
+    throw new Error(`Unexpected semantic Agent provenance: ${JSON.stringify({
+      receiptKey: apiAnswer.queryPlanReceipt?.receiptKey,
+      receiptStatus: apiAnswer.queryPlanReceipt?.status,
+      unitKey: apiAnswer.analysisUnit?.unitKey,
+      unitStatus: apiAnswer.analysisUnit?.status,
+      unitReceiptKey: apiAnswer.analysisUnit?.queryReceiptKey,
+      semanticStatus: apiAnswer.semanticPlan?.status,
+      executionStatus: apiAnswer.executionPlan?.status,
+      unresolved: apiAnswer.queryPlanReceipt?.unresolved,
+    })}`);
+  }
   const unitVerification = await postJson("/api/analysis-units/verify", { unitKey: apiAnswer.analysisUnit?.unitKey });
   const unitDetail = await fetchJson(`/api/analysis-units?unit=${encodeURIComponent(apiAnswer.analysisUnit?.unitKey ?? "")}`);
   const adaptedChart = await postJson("/api/chart-adapt", { unitKey: apiAnswer.analysisUnit?.unitKey, preferredChart: "bar" });
@@ -53,15 +102,19 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
   });
   const exportCreated = existsSync(exportPath);
   rmSync(exportPath, { force: true });
+  const directValues = new Map((directQuery.rows ?? []).map((row) => [String(row.label), Number(row.value)]));
+  const pathCandidates = pathClarification.semanticPlan?.joinPlan?.targets?.flatMap((target) => target.pathCandidates ?? []) ?? [];
   checks.push(
-    check("semantic-ui-fixture-relationships-validated", firstSaved.saved?.validation?.status === "validated" && secondSaved.saved?.validation?.status === "validated", { first: firstSaved.saved?.validation, second: secondSaved.saved?.validation }),
-    check("semantic-ui-api-executes-two-hop", apiAnswer.answerCard?.kind === "semantic-relationship-analysis" && apiAnswer.executionPlan?.status === "ready" && apiAnswer.executionPlan?.relationships?.length === 2 && apiAnswer.queryPlanReceipt?.status === "executed", { answerKind: apiAnswer.answerCard?.kind, executionPlan: apiAnswer.executionPlan }),
+    check("semantic-ui-fixture-relationships-validated", [regionSitesSaved, siteAssetsSaved, assetObservationsSaved, ownerObservationsSaved].every((saved) => saved.saved?.workspace_id === temporaryWorkspaceId && saved.saved?.validation?.status === "validated"), { regionSites: regionSitesSaved.saved, siteAssets: siteAssetsSaved.saved, assetObservations: assetObservationsSaved.saved, ownerObservations: ownerObservationsSaved.saved }),
+    check("semantic-ui-api-requires-explicit-path-for-equal-safe-routes", pathClarification.semanticPlan?.status === "needs-clarification" && (pathClarification.executionPlan == null || pathClarification.executionPlan?.status === "blocked") && pathClarification.queryPlanReceipt?.status === "blocked" && pathCandidates.length === 2 && pathCandidates.every((candidate) => candidate.hops?.length === 3), { semanticPlan: pathClarification.semanticPlan, executionPlan: pathClarification.executionPlan, receiptStatus: pathClarification.queryPlanReceipt?.status, pathCandidateCount: pathCandidates.length }),
+    check("semantic-ui-api-executes-three-hop", apiAnswer.answerCard?.kind === "semantic-relationship-analysis" && apiAnswer.semanticPlan?.joinPlan?.targets?.some((target) => target.selectedPathReason === "explicit-relationship-path") && apiAnswer.executionPlan?.status === "ready" && apiAnswer.executionPlan?.relationships?.map((relationship) => relationship.relationKey).join(",") === selectedRelationKeys.join(",") && apiAnswer.executionPlan?.relationshipPathProof?.hopProofs?.length === 3 && apiAnswer.queryPlanReceipt?.status === "executed" && apiAnswer.queryPlanReceipt?.source?.tableKeys?.join(",") === "regions,sites,assets,observations", { answerKind: apiAnswer.answerCard?.kind, semanticPlan: apiAnswer.semanticPlan, executionPlan: apiAnswer.executionPlan, receiptSource: apiAnswer.queryPlanReceipt?.source }),
+    check("semantic-ui-three-hop-results-are-exact", directValues.get("North") === 58 && directValues.get("South") === 26, directQuery.rows),
     check("semantic-ui-neutral-fixture-has-no-domain-pack-semantics", (apiAnswer.queryPlanReceipt?.domainPacks?.length ?? 0) === 0 && (apiAnswer.context?.knowledgeRules?.length ?? 0) === 0, { domainPacks: apiAnswer.queryPlanReceipt?.domainPacks, knowledgeRules: apiAnswer.context?.knowledgeRules }),
-    check("semantic-ui-direct-api-and-agent-share-plan", directQuery.executed === true && directQuery.executionPlan?.planHash === apiAnswer.executionPlan?.planHash && directQuery.query?.runtime?.executionPlanHash === apiAnswer.queryPlanReceipt?.runtime?.executionPlanHash, { directPlanHash: directQuery.executionPlan?.planHash, agentPlanHash: apiAnswer.executionPlan?.planHash }),
+    check("semantic-ui-direct-api-and-agent-share-plan", directQuery.executed === true && directQuery.executionPlan?.relationships?.length === 3 && directQuery.executionPlan?.planHash === apiAnswer.executionPlan?.planHash && directQuery.query?.runtime?.executionPlanHash === apiAnswer.queryPlanReceipt?.runtime?.executionPlanHash, { directPlanHash: directQuery.executionPlan?.planHash, agentPlanHash: apiAnswer.executionPlan?.planHash }),
     check("semantic-ui-undefined-ratio-is-blocked-with-required-definition", undefinedRatio.queryPlanReceipt?.status === "blocked" && undefinedRatio.queryPlanReceipt?.validation?.executed === false && undefinedRatio.queryPlanReceipt?.runtime?.compiledSql == null && undefinedRatio.queryPlanReceipt?.unresolved?.some((item) => item?.kind === "compound-analysis-definition") && undefinedRatio.analysisUnit?.status === "blocked" && undefinedRatio.answerCard?.kind === "clarification", { queryPlanReceipt: undefinedRatio.queryPlanReceipt, analysisUnit: undefinedRatio.analysisUnit, answerCard: undefinedRatio.answerCard }),
     check("semantic-ui-workflow-graph-round-trips-from-turn", workflowReadback.workflowGraph?.fingerprint === apiAnswer.evidencePlan?.workflowGraph?.fingerprint && workflowReadback.workflowExecution?.fingerprint === apiAnswer.evidencePlan?.workflowExecution?.fingerprint && workflowReadback.workflowExecution?.join?.status === "passed" && workflowReadback.workflowGraph?.nodes?.some((node) => node.operator === "unit"), { workflowReadback, expectedGraph: apiAnswer.evidencePlan?.workflowGraph }),
     check("semantic-ui-agent-creates-verifiable-analysis-unit", apiAnswer.analysisUnit?.status === "ready" && apiAnswer.analysisUnit?.queryReceiptKey === apiAnswer.queryPlanReceipt?.receiptKey && apiAnswer.chartAdapter?.status === "ready" && unitVerification.rowsFingerprintMatches === true && unitVerification.calculationMatches === true, { analysisUnit: apiAnswer.analysisUnit, chartAdapter: apiAnswer.chartAdapter, unitVerification }),
-    check("semantic-ui-analysis-unit-api-preserves-scalar-projection", unitDetail.analysisUnit?.unitKey === apiAnswer.analysisUnit?.unitKey && unitDetail.analysisUnit?.shape?.columns?.join(",") === "label,value" && unitDetail.analysisUnit?.rows?.every((row) => !("raw" in row)) && adaptedChart.chartAdapter?.status === "ready" && adaptedChart.chartAdapter?.chartType === "bar", { unitDetail: unitDetail.analysisUnit, adaptedChart: adaptedChart.chartAdapter }),
+    check("semantic-ui-analysis-unit-api-preserves-scalar-projection", unitDetail.analysisUnit?.unitKey === apiAnswer.analysisUnit?.unitKey && unitDetail.analysisUnit?.shape?.columns?.join(",") === "label,regions.region_name,value" && unitDetail.analysisUnit?.rows?.every((row) => !("raw" in row) && row["regions.region_name"] === row.label) && adaptedChart.chartAdapter?.status === "ready" && adaptedChart.chartAdapter?.chartType === "bar", { unitDetail: unitDetail.analysisUnit, adaptedChart: adaptedChart.chartAdapter }),
     check("semantic-ui-analysis-export-api-is-artifact-only", exportCreated && analysisExport.analysisExport?.receiptKey === apiAnswer.queryPlanReceipt?.receiptKey && analysisExport.analysisExport?.unitKey === apiAnswer.analysisUnit?.unitKey && analysisExport.analysisExport?.manifest?.sideEffects?.requery === false && analysisExport.analysisExport?.manifest?.sideEffects?.businessDatabaseWrite === false, { analysisExport: analysisExport.analysisExport }),
   );
 
@@ -114,13 +167,15 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     const visibleState = await evaluate(browser.client, () => ({
       answer: document.querySelector('[data-testid="agent-answer-card"]')?.textContent ?? "",
       execution: document.querySelector('[data-testid="agent-semantic-execution-plan"]')?.textContent ?? "",
+      path: document.querySelector('[data-testid="agent-relationship-path-proof"]')?.textContent ?? "",
+      pathHopCount: document.querySelectorAll('[data-testid="agent-relationship-path-proof"] li').length,
       unit: document.querySelector('[data-testid="agent-analysis-unit-strip"]')?.textContent ?? "",
       exportButton: document.querySelector('[data-testid="agent-analysis-export"]')?.textContent ?? "",
       hasError: Boolean(document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay")),
     }));
     checks.push(
       check("semantic-ui-agent-question-submitted", filled && submitted.ok, { filled, submitted }),
-      check("semantic-ui-execution-plan-rendered", rendered.ok && /计划哈希|Plan hash/.test(visibleState.execution) && /最终粒度|Final grain/.test(visibleState.execution), visibleState),
+      check("semantic-ui-execution-plan-rendered", rendered.ok && /计划哈希|Plan hash/.test(visibleState.execution) && /最终粒度|Final grain/.test(visibleState.execution) && visibleState.pathHopCount === 3 && /地区表/.test(visibleState.path) && /观测表/.test(visibleState.path), visibleState),
       check("semantic-ui-business-answer-rendered", /受控跨表分析|Controlled cross-table analysis/.test(visibleState.answer) && /执行引擎: sqlite|Engine: sqlite/.test(visibleState.answer) && !visibleState.answer.includes("[object Object]") && !visibleState.hasError, visibleState),
       check("semantic-ui-analysis-unit-rationale-visible", /可复算分析单元|Recomputable analysis unit/.test(visibleState.unit) && /比较|comparison/.test(visibleState.unit) && /柱状图|bar chart/.test(visibleState.unit), visibleState),
       check("semantic-ui-analysis-export-action-visible", /导出 Excel \+ 报告|Export Excel \+ report/.test(visibleState.exportButton), visibleState),
@@ -147,7 +202,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
       sessionKey: localStorage.getItem(`aibi.agentSession.${workspaceId}`) ?? "",
       workspaceId,
     }), temporaryWorkspaceId);
-    const followupPrompt = "重新按站点表的 region 汇总 reading_value";
+    const followupPrompt = `重新${prompt}`;
     const followupReady = await waitFor(browser.client, (targetValue) => {
       const button = document.querySelector('[data-testid="agent-prompt-composer"] button');
       const input = document.querySelector('[data-testid="agent-prompt-composer"] textarea');
@@ -195,6 +250,55 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
       check("semantic-ui-390x844-has-no-horizontal-overflow", narrowMetrics.innerWidth === 390 && narrowMetrics.documentX === 0 && narrowMetrics.bodyX === 0 && narrowMetrics.shellX === 0 && !narrowMetrics.hasError, narrowMetrics),
     );
     await captureScreenshot(browser.client, join(screenshotDir, "semantic-execution-agent-390x844.png"));
+
+    const pathPromptReady = await waitFor(browser.client, (targetValue) => {
+      const button = document.querySelector('[data-testid="agent-prompt-composer"] button');
+      const input = document.querySelector('[data-testid="agent-prompt-composer"] textarea');
+      if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLTextAreaElement)) return { ok: false };
+      if (input.value !== targetValue && !input.disabled) {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+        const previous = input.value;
+        setter?.call(input, targetValue);
+        input._valueTracker?.setValue(previous);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        input.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      return { ok: !button.disabled && !input.disabled && input.value === targetValue };
+    }, baseSemanticPrompt, { timeoutMs: 15000, intervalMs: 150 });
+    const pathPromptSubmitted = pathPromptReady.ok
+      ? await click(browser.client, '[data-testid="agent-prompt-composer"] button')
+      : { ok: false, error: "form-not-ready" };
+    const pathChoiceRendered = await waitFor(browser.client, () => ({
+      ok: Boolean(document.querySelector('[data-testid="agent-semantic-path-clarification"]')),
+      candidates: document.querySelectorAll('[data-testid="agent-semantic-path-candidate"]').length,
+      candidateTitles: Array.from(document.querySelectorAll('[data-testid="agent-semantic-path-candidate"]')).map((button) => button.getAttribute("title") ?? ""),
+      proofHops: document.querySelectorAll('[data-testid="agent-relationship-path-proof"] li').length,
+    }), null, { timeoutMs: 60000, intervalMs: 250 });
+    const pathCandidateSelected = await evaluate(browser.client, (relationKey) => {
+      const button = Array.from(document.querySelectorAll('[data-testid="agent-semantic-path-candidate"]'))
+        .find((candidate) => candidate.getAttribute("title")?.includes(relationKey));
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return false;
+      button.click();
+      return true;
+    }, selectedRelationKeys.at(-1));
+    const pathChoiceResolved = await waitFor(browser.client, () => {
+      const pathClarification = document.querySelector('[data-testid="agent-semantic-path-clarification"]');
+      const proof = document.querySelector('[data-testid="agent-relationship-path-proof"]');
+      const hops = Array.from(proof?.querySelectorAll("li") ?? []);
+      const answer = document.querySelector('[data-testid="agent-answer-card"]')?.textContent ?? "";
+      const button = document.querySelector('[data-testid="agent-prompt-composer"] button');
+      return {
+        ok: !pathClarification && Boolean(proof) && hops.length === 3 && hops.every((hop) => hop.classList.contains("verified")) && button instanceof HTMLButtonElement && !button.disabled,
+        hopCount: hops.length,
+        verifiedHopCount: hops.filter((hop) => hop.classList.contains("verified")).length,
+        answer,
+      };
+    }, null, { timeoutMs: 60000, intervalMs: 250 });
+    checks.push(
+      check("semantic-ui-equal-safe-paths-render-one-explicit-choice", pathPromptReady.ok && pathPromptSubmitted.ok && pathChoiceRendered.ok && pathChoiceRendered.candidates === 2 && pathChoiceRendered.proofHops === 0 && pathChoiceRendered.candidateTitles.some((title) => title.includes(selectedRelationKeys.at(-1))) && pathChoiceRendered.candidateTitles.some((title) => title.includes(alternateRelationKey)), { pathPromptReady, pathPromptSubmitted, pathChoiceRendered }),
+      check("semantic-ui-path-candidate-replans-and-executes-three-hop", pathCandidateSelected && pathChoiceResolved.ok && /受控跨表分析|Controlled cross-table analysis/.test(pathChoiceResolved.answer), { pathCandidateSelected, pathChoiceResolved }),
+    );
+    await captureScreenshot(browser.client, join(screenshotDir, "semantic-execution-path-choice.png"));
 
     const ambiguityPrompt = "看 site_id 和 status";
     const ambiguityFormIdle = await waitFor(browser.client, () => {

@@ -1,6 +1,6 @@
 import { fetchJson, fetchJsonStrict } from "./apiClient";
-import { emptyFormulaPreview, emptyRelationshipPreview } from "./emptyWorkspaceData";
-import type { FormulaMutationPayload, FormulaPreviewPayload, QueryResult, RelationshipPreviewPayload } from "./types";
+import { emptyFormulaPreview } from "./emptyWorkspaceData";
+import type { FormulaMutationPayload, FormulaPreviewPayload, QueryResult } from "./types";
 
 export function updateFieldConfig(options: {
   table: string;
@@ -78,23 +78,6 @@ export function queryMetric(options: {
   });
 }
 
-export function previewRelationship(options: {
-  leftTable: string;
-  rightTable: string;
-  leftField: string;
-  rightField: string;
-  fieldMappings?: Array<{ leftField: string; rightField: string }>;
-  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
-  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
-  joinType?: string;
-  limit?: number;
-}) {
-  return fetchJson<RelationshipPreviewPayload>("/api/relationships/preview", emptyRelationshipPreview, {
-    method: "POST",
-    body: JSON.stringify(options),
-  });
-}
-
 export function runSemanticQuery(options: { prompt: string; table?: string; limit?: number }) {
   return fetchJsonStrict<Record<string, unknown>>("/api/semantic-query", {
     method: "POST",
@@ -129,24 +112,6 @@ export function queryRelationship(options: {
   sortDirection?: string;
 }) {
   return fetchJsonStrict<QueryResult>("/api/relationships/query", {
-    method: "POST",
-    body: JSON.stringify(options),
-  });
-}
-
-export function saveRelationship(options: {
-  leftTable: string;
-  rightTable: string;
-  leftField: string;
-  rightField: string;
-  fieldMappings?: Array<{ leftField: string; rightField: string }>;
-  filters?: Array<{ phase?: "pre" | "post"; side?: string; field: string; operator: string; value?: string; enabled?: boolean }>;
-  preaggregation?: { side: "right"; groupFields: string[]; measures: Array<{ field: string; aggregation: string }> };
-  joinType?: string;
-  limit?: number;
-  confirm?: boolean;
-}) {
-  return fetchJson<RelationshipPreviewPayload>("/api/relationships/save", emptyRelationshipPreview, {
     method: "POST",
     body: JSON.stringify(options),
   });

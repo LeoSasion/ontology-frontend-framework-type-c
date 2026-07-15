@@ -6,9 +6,10 @@ import json
 import math
 import re
 import sqlite3
+from contextlib import closing
 from typing import Any, Callable
 
-from query_plan_receipt_service import get_query_receipt
+from query_plan_receipt_service import current_query_receipt_source_state, get_query_receipt
 
 
 ANALYSIS_UNIT_SCHEMA = "aibi-analysis-unit/v1"
@@ -105,6 +106,12 @@ def _shape(receipt: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any
     selection = receipt.get("selection") if isinstance(receipt.get("selection"), dict) else {}
     group = str(selection.get("group") or "")
     dimension = group if group in columns else next((column for column in columns if column not in numeric), None)
+    selected_group_columns = [
+        str(item.get("outputName") or "")
+        for item in selection.get("groups") or []
+        if isinstance(item, dict) and item.get("outputName") in columns
+    ]
+    dimension_columns = list(dict.fromkeys(selected_group_columns or ([dimension] if dimension else [])))
     measure = _measure_column(receipt, rows, numeric)
     missing = {column: sum(1 for row in rows if row.get(column) is None) for column in columns}
     dimension_values = [row.get(dimension) for row in rows] if dimension else []
@@ -114,6 +121,7 @@ def _shape(receipt: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any
         "columns": columns,
         "numericColumns": numeric,
         "dimensionColumn": dimension,
+        "dimensionColumns": dimension_columns,
         "measureColumn": measure,
         "temporalDimension": bool(dimension and _looks_temporal(dimension, dimension_values)),
         "missingByColumn": missing,
@@ -283,6 +291,11 @@ def create_analysis_unit(
     source = receipt.get("source") if isinstance(receipt.get("source"), dict) else {}
     if str(source.get("workspaceId") or "") != workspace_id:
         raise ValueError("Query Receipt belongs to a different workspace")
+    if str(receipt.get("status") or "") == "executed":
+        source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+        if not source_state.get("matchesReceipt"):
+            blockers = ", ".join(source_state.get("blockers") or ["query-receipt-drifted"])
+            raise ValueError(f"Analysis Unit cannot consume a drifted Query Receipt: {blockers}")
     normalized_rows = _safe_rows(rows)
     result_binding = receipt.get("resultBinding") if isinstance(receipt.get("resultBinding"), dict) else None
     if not result_binding or not result_binding.get("resultFingerprint"):
@@ -296,18 +309,40 @@ def create_analysis_unit(
     calculation = _calculation(kind, shape, normalized_rows)
     result_fingerprint = supplied_fingerprint
     selection = receipt.get("selection") if isinstance(receipt.get("selection"), dict) else {}
-    grain = {
-        "dimensions": [{
+    selected_groups = [
+        item
+        for item in selection.get("groups") or []
+        if isinstance(item, dict) and item.get("field")
+    ]
+    dimensions = [
+        {
+            "tableKey": item.get("tableKey"),
+            "field": item.get("field"),
+            "sourceResultColumn": item.get("outputName"),
+            "resultColumn": (
+                item.get("outputName")
+                if item.get("outputName") in shape["columns"]
+                else shape["dimensionColumn"]
+            ),
+        }
+        for item in selected_groups
+    ]
+    if not dimensions and shape["dimensionColumn"]:
+        dimensions = [{
             "field": selection.get("group"),
             "resultColumn": shape["dimensionColumn"],
-        }] if shape["dimensionColumn"] else [],
+        }]
+    grain = {
+        "dimensions": dimensions,
         "measures": [{
             "field": selection.get("measure"),
             "resultColumn": shape["measureColumn"],
             "aggregation": selection.get("aggregation"),
         }] if shape["measureColumn"] else [],
         "sourceTableKey": source.get("tableKey"),
+        "sourceTableKeys": source.get("tableKeys") or ([source.get("tableKey")] if source.get("tableKey") else []),
         "schemaFingerprint": source.get("schemaFingerprint"),
+        "relationshipPathFingerprint": source.get("relationshipPathFingerprint"),
     }
     definition = {
         "queryReceiptKey": receipt.get("receiptKey"),
@@ -404,6 +439,66 @@ def get_analysis_unit(connection: sqlite3.Connection, workspace_id: str, unit_ke
     return _row_payload(row) if row else None
 
 
+def analysis_unit_consumer_state(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    unit: dict[str, Any],
+) -> dict[str, Any]:
+    receipt_key = str(unit.get("queryReceiptKey") or "")
+    receipt = get_query_receipt(connection, workspace_id, receipt_key) if receipt_key else None
+    blockers: list[str] = []
+    source_state = None
+    frozen_verification = verify_analysis_unit(unit)
+    if not frozen_verification.get("ok"):
+        blockers.append("analysis-unit-frozen-result-drifted")
+    if not receipt:
+        blockers.append("analysis-unit-query-receipt-missing")
+    else:
+        if str(receipt.get("status") or "") != "executed":
+            blockers.append("analysis-unit-query-receipt-not-executed")
+        source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+        blockers.extend(source_state.get("blockers") or [])
+        result_binding = receipt.get("resultBinding") if isinstance(receipt.get("resultBinding"), dict) else {}
+        if str(result_binding.get("resultFingerprint") or "") != str(unit.get("resultFingerprint") or ""):
+            blockers.append("analysis-unit-receipt-result-binding-mismatch")
+    blockers = list(dict.fromkeys(blockers))
+    return {
+        "schema": "aibi-analysis-unit-consumer-state/v1",
+        "unitKey": unit.get("unitKey"),
+        "queryReceiptKey": receipt_key,
+        "usable": not blockers,
+        "blockers": blockers,
+        "queryReceiptStatus": receipt.get("status") if receipt else "missing",
+        "sourceState": source_state,
+        "frozenVerification": frozen_verification,
+    }
+
+
+def _analysis_unit_consumer_view(unit: dict[str, Any], consumer_state: dict[str, Any]) -> dict[str, Any]:
+    view = {**unit, "freshness": consumer_state}
+    if consumer_state.get("usable"):
+        return view
+    stored_validation = unit.get("validation") if isinstance(unit.get("validation"), dict) else {}
+    blockers = list(dict.fromkeys([
+        *(stored_validation.get("blockers") or []),
+        *(consumer_state.get("blockers") or []),
+    ]))
+    validation = {
+        **stored_validation,
+        "status": "blocked",
+        "blockers": blockers,
+    }
+    stored_adapter = unit.get("chartAdapter") if isinstance(unit.get("chartAdapter"), dict) else {}
+    adapter = {
+        **stored_adapter,
+        "status": "blocked",
+        "chartType": None,
+        "config": {},
+        "blockers": list(dict.fromkeys([*(stored_adapter.get("blockers") or []), *blockers])),
+    }
+    return {**view, "status": "blocked", "validation": validation, "chartAdapter": adapter}
+
+
 def analysis_unit_build_command(
     args: argparse.Namespace,
     *,
@@ -415,11 +510,19 @@ def analysis_unit_build_command(
         rows = json.loads(str(args.rows_json or "[]"))
     except json.JSONDecodeError as exc:
         raise ValueError("rows-json must be a JSON array") from exc
-    with open_db() as connection:
+    with closing(open_db()) as connection:
+        if connection.in_transaction:
+            connection.commit()
+        # Hold the same write-capable snapshot from the freshness proof through
+        # persistence. Otherwise an import can commit after the guard and before
+        # the Analysis Unit is stored, returning a unit that is already stale.
+        connection.execute("BEGIN IMMEDIATE")
         workspace_id = active_workspace_id(connection)
         receipt = get_query_receipt(connection, workspace_id, args.receipt)
         if not receipt:
             raise ValueError(f"Unknown query receipt in active workspace: {args.receipt}")
+        if str(receipt.get("status") or "") != "executed":
+            raise ValueError("Analysis Unit build requires an executed Query Receipt")
         unit = create_analysis_unit(
             connection,
             workspace_id=workspace_id,
@@ -446,7 +549,12 @@ def analysis_units_command(
             unit = get_analysis_unit(connection, workspace_id, args.unit)
             if not unit:
                 raise ValueError(f"Unknown Analysis Unit in active workspace: {args.unit}")
-            return {"ok": True, "analysisUnit": unit}
+            consumer_state = analysis_unit_consumer_state(connection, workspace_id, unit)
+            return {
+                "ok": bool(consumer_state["usable"]),
+                "analysisUnit": _analysis_unit_consumer_view(unit, consumer_state),
+                "freshness": consumer_state,
+            }
         clauses = ["workspace_id = ?"]
         params: list[Any] = [workspace_id]
         if args.receipt:
@@ -458,10 +566,20 @@ def analysis_units_command(
             params,
         ).fetchall()
         units = []
+        stale_count = 0
         for row in rows:
             unit = _row_payload(row)
-            units.append({key: value for key, value in unit.items() if key not in {"rows", "calculation"}})
-    return {"ok": True, "analysisUnits": units, "count": len(units)}
+            consumer_state = analysis_unit_consumer_state(connection, workspace_id, unit)
+            view = _analysis_unit_consumer_view(unit, consumer_state)
+            stale_count += 0 if consumer_state["usable"] else 1
+            units.append({key: value for key, value in view.items() if key not in {"rows", "calculation"}})
+    return {
+        "ok": stale_count == 0,
+        "analysisUnits": units,
+        "count": len(units),
+        "usableCount": len(units) - stale_count,
+        "staleCount": stale_count,
+    }
 
 
 def analysis_unit_verify_command(
@@ -475,7 +593,20 @@ def analysis_unit_verify_command(
         unit = get_analysis_unit(connection, workspace_id, args.unit)
         if not unit:
             raise ValueError(f"Unknown Analysis Unit in active workspace: {args.unit}")
-    return verify_analysis_unit(unit)
+        consumer_state = analysis_unit_consumer_state(connection, workspace_id, unit)
+    verification = verify_analysis_unit(unit)
+    source_state = consumer_state.get("sourceState")
+    source_current = bool(consumer_state.get("usable"))
+    verification["sourceCurrent"] = source_current
+    verification["sourceState"] = source_state
+    verification["freshness"] = consumer_state
+    verification["ok"] = bool(verification["ok"] and source_current)
+    if not source_current:
+        verification["blockers"] = list(dict.fromkeys([
+            "analysis-unit-source-drifted",
+            *(consumer_state.get("blockers") or []),
+        ]))
+    return verification
 
 
 def verify_analysis_unit(unit: dict[str, Any]) -> dict[str, Any]:
@@ -504,8 +635,28 @@ def chart_adapt_command(
         unit = get_analysis_unit(connection, workspace_id, args.unit)
         if not unit:
             raise ValueError(f"Unknown Analysis Unit in active workspace: {args.unit}")
+        consumer_state = analysis_unit_consumer_state(connection, workspace_id, unit)
     adapter = adapt_chart(unit, args.preferred_chart)
-    return {"ok": adapter["status"] == "ready", "chartAdapter": adapter, "analysisUnitRef": {"unitKey": unit["unitKey"], "resultFingerprint": unit["resultFingerprint"]}}
+    if not consumer_state["usable"]:
+        adapter = {
+            **adapter,
+            "status": "blocked",
+            "chartType": None,
+            "config": {},
+            "blockers": list(dict.fromkeys([
+                *(adapter.get("blockers") or []),
+                *(consumer_state.get("blockers") or []),
+            ])),
+        }
+    return {
+        "ok": adapter["status"] == "ready",
+        "chartAdapter": adapter,
+        "analysisUnitRef": {
+            "unitKey": unit["unitKey"],
+            "resultFingerprint": unit["resultFingerprint"],
+            "freshness": consumer_state,
+        },
+    }
 
 
 def attach_analysis_unit(

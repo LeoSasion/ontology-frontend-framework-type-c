@@ -117,6 +117,7 @@ const textSourceFiles = {
   apiClientSource: ["src", "apiClient.ts"],
   apiDashboardSource: ["src", "apiDashboard.ts"],
   apiModelSource: ["src", "apiModel.ts"],
+  apiRelationshipSource: ["src", "apiRelationship.ts"],
   apiSettingsSource: ["src", "apiSettings.ts"],
   apiSourceApiSource: ["src", "apiSource.ts"],
   apiViewsSource: ["src", "apiViews.ts"],

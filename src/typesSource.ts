@@ -379,6 +379,7 @@ export interface WorkbenchPayload {
 
 export interface RelationshipPreviewPayload {
   ok: boolean;
+  workspaceId?: string;
   dryRun: boolean;
   requiresConfirmation?: boolean;
   relationship: Record<string, unknown>;

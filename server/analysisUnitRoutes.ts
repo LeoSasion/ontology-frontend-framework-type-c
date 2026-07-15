@@ -20,7 +20,9 @@ export async function handleAnalysisUnitApi({ cli, request, response, url }: Ana
     if (receipt) args.push("--receipt", receipt);
     args.push("--limit", limit);
     const result = await cli(args);
-    sendJson(response, result.ok === false ? 404 : 200, result);
+    const rejectedExistingUnit = result.ok === false && result.analysisUnit;
+    const returnedList = Array.isArray(result.analysisUnits);
+    sendJson(response, result.ok === false ? (rejectedExistingUnit ? 409 : returnedList ? 200 : 404) : 200, result);
     return true;
   }
 

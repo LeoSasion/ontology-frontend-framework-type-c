@@ -2,7 +2,7 @@
 
 ## 当前发布边界
 
-当前发布版本为 v0.2.0，是 single-user and local-only 的通用可信分析工作台。新工作区为空且不启用领域包；本地确定性运行时拥有数据与写入边界，可选 Provider 仅解释。最新日期证据见 [2026-07-15 发布回执](../artifacts/release-2026-07-15/SUMMARY.md)。
+当前发布版本为 v0.3.0，是 single-user and local-only 的通用可信分析工作台。新工作区为空且不启用领域包；本地确定性运行时拥有数据与写入边界，可选 Provider 仅解释。最近一次已归档的日期证据见 [2026-07-15 发布回执](../artifacts/release-2026-07-15/SUMMARY.md)，v0.3.0 以当前提交的自动化和浏览器验收为准。
 
 “工作区”只显示当前必要任务：无数据时接入来源，有数据无证据时生成摘要，有证据时发起分析，有草案时核对确认。高级工具和设置按需展开。
 
@@ -13,13 +13,13 @@
 | 工作区与导航 | 稳定 | 工作区隔离；对象级 URL 可恢复；简化主导航和状态驱动首页已落地 |
 | 导入与画像 | 稳定 | CSV/XLSX/XLSM、文件与文件夹统一预检；旧 XLS 仅画像读取 |
 | Connector Adapter | 稳定受控 | 本地表格、allowlist HTTP JSON 与 allowlist SQLite table 支持有界预览、计划和确认导入 |
-| 语义与关系 | 稳定受控 | 组合字段消歧、复合键、版本失效、筛选、预聚合和放大阻断进入 Receipt |
+| 语义与关系 | 稳定受控 | 一至三跳全局线性覆盖、INNER 反向遍历、跨跳筛选/预聚合、组合字段消歧、复合键、版本失效、根到事实可达性、NULL 语义和放大阻断进入 Receipt；等价根表、同表异键或未穷尽的高密度路径搜索必须由用户显式选择 |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
 | Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；Analysis Unit 在计划持久化前补全；blocker 保持可读字符串；工作区 Session 可重启恢复和 Fork，失效持久 key 只恢复重试一次，浏览器禁用存储时安全退化；Analysis Run 比较分支与 Turn 父链独立；工作流图随 Turn 持久化并可回读 |
 | Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
-| Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
-| 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |
+| Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；全部读取与适配入口复核多源、关系、版本和 Pack 当前性 |
+| 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
@@ -32,7 +32,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 
 - 不支持认证、角色、协作、远程托管、云同步、原生移动客户端或远程灾备。
 - 不支持自由多 Agent、专家直接调用工具、任意 Operator 或循环重规划；专家失败只降级到单 Orchestrator 的固定复核。
-- 跨表执行开放一跳和严格线性正向两跳；三跳、反向路径、跨跳筛选和跨跳预聚合保持阻断。
+- 跨表执行限一至三跳线性路径；超过三跳、非线性关系树、反向 LEFT JOIN、未证明安全的 M:N、等价业务路径歧义和不可安全 rollup 的预聚合保持阻断。
 - 重启中断 Job 不自动续跑；当前后台白名单只包含 Source Intelligence。
 - Analysis Unit 与导出最多冻结 500 行；旧 Receipt 缺少结果绑定时必须重新执行。
 - 报告只生成 Markdown，不生成 PDF/Word；Excel 仅对兼容形状生成原生图表。

@@ -664,6 +664,23 @@
   color: var(--warning-text);
 }
 
+.agentEvidenceRelationshipRefs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agentEvidenceRelationshipRefs > span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.25;
+  padding: 4px 7px;
+}
+
 .agentEvidencePlan > small {
   display: block;
   padding: 0 var(--space-4) var(--space-4);
@@ -728,6 +745,7 @@
   color: var(--muted);
   margin: 0;
 }
+
 .agentAnalysisUnitStrip {
   display: flex;
   align-items: flex-start;

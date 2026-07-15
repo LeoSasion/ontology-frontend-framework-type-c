@@ -71,8 +71,15 @@ export async function handleModelApi(options: ModelRoutesOptions) {
 
   if (url.pathname === "/api/relationships/preview" && request.method === "POST") {
     const body = await readBody(request);
+    const workspaceId = String(body.workspaceId ?? "").trim();
+    if (!workspaceId) {
+      sendJson(response, 400, { ok: false, error: "workspaceId is required for relationship preview" });
+      return true;
+    }
     const args = [
       "relationship-preview",
+      "--workspace",
+      workspaceId,
       "--left-table",
       String(body.leftTable ?? ""),
       "--right-table",
@@ -143,8 +150,15 @@ export async function handleModelApi(options: ModelRoutesOptions) {
 
   if (url.pathname === "/api/relationships/save" && request.method === "POST") {
     const body = await readBody(request);
+    const workspaceId = String(body.workspaceId ?? "").trim();
+    if (!workspaceId) {
+      sendJson(response, 400, { ok: false, error: "workspaceId is required for relationship save" });
+      return true;
+    }
     const args = [
       "relationship-save",
+      "--workspace",
+      workspaceId,
       "--left-table",
       String(body.leftTable ?? ""),
       "--right-table",

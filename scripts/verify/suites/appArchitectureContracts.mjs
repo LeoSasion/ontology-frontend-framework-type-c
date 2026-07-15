@@ -12,6 +12,7 @@ export function appendAppArchitectureContractChecks(context) {
     apiClientSource,
     apiDashboardSource,
     apiModelSource,
+    apiRelationshipSource,
     apiSettingsSource,
     apiSource,
     apiSourceApiSource,
@@ -184,7 +185,7 @@ export function appendAppArchitectureContractChecks(context) {
           apiWorkspaceSource.includes('emptyDashboardPayload') &&
           apiSourceApiSource.includes('emptyImportPreview') &&
           apiModelSource.includes('emptyFormulaPreview') &&
-          apiModelSource.includes('emptyRelationshipPreview') &&
+          apiRelationshipSource.includes('emptyRelationshipPreview') &&
           !appWorkspaceModelSource.includes('from "./sampleData"') &&
           !apiWorkspaceSource.includes('from "./sampleData"') &&
           !apiAgentSource.includes('sampleActionDrafts'),
@@ -292,7 +293,8 @@ export function appendAppArchitectureContractChecks(context) {
         ok: existsSync(join(root, "src", "useAppDataActions.ts")) &&
           appSource.includes('from "./useAppDataActions"') &&
           appSource.includes("useAppDataActions({") &&
-          appSource.includes("setRelationshipPreview,") &&
+          appSource.includes("activeWorkspaceId: status.workspace.id,") &&
+          appMainViewSource.includes("handleRelationshipPreview,") &&
           appSource.includes("setFormulaPreview,") &&
           appSource.includes("setActionDrafts,") &&
           appSource.includes("navigateTo,") &&
@@ -303,6 +305,7 @@ export function appendAppArchitectureContractChecks(context) {
           appDataActionsSource.includes("const handleSourceIntelligenceRun = useCallback") &&
           appDataActionsSource.includes("const handleSourceDashboardDraft = useCallback") &&
           appDataActionsSource.includes("const handleDashboardRelationshipSave = useCallback") &&
+          appDataActionsSource.includes("previewWorkspaceRelationship(activeWorkspaceId, options)") &&
           appDataActionsSource.includes("const handleSaveConnector = useCallback") &&
           appDataActionsSource.includes("const handleSaveView = useCallback") &&
           appDataActionsSource.includes("const { stayOnPage = false, inputs = [], ...sourceOptions }") &&

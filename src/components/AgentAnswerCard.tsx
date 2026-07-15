@@ -14,6 +14,8 @@ type AgentAnswerCardProps = {
   answerQuery: Record<string, unknown> | null;
   onAskCandidate?: (prompt: string) => void;
   onSelectSemanticCandidates?: (candidates: import("../typesAgent").SemanticFieldCandidate[]) => void;
+  onSelectSemanticRoot?: (tableKey: string) => void;
+  onSelectSemanticPath?: (relationKeys: string[]) => void;
   providerResponse?: AgentAskResult["llm"]["response"];
   intentFrame?: AgentAskResult["intentFrame"];
   clarificationBundle?: AgentAskResult["clarification"];
@@ -62,7 +64,7 @@ function intentTypeText(taskType?: string) {
   return labels[taskType ?? ""] ?? taskType ?? biText("分析", "Analysis");
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, onSelectSemanticPath, onSelectSemanticRoot, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
@@ -122,7 +124,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
       ) : null}
       {semanticPlan && semanticPlan.status !== "not-applicable" ? (
         <Suspense fallback={null}>
-          <AgentSemanticPlan executionPlan={executionPlan} onSelectCandidates={onSelectSemanticCandidates} plan={semanticPlan} tableNameByKey={tableNameByKey} />
+          <AgentSemanticPlan executionPlan={executionPlan} onSelectCandidates={onSelectSemanticCandidates} onSelectPath={onSelectSemanticPath} onSelectRoot={onSelectSemanticRoot} plan={semanticPlan} tableNameByKey={tableNameByKey} />
         </Suspense>
       ) : null}
       <div className="agentAnswerMetrics">

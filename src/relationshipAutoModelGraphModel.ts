@@ -2,7 +2,9 @@ import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 import {
   buildRelationshipSavePayload,
   relationshipPrimaryMapping,
+  relationshipRecordKey,
   relationshipRecommendationKey,
+  relationshipSavePayloadKey,
 } from "./dashboardCanvasRelationshipModel";
 import type { FieldConfig, RelationshipRecommendation, RelationshipRecord, WorkbenchTable } from "./types";
 import { biText } from "./components/Bilingual";
@@ -30,21 +32,18 @@ function tableDisplayName(tables: WorkbenchTable[], tableKey: string, fallback?:
   return tables.find((table) => table.table_key === tableKey)?.display_name ?? fallback ?? tableKey;
 }
 
-function savedRelationshipKey(relationship: RelationshipRecord) {
-  return `${relationship.left_table_key}-${relationship.right_table_key}-${relationship.left_field}-${relationship.right_field}`;
-}
-
 export function relationshipSaveOptions(recommendation: RelationshipRecommendation, current: RelationshipSaveOptions): RelationshipSaveOptions | null {
   const payload = buildRelationshipSavePayload(recommendation, false);
   if (!payload) return null;
+  const preservePolicies = relationshipSavePayloadKey(current) === relationshipSavePayloadKey(payload);
   return {
     leftTable: payload.leftTable,
     rightTable: payload.rightTable,
     leftField: payload.leftField,
     rightField: payload.rightField,
     fieldMappings: payload.fieldMappings,
-    filters: current.filters,
-    preaggregation: current.preaggregation,
+    filters: preservePolicies ? current.filters : undefined,
+    preaggregation: preservePolicies ? current.preaggregation : undefined,
     joinType: payload.joinType ?? "left",
     limit: current.limit ?? payload.limit ?? 20,
   };
@@ -75,7 +74,7 @@ function savedRelationshipToEdge(relationship: RelationshipRecord, tables: Workb
     confidence: relationship.confidence ?? 0,
     coverage: relationship.confidence ?? 0,
     existing: true,
-    key: savedRelationshipKey(relationship),
+    key: relationshipRecordKey(relationship),
     leftField: relationship.left_field,
     leftTableKey: relationship.left_table_key,
     leftTableName: tableDisplayName(tables, relationship.left_table_key),

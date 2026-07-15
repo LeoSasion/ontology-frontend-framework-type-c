@@ -4,11 +4,15 @@ import argparse
 import hashlib
 import json
 import sqlite3
+from contextlib import closing
 from difflib import SequenceMatcher
 from typing import Any, Callable
 
-from context_pack_service import workspace_schema_fingerprint
-from query_plan_receipt_service import get_query_receipt
+from query_plan_receipt_service import (
+    current_query_receipt_source_state,
+    get_query_receipt,
+    query_receipt_binding_fingerprint,
+)
 
 
 def _query_key(workspace_id: str, action_key: str, receipt_key: str) -> str:
@@ -21,6 +25,16 @@ def _payload(row: sqlite3.Row) -> dict[str, Any]:
     item["chartSpec"] = json.loads(item.pop("chart_spec_json"))
     item["evidenceRefs"] = json.loads(item.pop("evidence_json"))
     return item
+
+
+def _stored_binding_matches_receipt(stored: Any, receipt: dict[str, Any]) -> bool:
+    stored_value = str(stored or "")
+    source = receipt.get("source") if isinstance(receipt.get("source"), dict) else {}
+    return stored_value in {
+        query_receipt_binding_fingerprint(receipt),
+        # Compatibility for candidates confirmed before the full binding contract.
+        str(source.get("schemaFingerprint") or ""),
+    }
 
 
 def create_confirmed_query_candidate(
@@ -38,6 +52,9 @@ def create_confirmed_query_candidate(
     receipt = get_query_receipt(connection, workspace_id, receipt_key)
     if not receipt or receipt.get("status") != "executed":
         return None
+    source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+    if not source_state.get("matchesReceipt"):
+        return None
     source = receipt.get("source") if isinstance(receipt.get("source"), dict) else {}
     table_key = str(source.get("tableKey") or action_payload.get("tableKey") or "").strip()
     query_key = _query_key(workspace_id, action_key, receipt_key)
@@ -47,7 +64,7 @@ def create_confirmed_query_candidate(
         {"type": "confirmedAction", "actionKey": action_key},
     ]
     question = str(action_payload.get("prompt") or receipt.get("request") or "").strip()
-    fingerprint = workspace_schema_fingerprint(connection, workspace_id, table_key or None)
+    fingerprint = query_receipt_binding_fingerprint(receipt)
     existing_rows = connection.execute(
         """
         SELECT * FROM confirmed_queries
@@ -57,7 +74,7 @@ def create_confirmed_query_candidate(
         (workspace_id, table_key),
     ).fetchall()
     existing = next((row for row in existing_rows if str(row["question"] or "").strip().casefold() == question.casefold()), None)
-    if existing and existing["status"] == "confirmed" and existing["schema_fingerprint"] == fingerprint:
+    if existing and existing["status"] == "confirmed" and _stored_binding_matches_receipt(existing["schema_fingerprint"], receipt):
         return _payload(existing)
     if existing and existing["status"] == "candidate":
         connection.execute(
@@ -114,18 +131,25 @@ def create_confirmed_query_candidate(
 
 def refresh_stale_confirmed_queries(connection: sqlite3.Connection, workspace_id: str, now_iso: Callable[[], str]) -> int:
     rows = connection.execute(
-        "SELECT query_key, source_table_key, schema_fingerprint FROM confirmed_queries WHERE workspace_id = ? AND status = 'confirmed'",
+        "SELECT query_key, query_receipt_key, source_table_key, schema_fingerprint FROM confirmed_queries WHERE workspace_id = ? AND status = 'confirmed'",
         (workspace_id,),
     ).fetchall()
     stale_count = 0
     for row in rows:
-        current = workspace_schema_fingerprint(connection, workspace_id, row["source_table_key"] or None)
-        if current == row["schema_fingerprint"]:
+        receipt = get_query_receipt(connection, workspace_id, row["query_receipt_key"])
+        source_state = current_query_receipt_source_state(connection, workspace_id, receipt) if receipt else None
+        if (
+            receipt
+            and receipt.get("status") == "executed"
+            and source_state
+            and source_state.get("matchesReceipt")
+            and _stored_binding_matches_receipt(row["schema_fingerprint"], receipt)
+        ):
             continue
         connection.execute(
             """
             UPDATE confirmed_queries
-            SET status = 'stale', stale_reason = 'Source schema or confirmed semantics changed', updated_at = ?
+            SET status = 'stale', stale_reason = 'Query Receipt source, Domain Pack, or relationship path changed', updated_at = ?
             WHERE workspace_id = ? AND query_key = ?
             """,
             (now_iso(), workspace_id, row["query_key"]),
@@ -171,7 +195,13 @@ def confirm_query_command(
     target_status = str(args.status or "confirmed").strip()
     if target_status not in {"confirmed", "deprecated"}:
         raise ValueError(f"Unsupported confirmed query status: {target_status}")
-    with open_db() as connection:
+    with closing(open_db()) as connection:
+        if connection.in_transaction:
+            connection.commit()
+        # Confirmation promotes a freshness decision into durable memory. Keep
+        # the proof and the status update in one stable snapshot so a source
+        # writer cannot race between them.
+        connection.execute("BEGIN IMMEDIATE")
         workspace_id = active_workspace_id(connection)
         row = connection.execute(
             "SELECT * FROM confirmed_queries WHERE workspace_id = ? AND query_key = ?",
@@ -183,13 +213,17 @@ def confirm_query_command(
         receipt = get_query_receipt(connection, workspace_id, item["query_receipt_key"])
         if not receipt or receipt.get("status") != "executed":
             raise ValueError("Only executed query receipts can become confirmed queries")
-        current_fingerprint = workspace_schema_fingerprint(connection, workspace_id, item["source_table_key"] or None)
-        if target_status == "confirmed" and current_fingerprint != item["schema_fingerprint"]:
+        source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+        binding_current = (
+            source_state.get("matchesReceipt")
+            and _stored_binding_matches_receipt(item["schema_fingerprint"], receipt)
+        )
+        if target_status == "confirmed" and not binding_current:
             return {
                 "ok": False,
                 "requiresConfirmation": False,
                 "query": item,
-                "error": "Query candidate is stale because the source schema or confirmed semantics changed",
+                "error": "Query candidate is stale because its source, Domain Pack, or relationship path changed",
             }
         proposal = {**item, "targetStatus": target_status}
         if not args.yes:
@@ -238,6 +272,12 @@ def recall_confirmed_queries(
     prompt_folded = prompt.casefold().strip()
     scored: list[tuple[float, dict[str, Any]]] = []
     for row in rows:
+        receipt = get_query_receipt(connection, workspace_id, row["query_receipt_key"])
+        if not receipt or receipt.get("status") != "executed":
+            continue
+        source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+        if not source_state.get("matchesReceipt") or not _stored_binding_matches_receipt(row["schema_fingerprint"], receipt):
+            continue
         if table_key and row["source_table_key"] and row["source_table_key"] != table_key:
             continue
         question = str(row["question"] or "").casefold().strip()

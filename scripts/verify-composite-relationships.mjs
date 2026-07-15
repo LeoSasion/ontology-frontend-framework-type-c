@@ -69,6 +69,7 @@ try {
   results.push(run("preaggregation-save", ["relationship-save", "--left-table", "orders", "--right-table", "refunds", "--map", "order_id:order_id", "--filter-json", persistedFilter, "--preaggregate-json", rightPreaggregation, "--yes"]));
   results.push(run("preaggregation-list", ["list-relationships"]));
   results.push(run("preaggregation-query", ["query-relationship", "--relationship", "orders_refunds_order_id_order_id", "--group", "left:channel", "--measure", "left:net_sales", "--agg", "sum", "--sort-direction", "asc"]));
+  results.push(run("remove-composite-before-semantic", ["remove-relationship", "--relationship", "orders_refunds_order_id_order_id_item_id_item_id", "--yes"]));
   results.push(run("semantic-single-hop-query", ["semantic-query", "按 channel 看 refund_amount", "--table", "orders", "--limit", "20"]));
   results.push(run("agent-semantic-single-hop", ["ask", "订单 按 channel 看 refund_amount", "--read-only"]));
   results.push(run("replace-refunds", ["import-commit", refundsChangedFile, "--table", "refunds", "--name", "退款", "--mode", "replace", "--yes"]));
@@ -158,6 +159,11 @@ try {
       ok: byLabel["preaggregation-query"].status === 0
         && Number(preaggregationValues.Douyin) === 300
         && Number(preaggregationValues.Tmall) === 150,
+    },
+    {
+      label: "semantic-test-has-one-explicit-business-path",
+      ok: byLabel["remove-composite-before-semantic"].status === 0
+        && byLabel["remove-composite-before-semantic"].parsed?.confirmed === true,
     },
     {
       label: "semantic-plan-executes-saved-single-hop-safety-policy",

@@ -781,6 +781,7 @@ def build_parser() -> argparse.ArgumentParser:
     field_update.add_argument("--yes", action="store_true")
 
     relationship = sub.add_parser("relationship-preview")
+    relationship.add_argument("--workspace", default="")
     relationship.add_argument("--left-table", required=True)
     relationship.add_argument("--right-table", required=True)
     relationship.add_argument("--left-field", default="")
@@ -794,6 +795,7 @@ def build_parser() -> argparse.ArgumentParser:
     relationship.add_argument("--limit", type=int, default=20)
 
     relationship_save = sub.add_parser("relationship-save")
+    relationship_save.add_argument("--workspace", default="")
     relationship_save.add_argument("--left-table", required=True)
     relationship_save.add_argument("--right-table", required=True)
     relationship_save.add_argument("--left-field", default="")

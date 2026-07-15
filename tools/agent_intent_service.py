@@ -84,12 +84,37 @@ def _comparisons(prompt: str) -> list[str]:
     return result
 
 
+def _dimension_is_filter_only(
+    prompt: str,
+    dimension: dict[str, Any],
+    filters: list[dict[str, str]],
+) -> bool:
+    normalized_prompt = _compact(prompt).casefold()
+    aliases = {
+        _compact(dimension.get("concept")).casefold(),
+        _compact(dimension.get("field")).casefold(),
+        _compact(f"{dimension.get('tableKey')}.{dimension.get('field')}").casefold(),
+    }
+    aliases.discard("")
+    filter_expressions = [_compact(item.get("fieldExpression")).casefold() for item in filters]
+    participates_in_filter = any(
+        alias == expression or alias in expression or expression in alias
+        for alias in aliases
+        for expression in filter_expressions
+        if expression
+    )
+    if not participates_in_filter:
+        return False
+    return max((normalized_prompt.count(alias) for alias in aliases), default=0) <= 1
+
+
 def build_business_intent_frame(prompt: str, *, semantic_plan: dict[str, Any] | None = None, evidence_refs: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     plan = semantic_plan if isinstance(semantic_plan, dict) else {}
     task_type, task_confidence, task_reason = _task_type(prompt)
     measures = _selected_fields(plan, {"measure"})
     dimensions = _selected_fields(plan, {"dimension", "event_time", "status"})
     other_fields = _selected_fields(plan, {"identity_key", "identity", "attribute", "unknown"})
+    filters = _filters(prompt)
     unresolved = [{
         "kind": "field-binding",
         "mention": str(item.get("mention") or ""),
@@ -97,7 +122,11 @@ def build_business_intent_frame(prompt: str, *, semantic_plan: dict[str, Any] | 
         "candidateCount": len(item.get("candidates") or []),
     } for item in plan.get("fieldResolution", {}).get("unresolved") or []]
     time_scope = _time_scope(prompt)
-    grain_fields = [f"{item['tableKey']}.{item['field']}" for item in dimensions if item["field"]]
+    grain_fields = [
+        f"{item['tableKey']}.{item['field']}"
+        for item in dimensions
+        if item["field"] and not _dimension_is_filter_only(prompt, item, filters)
+    ]
     output = _requested_output(prompt)
     return {
         "schema": INTENT_SCHEMA,
@@ -107,7 +136,7 @@ def build_business_intent_frame(prompt: str, *, semantic_plan: dict[str, Any] | 
         "dimensionConcepts": dimensions,
         "otherConcepts": other_fields,
         "timeScope": time_scope,
-        "filters": _filters(prompt),
+        "filters": filters,
         "comparisons": _comparisons(prompt),
         "requestedOutput": output,
         "grainExpectation": {"fields": grain_fields, "description": " + ".join(grain_fields) if grain_fields else "aggregate-result"},

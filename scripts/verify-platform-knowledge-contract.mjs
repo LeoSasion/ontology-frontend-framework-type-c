@@ -24,7 +24,12 @@ const checks = [
   { label: "knowledge-loader-validates-structure-before-query", ok: loader.includes("required.issubset(table[\"fields\"])") && loader.includes("Unsafe platform knowledge query") },
   { label: "knowledge-loader-has-complex-analysis-guard", ok: loader.includes("requires_verified_analysis_plan") && loader.includes("build_verified_analysis_gap") },
   { label: "knowledge-loader-normalizes-percent-threshold", ok: loader.includes("float(percent_match.group(1)) / 100") && ids.includes("jushuitan-multi-package-threshold") },
-  { label: "agent-injects-model-independent-knowledge", ok: cli.includes("match_platform_knowledge(connection, workspace_id, prompt)") && cli.includes('"modelIndependent": True') },
+  {
+    label: "agent-injects-model-independent-knowledge",
+    ok: cli.includes("match_platform_knowledge(connection, workspace_id, business_prompt)")
+      && cli.includes("platform_knowledge_context(platform_match)")
+      && cli.includes('"modelIndependent": True'),
+  },
   { label: "query-receipt-carries-knowledge-rule", ok: cli.includes("knowledge_rule=answer_card.get(\"knowledgeRule\")") },
 ];
 const failedChecks = checks.filter((check) => !check.ok);

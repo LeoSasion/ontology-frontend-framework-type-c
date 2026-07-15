@@ -4,6 +4,7 @@ import argparse
 import json
 import re
 import sqlite3
+from contextlib import closing
 from typing import Any, Callable
 
 from bi_cli_core import now_iso, slug
@@ -87,8 +88,15 @@ def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
         blockers.append("no-overlap")
     if float(metrics.get("confidence") or 0) < 0.55:
         blockers.append("low-confidence")
-    if float(metrics.get("rowExpansion") or 0) > 1.000001:
-        blockers.append("row-expansion")
+    expands = max(
+        float(metrics.get("rowExpansion") or 0),
+        float(metrics.get("matchedRowExpansion") or 0),
+    ) > 1.000001
+    # A genuine one-to-many edge is valid graph metadata; whether it is safe for
+    # a particular metric is decided by the path proof. Only an expanding edge
+    # with duplicate keys on both sides is intrinsically ambiguous here.
+    if expands and int(metrics.get("leftDuplicateKeyGroups") or 0) > 0 and int(metrics.get("rightDuplicateKeyGroups") or 0) > 0:
+        blockers.append("many-to-many-row-expansion")
     return {
         "schema": "aibi-relationship-validation/v1",
         "status": "validated" if not blockers else "review-required",
@@ -407,14 +415,10 @@ def resolve_relationship_query_inputs(
         saved_filters = relation_payload.get("filters") if isinstance(relation_payload.get("filters"), list) else []
         saved_preaggregation = relation_payload.get("preaggregation") if isinstance(relation_payload.get("preaggregation"), dict) else {}
     else:
-        left_table_key = args.left_table
-        right_table_key = args.right_table
-        mappings = relationship_mappings_from_args(args)
-        join_type = args.join_type
-        saved_filters = []
-        saved_preaggregation = {}
-        if not left_table_key or not right_table_key:
-            raise ValueError("Use --relationship or provide --left-table and --right-table with relationship mappings.")
+        raise ValueError(
+            "Relationship execution requires --relationship with a saved, currently validated relation. "
+            "Use relationship-preview for unsaved mappings."
+        )
     left = registry_for_table(connection, left_table_key)
     right = registry_for_table(connection, right_table_key)
     if not left or not right:
@@ -426,9 +430,23 @@ def resolve_relationship_query_inputs(
             str(left_table_key): int(left["data_version"] or 1),
             str(right_table_key): int(right["data_version"] or 1),
         }
-        if expected_versions and any(
-            int(expected_versions.get(key) or 0) != version for key, version in current_versions.items()
-        ):
+        missing_version_tables = [key for key in current_versions if key not in expected_versions]
+        if missing_version_tables:
+            raise ValueError(
+                "relationship-validation-missing-data-versions: "
+                f"saved validation has no version evidence for {', '.join(missing_version_tables)}; "
+                "preview and save the relationship again before querying."
+            )
+        try:
+            version_mismatch = any(
+                int(expected_versions.get(key)) != version for key, version in current_versions.items()
+            )
+        except (TypeError, ValueError):
+            raise ValueError(
+                "relationship-validation-invalid-data-versions: "
+                "saved relationship version evidence is malformed; preview and save it again before querying."
+            ) from None
+        if version_mismatch:
             raise ValueError(f"Relationship validation is stale for current source versions: {args.relationship}")
     left_columns = table_columns(connection, left["physical_table"])
     right_columns = table_columns(connection, right["physical_table"])
@@ -444,6 +462,52 @@ def resolve_relationship_query_inputs(
         "joinType": join_type,
         "savedFilters": saved_filters,
         "savedPreaggregation": saved_preaggregation,
+        "validation": validation,
+    }
+
+
+def relationship_measure_fanout_proof(
+    validation: dict[str, Any],
+    measure: dict[str, Any] | None,
+) -> dict[str, Any]:
+    if not measure:
+        return {
+            "status": "not-applicable",
+            "measureSide": "",
+            "expansionMetric": "",
+            "matchedRowExpansion": 1.0,
+            "blockers": [],
+        }
+    side = str(measure.get("side") or "").strip().lower()
+    if side not in {"left", "right"}:
+        raise ValueError("relationship-measure-side-invalid: metric field must use left:field or right:field.")
+    metrics = validation.get("metrics") if isinstance(validation.get("metrics"), dict) else {}
+    expansion_metric = "matchedRowExpansion" if side == "left" else "reverseMatchedRowExpansion"
+    if expansion_metric not in metrics:
+        raise ValueError(
+            "relationship-validation-missing-cardinality-evidence: "
+            f"saved validation has no {expansion_metric} proof for a {side}-side measure; "
+            "preview and save the relationship again before querying."
+        )
+    try:
+        matched_row_expansion = float(metrics.get(expansion_metric))
+    except (TypeError, ValueError):
+        raise ValueError(
+            "relationship-validation-invalid-cardinality-evidence: "
+            f"saved {expansion_metric} proof is malformed; preview and save the relationship again before querying."
+        ) from None
+    if matched_row_expansion > 1.000001:
+        raise ValueError(
+            f"relationship-measure-fanout-risk:{side}: "
+            f"{expansion_metric}={matched_row_expansion:g}; the join would repeat {side}-side metric rows. "
+            "Use the many-side measure, or save a validated preaggregation that restores the metric grain."
+        )
+    return {
+        "status": "safe",
+        "measureSide": side,
+        "expansionMetric": expansion_metric,
+        "matchedRowExpansion": matched_row_expansion,
+        "blockers": [],
     }
 
 
@@ -511,16 +575,35 @@ def relationship_rows_for_chart(payload: dict[str, Any]) -> list[dict[str, Any]]
     rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
     columns = payload.get("columns") if isinstance(payload.get("columns"), list) else []
     metric_name = str(payload.get("metricName") or (columns[-1] if columns else "value"))
-    group_name = str(columns[0]) if len(columns) > 1 else ""
+    aggregation = str(payload.get("aggregation") or "").strip().lower()
+    groups = payload.get("groups") if isinstance(payload.get("groups"), list) else []
+    group_names = [
+        str(item.get("outputName") or "")
+        for item in groups
+        if isinstance(item, dict) and item.get("outputName")
+    ]
+    if not group_names and len(columns) > 1:
+        group_names = [str(columns[0])]
     chart_rows = []
     for index, row in enumerate(rows):
         if not isinstance(row, dict):
             continue
-        label = str(row.get(group_name) if group_name else f"Row {index + 1}")
-        value = row.get(metric_name, 0)
+        dimension_values = {
+            name: row.get(name)
+            for name in group_names
+        }
+        label_parts = [str(value) for value in dimension_values.values() if value is not None and str(value) != ""]
+        label = " / ".join(label_parts) if label_parts else f"Row {index + 1}"
+        raw_value = row.get(metric_name)
+        if raw_value is None:
+            value = 0.0 if aggregation in {"count", "count-distinct"} else None
+        else:
+            value = to_number(raw_value)
         chart_rows.append({
             "label": label,
-            "value": to_number(value),
+            "value": value,
+            **dimension_values,
+            "dimensions": dimension_values,
             "raw": row,
         })
     return chart_rows
@@ -534,10 +617,17 @@ def query_relationship_command(
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     parse_relationship_field_ref: Callable[[str], dict[str, str]],
+    build_relationship_preview: Callable[..., dict[str, Any]],
     build_relationship_query: Callable[..., dict[str, Any]],
     quote_relationship_identifier: Callable[[str], str],
 ) -> dict[str, Any]:
-    with open_db() as connection:
+    with closing(open_db()) as connection:
+        # Keep validation, registry versions, physical-column discovery and the
+        # compiled query on one stable SQLite snapshot. BEGIN IMMEDIATE also
+        # prevents an import/replace writer from racing between proof and use.
+        if connection.in_transaction:
+            connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
         resolved = resolve_relationship_query_inputs(
             args,
             connection,
@@ -547,8 +637,40 @@ def query_relationship_command(
         )
         group_fields = [parse_relationship_field_ref(item) for item in args.group]
         measure = parse_relationship_field_ref(args.measure) if args.measure else None
-        filters = [*resolved["savedFilters"], *relationship_filters_from_args(args)]
-        preaggregation = relationship_preaggregation_from_args(args) or resolved["savedPreaggregation"]
+        runtime_filters = relationship_filters_from_args(args)
+        runtime_preaggregation = relationship_preaggregation_from_args(args)
+        filters = [*resolved["savedFilters"], *runtime_filters]
+        preaggregation = runtime_preaggregation or resolved["savedPreaggregation"]
+        definition_changed = bool(runtime_filters) or (
+            runtime_preaggregation is not None
+            and runtime_preaggregation != resolved["savedPreaggregation"]
+        )
+        proof_validation = resolved["validation"]
+        validation_scope = "saved-relationship"
+        if definition_changed:
+            # Runtime filters/preaggregation change the cardinality surface that
+            # the saved validation described. Recompute the exact effective
+            # shape while the source-version lock is still held; never reuse a
+            # safe saved proof for a different query definition.
+            effective_preview = build_relationship_preview(
+                connection,
+                resolved["leftPhysicalTable"],
+                resolved["rightPhysicalTable"],
+                resolved["leftColumns"],
+                resolved["rightColumns"],
+                resolved["mappings"],
+                join_type=resolved["joinType"],
+                sample_limit=max(1, min(int(args.limit or 50), 50)),
+                quote_identifier=quote_relationship_identifier,
+                filters=filters,
+                preaggregation=preaggregation,
+            )
+            proof_validation = {"metrics": effective_preview.get("metrics", {})}
+            validation_scope = "effective-query-preview"
+        fanout_proof = relationship_measure_fanout_proof(proof_validation, measure)
+        fanout_proof["validationScope"] = validation_scope
+        fanout_proof["runtimeFilterCount"] = len(runtime_filters)
+        fanout_proof["runtimePreaggregationOverride"] = runtime_preaggregation is not None
         payload = build_relationship_query(
             connection,
             resolved["leftPhysicalTable"],
@@ -567,6 +689,7 @@ def query_relationship_command(
             sort_direction=args.sort_direction,
             quote_identifier=quote_relationship_identifier,
         )
+        payload["fanoutSafety"] = fanout_proof
     return {
         "ok": True,
         "relationship": {
@@ -577,6 +700,7 @@ def query_relationship_command(
             "joinType": resolved["joinType"],
             "filters": payload["filters"],
             "preaggregation": payload["preaggregation"],
+            "fanoutSafety": fanout_proof,
         },
         "relationshipQuery": payload,
         "query": {
@@ -617,18 +741,42 @@ def remove_relationship_command(
     return {"ok": True, "confirmed": True, "removedRelationship": relationship}
 
 
+def _relationship_workspace_id(
+    connection: sqlite3.Connection,
+    args: argparse.Namespace,
+    active_workspace_id: Callable[[sqlite3.Connection], str],
+) -> str:
+    workspace_id = str(getattr(args, "workspace", "") or "").strip() or active_workspace_id(connection)
+    if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
+        raise ValueError(f"Unknown workspace: {workspace_id}")
+    return workspace_id
+
+
+def _relationship_registry_for_workspace(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    table_key: str,
+) -> sqlite3.Row | None:
+    return connection.execute(
+        "SELECT * FROM table_registry WHERE table_key = ? AND workspace_id = ?",
+        (table_key, workspace_id),
+    ).fetchone()
+
+
 def relationship_preview_command(
     args: argparse.Namespace,
     *,
     open_db: Callable[[], Any],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     build_relationship_preview: Callable[..., dict[str, Any]],
     quote_identifier: Callable[[str], str],
 ) -> dict[str, Any]:
     with open_db() as connection:
-        left = registry_for_table(connection, args.left_table)
-        right = registry_for_table(connection, args.right_table)
+        workspace_id = _relationship_workspace_id(connection, args, active_workspace_id)
+        left = _relationship_registry_for_workspace(connection, workspace_id, args.left_table)
+        right = _relationship_registry_for_workspace(connection, workspace_id, args.right_table)
         if not left or not right:
             raise ValueError("Unknown relationship table.")
         left_columns = table_columns(connection, left["physical_table"])
@@ -651,6 +799,7 @@ def relationship_preview_command(
         )
     return {
         "ok": True,
+        "workspaceId": workspace_id,
         "dryRun": True,
         "relationship": {
             "leftTable": args.left_table,
@@ -679,14 +828,23 @@ def build_relationship_save_plan(
     mappings: list[dict[str, str]] | None = None,
     filters: list[dict[str, Any]] | None = None,
     preaggregation: dict[str, Any] | None = None,
+    workspace_id: str | None = None,
     *,
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     build_relationship_preview: Callable[..., dict[str, Any]],
     quote_identifier: Callable[[str], str],
 ) -> dict[str, Any]:
-    left = registry_for_table(connection, left_table)
-    right = registry_for_table(connection, right_table)
+    left = (
+        _relationship_registry_for_workspace(connection, workspace_id, left_table)
+        if workspace_id
+        else registry_for_table(connection, left_table)
+    )
+    right = (
+        _relationship_registry_for_workspace(connection, workspace_id, right_table)
+        if workspace_id
+        else registry_for_table(connection, right_table)
+    )
     if not left or not right:
         raise ValueError("Unknown relationship table.")
     left_columns = table_columns(connection, left["physical_table"])
@@ -749,8 +907,9 @@ def execute_relationship_save(
     proposed: dict[str, Any],
     *,
     active_workspace_id: Callable[[sqlite3.Connection], str],
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
-    workspace_id = active_workspace_id(connection)
+    workspace_id = workspace_id or active_workspace_id(connection)
     timestamp = now_iso()
     connection.execute(
         """
@@ -785,11 +944,13 @@ def relationship_save_command(
     args: argparse.Namespace,
     *,
     open_db: Callable[[], Any],
-    build_relationship_save_plan: Callable[[sqlite3.Connection, str, str, str, str, str, int], dict[str, Any]],
-    execute_relationship_save: Callable[[sqlite3.Connection, dict[str, Any]], dict[str, Any]],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
+    build_relationship_save_plan: Callable[..., dict[str, Any]],
+    execute_relationship_save: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     limit = getattr(args, "limit", 20)
     with open_db() as connection:
+        workspace_id = _relationship_workspace_id(connection, args, active_workspace_id)
         mappings = relationship_mappings_from_args(args)
         filters = relationship_filters_from_args(args)
         preaggregation = relationship_preaggregation_from_args(args)
@@ -804,16 +965,18 @@ def relationship_save_command(
             mappings=mappings,
             filters=filters,
             preaggregation=preaggregation,
+            workspace_id=workspace_id,
         )
         proposed = plan["relationship"]
         if not args.yes:
             return {
                 "ok": True,
+                "workspaceId": workspace_id,
                 "dryRun": True,
                 "requiresConfirmation": True,
                 "relationship": proposed,
                 "relationshipPreview": plan["relationshipPreview"],
             }
-        saved = execute_relationship_save(connection, proposed)
+        saved = execute_relationship_save(connection, proposed, workspace_id=workspace_id)
         connection.commit()
-    return {"ok": True, "saved": saved, "relationshipPreview": plan["relationshipPreview"]}
+    return {"ok": True, "workspaceId": workspace_id, "saved": saved, "relationshipPreview": plan["relationshipPreview"]}

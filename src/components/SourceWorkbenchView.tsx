@@ -1,4 +1,7 @@
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { relationshipRequestScopeKey } from "../dashboardCanvasRelationshipModel";
+import { emptyRelationshipPreview } from "../emptyWorkspaceData";
+import { invalidateRelationshipRequests } from "../relationshipRequestGuard";
 import type { SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import type { useSourceWorkbenchState } from "../useSourceWorkbenchState";
 import {
@@ -24,7 +27,7 @@ type SourceWorkbenchViewProps = SourceWorkbenchProps & ReturnType<typeof useSour
 
 export function SourceWorkbenchView({
   formulaPreview,
-  relationshipPreview,
+  status,
   onAsk,
   onOpenAnalysis,
   onInspectSource,
@@ -131,6 +134,32 @@ export function SourceWorkbenchView({
   sourceProfileOptions,
   sourceRenameName,
 }: SourceWorkbenchViewProps) {
+  const [relationshipPreview, setRelationshipPreview] = useState(emptyRelationshipPreview);
+  const relationshipScope = relationshipRequestScopeKey(status.workspace.id, relationshipForm);
+  const relationshipScopeRef = useRef(relationshipScope);
+
+  useEffect(() => {
+    if (relationshipScopeRef.current !== relationshipScope) {
+      relationshipScopeRef.current = relationshipScope;
+      invalidateRelationshipRequests();
+    }
+    setRelationshipPreview(emptyRelationshipPreview);
+  }, [relationshipScope]);
+
+  async function runRelationshipPreview(options: Parameters<typeof onRelationshipPreview>[0]) {
+    const requestScope = relationshipRequestScopeKey(status.workspace.id, options);
+    relationshipScopeRef.current = requestScope;
+    const result = await onRelationshipPreview(options);
+    if (result && relationshipScopeRef.current === requestScope) setRelationshipPreview(result);
+  }
+
+  async function runRelationshipSave(options: Parameters<typeof onRelationshipSave>[0]) {
+    const requestScope = relationshipRequestScopeKey(status.workspace.id, options);
+    relationshipScopeRef.current = requestScope;
+    const result = await onRelationshipSave(options);
+    if (result && relationshipScopeRef.current === requestScope) setRelationshipPreview(result);
+  }
+
   return (
     <section className={hasData ? "mainPanel" : "mainPanel sourceBeginnerMode"} aria-labelledby="source-workbench-title">
       <SourceWorkbenchHeader sourceProfileRunning={sourceProfileRunning} />
@@ -307,8 +336,8 @@ export function SourceWorkbenchView({
               relationshipForm={relationshipForm}
               setRelationshipForm={setRelationshipForm}
               runBusy={runBusy}
-              onRelationshipPreview={onRelationshipPreview}
-              onRelationshipSave={onRelationshipSave}
+              onRelationshipPreview={runRelationshipPreview}
+              onRelationshipSave={runRelationshipSave}
             />
 
             <SourceWorkbenchConnectorPanel

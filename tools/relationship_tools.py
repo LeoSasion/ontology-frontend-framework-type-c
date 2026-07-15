@@ -14,7 +14,10 @@ def clean(value: Any) -> str:
 def relationship_key(row: dict[str, Any], mappings: list[dict[str, str]], side: str) -> str | None:
     field_key = "leftField" if side == "left" else "rightField"
     values = [clean(row.get(mapping[field_key], "")) for mapping in mappings]
-    if not values or all(value == "" for value in values):
+    # A composite key is only usable when every component is present. Treating
+    # partially empty keys as values lets unrelated rows match on the remaining
+    # empty components and creates false fan-out evidence.
+    if not values or any(value == "" for value in values):
         return None
     return json.dumps(values, ensure_ascii=False, separators=(",", ":"))
 
@@ -104,10 +107,20 @@ def build_relationship_preview(
     right_keys = set(right_stats["counts"].keys())
     overlap = left_keys & right_keys
     matched_left_rows = sum(left_stats["counts"][key] for key in overlap)
+    matched_right_rows = sum(right_stats["counts"][key] for key in overlap)
     unmatched_left_rows = len(left_rows) - matched_left_rows
+    unmatched_right_rows = len(right_rows) - matched_right_rows
     joined_rows = sum(left_stats["counts"][key] * right_stats["counts"][key] for key in overlap)
     output_rows = joined_rows + (unmatched_left_rows if join_type == "left" else 0)
     row_expansion = output_rows / max(1, len(left_rows))
+    reverse_output_rows = joined_rows + (unmatched_right_rows if join_type == "left" else 0)
+    reverse_row_expansion = reverse_output_rows / max(1, len(right_rows))
+    matched_row_expansion = joined_rows / max(1, matched_left_rows)
+    reverse_matched_row_expansion = joined_rows / max(1, matched_right_rows)
+    right_fanouts = sorted(right_stats["counts"].get(key, 0) for key in overlap)
+    left_fanouts = sorted(left_stats["counts"].get(key, 0) for key in overlap)
+    right_p95_index = max(0, min(len(right_fanouts) - 1, int(len(right_fanouts) * 0.95))) if right_fanouts else 0
+    left_p95_index = max(0, min(len(left_fanouts) - 1, int(len(left_fanouts) * 0.95))) if left_fanouts else 0
     confidence = len(overlap) / max(1, min(len(left_keys), len(right_keys)))
 
     right_by_key: dict[str, dict[str, Any]] = {}
@@ -145,10 +158,20 @@ def build_relationship_preview(
             "rightDistinctKeys": len(right_keys),
             "overlapKeys": len(overlap),
             "matchedLeftRows": matched_left_rows,
+            "matchedRightRows": matched_right_rows,
             "unmatchedLeftRows": unmatched_left_rows,
+            "unmatchedRightRows": unmatched_right_rows,
             "joinedRows": joined_rows,
             "outputRows": output_rows,
             "rowExpansion": round(row_expansion, 4),
+            "matchedRowExpansion": round(matched_row_expansion, 4),
+            "reverseOutputRows": reverse_output_rows,
+            "reverseRowExpansion": round(reverse_row_expansion, 4),
+            "reverseMatchedRowExpansion": round(reverse_matched_row_expansion, 4),
+            "maxRightRowsPerKey": max(right_fanouts, default=0),
+            "p95RightRowsPerKey": right_fanouts[right_p95_index] if right_fanouts else 0,
+            "maxLeftRowsPerKey": max(left_fanouts, default=0),
+            "p95LeftRowsPerKey": left_fanouts[left_p95_index] if left_fanouts else 0,
             "leftDuplicateKeyGroups": left_stats["duplicateKeyGroups"],
             "rightDuplicateKeyGroups": right_stats["duplicateKeyGroups"],
             "leftEmptyKeyRows": left_stats["emptyKeyRows"],
@@ -169,6 +192,11 @@ def build_relationship_preview(
             *(
                 ["存在左表未匹配行，跨表指标需要标记覆盖率。"]
                 if unmatched_left_rows
+                else []
+            ),
+            *(
+                ["存在右表未匹配行；反向遍历或右表指标可能遗漏迟到维度数据。"]
+                if unmatched_right_rows
                 else []
             ),
             *(
@@ -261,7 +289,8 @@ def normalize_query_field(
 
 
 def numeric_expr(alias: str, field: str, quote_identifier: QuoteIdentifier) -> str:
-    return f"CAST(REPLACE(COALESCE({qualified(alias, field, quote_identifier)}, '0'), ',', '') AS REAL)"
+    column = qualified(alias, field, quote_identifier)
+    return f"CAST(NULLIF(REPLACE(TRIM(CAST({column} AS TEXT)), ',', ''), '') AS REAL)"
 
 
 def parse_filter_values(value: Any) -> list[str]:
@@ -522,6 +551,15 @@ def sqlite_row_to_dict(row: Any) -> dict[str, Any]:
     return dict(row)
 
 
+def relationship_query_row_to_dict(row: Any, metric_name: str) -> dict[str, Any]:
+    payload = sqlite_row_to_dict(row)
+    if hasattr(row, "keys") and metric_name in row.keys():
+        # Dimensions retain their legacy empty-string display contract, while
+        # aggregate NULL must remain distinguishable from a verified zero.
+        payload[metric_name] = row[metric_name]
+    return payload
+
+
 def build_relationship_query(
     connection: Any,
     left_table_name: str,
@@ -694,7 +732,7 @@ def build_relationship_query(
         "sortDirection": sort_direction,
         "metricName": metric_name,
         "columns": columns,
-        "rows": [sqlite_row_to_dict(row) for row in rows],
+        "rows": [relationship_query_row_to_dict(row, metric_name) for row in rows],
         "sqlShape": {
             "leftTable": left_table_name,
             "rightTable": right_table_name,

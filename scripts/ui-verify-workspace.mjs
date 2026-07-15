@@ -11,7 +11,12 @@ export async function fetchJson(path, options = {}) {
     try {
       const response = await fetch(`${apiBaseUrl}${path}`, options);
       const payload = await response.json().catch(() => ({ ok: false, error: `Non-JSON response from ${path}` }));
-      if (!response.ok || payload?.ok === false) throw new Error(`${path}: ${payload?.error ?? `${response.status} ${response.statusText}`}`);
+      if (!response.ok || payload?.ok === false) {
+        const detail = payload?.error
+          ?? (Array.isArray(payload?.blockers) && payload.blockers.length ? payload.blockers.join(", ") : null)
+          ?? JSON.stringify(payload);
+        throw new Error(`${path}: ${detail} (${response.status} ${response.statusText})`);
+      }
       return payload;
     } catch (error) {
       lastError = error;

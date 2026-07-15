@@ -1,0 +1,239 @@
+.agentSemanticPlanTitle,
+.agentSemanticPlanSummaryMeta {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.agentSemanticPlanTitle > span,
+.agentRelationshipProofLead > span,
+.agentSemanticExecutionSummary span {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.agentSemanticPlanSummaryMeta {
+  justify-items: end;
+  text-align: right;
+}
+
+.agentSemanticPlanSummaryMeta strong {
+  max-width: min(56vw, 660px);
+  overflow-wrap: anywhere;
+  color: var(--text);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.agentSemanticPlanSummaryMeta small {
+  color: var(--muted);
+}
+
+.agentSemanticPrimaryBlocker {
+  display: grid;
+  gap: 4px;
+  border: 1px solid color-mix(in srgb, var(--amber) 46%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--amber-soft) 64%, var(--surface));
+  padding: 10px 12px;
+}
+
+.agentSemanticPrimaryBlocker strong {
+  color: var(--warning-text);
+}
+
+.agentSemanticPrimaryBlocker span,
+.agentRelationshipHopNotes span {
+  overflow-wrap: anywhere;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+}
+
+.agentRelationshipProof {
+  gap: 9px;
+}
+
+.agentRelationshipProofLead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.agentRelationshipProof ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agentRelationshipProof li {
+  min-width: 0;
+  display: grid;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.agentRelationshipProof li.verified {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--line));
+}
+
+.agentRelationshipProof li.blocked {
+  border-color: color-mix(in srgb, var(--danger) 42%, var(--line));
+  background: color-mix(in srgb, var(--danger) 5%, var(--surface));
+}
+
+.agentRelationshipHopHeading {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+}
+
+.agentRelationshipHopHeading > span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.agentRelationshipHopHeading > div,
+.agentRelationshipHopFacts > div,
+.agentSemanticExecutionSummary > div {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.agentRelationshipHopHeading strong,
+.agentRelationshipHopHeading small,
+.agentRelationshipHopFacts dd,
+.agentSemanticExecutionSummary strong,
+.agentSemanticExecutionSummary code {
+  overflow-wrap: anywhere;
+}
+
+.agentRelationshipHopHeading strong {
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.agentRelationshipHopHeading small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.agentRelationshipHopHeading em {
+  min-height: 24px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  font-style: normal;
+  font-weight: 760;
+  padding: 0 8px;
+}
+
+.agentRelationshipHopFacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.agentRelationshipHopFacts > div {
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 7px 8px;
+}
+
+.agentRelationshipHopFacts dd {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 720;
+}
+
+.agentRelationshipHopPolicies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agentRelationshipHopPolicies span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  line-height: 1.25;
+  padding: 4px 7px;
+}
+
+.agentRelationshipHopNotes summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.agentRelationshipHopNotes span {
+  display: block;
+  margin-top: 4px;
+  color: var(--warning-text);
+}
+
+.agentSemanticExecutionSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.agentSemanticExecutionSummary strong,
+.agentSemanticExecutionSummary code {
+  color: var(--text);
+  font-size: 0.76rem;
+}
+
+@media (max-width: 760px) {
+  .agentSemanticPlan > summary {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .agentSemanticPlanSummaryMeta {
+    justify-items: start;
+    text-align: left;
+  }
+
+  .agentSemanticPlanSummaryMeta strong {
+    max-width: 100%;
+  }
+
+  .agentRelationshipHopHeading {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .agentRelationshipHopHeading em {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .agentRelationshipHopFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

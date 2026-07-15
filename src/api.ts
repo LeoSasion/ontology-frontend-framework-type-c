@@ -18,17 +18,16 @@ export {
   inferMetrics,
   inferSemantics,
   previewFormula,
-  previewRelationship,
   queryMetric,
   queryRelationship,
   runSemanticQuery,
   recommendIndexes,
   recommendRelationships,
   saveFormula,
-  saveRelationship,
   setSemantic,
   updateFieldConfig,
 } from "./apiModel";
+export { previewRelationship, saveRelationship } from "./apiRelationship";
 export { applyConfig, exportConfig, savePreferences, saveThemePalette, validateConfig } from "./apiSettings";
 export {
   commitImport,

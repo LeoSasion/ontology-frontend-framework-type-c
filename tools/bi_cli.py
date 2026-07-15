@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import closing
 import json
 import os
 import re
@@ -75,8 +76,8 @@ from platform_analytics_knowledge import (
     platform_knowledge_pack,
 )
 from query_plan_receipt_service import create_query_plan_receipt, get_query_receipt, query_receipts_command
-from semantic_query_planner import BLOCKING_STATUSES, build_workspace_semantic_plan
-from semantic_query_execution import execute_workspace_semantic_query, semantic_query_command as semantic_query_command_service
+from semantic_query_planner import BLOCKING_STATUSES, build_workspace_semantic_plan, semantic_query_prompt_directives
+from semantic_query_execution import execute_workspace_semantic_query
 from evidence_export_service import export_evidence_command
 from analysis_export_service import export_analysis_command
 from confirmed_query_service import (
@@ -1898,10 +1899,27 @@ def build_agent_answer_card(
     }
 
 
+def merge_receipt_unresolved_with_execution_blockers(
+    unresolved: Any,
+    execution_plan: Any,
+) -> list[Any]:
+    """Preserve runtime execution blockers in an Agent query Receipt."""
+    result = list(unresolved) if isinstance(unresolved, list) else ([] if unresolved is None else [unresolved])
+    plan = execution_plan if isinstance(execution_plan, dict) else {}
+    blockers = plan.get("blockers") or []
+    if not isinstance(blockers, list):
+        blockers = [blockers]
+    for blocker in blockers:
+        if blocker is not None and blocker not in result:
+            result.append(blocker)
+    return result
+
+
 def ask_command(args: argparse.Namespace) -> dict[str, Any]:
     prompt = args.prompt
+    business_prompt = str(semantic_query_prompt_directives(prompt)["basePrompt"])
     read_only = getattr(args, "read_only", False)
-    intents = resolve_agent_prompt_intents(prompt)
+    intents = resolve_agent_prompt_intents(business_prompt)
     deepseek_configured = bool(os.environ.get("DEEPSEEK_API_KEY"))
     llm_audit = {
         "provider": "deepseek" if deepseek_configured else "deterministic",
@@ -1913,7 +1931,10 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         "fallbackReason": None if deepseek_configured else "DEEPSEEK_API_KEY is not configured; deterministic fallback answered from local BI evidence.",
         "regressionStatus": "provider-ready" if deepseek_configured else "provider-skipped",
     }
-    with open_db() as connection:
+    with closing(open_db()) as connection:
+        if connection.in_transaction:
+            connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
         workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
             raise ValueError(f"Unknown workspace: {workspace_id}")
@@ -1927,7 +1948,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 (workspace_id,),
             )
         )
-        selected_table, table_confidence = select_agent_table(tables, prompt)
+        selected_table, table_confidence = select_agent_table(tables, business_prompt)
         active_domain_pack_context = domain_pack_runtime_context(connection, workspace_id)
         platform_pack_enabled = is_domain_pack_enabled(
             connection,
@@ -1935,8 +1956,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             "platform-commerce",
             "agentKnowledge",
         )
-        platform_match = match_platform_knowledge(connection, workspace_id, prompt) if platform_pack_enabled else None
-        verified_analysis_gap = platform_match is None and requires_verified_analysis_plan(prompt)
+        platform_match = match_platform_knowledge(connection, workspace_id, business_prompt) if platform_pack_enabled else None
+        verified_analysis_gap = platform_match is None and requires_verified_analysis_plan(business_prompt)
         if platform_match:
             primary_table_key = str(next(iter(platform_match["roles"].values()))["table_key"])
             selected_table = next((table for table in tables if table["table_key"] == primary_table_key), selected_table)
@@ -1944,13 +1965,13 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         context_matches = matched_context(
             connection,
             workspace_id,
-            prompt,
+            business_prompt,
             selected_table["table_key"] if selected_table else None,
         )
         recalled_queries = recall_confirmed_queries(
             connection,
             workspace_id=workspace_id,
-            prompt=prompt,
+            prompt=business_prompt,
             table_key=selected_table["table_key"] if selected_table else None,
             now_iso=now_iso,
         )
@@ -1963,14 +1984,14 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     recalled_fields.append(str(field))
         resolution_prompt = " ".join(
             [
-                contextualized_prompt(prompt, context_matches),
+                contextualized_prompt(business_prompt, context_matches),
                 platform_knowledge_context(platform_match),
                 *recalled_fields,
             ]
         ).strip()
         selected_dashboard, dashboard_confidence = select_dashboard(
             dashboards,
-            prompt,
+            business_prompt,
             intents.wants_dashboard or intents.wants_widget,
         )
         semantic_selected_table_key = (
@@ -1989,7 +2010,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             selected_table_key=semantic_selected_table_key,
             table_columns=table_columns,
         )
-        intent_frame = build_business_intent_frame(prompt, semantic_plan=semantic_plan)
+        intent_frame = build_business_intent_frame(business_prompt, semantic_plan=semantic_plan)
         analytical_skill_runtime = analytical_skill_runtime_context(connection, workspace_id)
         analytical_skill_match = match_analytical_skills(
             analytical_skill_runtime,
@@ -2024,6 +2045,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 quote_identifier=quote_relationship_identifier,
                 build_relationship_query=build_relationship_query,
                 semantic_plan=semantic_plan,
+                intent_frame=intent_frame,
             )
         semantic_execution_blocked = bool(semantic_execution and not semantic_execution.get("executed"))
         semantic_blocked = (
@@ -2052,13 +2074,13 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         relationship_action = None
         relationship_confidence = "missing"
         if intents.wants_relationship:
-            relationship_action, relationship_confidence = select_relationship_action(connection, tables, prompt)
+            relationship_action, relationship_confidence = select_relationship_action(connection, tables, business_prompt)
         import_file = None
         import_confidence = "missing"
         import_mode = "create"
         if intents.wants_import:
-            import_file, import_confidence = resolve_prompt_import_file(prompt)
-            import_mode = import_mode_from_prompt(prompt)
+            import_file, import_confidence = resolve_prompt_import_file(business_prompt)
+            import_mode = import_mode_from_prompt(business_prompt)
         formula_action = None
         formula_confidence = "missing"
         if intents.wants_formula:
@@ -2095,7 +2117,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         if semantic_blocked:
             should_create_draft = False
         action_payload = build_agent_action_payload(
-            prompt=prompt,
+            prompt=business_prompt,
             selected_dashboard=selected_dashboard,
             selected_table=selected_table,
             widget_action=actionable_widget_action,
@@ -2158,12 +2180,11 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 evidence=action_evidence,
                 created_at=now_iso(),
             )
-            connection.commit()
         answer_card = (
             execute_platform_knowledge(connection, platform_match)
             if platform_match
             else (
-                build_verified_analysis_gap(prompt, selected_table["table_key"] if selected_table else None)
+                build_verified_analysis_gap(business_prompt, selected_table["table_key"] if selected_table else None)
                 if verified_analysis_gap
                 else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action, workspace_id)
             )
@@ -2174,19 +2195,29 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             execution_measure = semantic_execution["executionPlan"]["measure"]
             metric_name = f"{execution_measure['aggregation']}({execution_measure['field']})"
             top_row = semantic_rows[0] if semantic_rows else {}
-            top_value = float(top_row.get("value") or 0)
+            top_raw_value = top_row.get("value")
+            top_value = None if top_raw_value is None else float(top_raw_value)
             top_label = str(top_row.get("label") or "")
+            if top_value is None:
+                summary = localized_value(
+                    f"{top_label or '当前结果'} 的 {metric_name} 暂无可聚合数据；结果来自已验证关系与固定执行计划。",
+                    f"{top_label or 'Current result'} has no data to aggregate for {metric_name}; the result comes from a validated relationship and fixed execution plan.",
+                )
+                display_value = "无数据 / No data"
+            else:
+                summary = localized_value(
+                    f"{top_label or '当前结果'} 的 {metric_name} 为 {format_answer_number(top_value)}；结果来自已验证关系与固定执行计划。",
+                    f"{top_label or 'Current result'} has {metric_name} {format_answer_number(top_value)} from a validated relationship and fixed execution plan.",
+                )
+                display_value = format_answer_number(top_value)
             answer_card = {
                 "kind": "semantic-relationship-analysis",
                 "title": localized_value("受控跨表分析", "Controlled cross-table analysis"),
-                "summary": localized_value(
-                    f"{top_label or '当前结果'} 的 {metric_name} 为 {format_answer_number(top_value)}；结果来自已验证关系与固定执行计划。",
-                    f"{top_label or 'Current result'} has {metric_name} {format_answer_number(top_value)} from a validated relationship and fixed execution plan.",
-                ),
+                "summary": summary,
                 "confidence": "validated-execution-plan",
                 "metrics": [{
                     "label": localized_value(metric_name, metric_name),
-                    "value": format_answer_number(top_value),
+                    "value": display_value,
                     "rawValue": top_value,
                     "unit": "value",
                 }],
@@ -2197,6 +2228,12 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     {"type": "queryRuntime", **semantic_execution["query"]["runtime"]},
                     {"type": "semanticQueryPlan", "status": semantic_plan["status"]},
                     {"type": "semanticExecutionPlan", "planHash": semantic_execution["executionPlan"]["planHash"]},
+                    {
+                        "type": "relationshipPathProof",
+                        "status": semantic_execution.get("relationshipPathProof", {}).get("status"),
+                        "fingerprint": semantic_execution.get("relationshipPathProof", {}).get("fingerprint"),
+                        "hopCount": len(semantic_execution.get("relationshipPathProof", {}).get("hopProofs") or []),
+                    },
                     *[
                         {"type": "relationship", "relationKey": relationship["relationKey"]}
                         for relationship in semantic_execution["executionPlan"].get("relationships", [])
@@ -2281,13 +2318,29 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             if semantic_blocked
             else ([] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")])
         )
+        if semantic_execution_blocked:
+            receipt_unresolved = merge_receipt_unresolved_with_execution_blockers(
+                receipt_unresolved,
+                semantic_execution.get("executionPlan"),
+            )
         query_receipt = create_query_plan_receipt(
             connection,
             workspace_id=workspace_id,
             request_text=prompt,
             source_table_key=str(answer_query.get("table")) if answer_query and answer_query.get("table") else (selected_table["table_key"] if selected_table else None),
+            source_table_keys=(
+                list(semantic_execution.get("executionPlan", {}).get("pathTables") or [])
+                if semantic_execution
+                else (list(answer_query.get("tables") or []) if answer_query else None)
+            ),
+            relationship_path_proof=(
+                semantic_execution.get("relationshipPathProof")
+                if semantic_execution
+                else None
+            ),
             status="executed" if not semantic_blocked and answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
             group=str(answer_query.get("group")) if answer_query and answer_query.get("group") else None,
+            groups=list(answer_query.get("groupRefs") or []) if answer_query else [],
             measure=str(answer_query.get("measure")) if answer_query and answer_query.get("measure") else None,
             aggregation=str(answer_query.get("aggregation")) if answer_query and answer_query.get("aggregation") else None,
             filters=list(answer_query.get("filters") or []) if answer_query else [],
@@ -2921,14 +2974,54 @@ def main() -> int:
             result = query_relationship_command(args)
         elif args.command == "semantic-query":
             args.prompt = " ".join(args.prompt)
-            result = semantic_query_command_service(
-                args,
-                open_db=open_db,
-                active_workspace_id=active_workspace_id,
-                table_columns=table_columns,
-                quote_identifier=quote_relationship_identifier,
-                build_relationship_query=build_relationship_query,
-            )
+            with closing(open_db()) as connection:
+                if connection.in_transaction:
+                    connection.commit()
+                connection.execute("BEGIN IMMEDIATE")
+                workspace_id = active_workspace_id(connection)
+                result = execute_workspace_semantic_query(
+                    connection,
+                    workspace_id,
+                    str(args.prompt),
+                    selected_table_key=str(getattr(args, "table", "") or ""),
+                    limit=int(getattr(args, "limit", 50) or 50),
+                    table_columns=table_columns,
+                    quote_identifier=quote_relationship_identifier,
+                    build_relationship_query=build_relationship_query,
+                )
+                result["workspaceId"] = workspace_id
+                execution_plan = result.get("executionPlan") if isinstance(result.get("executionPlan"), dict) else {}
+                query = result.get("query") if isinstance(result.get("query"), dict) else {}
+                relationship_query = result.get("relationshipQuery") if isinstance(result.get("relationshipQuery"), dict) else {}
+                result_rows = relationship_rows_for_chart_service(relationship_query) if result.get("executed") else []
+                receipt = create_query_plan_receipt(
+                    connection,
+                    workspace_id=workspace_id,
+                    request_text=str(args.prompt),
+                    source_table_key=str(execution_plan.get("rootTable") or getattr(args, "table", "") or "") or None,
+                    source_table_keys=list(execution_plan.get("pathTables") or query.get("tables") or []),
+                    relationship_path_proof=result.get("relationshipPathProof"),
+                    status="executed" if result.get("executed") else "blocked",
+                    group=str(query.get("group") or "") or None,
+                    groups=list(query.get("groupRefs") or []),
+                    measure=str(query.get("measure") or "") or None,
+                    aggregation=str(query.get("aggregation") or "") or None,
+                    filters=list(query.get("filters") or []),
+                    joins=list(query.get("joins") or []),
+                    semantic_plan=result.get("semanticPlan"),
+                    execution_plan=execution_plan,
+                    runtime=query.get("runtime") if isinstance(query.get("runtime"), dict) else None,
+                    evidence_refs=[{
+                        "type": "relationshipPathProof",
+                        "fingerprint": result.get("relationshipPathProof", {}).get("fingerprint"),
+                    }] if isinstance(result.get("relationshipPathProof"), dict) else [],
+                    unresolved=list(execution_plan.get("blockers") or []),
+                    result_rows=result_rows,
+                    now_iso=now_iso,
+                )
+                connection.commit()
+            result["queryPlanReceipt"] = receipt
+            result["rows"] = result_rows
         elif args.command == "formula-preview":
             result = formula_preview_command(args)
         elif args.command == "list-formulas":

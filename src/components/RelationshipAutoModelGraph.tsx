@@ -47,6 +47,7 @@ export function RelationshipAutoModelGraph({
     relationships,
     tables,
   });
+  const relationshipBusy = Boolean(busy?.startsWith("relationship"));
 
   function runRecommendationPreview(recommendation: RelationshipRecommendation, label: string) {
     const options = relationshipSaveOptions(recommendation, relationshipForm);
@@ -63,7 +64,7 @@ export function RelationshipAutoModelGraph({
   }
 
   return (
-    <article className="workbenchPanel widePanel relationshipAutoGraph" data-testid="relationship-auto-graph">
+    <article aria-busy={relationshipBusy} className="workbenchPanel widePanel relationshipAutoGraph" data-testid="relationship-auto-graph">
       <div className="relationshipGraphHeader">
         <div>
           <span className="statusPill">{biText("AI 自动连线", "AI auto-linking")}</span>
@@ -86,7 +87,7 @@ export function RelationshipAutoModelGraph({
         <button
           className="miniButton"
           data-testid="relationship-graph-best-apply"
-          disabled={!bestRecommendation}
+          disabled={!bestRecommendation || relationshipBusy}
           onClick={() => bestRecommendation && onApplyRecommendation(bestRecommendation)}
           type="button"
         >
@@ -95,7 +96,7 @@ export function RelationshipAutoModelGraph({
         <button
           className="miniButton"
           data-testid="relationship-graph-best-preview"
-          disabled={!bestRecommendation || !bestOptions || busy === "relationship-auto-preview"}
+          disabled={!bestRecommendation || !bestOptions || relationshipBusy}
           onClick={() => bestRecommendation && runRecommendationPreview(bestRecommendation, "relationship-auto-preview")}
           type="button"
         >
@@ -104,7 +105,7 @@ export function RelationshipAutoModelGraph({
         <button
           className="primaryButton compactAction"
           data-testid="relationship-graph-best-confirm"
-          disabled={!bestRecommendation || !bestOptions || bestRecommendation.existing || busy === "relationship-auto-save"}
+          disabled={!bestRecommendation || !bestOptions || bestRecommendation.existing || relationshipBusy}
           onClick={() => bestRecommendation && runRecommendationSave(bestRecommendation, "relationship-auto-save", true)}
           type="button"
         >
@@ -117,7 +118,7 @@ export function RelationshipAutoModelGraph({
           {graphEdges.map((edge, index) => {
             const leftFields = topRelationshipNodeFields(fields, edge.leftTableKey, edge.leftField);
             const rightFields = topRelationshipNodeFields(fields, edge.rightTableKey, edge.rightField);
-            const disabled = !edge.recommendation;
+            const disabled = !edge.recommendation || relationshipBusy;
             return (
               <button
                 className={`relationshipGraphEdgeRow ${edge.existing ? "saved" : "recommended"}`}

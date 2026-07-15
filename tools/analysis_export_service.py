@@ -19,7 +19,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.table import Table, TableStyleInfo
 
-from analysis_unit_service import get_analysis_unit, verify_analysis_unit
+from analysis_unit_service import analysis_unit_consumer_state, get_analysis_unit, verify_analysis_unit
 from query_plan_receipt_service import get_query_receipt
 
 
@@ -106,7 +106,11 @@ def _receipt_snapshot(receipt: dict[str, Any]) -> dict[str, Any]:
         "status": receipt.get("status"),
         "source": {
             "tableKey": source.get("tableKey"),
+            "tableKeys": source.get("tableKeys", []),
             "schemaFingerprint": source.get("schemaFingerprint"),
+            "dataFingerprint": source.get("dataFingerprint"),
+            "relationshipPathFingerprint": source.get("relationshipPathFingerprint"),
+            "sourceFingerprint": source.get("sourceFingerprint"),
         },
         "selection": {
             "group": selection.get("group"),
@@ -126,6 +130,8 @@ def _receipt_snapshot(receipt: dict[str, Any]) -> dict[str, Any]:
         "validation": receipt.get("validation", {}),
         "resultBinding": receipt.get("resultBinding"),
         "contextRefs": receipt.get("contextRefs", []),
+        "domainPacks": receipt.get("domainPacks", []),
+        "domainPackFingerprint": receipt.get("domainPackFingerprint"),
         "evidenceRefs": _evidence_references(receipt.get("evidenceRefs", [])),
         "unresolved": receipt.get("unresolved", []),
         "actionKey": receipt.get("actionKey"),
@@ -446,18 +452,23 @@ def export_analysis_command(
         workspace_id = active_workspace_id(connection)
         receipt = get_query_receipt(connection, workspace_id, receipt_key)
         unit = get_analysis_unit(connection, workspace_id, unit_key)
+        consumer_state = analysis_unit_consumer_state(connection, workspace_id, unit) if unit else None
     if not receipt:
         raise ValueError(f"Unknown query receipt in active workspace: {receipt_key}")
     if not unit:
         raise ValueError(f"Unknown Analysis Unit in active workspace: {unit_key}")
     if str(unit.get("queryReceiptKey") or "") != receipt_key:
         raise ValueError("Analysis Unit is not bound to the requested Query Receipt")
+    if not consumer_state or not consumer_state.get("usable"):
+        blockers = ", ".join((consumer_state or {}).get("blockers") or ["analysis-unit-source-drifted"])
+        raise ValueError(f"Analysis export rejects a drifted Analysis Unit: {blockers}")
     result_binding = receipt.get("resultBinding") if isinstance(receipt.get("resultBinding"), dict) else {}
     if str(receipt.get("status") or "") != "executed" or str(unit.get("status") or "") != "ready":
         raise ValueError("Analysis export requires an executed Query Receipt and ready Analysis Unit")
     if str(result_binding.get("resultFingerprint") or "") != str(unit.get("resultFingerprint") or ""):
         raise ValueError("Analysis Unit result fingerprint does not match the Query Receipt")
     verification = verify_analysis_unit(unit)
+    verification["freshness"] = consumer_state
     if not verification.get("ok"):
         raise ValueError("Analysis Unit recomputation verification failed")
 

@@ -17,6 +17,12 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
   const [busy, setBusy] = useState(false);
   const run = result.analysisRun;
   const receipt = result.queryPlanReceipt;
+  const storedPathProof = receipt?.selection.relationshipPathProof;
+  const hopProofs = Array.isArray(storedPathProof)
+    ? storedPathProof
+    : storedPathProof?.hopProofs ?? [];
+  const verifiedHops = hopProofs.filter((proof) => proof.proofStatus === "verified").length;
+  const sourceTableCount = receipt?.source.tableKeys?.length ?? (receipt?.source.tableKey ? 1 : 0);
 
   useEffect(() => {
     if (!run?.run_key) return;
@@ -42,12 +48,16 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
         <span><strong>{result.context?.matchedTermCount ?? 0}</strong><small>{biText("命中术语", "matched terms")}</small></span>
         <span><strong>{result.context?.confirmedQueries?.length ?? 0}</strong><small>{biText("确认问法", "confirmed queries")}</small></span>
         <span><strong>{branchCount}</strong><small>{biText("比较分支", "branches")}</small></span>
+        {hopProofs.length || sourceTableCount > 1 ? <span><strong>{verifiedHops}/{hopProofs.length}</strong><small>{biText("关系跳已验证", "verified hops")}</small></span> : null}
       </div>
       {receipt ? (
         <dl className="agentTrustPlan">
           <div><dt>{biText("指标", "Measure")}</dt><dd>{receipt.selection.measure || "-"}</dd></div>
           <div><dt>{biText("分组", "Group")}</dt><dd>{receipt.selection.group || "-"}</dd></div>
           <div><dt>{biText("聚合", "Aggregation")}</dt><dd>{receipt.selection.aggregation || "-"}</dd></div>
+          <div><dt>{biText("参与表", "Source tables")}</dt><dd>{sourceTableCount}</dd></div>
+          <div><dt>{biText("最终粒度", "Final grain")}</dt><dd>{receipt.selection.executionPlan?.finalGrain?.join(" + ") || "-"}</dd></div>
+          <div><dt>{biText("路径证明", "Path proof")}</dt><dd>{receipt.source.relationshipPathFingerprint?.slice(0, 12) || "-"}</dd></div>
           <div><dt>{biText("未决项", "Unresolved")}</dt><dd>{receipt.unresolved.length}</dd></div>
         </dl>
       ) : null}

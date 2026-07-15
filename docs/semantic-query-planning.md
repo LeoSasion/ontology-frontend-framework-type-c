@@ -74,17 +74,28 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 
 当前开放：
 
-- 一跳：关系为当前 `validated`，指标使用白名单聚合。
-- 两跳：严格线性正向路径，每跳版本匹配且 `rowExpansion <= 1`。
+- 一至三跳线性路径；每条关系都必须来自当前工作区、状态为 `validated`，并同时保存和匹配两侧 `data_version`。
+- 正向关系按保存的 `INNER` 或 `LEFT` 执行；反向关系只允许 `INNER`，且必须具备反向行膨胀证据。
+- 指标只能位于路径末端；维度可来自根表或中间表。规划器必须选择一条覆盖全部必需表的全局线性路径，不能给每张表各选一条局部最短路径；自然问句优先选择能完整覆盖“维度到指标”路径的根表，多个同等根或同表异键路径必须澄清。候选枚举达到安全上限且无法证明穷尽时标记 `pathSearchIncomplete` 并 fail closed；只有用户提供完整 `relationKey` 序列后才可绕过通用枚举继续验证。
+- 根表与路径澄清面必须分别展示可选根表，以及每条路径的表序列、连接键和 `relationKey`；用户选择后，客户端保留原问题并附加显式根表或完整关系键序列，CLI、API 与 Agent 都按该选择重规划，不能静默采用候选顺序。
+- 请求筛选和关系筛选可作用于任一跳；白名单 pre-filter 在对应表进入连接前执行，post-filter 在完整路径上执行。
+- 已保存的右表预聚合可跨跳复用。`sum`、`count`、`min`、`max` 只有在部分聚合与最终 rollup 可证明一致时执行；预聚合后的 `avg` 与 `count-distinct` 保持阻断。
+- `count` 统计事实行而不是可空字段值；LEFT JOIN 的空侧计数为 0，真实但指标字段为 NULL 的事实仍计为一行。`sum`、`avg`、`min`、`max` 的空侧必须保留 NULL 并展示为“无数据”，不能伪装成已验证的零值。
 
-当前阻断：三跳、反向路径、跨跳筛选和跨跳预聚合。
+每次运行生成 `aibi-relationship-path-proof/v1`，逐跳记录输入/输出粒度、行数、基数、函数依赖、筛选、预聚合、版本和 blocker，并额外证明所有作用域内末端事实都能从根表到达。任何中间孤儿链、迟到维度、M:N 放大、关系版本缺失/漂移或末端事实不可达都必须 fail closed。
 
-执行前必须重新构建计划并比对 SHA-256。关系被删除、替换或改版时返回 `semantic-plan-changed-before-execution`，不得回退到单表猜测。
+直接 `query-relationship` 同样受当前版本和扇出合同约束：1:N 路径上的 one-side 指标不得静默重复，many-side 指标只有在验证有效时执行。请求若覆盖筛选或预聚合，必须在同一事务和数据快照内按最终有效形状重新预演，旧关系的扇出证明不得复用。
+
+当前阻断：超过三跳、非线性关系树、反向 `LEFT JOIN`、未证明安全的 M:N、多个等价业务路径、未穷尽的高密度路径搜索、无法安全 rollup 的预聚合，以及指标不在路径末端的计划。
+
+执行前必须在同一事务内重新构建计划、读取当前版本、生成运行时证明、执行查询并写入 Receipt。关系被删除、替换或改版时返回 `semantic-plan-changed-before-execution`，不得回退到单表猜测。Receipt、Analysis Unit、图表适配、导出和 Confirmed Query 都要重新核对全部源表、路径证明、关系定义、数据版本和 Domain Pack 指纹。
 
 ## 验证
 
 ```powershell
 npm run verify:semantic-plan
+npm run verify:receipt-freshness
+npm run verify:relationship-safety
 npm run verify:agent-intent
 npm run verify:agent-turns
 npm run verify:agent-sessions

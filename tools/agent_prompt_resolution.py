@@ -127,11 +127,14 @@ def select_agent_table(tables: list[dict[str, Any]], prompt: str) -> tuple[dict[
     selected_table = tables[0] if tables else None
     table_confidence = "fallback"
     lower = prompt.lower()
-    for table in tables:
-        if str(table["table_key"]).lower() in lower or str(table["display_name"]).lower() in lower:
-            selected_table = table
-            table_confidence = "explicit"
-            break
+    explicit_tables = [
+        table
+        for table in tables
+        if str(table["table_key"]).lower() in lower or str(table["display_name"]).lower() in lower
+    ]
+    if explicit_tables:
+        selected_table = explicit_tables[0]
+        table_confidence = "explicit" if len(explicit_tables) == 1 else "ambiguous"
     return selected_table, table_confidence
 
 

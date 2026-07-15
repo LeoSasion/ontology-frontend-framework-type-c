@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Sidebar, type AppSection } from "./components/Sidebar";
 import { useLanguage } from "./components/Bilingual";
-import { emptyAgentResult, emptyDashboardPayload, emptyFormulaPreview, emptyImportPreview, emptyQueryResult, emptyRelationshipPreview, emptyTableQuery, emptyWorkbenchPayload, emptyWorkspaceStatus } from "./emptyWorkspaceData";
+import { emptyAgentResult, emptyDashboardPayload, emptyFormulaPreview, emptyImportPreview, emptyQueryResult, emptyTableQuery, emptyWorkbenchPayload, emptyWorkspaceStatus } from "./emptyWorkspaceData";
 import { applyThemePalette, getUserPreferences, hasStoredThemeSnapshot, resolveThemePalette } from "./theme";
 import { businessSectionForStep, type BusinessPathStepKey } from "./businessPathModel";
 import { actionErrorResult, connectingStatus, preferredLandingSection, type ApiMode, type LoadState } from "./appWorkspaceModel";
@@ -12,7 +12,7 @@ import { useAppDataActions } from "./useAppDataActions";
 import { useAppDashboardActions } from "./useAppDashboardActions";
 import { useAppSettingsActions } from "./useAppSettingsActions";
 import { useAppWorkspaceActions } from "./useAppWorkspaceActions";
-import type { ActionDraft, AgentAskResult, DashboardPayload, EvidenceFocus, FormulaPreviewPayload, ImportPreview, QueryResult, RelationshipPreviewPayload, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
+import type { ActionDraft, AgentAskResult, DashboardPayload, EvidenceFocus, FormulaPreviewPayload, ImportPreview, QueryResult, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import { buildWorkspaceFlow, resolveSectionForFlow } from "./workspaceFlowModel";
 import {
   evidenceFocusFromNavigation,
@@ -41,7 +41,6 @@ export default function App() {
   const [query, setQuery] = useState<QueryResult>(emptyQueryResult);
   const [tableQuery, setTableQuery] = useState<TableQueryPayload>(emptyTableQuery);
   const [workbench, setWorkbench] = useState<WorkbenchPayload>(emptyWorkbenchPayload);
-  const [relationshipPreview, setRelationshipPreview] = useState<RelationshipPreviewPayload>(emptyRelationshipPreview);
   const [formulaPreview, setFormulaPreview] = useState<FormulaPreviewPayload>(emptyFormulaPreview);
   const [dashboards, setDashboards] = useState<DashboardPayload>(emptyDashboardPayload);
   const [activeDashboardKey, setActiveDashboardKey] = useState(initialNavigation.dashboardKey ?? "default");
@@ -201,7 +200,6 @@ export default function App() {
     setLastActionResult,
     setPreview,
     setQuery,
-    setRelationshipPreview,
     navigateTo,
     setStatus,
     setTableQuery,
@@ -300,7 +298,6 @@ export default function App() {
             pendingDraftCount={pendingDraftCount}
             preview={preview}
             query={query}
-            relationshipPreview={relationshipPreview}
             section={section}
             setActiveDashboardKey={setActiveDashboardKey}
             setActiveViewKey={setActiveViewKey}

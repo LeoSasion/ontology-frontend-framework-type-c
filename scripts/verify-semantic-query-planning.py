@@ -98,10 +98,12 @@ check(
 )
 combined_explicit = build_workspace_semantic_plan(connection, "default", "看订单表的 amount 和退款表的 status")
 check(
-    "combined-table-field-bindings-resolve-in-one-followup",
-    combined_explicit["status"] == "ready"
+    "combined-table-field-bindings-resolve-before-path-safety-validation",
+    combined_explicit["status"] == "needs-validation"
     and len(combined_explicit["fieldResolution"]["unresolved"]) == 0
-    and all(binding["reason"] == "explicit-table-field" for binding in combined_explicit["fieldResolution"]["bindings"]),
+    and all(binding["reason"] == "explicit-table-field" for binding in combined_explicit["fieldResolution"]["bindings"])
+    and combined_explicit["joinPlan"]["rootTable"] == "refunds"
+    and "missing-reverse-row-expansion-evidence" in combined_explicit["joinPlan"]["targets"][0]["selectedPath"]["risks"],
     combined_explicit,
 )
 
@@ -253,8 +255,9 @@ filtered_two_hop = json.loads(json.dumps(two_hop_plan))
 filtered_two_hop["joinPlan"]["targets"][0]["selectedPath"]["hops"][0]["filters"] = [{"phase": "pre", "side": "left", "field": "channel", "operator": "equals", "value": "Douyin"}]
 filtered_two_hop_execution = build_semantic_query_execution_plan(filtered_two_hop)
 check(
-    "two-hop-filter-pushdown-remains-explicitly-blocked",
-    filtered_two_hop_execution["status"] == "blocked" and "two-hop-filters-not-yet-supported" in filtered_two_hop_execution["blockers"],
+    "two-hop-filter-pushdown-is-part-of-canonical-plan",
+    filtered_two_hop_execution["status"] == "ready"
+    and filtered_two_hop_execution["relationships"][0]["filters"][0]["tableKey"] == "orders",
     filtered_two_hop_execution,
 )
 execution_connection.execute(

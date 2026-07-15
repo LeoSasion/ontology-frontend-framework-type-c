@@ -15,7 +15,6 @@ import type {
   FormulaPreviewPayload,
   ImportPreview,
   QueryResult,
-  RelationshipPreviewPayload,
   TableQueryPayload,
   WorkbenchPayload,
   WorkspaceStatus,
@@ -41,7 +40,6 @@ type AppMainViewProps = {
   pendingDraftCount: number;
   preview: ImportPreview;
   query: QueryResult;
-  relationshipPreview: RelationshipPreviewPayload;
   section: AppSection;
   setActiveDashboardKey: Dispatch<SetStateAction<string>>;
   setActiveViewKey: Dispatch<SetStateAction<string>>;
@@ -71,7 +69,6 @@ export function AppMainView({
   pendingDraftCount,
   preview,
   query,
-  relationshipPreview,
   section,
   setActiveDashboardKey,
   setActiveViewKey,
@@ -246,7 +243,6 @@ export function AppMainView({
       preview={preview}
       query={query}
       workbench={workbench}
-      relationshipPreview={relationshipPreview}
       formulaPreview={formulaPreview}
       focusedTableKey={focusedTableKey}
       onTableFocus={(tableKey) => navigateTo({ section: "sources", tableKey })}

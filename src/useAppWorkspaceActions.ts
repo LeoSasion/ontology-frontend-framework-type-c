@@ -4,6 +4,7 @@ import type { AppSection } from "./components/Sidebar";
 import { emptyAgentResult } from "./emptyWorkspaceData";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
 import { preferredLandingSection } from "./appWorkspaceModel";
+import { invalidateRelationshipRequests } from "./relationshipRequestGuard";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import type { AppNavigationContext } from "./appNavigationModel";
 import type { EvidenceFocus } from "./types";
@@ -40,6 +41,7 @@ export function useAppWorkspaceActions({
   setWorkbench,
 }: AppWorkspaceActionsOptions) {
   const reloadWorkspaceSurface = useCallback(async () => {
+    invalidateRelationshipRequests();
     const surface = await refreshStatusDashboardsWorkbenchDrafts();
     setStatus(surface.status);
     setWorkbench(surface.workbench);

@@ -23,6 +23,7 @@ import {
 import { businessIdentifier } from "../businessPresentation";
 import { fetchJsonStrict } from "../apiClient";
 import { lazyWithRetry } from "../lazyWithRetry";
+import { withSemanticPathSelection, withSemanticRootSelection } from "../semanticPromptSelectors";
 import type { AgentCanAnswerSuggestion } from "./AgentCanAnswerPanel";
 import { AgentContextPlanPanel } from "./AgentContextPlanPanel";
 import { AgentPendingChangesPanel } from "./AgentPendingChangesPanel";
@@ -497,6 +498,16 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
               const bindings = candidates.map((candidate) => `${candidate.tableName || tableNameByKey.get(candidate.tableKey) || candidate.tableKey}的 ${candidate.field}`).join("，使用");
               setPromptTouched(true);
               void submit(`${original}，使用${bindings}`);
+            }}
+            onSelectSemanticRoot={(tableKey) => {
+              const original = resultRequest || prompt;
+              setPromptTouched(true);
+              void submit(withSemanticRootSelection(original, tableKey));
+            }}
+            onSelectSemanticPath={(relationKeys) => {
+              const original = resultRequest || prompt;
+              setPromptTouched(true);
+              void submit(withSemanticPathSelection(original, relationKeys));
             }}
             onExportAnalysis={() => void exportVerifiedAnalysis()}
             analysisExportStatus={analysisExport.status}

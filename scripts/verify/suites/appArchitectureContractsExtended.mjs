@@ -222,7 +222,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("### P0.") &&
           !developmentRoadmapDocSource.includes("### P1.") &&
-          developmentRoadmapDocSource.includes("### P2. 更复杂的跨表执行") &&
+          !developmentRoadmapDocSource.includes("### P2.") &&
+          developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
           developmentRoadmapDocSource.includes("## 暂不开发") &&
           !developmentRoadmapDocSource.includes("npm run preflight"),
       },

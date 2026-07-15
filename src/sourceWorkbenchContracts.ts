@@ -55,7 +55,6 @@ export type SourceWorkbenchProps = {
   preview: ImportPreview;
   query: QueryResult;
   workbench: WorkbenchPayload;
-  relationshipPreview: RelationshipPreviewPayload;
   formulaPreview: FormulaPreviewPayload;
   onPreview: (options: ImportOptions) => Promise<ImportPreview>;
   onCommitImport: (options: ImportOptions) => Promise<void>;
@@ -77,8 +76,8 @@ export type SourceWorkbenchProps = {
   onInferMetrics: (options: SemanticInferOptions) => Promise<Record<string, unknown>>;
   onAddMetric: (options: MetricMutationOptions) => Promise<Record<string, unknown>>;
   onQueryMetric: (options: MetricQueryOptions) => Promise<Record<string, unknown>>;
-  onRelationshipPreview: (options: RelationshipSaveOptions) => Promise<void>;
-  onRelationshipSave: (options: RelationshipSaveOptions) => Promise<void>;
+  onRelationshipPreview: (options: RelationshipSaveOptions) => Promise<RelationshipPreviewPayload | undefined>;
+  onRelationshipSave: (options: RelationshipSaveOptions) => Promise<RelationshipPreviewPayload | undefined>;
   onFormulaPreview: (options: { expression: string; table?: string; mode?: string }) => Promise<void>;
   onFormulaSave: (options: { id?: string; name: string; table: string; expression: string; mode?: string; dimension?: string; timeField?: string; valueFormat?: string; description?: string; confirm?: boolean }) => Promise<FormulaMutationPayload>;
   onFormulaDelete: (options: { formula: string; confirm?: boolean }) => Promise<FormulaMutationPayload>;

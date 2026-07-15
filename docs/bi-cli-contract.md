@@ -151,8 +151,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `recommend-indexes` | `performance` | `read-only` | `no` | `no` | `--table`, `--limit` |
 | `recommend-relationships` | `relationship` | `read-only` | `no` | `no` | `--limit` |
 | `recommend-widgets` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--all`, `--limit` |
-| `relationship-preview` | `relationship` | `read-only` | `no` | `no` | `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
-| `relationship-save` | `relationship` | `dry-run-confirm` | `yes` | `no` | `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
+| `relationship-preview` | `relationship` | `read-only` | `no` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
+| `relationship-save` | `relationship` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
 | `remove-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--yes` |
 | `remove-filter` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--filter`, `--yes` |
 | `remove-import-job` | `import` | `dry-run-confirm` | `yes` | `no` | `--job`, `--yes` |

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { FieldConfig, FormulaMutationPayload } from "./types";
 import type { QueryOptions, RelationshipSaveOptions, SourceWorkbenchProps } from "./sourceWorkbenchContracts";
+import { withRelationshipIdentity } from "./dashboardCanvasRelationshipModel";
 import {
   buildFieldSemanticReadiness,
   buildSourceWorkbenchCollections,
@@ -273,13 +274,12 @@ export function useSourceWorkbenchState({
       const rightFields = fieldsByTable.get(rightTable) ?? [];
       const hasLeftField = leftFields.some((field) => field.field_name === current.leftField);
       const hasRightField = rightFields.some((field) => field.field_name === current.rightField);
-      return {
-        ...current,
+      return withRelationshipIdentity(current, {
         leftTable,
         rightTable,
         leftField: hasLeftField ? current.leftField : leftFields[0]?.field_name ?? "",
         rightField: hasRightField ? current.rightField : rightFields[0]?.field_name ?? "",
-      };
+      });
     });
   }, [fieldsByTable, tableKeySet, tables]);
 

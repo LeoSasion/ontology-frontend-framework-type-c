@@ -343,6 +343,68 @@ export interface AnalysisUnit {
   updatedAt: string;
 }
 
+export interface RelationshipTraversalMapping {
+  leftField: string;
+  rightField: string;
+  fromField: string;
+  toField: string;
+}
+
+export interface RelationshipCardinalityProof {
+  fromRows: number;
+  toRows: number;
+  matchedFromRows: number;
+  matchedToRows: number;
+  unmatchedFromRows: number;
+  unmatchedToRows: number;
+  joinedRows: number;
+  matchedRowExpansion: number;
+  reverseMatchedRowExpansion: number;
+  incompleteFromKeyRows: number;
+  incompleteToKeyRows: number;
+}
+
+export interface RelationshipHopProof {
+  schema?: string;
+  ordinal?: number;
+  hopIndex?: number;
+  relationKey: string;
+  fromTable: string;
+  toTable: string;
+  direction: "forward" | "reverse" | string;
+  joinType: "inner" | "left" | string;
+  fieldMappings: Array<{ leftField: string; rightField: string }>;
+  traversalMappings?: RelationshipTraversalMapping[];
+  inputGrain?: string[];
+  outputGrain?: string[];
+  inputRows?: number;
+  outputRows?: number;
+  rowExpansion?: number;
+  cardinalityProof?: RelationshipCardinalityProof;
+  functionDependencyProof?: { status: string; determinant: string[]; dependents: string[]; violations: number };
+  filterProof?: { status: string; filters: Array<Record<string, unknown>> };
+  preaggregationProof?: { status: string; tables: Record<string, Record<string, unknown>> };
+  dataVersions?: { expected: Record<string, number>; current: Record<string, number>; matches: boolean };
+  relationshipFingerprint?: string;
+  proofFingerprint?: string;
+  proofStatus: "planned" | "verified" | "blocked" | string;
+  blockers: string[];
+  warnings: string[];
+}
+
+export interface RelationshipPathProof {
+  schema: "aibi-relationship-path-proof/v1" | string;
+  status: "planned" | "verified" | "blocked" | string;
+  rootTable: string;
+  tables: string[];
+  finalGrain: string[];
+  hopProofs: RelationshipHopProof[];
+  blockers: string[];
+  warnings: string[];
+  deduplicatedTables?: string[];
+  fingerprint?: string;
+}
+
 export interface QueryPlanReceipt {
   schema: "aibi-query-plan-receipt/v1" | string;
   receiptKey: string;
@@ -351,17 +413,29 @@ export interface QueryPlanReceipt {
   source: {
     workspaceId: string;
     tableKey?: string | null;
+    tableKeys?: string[];
+    tables?: Array<{
+      tableKey: string;
+      registered: boolean;
+      dataVersion?: number | null;
+      schemaFingerprint: string;
+      dataFingerprint: string;
+    }>;
     schemaFingerprint: string;
     dataFingerprint: string;
+    relationshipPathFingerprint?: string | null;
+    sourceFingerprint?: string;
   };
   selection: {
     group?: string | null;
+    groups?: Array<{ tableKey?: string; field: string; outputName?: string }>;
     measure?: string | null;
     aggregation?: string | null;
     filters: Array<Record<string, unknown>>;
     joins: Array<Record<string, unknown>>;
     semanticPlan?: SemanticQueryPlan | null;
     executionPlan?: SemanticQueryExecutionPlan | null;
+    relationshipPathProof?: RelationshipHopProof[] | RelationshipPathProof | null;
   };
   runtime: {
     engine?: string | null;
@@ -426,6 +500,8 @@ export interface SemanticRelationshipPath {
     dataVersions?: Record<string, number>;
     currentDataVersions?: Record<string, number>;
     relationshipUpdatedAt?: string;
+    relationshipFingerprint?: string;
+    validationMetrics?: Record<string, number>;
     risk: {
       safeForPlanning: boolean;
       risks: string[];
@@ -454,11 +530,22 @@ export interface SemanticQueryPlan {
   };
   joinPlan: {
     rootTable: string;
+    rootCandidates?: string[];
+    requiresRootClarification?: boolean;
+    rootSearchTruncated?: boolean;
+    pathSearchLimit?: number;
+    pathSearchTruncated?: boolean;
+    pathSearchIncomplete?: boolean;
+    pathSearchTruncatedTargets?: string[];
     requiredTables: string[];
     targets: Array<{
       targetTable: string;
       paths: SemanticRelationshipPath[];
       selectedPath?: SemanticRelationshipPath | null;
+      selectedPathReason?: string;
+      requiresPathClarification?: boolean;
+      pathCandidates?: SemanticRelationshipPath[];
+      pathSearchTruncated?: boolean;
     }>;
     maxHops: number;
   };
@@ -472,23 +559,32 @@ export interface SemanticQueryExecutionPlan {
   blockers: string[];
   semanticPlanStatus: string;
   rootTable?: string | null;
+  pathTables?: string[];
   planHash: string;
   relationships?: Array<NonNullable<SemanticQueryExecutionPlan["relationship"]>>;
   relationship?: {
     relationKey: string;
     leftTable: string;
     rightTable: string;
+    fromTable: string;
+    toTable: string;
     joinType: string;
     direction: string;
     fieldMappings: Array<{ leftField: string; rightField: string }>;
+    traversalMappings?: RelationshipTraversalMapping[];
     filters: Array<Record<string, unknown>>;
     preaggregation: Record<string, unknown>;
     dataVersions: Record<string, number>;
+    currentDataVersions?: Record<string, number>;
+    relationshipFingerprint?: string;
+    validationMetrics?: Record<string, number>;
     updatedAt: string;
   };
-  groups?: Array<{ side: "left" | "right"; tableKey: string; field: string }>;
-  measure?: { side: "left" | "right"; tableKey: string; field: string; aggregation: string };
+  groups?: Array<{ side?: "left" | "right"; tableKey: string; field: string }>;
+  measure?: { side?: "left" | "right"; tableKey: string; field: string; aggregation: string };
+  requestFilters?: Array<Record<string, unknown>>;
   finalGrain?: string[];
+  relationshipPathProof?: RelationshipPathProof;
 }
 
 export interface AnalysisRun {

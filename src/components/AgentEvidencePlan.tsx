@@ -71,11 +71,21 @@ export function AgentEvidencePlan({ plan }: { plan: AgentEvidencePlanContract })
       <ol>
         {plan.steps.map((step) => {
           const blockerLabels = evidencePlanBlockers(step.blockers);
+          const relationshipRefs = step.evidenceRefs.filter((reference) => reference.type === "relationshipPathProof");
           return (
             <li className={step.status} key={step.stepKey}>
               <span>{step.kind}</span>
               <strong>{statusText(step.status)}</strong>
               {blockerLabels.length ? <small>{blockerLabels.join(" · ")}</small> : null}
+              {relationshipRefs.length ? (
+                <span className="agentEvidenceRelationshipRefs">
+                  {relationshipRefs.map((reference, index) => (
+                    <span key={`${String(reference.relationKey ?? "hop")}:${index}`}>
+                      {biText("关系证明", "Path proof")} {index + 1} · {String(reference.fromTable ?? "?")} → {String(reference.toTable ?? "?")}
+                    </span>
+                  ))}
+                </span>
+              ) : null}
             </li>
           );
         })}

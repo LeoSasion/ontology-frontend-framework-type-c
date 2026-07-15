@@ -1,22 +1,15 @@
 import { useCallback, useRef, type Dispatch, type SetStateAction } from "react";
 import {
-  addMetric,
   commitImport,
   commitFolderImport,
   copyView,
   createSourceDashboardDraft,
-  deleteFormula,
   deleteSource,
   deleteView,
-  inferMetrics,
-  inferSemantics,
   inspectSource,
   navigationOperation,
-  previewFormula,
   previewFolderImport,
   previewImportWithOptions,
-  previewRelationship,
-  queryMetric,
   removeConnector,
   removeImportJob,
   renameSource,
@@ -24,13 +17,9 @@ import {
   runSourceIntelligence,
   runTableQuery,
   saveConnector,
-  saveFormula,
-  saveRelationship,
   saveView,
   setImportPolicy,
-  setSemantic,
   syncConnector,
-  updateFieldConfig,
 } from "./api";
 import type { AppNavigationTarget } from "./appNavigationModel";
 import type { AppSection } from "./appSections";
@@ -51,11 +40,14 @@ import type {
   FormulaPreviewPayload,
   ImportPreview,
   QueryResult,
-  RelationshipPreviewPayload,
   TableQueryPayload,
   WorkbenchPayload,
   WorkspaceStatus,
 } from "./types";
+
+type ApiModel = typeof import("./apiModel");
+const loadApiModel = () => import("./apiModel");
+const loadRelationshipWorkspaceActions = () => import("./relationshipWorkspaceActions");
 
 type AppDataActionsOptions = {
   activeWorkspaceId: string;
@@ -66,7 +58,6 @@ type AppDataActionsOptions = {
   setLastActionResult: Dispatch<SetStateAction<Record<string, unknown> | null>>;
   setPreview: Dispatch<SetStateAction<ImportPreview>>;
   setQuery: Dispatch<SetStateAction<QueryResult>>;
-  setRelationshipPreview: Dispatch<SetStateAction<RelationshipPreviewPayload>>;
   navigateTo: (target: AppNavigationTarget) => void;
   setStatus: Dispatch<SetStateAction<WorkspaceStatus>>;
   setTableQuery: Dispatch<SetStateAction<TableQueryPayload>>;
@@ -101,7 +92,6 @@ export function useAppDataActions({
   setLastActionResult,
   setPreview,
   setQuery,
-  setRelationshipPreview,
   navigateTo,
   setStatus,
   setTableQuery,
@@ -287,7 +277,8 @@ export function useAppDataActions({
     navigateTo({ section: "views", viewKey: nextWorkbench.savedViews[0]?.view_key });
   }, [navigateTo, setActiveViewKey, setLastActionResult, setWorkbench]);
 
-  const handleFieldUpdate = useCallback(async (options: { table: string; field: string; role: string; usage: string; confidence?: number; confirm?: boolean }) => {
+  const handleFieldUpdate = useCallback(async (options: Parameters<ApiModel["updateFieldConfig"]>[0]) => {
+    const { updateFieldConfig } = await loadApiModel();
     const result = await updateFieldConfig(options);
     setLastActionResult(result);
     if (options.confirm) {
@@ -295,7 +286,8 @@ export function useAppDataActions({
     }
   }, [setLastActionResult, setWorkbench]);
 
-  const handleInferSemantics = useCallback(async (options: Parameters<typeof inferSemantics>[0]) => {
+  const handleInferSemantics = useCallback(async (options: Parameters<ApiModel["inferSemantics"]>[0]) => {
+    const { inferSemantics } = await loadApiModel();
     const result = await inferSemantics(options);
     setLastActionResult(result);
     if (options.confirm) {
@@ -307,7 +299,8 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleSetSemantic = useCallback(async (options: Parameters<typeof setSemantic>[0] & { stayOnPage?: boolean }) => {
+  const handleSetSemantic = useCallback(async (options: Parameters<ApiModel["setSemantic"]>[0] & { stayOnPage?: boolean }) => {
+    const { setSemantic } = await loadApiModel();
     const { stayOnPage = false, ...semanticOptions } = options;
     const result = await setSemantic(semanticOptions);
     setLastActionResult(result);
@@ -320,7 +313,8 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleInferMetrics = useCallback(async (options: Parameters<typeof inferMetrics>[0]) => {
+  const handleInferMetrics = useCallback(async (options: Parameters<ApiModel["inferMetrics"]>[0]) => {
+    const { inferMetrics } = await loadApiModel();
     const result = await inferMetrics(options);
     setLastActionResult(result);
     if (options.confirm) {
@@ -332,7 +326,8 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleAddMetric = useCallback(async (options: Parameters<typeof addMetric>[0]) => {
+  const handleAddMetric = useCallback(async (options: Parameters<ApiModel["addMetric"]>[0]) => {
+    const { addMetric } = await loadApiModel();
     const result = await addMetric(options);
     setLastActionResult(result);
     if (options.confirm) {
@@ -344,7 +339,8 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleQueryMetric = useCallback(async (options: Parameters<typeof queryMetric>[0]) => {
+  const handleQueryMetric = useCallback(async (options: Parameters<ApiModel["queryMetric"]>[0]) => {
+    const { queryMetric } = await loadApiModel();
     const result = await queryMetric(options);
     setLastActionResult(result);
     setSection("sources");
@@ -352,33 +348,46 @@ export function useAppDataActions({
   }, [setLastActionResult, setSection]);
 
   const handleRelationshipPreview = useCallback(async (options: RelationshipSaveOptions) => {
-    setRelationshipPreview(await previewRelationship(options));
+    const { previewWorkspaceRelationship } = await loadRelationshipWorkspaceActions();
+    const result = await previewWorkspaceRelationship(activeWorkspaceId, options);
+    if (!result) return;
     setSection("sources");
-  }, [setRelationshipPreview, setSection]);
+    return result;
+  }, [activeWorkspaceId, setSection]);
 
   const handleRelationshipSave = useCallback(async (options: RelationshipSaveOptions) => {
-    const result = await saveRelationship(options);
-    setRelationshipPreview(result);
-    if (options.confirm) {
-      setWorkbench(await refreshWorkbench());
+    const { saveWorkspaceRelationship } = await loadRelationshipWorkspaceActions();
+    const outcome = await saveWorkspaceRelationship(activeWorkspaceId, options, Boolean(options.confirm));
+    if (!outcome) return;
+    if (outcome.surface) {
+      if (outcome.surface.status.workspace.id !== activeWorkspaceId) return;
+      setStatus(outcome.surface.status);
+      setWorkbench(outcome.surface.workbench);
     }
     setSection("sources");
-  }, [setRelationshipPreview, setSection, setWorkbench]);
+    return outcome.result;
+  }, [activeWorkspaceId, setSection, setStatus, setWorkbench]);
 
-  const handleDashboardRelationshipSave = useCallback(async (options: Parameters<typeof saveRelationship>[0]) => {
-    const result = await saveRelationship(options);
-    setRelationshipPreview(result);
-    setLastActionResult(result as unknown as Record<string, unknown>);
-    setWorkbench(await refreshWorkbench());
-    return result as unknown as Record<string, unknown>;
-  }, [setLastActionResult, setRelationshipPreview, setWorkbench]);
+  const handleDashboardRelationshipSave = useCallback(async (options: RelationshipSaveOptions) => {
+    const { saveWorkspaceRelationship } = await loadRelationshipWorkspaceActions();
+    const outcome = await saveWorkspaceRelationship(activeWorkspaceId, options, true);
+    if (!outcome?.surface) {
+      return { ok: false, stale: true, workspaceId: activeWorkspaceId };
+    }
+    setLastActionResult(outcome.result as unknown as Record<string, unknown>);
+    setStatus(outcome.surface.status);
+    setWorkbench(outcome.surface.workbench);
+    return outcome.result as unknown as Record<string, unknown>;
+  }, [activeWorkspaceId, setLastActionResult, setStatus, setWorkbench]);
 
-  const handleFormulaPreview = useCallback(async (options: { expression: string; table?: string; mode?: string }) => {
+  const handleFormulaPreview = useCallback(async (options: Parameters<ApiModel["previewFormula"]>[0]) => {
+    const { previewFormula } = await loadApiModel();
     setFormulaPreview(await previewFormula(options));
     setSection("sources");
   }, [setFormulaPreview, setSection]);
 
-  const handleSaveFormula = useCallback(async (options: Parameters<typeof saveFormula>[0]) => {
+  const handleSaveFormula = useCallback(async (options: Parameters<ApiModel["saveFormula"]>[0]) => {
+    const { saveFormula } = await loadApiModel();
     const result = await saveFormula(options);
     setLastActionResult(result as unknown as Record<string, unknown>);
     if (options.confirm) {
@@ -388,7 +397,8 @@ export function useAppDataActions({
     return result;
   }, [setLastActionResult, setSection, setWorkbench]);
 
-  const handleDeleteFormula = useCallback(async (options: Parameters<typeof deleteFormula>[0]) => {
+  const handleDeleteFormula = useCallback(async (options: Parameters<ApiModel["deleteFormula"]>[0]) => {
+    const { deleteFormula } = await loadApiModel();
     const result = await deleteFormula(options);
     setLastActionResult(result as unknown as Record<string, unknown>);
     if (options.confirm) {
