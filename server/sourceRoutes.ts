@@ -197,6 +197,11 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     if (body.provider) args.push("--provider", String(body.provider));
     if (body.status) args.push("--status", String(body.status));
     if (body.endpoint) args.push("--endpoint", String(body.endpoint));
+    if (body.resource) args.push("--resource", String(body.resource));
+    if (body.pageParam) args.push("--page-param", String(body.pageParam));
+    if (body.pageSizeParam) args.push("--page-size-param", String(body.pageSizeParam));
+    if (body.pageSize) args.push("--page-size", String(body.pageSize));
+    if (body.maxPages) args.push("--max-pages", String(body.maxPages));
     if (body.importMode) args.push("--import-mode", String(body.importMode));
     if (body.targetTable) args.push("--target-table", String(body.targetTable));
     if (Array.isArray(body.uniqueFields)) args.push("--unique-fields", body.uniqueFields.map(String).join(","));

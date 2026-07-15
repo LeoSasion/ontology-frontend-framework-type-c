@@ -30,6 +30,7 @@ export function useSourceWorkbenchConnectorController({
   const [connectorProvider, setConnectorProvider] = useState("local-file");
   const [connectorStatus, setConnectorStatus] = useState("draft");
   const [connectorEndpoint, setConnectorEndpoint] = useState("");
+  const [connectorResource, setConnectorResource] = useState("");
   const [connectorImportMode, setConnectorImportMode] = useState("auto");
   const [connectorTargetTable, setConnectorTargetTable] = useState(firstTableKey);
   const [connectorUniqueFields, setConnectorUniqueFields] = useState("");
@@ -50,6 +51,7 @@ export function useSourceWorkbenchConnectorController({
       connectorProvider,
       connectorStatus,
       connectorEndpoint,
+      connectorResource,
       connectorImportMode,
       connectorTargetTable,
       connectorUniqueFields,
@@ -66,6 +68,7 @@ export function useSourceWorkbenchConnectorController({
     setConnectorProvider(connector.provider || "");
     setConnectorStatus(connector.status || "draft");
     setConnectorEndpoint(String(connector.config?.endpoint ?? ""));
+    setConnectorResource(String(connector.config?.resource ?? ""));
     setConnectorImportMode(String(connector.config?.importMode ?? "auto"));
     setConnectorTargetTable(String(connector.config?.targetTableKey ?? ""));
     setConnectorUniqueFields((connector.config?.uniqueFields ?? []).join(", "));
@@ -80,6 +83,7 @@ export function useSourceWorkbenchConnectorController({
     setConnectorProvider("local-file");
     setConnectorStatus("draft");
     setConnectorEndpoint("");
+    setConnectorResource("");
     setConnectorImportMode("auto");
     setConnectorTargetTable(firstTableKey);
     setConnectorUniqueFields("");
@@ -117,6 +121,7 @@ export function useSourceWorkbenchConnectorController({
     connectorProvider,
     connectorStatus,
     connectorEndpoint,
+    connectorResource,
     connectorImportMode,
     connectorTargetTable,
     connectorUniqueFields,
@@ -128,6 +133,7 @@ export function useSourceWorkbenchConnectorController({
     setConnectorProvider,
     setConnectorStatus,
     setConnectorEndpoint,
+    setConnectorResource,
     setConnectorImportMode,
     setConnectorTargetTable,
     setConnectorUniqueFields,

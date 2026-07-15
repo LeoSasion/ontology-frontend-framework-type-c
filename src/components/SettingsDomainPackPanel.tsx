@@ -57,9 +57,17 @@ export function SettingsDomainPackPanel({ busyKey, onSetDomainPack, result, runt
                     <strong>{biText(pack.displayName.zh, pack.displayName.en)}</strong>
                     <span>{pack.packId} · v{pack.version}</span>
                     <p>{biText(pack.description.zh, pack.description.en)}</p>
+                    <small>{pack.builtIn === false ? biText("外部签名包", "Signed external pack") : biText("内置能力包", "Built-in pack")}</small>
                     <div className="domainPackCapabilities">
                       {pack.capabilities.map((capability) => <small key={capability}>{capability}</small>)}
                     </div>
+                    {(pack.uiContributions ?? []).map((contribution, index) => (
+                      <aside className="domainPackContribution" key={`${pack.packId}-${contribution.kind}-${index}`}>
+                        <strong>{biText(contribution.title.zh, contribution.title.en)}</strong>
+                        <span>{biText(contribution.body.zh, contribution.body.en)}</span>
+                        {contribution.href ? <a href={contribution.href} rel="noreferrer" target="_blank">{biText("查看帮助", "Open help")}</a> : null}
+                      </aside>
+                    ))}
                   </div>
                   <div className="buttonRow tight">
                     <span className={pack.enabled ? "statusBadge ready" : "statusBadge"}>

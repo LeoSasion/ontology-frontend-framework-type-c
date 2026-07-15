@@ -2,23 +2,82 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from pathlib import Path
 from typing import Any
 
+from bi_cli_core import ROOT
 from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
 from domain_pack_service import domain_pack_runtime_context, domain_pack_set_fingerprint
 from evidence_receipts import source_intelligence_file_coverage
+from evidence_profile_runtime.file_readers import discover_source_files, read_source_tables, sha256_file
 
 
-def _run_freshness(connection: sqlite3.Connection, workspace_id: str, manifest: dict[str, Any]) -> dict[str, Any]:
+def _current_source_fingerprint(input_roots: list[Any], manifest: dict[str, Any]) -> str:
+    roots = []
+    for item in input_roots:
+        path = Path(str(item)).expanduser()
+        roots.append(path if path.is_absolute() else ROOT / path)
+    files = discover_source_files(roots)
+    if not files:
+        return "missing"
+    captured_entries = manifest.get("sourceFingerprintEntries")
+    if isinstance(captured_entries, list) and captured_entries:
+        resolved_entries: list[tuple[dict[str, Any], Path]] = []
+        for item in captured_entries:
+            if not isinstance(item, dict):
+                resolved_entries = []
+                break
+            path = Path(str(item.get("sourcePath") or ""))
+            path = path if path.is_absolute() else ROOT / path
+            resolved_entries.append((item, path.resolve()))
+        if resolved_entries and {path for _item, path in resolved_entries} == set(files):
+            digest_by_path = {path: sha256_file(path) for path in files}
+            material = [
+                {
+                    "tableKey": str(item.get("tableKey") or ""),
+                    "sheetName": str(item.get("sheetName") or ""),
+                    "sha256": digest_by_path[path],
+                }
+                for item, path in resolved_entries
+            ]
+            import hashlib
+
+            return hashlib.sha256(
+                json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+    tables, _warnings = read_source_tables(files)
+    material = [
+        {
+            "tableKey": str(table.get("tableKey") or ""),
+            "sheetName": str(table.get("sheetName") or ""),
+            "sha256": str(table.get("sha256") or ""),
+        }
+        for table in tables
+    ]
+    import hashlib
+
+    return hashlib.sha256(
+        json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _run_freshness(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    manifest: dict[str, Any],
+    input_roots: list[Any] | None = None,
+) -> dict[str, Any]:
     current = {
         "schema": workspace_schema_fingerprint(connection, workspace_id),
         "data": workspace_data_fingerprint(connection, workspace_id),
         "domainPacks": domain_pack_set_fingerprint(domain_pack_runtime_context(connection, workspace_id)),
+        "source": _current_source_fingerprint(list(input_roots or manifest.get("inputRoots") or []), manifest),
     }
     captured = {
         "schema": str(manifest.get("workspaceSchemaFingerprint") or ""),
         "data": str(manifest.get("workspaceDataFingerprint") or ""),
         "domainPacks": str(manifest.get("domainPackFingerprint") or ""),
+        "source": str(manifest.get("sourceFingerprint") or ""),
     }
     missing = [key for key, value in captured.items() if not value]
     mismatches = [key for key in current if captured.get(key) and captured[key] != current[key]]
@@ -94,7 +153,7 @@ def list_source_intelligence_runs(connection: sqlite3.Connection, *, workspace_i
         manifest = manifest if isinstance(manifest, dict) else {}
         item["sourceFingerprint"] = str(manifest.get("sourceFingerprint") or "")
         item["enabledDomainPacks"] = list(manifest.get("enabledDomainPacks") or [])
-        item["freshness"] = _run_freshness(connection, workspace_id, manifest)
+        item["freshness"] = _run_freshness(connection, workspace_id, manifest, item["inputRoots"])
         item["fileCoverage"] = source_intelligence_file_coverage({**item, "manifest_json": json.dumps(manifest, ensure_ascii=False)})
         if not item["freshness"]["usableForPlanning"]:
             item["fileCoverage"]["complete"] = False
@@ -159,7 +218,12 @@ def source_intelligence_summary_payload(row: sqlite3.Row, connection: sqlite3.Co
         item["sourceFingerprint"] = str(manifest.get("sourceFingerprint") or "")
         item["enabledDomainPacks"] = list(manifest.get("enabledDomainPacks") or [])
         if connection is not None:
-            item["freshness"] = _run_freshness(connection, str(item.get("workspace_id") or "default"), manifest)
+            item["freshness"] = _run_freshness(
+                connection,
+                str(item.get("workspace_id") or "default"),
+                manifest,
+                item["inputRoots"],
+            )
     return item
 
 
@@ -180,9 +244,9 @@ def latest_source_intelligence_summary(connection: sqlite3.Connection, *, worksp
         return None
     summaries = [source_intelligence_summary_payload(row, connection) for row in rows]
     if include_internal:
-        return next((item for item in summaries if item.get("freshness", {}).get("usableForPlanning")), summaries[0])
+        return next((item for item in summaries if item.get("freshness", {}).get("usableForPlanning")), None)
     visible = [item for item in summaries if not internal_source_intelligence_run(item)] or summaries[:1]
-    return next((item for item in visible if item.get("freshness", {}).get("usableForPlanning")), visible[0])
+    return next((item for item in visible if item.get("freshness", {}).get("usableForPlanning")), None)
 
 
 def source_intelligence_run_manifest(run: sqlite3.Row) -> dict[str, Any]:

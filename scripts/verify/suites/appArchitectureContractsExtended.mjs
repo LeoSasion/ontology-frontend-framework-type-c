@@ -288,14 +288,14 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
           !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
           implementationStatusSource.includes("| Verifiable analysis units | Stable initial |") &&
-          implementationStatusSource.includes("| Safe read-only connector adapter | Stable initial |") &&
+          implementationStatusSource.includes("| Safe read-only connector adapter | Stable controlled |") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
-          !developmentRoadmapDocSource.includes("安全只读 Connector Adapter") &&
-          developmentRoadmapDocSource.includes("### P1. 领域包注册表与工作区配置") &&
-          developmentRoadmapDocSource.includes("### P5. 扩展性与发布验收") &&
+          !developmentRoadmapDocSource.includes("### P0.") &&
+          !developmentRoadmapDocSource.includes("### P1.") &&
+          developmentRoadmapDocSource.includes("### P2. 更复杂的跨表执行") &&
           developmentRoadmapDocSource.includes("## 明确暂时不做") &&
-          developmentRoadmapDocSource.includes("npm run preflight"),
+          !developmentRoadmapDocSource.includes("npm run preflight"),
       },
     {
         label: "preflight-delegates-to-stable-verification-entrypoints",
@@ -702,12 +702,17 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           Array.isArray(byLabel["cli-quality-doctor"].parsed?.issues) &&
           byLabel["cli-quality-doctor"].parsed?.metricSql?.planned >= 0 &&
           byLabel["cli-quality-doctor"].parsed?.metricSql?.blocked >= 0 &&
-          Array.isArray(byLabel["cli-quality-doctor"].parsed?.latestSourceIntelligenceRun?.inputRoots) &&
-          Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.missingSemantics) &&
-          Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.failedSamples) &&
-          Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.semanticBindingDrafts) &&
-          byLabel["cli-quality-doctor"].parsed?.metricSql?.repairDraft?.kind === "metric-sql.repair" &&
-          Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.repairDraft?.semanticBindingDrafts),
+          (
+            byLabel["cli-quality-doctor"].parsed?.latestSourceIntelligenceRun === null
+              ? byLabel["cli-quality-doctor"].parsed?.metricSql?.planned === 0 &&
+                byLabel["cli-quality-doctor"].parsed?.metricSql?.executable === 0
+              : Array.isArray(byLabel["cli-quality-doctor"].parsed?.latestSourceIntelligenceRun?.inputRoots) &&
+                Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.missingSemantics) &&
+                Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.failedSamples) &&
+                Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.semanticBindingDrafts) &&
+                byLabel["cli-quality-doctor"].parsed?.metricSql?.repairDraft?.kind === "metric-sql.repair" &&
+                Array.isArray(byLabel["cli-quality-doctor"].parsed?.metricSql?.repairDraft?.semanticBindingDrafts)
+          ),
       },
     {
         label: "frontend-initial-agent-readonly",

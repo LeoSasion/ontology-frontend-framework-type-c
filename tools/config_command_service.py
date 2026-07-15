@@ -26,6 +26,7 @@ CONFIG_TABLES = [
     "data_connectors",
     "user_preferences",
     "theme_palettes",
+    "workspace_domain_packs",
     "action_drafts",
 ]
 

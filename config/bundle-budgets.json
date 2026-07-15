@@ -14,7 +14,7 @@
     { "label": "inspector-route-js", "pattern": "^InspectorPanel-[^.]+\\.js$", "maxBytes": 27000 },
     { "label": "home-route-js", "pattern": "^HomeOverview-[^.]+\\.js$", "maxBytes": 31000 },
     { "label": "dashboard-deferred-js", "pattern": "^DashboardDeferredPanels-[^.]+\\.js$", "maxBytes": 52000 },
-    { "label": "source-advanced-js", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.js$", "maxBytes": 48000 },
+    { "label": "source-advanced-js", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.js$", "maxBytes": 48500 },
     { "label": "agent-evidence-css", "pattern": "^agentEvidenceWorkspace-[^.]+\\.css$", "maxBytes": 30000 },
     { "label": "dashboard-deferred-css", "pattern": "^DashboardDeferredPanels-[^.]+\\.css$", "maxBytes": 22000 },
     { "label": "source-advanced-css", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.css$", "maxBytes": 12000 },

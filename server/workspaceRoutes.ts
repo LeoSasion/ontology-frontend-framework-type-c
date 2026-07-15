@@ -72,6 +72,31 @@ export async function handleWorkspaceApi({ cli, port, request, response, url }: 
     return true;
   }
 
+  if (url.pathname === "/api/domain-packs/lint" && request.method === "POST") {
+    const body = await readBody(request);
+    const result = await cli(["domain-pack-lint", "--package", String(body.package ?? "")]);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/domain-packs/install" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["domain-pack-install", "--package", String(body.package ?? "")];
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/domain-packs/uninstall" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["domain-pack-uninstall", "--pack", String(body.packId ?? body.pack ?? "")];
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/workbench" && request.method === "GET") {
     const limit = url.searchParams.get("limit") ?? "12";
     const result = await cli(["workbench", "--limit", limit]);

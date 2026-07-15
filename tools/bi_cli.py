@@ -159,7 +159,10 @@ from bi_cli_io_services import (
 )
 from bi_cli_system_commands import (
     cli_contract_command,
+    domain_pack_install_command,
+    domain_pack_lint_command,
     domain_pack_set_command,
+    domain_pack_uninstall_command,
     domain_packs_command,
     list_commands_command,
     quality_doctor_command,
@@ -2671,6 +2674,12 @@ def main() -> int:
             result = domain_packs_command(args)
         elif args.command == "domain-pack-set":
             result = domain_pack_set_command(args)
+        elif args.command == "domain-pack-lint":
+            result = domain_pack_lint_command(args)
+        elif args.command == "domain-pack-install":
+            result = domain_pack_install_command(args)
+        elif args.command == "domain-pack-uninstall":
+            result = domain_pack_uninstall_command(args)
         elif args.command == "source-run":
             result = source_run_command(args)
         elif args.command == "list-tables":

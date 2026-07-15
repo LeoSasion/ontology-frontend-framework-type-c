@@ -6,6 +6,8 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 VERIFY_DIR = Path(tempfile.mkdtemp(prefix="aibi-connector-adapter-"))
 DB_PATH = VERIFY_DIR / "runtime.sqlite"
 SOURCE_PATH = VERIFY_DIR / "connector-source.csv"
+SQLITE_SOURCE_PATH = VERIFY_DIR / "connector-source.sqlite"
 SECRET_VALUE = "M11_LITERAL_SECRET_MUST_NEVER_ESCAPE"
 ENV = {
     **os.environ,
@@ -24,6 +27,31 @@ ENV = {
     "PYTHONIOENCODING": "utf-8",
 }
 checks: list[dict[str, Any]] = []
+
+
+class JsonHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        if self.headers.get("Authorization") != f"Bearer {SECRET_VALUE}":
+            self.send_response(401)
+            self.end_headers()
+            return
+        page = 1
+        if "?" in self.path:
+            from urllib.parse import parse_qs, urlsplit
+            page = int(parse_qs(urlsplit(self.path).query).get("page", ["1"])[0])
+        rows = [
+            {"id": "a-1", "segment": "North", "value": 11},
+            {"id": "a-2", "segment": "South", "value": 17},
+        ] if page == 1 else [{"id": "a-3", "segment": "West", "value": 23}]
+        body = json.dumps({"data": {"items": rows}}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
 
 
 def check(label: str, ok: bool, detail: Any = None) -> None:
@@ -74,18 +102,33 @@ try:
         "o-3,Direct,20\n",
         encoding="utf-8",
     )
+    with sqlite3.connect(SQLITE_SOURCE_PATH) as source_connection:
+        source_connection.execute("CREATE TABLE source_rows(id TEXT, segment TEXT, value INTEGER)")
+        source_connection.executemany("INSERT INTO source_rows VALUES(?, ?, ?)", [("s-1", "A", 3), ("s-2", "B", 5), ("s-3", "C", 8)])
+    http_server = ThreadingHTTPServer(("127.0.0.1", 0), JsonHandler)
+    http_thread = threading.Thread(target=http_server.serve_forever, daemon=True)
+    http_thread.start()
+    http_origin = f"http://127.0.0.1:{http_server.server_port}"
+    ENV["AIBI_HTTP_CONNECTOR_ALLOWLIST"] = http_origin
+    ENV["AIBI_SQLITE_CONNECTOR_ALLOWLIST"] = str(SQLITE_SOURCE_PATH)
 
     adapters = run("adapter-contracts", ["list-connector-adapters"])["parsed"] or {}
     adapter_rows = adapters.get("adapters") or []
     local_adapter = next((item for item in adapter_rows if item.get("connectorType") == "file"), {})
-    unavailable = [item for item in adapter_rows if item.get("connectorType") in {"api", "erp", "database"}]
+    api_adapter = next((item for item in adapter_rows if item.get("connectorType") == "api"), {})
+    database_adapter = next((item for item in adapter_rows if item.get("connectorType") == "database"), {})
+    erp_adapter = next((item for item in adapter_rows if item.get("connectorType") == "erp"), {})
     check(
         "adapter-permissions-are-explicit-and-networkless",
         local_adapter.get("available") is True
         and local_adapter.get("operations") == ["metadata-discovery", "bounded-preview", "sync-plan"]
         and local_adapter.get("permissions", {}).get("network") == "none"
         and local_adapter.get("permissions", {}).get("arbitrarySql") is False
-        and all(item.get("available") is False and item.get("permissions", {}).get("network") == "none" for item in unavailable),
+        and api_adapter.get("available") is True
+        and api_adapter.get("permissions", {}).get("network") == "allowlisted-get-only"
+        and database_adapter.get("available") is True
+        and database_adapter.get("permissions", {}).get("arbitrarySql") is False
+        and erp_adapter.get("available") is False,
         adapter_rows,
     )
     workbench = run("workbench-adapter-registry", ["workbench"]) ["parsed"] or {}
@@ -93,7 +136,7 @@ try:
     check(
         "workbench-exposes-the-same-adapter-availability-registry",
         workbench_adapters == adapter_rows
-        and [item.get("connectorType") for item in workbench_adapters if item.get("available")] == ["file"],
+        and [item.get("connectorType") for item in workbench_adapters if item.get("available")] == ["file", "api", "database"],
         workbench_adapters,
     )
 
@@ -190,8 +233,9 @@ try:
     check("literal-credential-is-not-persisted-or-returned", SECRET_VALUE not in json.dumps(connector_state(), ensure_ascii=False) and SECRET_VALUE not in literal_secret["stdout"])
 
     api_saved = run("env-reference-registration", [
-        "save-connector", "--name", "Disabled API", "--type", "api", "--endpoint", "https://example.invalid/data",
-        "--credential-ref", "env:AIBI_TEST_CONNECTOR_SECRET", "--yes",
+        "save-connector", "--name", "Allowlisted API", "--type", "api", "--endpoint", f"{http_origin}/rows",
+        "--resource", "data.items", "--page-param", "page", "--page-size-param", "page_size", "--page-size", "2", "--max-pages", "2",
+        "--target-table", "api_rows", "--import-mode", "replace", "--credential-ref", "env:AIBI_TEST_CONNECTOR_SECRET", "--yes",
     ])["parsed"] or {}
     api_key = str(api_saved.get("savedConnector") or "")
     public_list = run("credential-redacted-list", ["list-connectors"])["parsed"] or {}
@@ -203,15 +247,74 @@ try:
         and "env:AIBI_TEST_CONNECTOR_SECRET" not in public_text
         and any(item.get("connectorKey") == api_key and item.get("config", {}).get("credentialConfigured") is True for item in public_list.get("connectors") or []),
     )
-    before_api_block = connector_state()
-    api_block = run("unavailable-api-adapter-blocked", ["discover-connector", "--connector", api_key], expected_status=1)["parsed"] or {}
-    after_api_block = connector_state()
+    before_api_read = connector_state()
+    api_discovery = run("allowlisted-api-discovery", ["discover-connector", "--connector", api_key])["parsed"] or {}
+    api_preview = run("allowlisted-api-preview", ["preview-connector", "--connector", api_key, "--limit", "2"])["parsed"] or {}
+    api_plan = run("allowlisted-api-plan", ["plan-connector-sync", "--connector", api_key])["parsed"] or {}
+    after_api_read = connector_state()
     check(
-        "unavailable-adapter-grants-no-network-or-write-authority",
-        api_block.get("blocked") is True
-        and api_block.get("adapter", {}).get("permissions", {}).get("network") == "none"
-        and api_block.get("sideEffects", {}).get("businessDatabaseWrite") is False
-        and before_api_block == after_api_block,
+        "allowlisted-api-is-bounded-read-only-and-secret-free",
+        api_discovery.get("adapter", {}).get("adapterId") == "http-json/v1"
+        and api_preview.get("preview", {}).get("returnedRows") == 2
+        and api_plan.get("syncPlan", {}).get("resource", {}).get("pagesRead") == 2
+        and api_plan.get("sideEffects", {}).get("network") is True
+        and api_plan.get("sideEffects", {}).get("businessDatabaseWrite") is False
+        and before_api_read == after_api_read
+        and SECRET_VALUE not in json.dumps([api_discovery, api_preview, api_plan], ensure_ascii=False),
+    )
+    before_api_sync = table_count()
+    api_synced = run("confirmed-api-sync", ["sync-connector", "--connector", api_key, "--yes"])["parsed"] or {}
+    check(
+        "api-sync-materializes-only-after-confirmation",
+        api_synced.get("confirmed") is True
+        and api_synced.get("connectorSync", {}).get("adapter", {}).get("adapterId") == "http-json/v1"
+        and table_count() == before_api_sync + 1,
+        api_synced,
+    )
+    api_resynced = run("repeated-api-sync", ["sync-connector", "--connector", api_key, "--yes"])["parsed"] or {}
+    check(
+        "repeated-api-sync-replaces-one-target-with-new-data-version",
+        api_resynced.get("confirmed") is True
+        and api_resynced.get("connectorSync", {}).get("importResult", {}).get("dataVersion") == 2
+        and table_count() == before_api_sync + 1,
+        api_resynced.get("connectorSync"),
+    )
+
+    database_saved = run("sqlite-registration", [
+        "save-connector", "--name", "Allowlisted SQLite", "--type", "database", "--endpoint", str(SQLITE_SOURCE_PATH),
+        "--resource", "source_rows", "--target-table", "sqlite_rows", "--import-mode", "replace", "--yes",
+    ])["parsed"] or {}
+    database_key = str(database_saved.get("savedConnector") or "")
+    database_discovery = run("sqlite-discovery", ["discover-connector", "--connector", database_key])["parsed"] or {}
+    database_preview = run("sqlite-preview", ["preview-connector", "--connector", database_key, "--limit", "2"])["parsed"] or {}
+    before_database_sync = table_count()
+    database_synced = run("sqlite-confirmed-sync", ["sync-connector", "--connector", database_key, "--yes"])["parsed"] or {}
+    check(
+        "sqlite-adapter-is-explicit-table-read-only-and-confirmed-write",
+        database_discovery.get("adapter", {}).get("adapterId") == "sqlite-table/v1"
+        and database_preview.get("preview", {}).get("returnedRows") == 2
+        and database_preview.get("resource", {}).get("table") == "source_rows"
+        and database_synced.get("confirmed") is True
+        and table_count() == before_database_sync + 1,
+        {"discovery": database_discovery, "preview": database_preview, "sync": database_synced},
+    )
+
+    blocked_origin = run("unallowlisted-origin-rejected", [
+        "save-connector", "--name", "Unallowlisted", "--type", "api", "--endpoint", "https://example.invalid/data", "--yes",
+    ], expected_status=1)
+    check(
+        "unallowlisted-api-origin-is-blocked-before-persist-or-network",
+        "not allowlisted" in blocked_origin["stdout"]
+        and not any(row[1] == "unallowlisted" for row in connector_state()),
+    )
+
+    sensitive_endpoint = run("sensitive-query-endpoint-rejected", [
+        "save-connector", "--name", "Sensitive Query", "--type", "api", "--endpoint", f"{http_origin}/rows?api_key=unsafe", "--yes",
+    ], expected_status=1)
+    check(
+        "sensitive-query-credentials-are-blocked-before-persist",
+        "cannot be embedded" in sensitive_endpoint["stdout"]
+        and not any(row[1] == "sensitive_query" for row in connector_state()),
     )
 
     forbidden_dir = VERIFY_DIR / "AIBI-D"
@@ -238,7 +341,7 @@ try:
     adapter_commands = ["list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync"]
     check(
         "adapter-capabilities-are-read-only",
-        contract.get("commandCount") == 113
+        contract.get("commandCount") == len(contract.get("commands") or [])
         and all(
             command_contracts.get(command, {}).get("mutationMode") == "read-only"
             and command_contracts.get(command, {}).get("writesBusinessState") is False
@@ -248,6 +351,9 @@ try:
         {command: command_contracts.get(command) for command in adapter_commands},
     )
 finally:
+    if "http_server" in locals():
+        http_server.shutdown()
+        http_server.server_close()
     failed = [item for item in checks if not item["ok"]]
     print(json.dumps({
         "ok": not failed,

@@ -24,6 +24,7 @@ export function SourceWorkbenchConnectorPanel({
   connectorProvider,
   connectorStatus,
   connectorEndpoint,
+  connectorResource,
   connectorImportMode,
   connectorTargetTable,
   connectorUniqueFields,
@@ -35,6 +36,7 @@ export function SourceWorkbenchConnectorPanel({
   setConnectorProvider,
   setConnectorStatus,
   setConnectorEndpoint,
+  setConnectorResource,
   setConnectorImportMode,
   setConnectorTargetTable,
   setConnectorUniqueFields,
@@ -106,8 +108,11 @@ export function SourceWorkbenchConnectorPanel({
               </select>
             </label>
             <label>
-              <span>{biText("提供方", "Provider")}</span>
-              <input value={connectorProvider} onChange={(event) => setConnectorProvider(event.target.value)} />
+              <span>{connectorType === "file" ? biText("提供方", "Provider") : biText("只读资源", "Read-only resource")}</span>
+              <input
+                value={connectorType === "file" ? connectorProvider : connectorResource}
+                onChange={(event) => connectorType === "file" ? setConnectorProvider(event.target.value) : setConnectorResource(event.target.value)}
+              />
             </label>
             <label>
               <span>{biText("状态", "Status")}</span>

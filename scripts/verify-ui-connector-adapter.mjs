@@ -69,7 +69,13 @@ const run = await withTemporaryWorkspace("codex_connector_adapter", async ({ tem
       }));
       checks.push(
         check("connector-adapter-boundary-copy-visible", connectorPanel.ok, connectorPanel),
-        check("unavailable-adapters-are-not-presented-as-operable", adapterOptions.length === 1 && adapterOptions[0]?.value === "file" && adapterOptions[0]?.disabled === false, adapterOptions),
+        check(
+          "only-available-adapters-are-presented-as-operable",
+          adapterOptions.length === 3 &&
+            ["file", "api", "database"].every((value, index) => adapterOptions[index]?.value === value && adapterOptions[index]?.disabled === false) &&
+            !adapterOptions.some((option) => option.value === "erp"),
+          adapterOptions,
+        ),
         check("connector-adapter-preview-receipt-visible", clicked.ok && receipt.ok, { clicked, receipt }),
         check("connector-adapter-browser-layout-stable", !visibleState.hasFallback && !visibleState.horizontalOverflow, visibleState),
       );

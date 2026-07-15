@@ -90,6 +90,15 @@ export interface DomainPackManifest extends DomainPackReference {
   configuredVersion?: string | null;
   enabledAt?: string | null;
   updatedAt?: string | null;
+  source?: { type: "builtin" | "external" | string; publisher?: string; reference?: string };
+  builtIn?: boolean;
+  conflicts?: string[];
+  uiContributions?: Array<{
+    kind: "info-card" | "help-link" | string;
+    title: { zh: string; en: string };
+    body: { zh: string; en: string };
+    href?: string;
+  }>;
   contributions?: {
     semanticAliases?: Record<string, string[]>;
     semanticRoles?: Record<string, string[]>;

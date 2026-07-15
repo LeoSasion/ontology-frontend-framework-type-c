@@ -13,8 +13,11 @@ from bi_cli_schema import active_workspace_id, open_db, workspace_records
 from evidence_run_store import count_source_intelligence_runs, latest_source_intelligence_summary
 from query_runtime import duckdb_status
 from domain_pack_service import (
+    domain_pack_install_command as domain_pack_install_command_service,
+    domain_pack_lint_command as domain_pack_lint_command_service,
     domain_pack_runtime_context,
     domain_pack_set_command as domain_pack_set_command_service,
+    domain_pack_uninstall_command as domain_pack_uninstall_command_service,
     domain_packs_command as domain_packs_command_service,
 )
 from workspace_command_service import (
@@ -201,7 +204,22 @@ def quality_doctor_command(args: argparse.Namespace) -> dict[str, Any]:
 
     latest_run = latest_run or {}
     source_intelligence_tables = int(latest_run.get("table_count") or 0)
-    metric_sql_diagnostic = metric_sql_doctor_from_run(latest_run) if latest_run else {}
+    metric_sql_diagnostic = metric_sql_doctor_from_run(latest_run) if latest_run else {
+        "artifactDir": "",
+        "compilerArtifact": "metric-sql-compiler.json",
+        "queryResultArtifact": "metric-query-results.json",
+        "planned": 0,
+        "executable": 0,
+        "blocked": 0,
+        "rate": 0.0,
+        "statusCounts": {},
+        "missingSemantics": [],
+        "missingRealSemantics": [],
+        "semanticBindingDrafts": [],
+        "failedSamples": [],
+        "executableSamples": [],
+        "repairDraft": None,
+    }
     metric_sql_plans = int(metric_sql_diagnostic.get("planned") or latest_run.get("metric_sql_plan_count") or 0)
     executable_metric_sql = int(metric_sql_diagnostic.get("executable") or latest_run.get("metric_sql_executable_count") or 0)
     metric_sql_rate = executable_metric_sql / max(1, metric_sql_plans)
@@ -333,5 +351,17 @@ def domain_packs_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def domain_pack_set_command(args: argparse.Namespace) -> dict[str, Any]:
     return domain_pack_set_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
+
+
+def domain_pack_lint_command(args: argparse.Namespace) -> dict[str, Any]:
+    return domain_pack_lint_command_service(args)
+
+
+def domain_pack_install_command(args: argparse.Namespace) -> dict[str, Any]:
+    return domain_pack_install_command_service(args, open_db=open_db)
+
+
+def domain_pack_uninstall_command(args: argparse.Namespace) -> dict[str, Any]:
+    return domain_pack_uninstall_command_service(args, open_db=open_db)
 
 

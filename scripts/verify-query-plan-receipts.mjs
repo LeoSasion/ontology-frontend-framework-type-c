@@ -26,6 +26,16 @@ try {
     run("import", ["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"]),
     run("dashboard", ["business-dashboard", "--op", "create", "--table", "orders", "--name", "Receipt verification", "--limit", "1", "--yes"]),
   ];
+  const unsafeRatio = run("unverified-ratio", ["ask", "请计算退款率"]);
+  checks.push(unsafeRatio);
+  checks.push({
+    label: "unverified-ratio-never-falls-through-to-count",
+    ok: unsafeRatio.parsed?.queryPlanReceipt?.status === "blocked"
+      && unsafeRatio.parsed?.answerCard?.clarification?.kind === "compound-analysis-definition"
+      && unsafeRatio.parsed?.queryPlanReceipt?.validation?.executed === false,
+  });
+  const enabledPack = run("enable-pack", ["domain-pack-set", "--pack", "platform-commerce", "--state", "enabled", "--yes"]);
+  checks.push(enabledPack);
   const query = run("direct-query", ["query", "--table", "orders", "--group", "channel", "--measure", "net_sales", "--agg", "sum", "--request", "各渠道净销售额"]);
   checks.push(query);
   checks.push({
@@ -35,7 +45,9 @@ try {
       && query.parsed?.queryPlanReceipt?.selection?.measure === "net_sales"
       && query.parsed?.queryPlanReceipt?.selection?.group === "channel"
       && Boolean(query.parsed?.queryPlanReceipt?.runtime?.compiledSql)
-      && query.parsed?.queryPlanReceipt?.validation?.whitelistOnly === true,
+      && query.parsed?.queryPlanReceipt?.validation?.whitelistOnly === true
+      && query.parsed?.queryPlanReceipt?.domainPacks?.[0]?.packId === "platform-commerce"
+      && query.parsed?.queryPlanReceipt?.domainPackFingerprint !== "",
   });
   const ask = run("agent-query", ["ask", "请用net_sales按channel生成柱状图"]);
   checks.push(ask);

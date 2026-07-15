@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import sqlite3
+import tempfile
 from pathlib import Path
 from typing import Any, Callable
 
@@ -13,6 +15,8 @@ from connector_adapter_service import (
     public_sync_plan,
     validate_connector_resource,
     validate_credential_reference,
+    validate_http_connector_registration,
+    validate_sqlite_connector_registration,
 )
 from workspace_command_service import active_workspace_id
 
@@ -94,14 +98,26 @@ def save_connector_command(args: argparse.Namespace, *, open_db: Callable[[], An
     connector_type = normalize_connector_type(args.type)
     connector_status = normalize_connector_status(args.status)
     endpoint = str(args.endpoint or "").strip()
+    resource = str(getattr(args, "resource", "") or "").strip()
     credential_reference = validate_credential_reference(getattr(args, "credential_ref", None))
     if connector_type == "file":
         if credential_reference:
             raise ValueError("Local file connectors cannot declare credentials.")
         if endpoint:
             validate_connector_resource(endpoint, require_exists=False)
+    if connector_type == "api":
+        validate_http_connector_registration(endpoint)
+    if connector_type == "database" and credential_reference:
+        raise ValueError("SQLite database connectors cannot declare credentials.")
+    if connector_type == "database":
+        validate_sqlite_connector_registration(endpoint, resource)
     config = {
         "endpoint": endpoint,
+        "resource": resource,
+        "pageParam": str(getattr(args, "page_param", "") or "").strip(),
+        "pageSizeParam": str(getattr(args, "page_size_param", "") or "").strip(),
+        "pageSize": max(1, min(int(getattr(args, "page_size", 100) or 100), 1000)),
+        "maxPages": max(1, min(int(getattr(args, "max_pages", 1) or 1), 10)),
         "importMode": str(args.import_mode or "auto"),
         "targetTableKey": str(args.target_table or "").strip(),
         "uniqueFields": parse_csv_list(args.unique_fields),
@@ -222,13 +238,6 @@ def sync_connector_command(
         import_mode = str(config.get("importMode") or "auto")
         unique_fields = [str(item) for item in config.get("uniqueFields") or []]
         conflict_rule = str(config.get("conflictRule") or "overwrite")
-        if connector["type"] != "file":
-            return public_sync_plan(build_sync_plan(
-                row,
-                connection=connection,
-                registry_for_table=registry_for_table,
-                saved_import_policy=saved_import_policy,
-            ))
         adapter_plan = build_sync_plan(
             row,
             connection=connection,
@@ -240,30 +249,52 @@ def sync_connector_command(
             return public_plan
         if not args.yes:
             return public_plan
-        source_path = adapter_plan["_sourcePath"]
+        source_path = adapter_plan.get("_sourcePath")
+        temporary_source: Path | None = None
+        if source_path is None:
+            rows = adapter_plan.get("_rows")
+            columns = adapter_plan.get("syncPlan", {}).get("columns")
+            if not isinstance(rows, list) or not isinstance(columns, list) or not columns:
+                raise ValueError("Connector adapter did not produce a bounded tabular snapshot.")
+            handle = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".csv", prefix="aibi-c-connector-", delete=False, encoding="utf-8-sig", newline=""
+            )
+            try:
+                writer = csv.DictWriter(handle, fieldnames=[str(item) for item in columns], extrasaction="ignore")
+                writer.writeheader()
+                for item in rows:
+                    writer.writerow(item if isinstance(item, dict) else {})
+            finally:
+                handle.close()
+            temporary_source = Path(handle.name)
+            source_path = temporary_source
         registry = registry_for_table(connection, target_table)
         mode = "merge" if import_mode == "auto" and registry else "create" if import_mode == "auto" else import_mode
-        if mode == "merge":
-            if not unique_fields:
-                policy = saved_import_policy(connection, target_table)
-                unique_fields = policy["uniqueFields"] if policy else []
-                conflict_rule = policy["conflictRule"] if policy else conflict_rule
-            import_result = merge_import_into_table(
-                connection,
-                source_path,
-                table_key=target_table,
-                unique_fields=unique_fields,
-                conflict_rule=conflict_rule,
-                display_name=target_table,
-            )
-        else:
-            import_result = import_csv_as_table(
-                connection,
-                source_path,
-                table_key=target_table,
-                display_name=target_table,
-                mode="connector-sync",
-            )
+        try:
+            if mode == "merge":
+                if not unique_fields:
+                    policy = saved_import_policy(connection, target_table)
+                    unique_fields = policy["uniqueFields"] if policy else []
+                    conflict_rule = policy["conflictRule"] if policy else conflict_rule
+                import_result = merge_import_into_table(
+                    connection,
+                    source_path,
+                    table_key=target_table,
+                    unique_fields=unique_fields,
+                    conflict_rule=conflict_rule,
+                    display_name=target_table,
+                )
+            else:
+                import_result = import_csv_as_table(
+                    connection,
+                    source_path,
+                    table_key=target_table,
+                    display_name=target_table,
+                    mode="connector-sync",
+                )
+        finally:
+            if temporary_source is not None:
+                temporary_source.unlink(missing_ok=True)
         result = {
             "importResult": import_result,
             "syncedAt": now_iso(),
@@ -273,7 +304,7 @@ def sync_connector_command(
                 "planFingerprint": adapter_plan["planFingerprint"],
                 "resourceFingerprint": adapter_plan["syncPlan"]["resource"]["sha256"],
             },
-            "evidence": ["b-file-connector", "source-profile", "field-semantics", "metric-sql-plan", "query-runtime"],
+            "evidence": [f"connector-adapter:{adapter_plan['syncPlan']['adapterId']}", "source-profile", "field-semantics", "metric-sql-plan", "query-runtime"],
         }
         connection.execute(
             """

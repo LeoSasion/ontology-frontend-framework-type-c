@@ -12,11 +12,13 @@ FILESYSTEM_READ_COMMANDS = {
     "preview-import", "import-commit", "preview-import-folder", "import-folder",
     "source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run",
     "validate-config", "apply-config",
-    "discover-connector", "preview-connector", "plan-connector-sync",
+    "discover-connector", "preview-connector", "plan-connector-sync", "domain-pack-lint",
 }
 FILESYSTEM_WRITE_COMMANDS = {
     "source-intelligence", "source-intelligence-job-run", "export-evidence", "export-analysis", "export-config", "cli-contract",
+    "domain-pack-install", "domain-pack-uninstall", "sync-connector",
 }
+NETWORK_READ_COMMANDS = {"discover-connector", "preview-connector", "plan-connector-sync", "sync-connector"}
 OWNED_WORKER_COMMANDS = {"source-intelligence-job-run"}
 JOB_SUPPORTED_COMMANDS = {"source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run", "jobs", "job-cancel", "job-recover", "job-process-exit"}
 AGENT_ENTRY_COMMANDS = {"ask", "confirm-action", "action-drafts", "semantic-query"}
@@ -55,7 +57,7 @@ def build_capability_contract(command: str, semantics: dict[str, Any] | None = N
         "permissions": {
             "database": _database_access(semantics),
             "filesystem": filesystem,
-            "network": "none",
+            "network": "allowlisted-read-only" if command in NETWORK_READ_COMMANDS else "none",
             "process": "owned-worker" if command in OWNED_WORKER_COMMANDS else "none",
             "workspaceScopeRequired": True,
             "otherAibiRepositories": "forbidden",

@@ -7,7 +7,7 @@ import sqlite3
 from typing import Any, Callable
 
 from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
-from domain_pack_service import domain_pack_set_fingerprint
+from domain_pack_service import domain_pack_runtime_context, domain_pack_set_fingerprint
 
 
 def _receipt_key(workspace_id: str, request_text: str, created_at: str) -> str:
@@ -71,7 +71,10 @@ def create_query_plan_receipt(
     runtime = runtime if isinstance(runtime, dict) else {}
     evidence_refs = list(evidence_refs or [])
     context_refs = list(context_refs or [])
-    domain_packs = list(domain_packs or [])
+    if domain_packs is None:
+        domain_packs = list(domain_pack_runtime_context(connection, workspace_id).get("enabledDomainPacks") or [])
+    else:
+        domain_packs = list(domain_packs)
     domain_pack_fingerprint = domain_pack_set_fingerprint({"enabledDomainPacks": domain_packs})
     unresolved = list(unresolved or [])
     filters = list(filters or [])

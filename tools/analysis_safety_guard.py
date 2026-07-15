@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -17,7 +18,11 @@ def requires_verified_analysis_plan(prompt: str) -> bool:
         "join grain",
         "after joining",
     ]
-    return any(term.casefold() in folded for term in structural_risk_terms)
+    ratio_risk = bool(
+        re.search(r"[\u4e00-\u9fff](率|占比|比例|比率|百分比)", prompt)
+        or re.search(r"\b(rate|ratio|percentage|percent)\b", folded)
+    )
+    return ratio_risk or any(term.casefold() in folded for term in structural_risk_terms)
 
 
 def build_verified_analysis_gap(prompt: str, table_key: str | None) -> dict[str, Any]:

@@ -142,6 +142,12 @@ export function saveConnector(options: {
   provider?: string;
   status?: string;
   endpoint?: string;
+  resource?: string;
+  credentialRef?: string;
+  pageParam?: string;
+  pageSizeParam?: string;
+  pageSize?: number;
+  maxPages?: number;
   importMode?: string;
   targetTable?: string;
   uniqueFields?: string[];

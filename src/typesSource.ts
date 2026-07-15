@@ -248,6 +248,8 @@ export interface DataConnectorConfig {
   status: "draft" | "active" | "paused" | string;
   config: {
     endpoint?: string;
+    resource?: string;
+    credentialConfigured?: boolean;
     importMode?: "auto" | "create" | "replace" | "merge" | string;
     targetTableKey?: string;
     uniqueFields?: string[];

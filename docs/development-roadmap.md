@@ -10,26 +10,6 @@
 
 ## 当前队列
 
-### P0. 外部 Domain Pack SDK
-
-目标：把当前内置、默认停用的 Pack 合同扩展为可独立分发的受控插件格式。
-
-- 增加显式冲突声明、签名与来源校验、安装/卸载预演和版本迁移回执。
-- 定义通用 UI contribution schema，使新的领域设置、模板说明和结果面板无需新增 Core 分支。
-- 提供最小 Pack 模板、Manifest lint 和仅使用中性 Core fixture 的开发者验收。
-
-退出条件：一个仓库外 AIBI-C 测试 Pack 可在不修改 Core 源码的前提下安装、启用、升级、停用和卸载。
-
-### P1. 更多 Connector Adapter
-
-目标：在不扩大默认网络权限的前提下接入受控 API 和数据库来源。
-
-- 先实现 provider-specific allowlist、凭据引用、分页/限流和只读查询计划。
-- Adapter 只返回结构与标量证据，不携带 Domain Pack，也不直接写业务表。
-- 为每种 Adapter 增加断网、超时、凭据脱敏、资源上限和重复同步验收。
-
-退出条件：至少一个 API 与一个数据库 Adapter 从 `unavailable` 晋级，仍保持预演、确认和证据边界。
-
 ### P2. 更复杂的跨表执行
 
 目标：在可证明粒度安全的前提下扩展当前一跳和线性正向两跳能力。

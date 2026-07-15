@@ -334,7 +334,7 @@ def handle_dashboard_create_confirmation(
     confirmed_at: str,
     workspace_id: str,
     unique_key: Callable[[str], str],
-    build_agent_dashboard_create_draft: Callable[[sqlite3.Connection, str, str, int], dict[str, Any]],
+    build_agent_dashboard_create_draft: Callable[[sqlite3.Connection, str, str | None, str, int], dict[str, Any]],
     write_business_dashboard: Callable[[sqlite3.Connection, str, str, str, list[dict[str, Any]], list[dict[str, Any]]], dict[str, Any]],
     upsert_navigation_module: Callable[..., dict[str, Any] | None],
 ) -> dict[str, Any]:
@@ -342,6 +342,7 @@ def handle_dashboard_create_confirmation(
     if not draft or not isinstance(draft.get("widgets"), list):
         draft = build_agent_dashboard_create_draft(
             connection,
+            workspace_id,
             str(payload.get("tableKey") or "") or None,
             str(payload.get("prompt", "")),
             8,

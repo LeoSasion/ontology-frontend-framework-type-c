@@ -631,6 +631,13 @@ def source_intelligence(
         }
         for table in tables
     ]
+    source_fingerprint_entries = [
+        {
+            **item,
+            "sourcePath": rel(Path(str(table.get("sourcePath") or ""))),
+        }
+        for item, table in zip(source_fingerprint_material, tables, strict=True)
+    ]
     source_fingerprint = hashlib.sha256(
         json.dumps(source_fingerprint_material, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()
@@ -677,6 +684,7 @@ def source_intelligence(
         "userConfirmationSummary": user_confirmations["summary"],
         "stageTimingsMs": stage_timings,
         "sourceFingerprint": source_fingerprint,
+        "sourceFingerprintEntries": source_fingerprint_entries,
         "workspaceSchemaFingerprint": str((workspace_fingerprints or {}).get("schema") or ""),
         "workspaceDataFingerprint": str((workspace_fingerprints or {}).get("data") or ""),
         "domainPackFingerprint": str((workspace_fingerprints or {}).get("domainPacks") or ""),

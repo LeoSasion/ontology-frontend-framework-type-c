@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 2
+CURRENT_SQLITE_SCHEMA_VERSION = 3
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 

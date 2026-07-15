@@ -28,6 +28,8 @@ export type ConnectorOptions = {
   provider?: string;
   status?: string;
   endpoint?: string;
+  resource?: string;
+  credentialRef?: string;
   importMode?: string;
   targetTable?: string;
   uniqueFields?: string[];
@@ -118,6 +120,7 @@ export function buildConnectorOptions({
   connectorProvider,
   connectorStatus,
   connectorEndpoint,
+  connectorResource,
   connectorImportMode,
   connectorTargetTable,
   connectorUniqueFields,
@@ -131,6 +134,7 @@ export function buildConnectorOptions({
   connectorProvider: string;
   connectorStatus: string;
   connectorEndpoint: string;
+  connectorResource: string;
   connectorImportMode: string;
   connectorTargetTable: string;
   connectorUniqueFields: string;
@@ -145,6 +149,7 @@ export function buildConnectorOptions({
     provider: connectorProvider,
     status: connectorStatus,
     endpoint: connectorEndpoint,
+    resource: connectorResource || undefined,
     importMode: connectorImportMode,
     targetTable: connectorTargetTable,
     uniqueFields: splitCsv(connectorUniqueFields),

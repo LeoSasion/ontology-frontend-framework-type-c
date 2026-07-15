@@ -219,6 +219,17 @@ def build_parser() -> argparse.ArgumentParser:
     domain_pack_set.add_argument("--workspace", default="")
     domain_pack_set.add_argument("--yes", action="store_true")
 
+    domain_pack_lint = sub.add_parser("domain-pack-lint", description="Validate an external static Domain Pack package and its server-trusted signature.")
+    domain_pack_lint.add_argument("--package", required=True)
+
+    domain_pack_install = sub.add_parser("domain-pack-install", description="Preview or confirm installation or upgrade of a signed external Domain Pack.")
+    domain_pack_install.add_argument("--package", required=True)
+    domain_pack_install.add_argument("--yes", action="store_true")
+
+    domain_pack_uninstall = sub.add_parser("domain-pack-uninstall", description="Preview or confirm uninstall of an external Domain Pack.")
+    domain_pack_uninstall.add_argument("--pack", required=True)
+    domain_pack_uninstall.add_argument("--yes", action="store_true")
+
     source_run = sub.add_parser("source-run")
     source_run.add_argument("source_run_id")
 
@@ -419,6 +430,11 @@ def build_parser() -> argparse.ArgumentParser:
     save_connector.add_argument("--provider", default="")
     save_connector.add_argument("--status", default="draft", choices=sorted(VALID_CONNECTOR_STATUSES))
     save_connector.add_argument("--endpoint", default="")
+    save_connector.add_argument("--resource", default="")
+    save_connector.add_argument("--page-param", default="")
+    save_connector.add_argument("--page-size-param", default="")
+    save_connector.add_argument("--page-size", type=int, default=100)
+    save_connector.add_argument("--max-pages", type=int, default=1)
     save_connector.add_argument("--import-mode", default="auto", choices=["auto", "create", "replace", "merge"])
     save_connector.add_argument("--target-table", default="")
     save_connector.add_argument("--unique-fields", default="")
