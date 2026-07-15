@@ -234,6 +234,7 @@ const textSourceFiles = {
   developmentRoadmapDocSource: ["docs", "development-roadmap.md"],
   prdDocSource: ["docs", "PRD.md"],
   preflightSource: ["scripts", "preflight.mjs"],
+  preflightLifecycleSource: ["scripts", "preflight-lifecycle.mjs"],
   verifyBiCliAgentContractSource: ["scripts", "verify-bi-cli-agent-contract.mjs"],
   verifySecondDomainLiveSource: ["scripts", "verify-second-domain-live.mjs"],
   verifyContextPackSource: ["scripts", "verify-context-pack.mjs"],

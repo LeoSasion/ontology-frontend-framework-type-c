@@ -1,12 +1,9 @@
 import { spawnSync } from "node:child_process";
+import { runPreflightLifecycle } from "./preflight-lifecycle.mjs";
 
 const npmCommand = process.platform === "win32" ? process.env.ComSpec ?? "cmd.exe" : "npm";
 const npmPrefixArgs = process.platform === "win32" ? ["/d", "/s", "/c", "npm"] : [];
 const powershellCommand = process.platform === "win32" ? "powershell.exe" : "pwsh";
-const args = new Set(process.argv.slice(2));
-const skipUi = args.has("--skip-ui");
-const stopAfter = args.has("--stop-after");
-
 function runCommand(label, command, commandArgs) {
   const startedAt = Date.now();
   console.log(`\n[preflight] ${label}`);
@@ -22,7 +19,10 @@ function runCommand(label, command, commandArgs) {
       console.error(`[preflight] ${label} could not start: ${result.error.message}`);
     }
     console.error(`[preflight] ${label} failed after ${seconds}s.`);
-    process.exit(result.status ?? 1);
+    const error = new Error(`${label} failed after ${seconds}s.`);
+    error.exitCode = result.status ?? 1;
+    error.cause = result.error;
+    throw error;
   }
   console.log(`[preflight] ${label} passed in ${seconds}s.`);
 }
@@ -35,27 +35,64 @@ function runPowerShell(label, scriptPath) {
   runCommand(label, powershellCommand, ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath]);
 }
 
-runNpmScript("production build and bundle budgets", "build");
-runNpmScript("core, CLI, and AI verification", "verify");
-runNpmScript("workspace landing flow", "verify:workspace-flow");
-runNpmScript("local backup and restore", "verify:backup");
-runNpmScript("local schema migration and rollback", "verify:migration");
-runNpmScript("multi-domain Beta repeatability", "verify:multi-domain-beta");
-runNpmScript("local query release baseline", "verify:release-baseline");
-runNpmScript("production readiness", "verify:production");
-runPowerShell("start local services", "scripts/start-local.ps1");
-runPowerShell("health check", "scripts/local-health.ps1");
-runNpmScript("server security runtime", "verify:security-runtime");
+function inspectLocalServices() {
+  const healthResult = spawnSync(
+    powershellCommand,
+    ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "scripts/local-health.ps1", "-Json"],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: "utf8",
+      windowsHide: true,
+    },
+  );
+  let healthy = false;
+  try {
+    healthy = !healthResult.error && healthResult.status === 0 && JSON.parse(healthResult.stdout || "{}").ok === true;
+  } catch {
+    healthy = false;
+  }
 
-if (skipUi) {
-  console.log("\n[preflight] UI verification skipped by --skip-ui.");
-} else {
-  runNpmScript("complete UI verification", "verify:ui");
-  runPowerShell("final health check", "scripts/local-health.ps1");
+  const listenerProbe = spawnSync(
+    powershellCommand,
+    [
+      "-NoProfile",
+      "-Command",
+      "$items = @(); foreach ($port in @(8787, 8686)) { $items += @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | ForEach-Object { [pscustomobject]@{ port = $port; processId = [int]$_.OwningProcess } }) }; [pscustomobject]@{ listeners = $items } | ConvertTo-Json -Compress -Depth 4",
+    ],
+    {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: "utf8",
+      windowsHide: true,
+    },
+  );
+  if (listenerProbe.error || listenerProbe.status !== 0) {
+    return { healthy, ownershipKnown: false, listeners: [] };
+  }
+  try {
+    const parsed = JSON.parse(listenerProbe.stdout || "{}");
+    const listeners = Array.isArray(parsed.listeners)
+      ? parsed.listeners
+      : parsed.listeners
+        ? [parsed.listeners]
+        : [];
+    return { healthy, ownershipKnown: true, listeners };
+  } catch {
+    return { healthy, ownershipKnown: false, listeners: [] };
+  }
 }
 
-if (stopAfter) {
-  runPowerShell("stop local services", "scripts/stop-local.ps1");
+try {
+  const receipt = runPreflightLifecycle({
+    args: process.argv.slice(2),
+    runNpmScript,
+    runPowerShell,
+    inspectLocalServices,
+  });
+  console.log(`\n[preflight] AIBI-C is ready. ${JSON.stringify(receipt.services)}`);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`\n[preflight] AIBI-C is not ready: ${message}`);
+  process.exitCode = Number.isInteger(error?.exitCode) ? error.exitCode : 1;
 }
-
-console.log("\n[preflight] AIBI-C is ready.");

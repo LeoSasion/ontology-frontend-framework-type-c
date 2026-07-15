@@ -43,15 +43,32 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
   $npmCommand = "npm.cmd"
 }
 
+$ownerToken = [Guid]::NewGuid().ToString("N")
+if (Test-Path -LiteralPath $pidFile) {
+  Remove-Item -LiteralPath $pidFile -Force
+}
+
 $process = Start-Process -FilePath $npmCommand `
-  -ArgumentList @("run", "dev") `
+  -ArgumentList @("run", "dev", "--", "--aibi-local-owner=$ownerToken") `
   -WorkingDirectory $repoRoot `
   -WindowStyle Hidden `
   -RedirectStandardOutput $outLog `
   -RedirectStandardError $errLog `
   -PassThru
 
-Set-Content -LiteralPath $pidFile -Value $process.Id
+try {
+  $launcherRecord = [ordered]@{
+    schema = "aibi-local-launcher/v1"
+    processId = $process.Id
+    ownerToken = $ownerToken
+    repositoryRoot = $repoRoot
+    startedAt = (Get-Date).ToUniversalTime().ToString("o")
+  }
+  Set-Content -LiteralPath $pidFile -Value ($launcherRecord | ConvertTo-Json -Compress)
+} catch {
+  Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+  throw
+}
 Write-Host ("Started AIBI-C local launcher pid {0}." -f $process.Id)
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)

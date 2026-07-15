@@ -68,6 +68,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     metricSemanticRepairActionsSource,
     packageJson,
     preflightSource,
+    preflightLifecycleSource,
     prdDocSource,
     productAcceptanceMatrixDocSource,
     productActivationModelSource,
@@ -228,12 +229,14 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     {
         label: "preflight-delegates-to-stable-verification-entrypoints",
         ok: packageJson.scripts?.preflight === "node scripts/preflight.mjs" &&
-          preflightSource.includes('runNpmScript("production build and bundle budgets", "build")') &&
-          preflightSource.includes('runNpmScript("core, CLI, and AI verification", "verify")') &&
-          preflightSource.includes('runNpmScript("workspace landing flow", "verify:workspace-flow")') &&
-          preflightSource.includes('runNpmScript("complete UI verification", "verify:ui")') &&
+          preflightSource.includes("runPreflightLifecycle({") &&
+          preflightLifecycleSource.includes('["production build and bundle budgets", "build"]') &&
+          preflightLifecycleSource.includes('["core, CLI, and AI verification", "verify"]') &&
+          preflightLifecycleSource.includes('["workspace landing flow", "verify:workspace-flow"]') &&
+          preflightLifecycleSource.includes('runNpmScript("complete UI verification", "verify:ui")') &&
           !preflightSource.includes("node_modules/typescript") &&
-          !preflightSource.includes("scripts/verify-ui-flow.mjs"),
+          !preflightSource.includes("scripts/verify-ui-flow.mjs") &&
+          !preflightLifecycleSource.includes("scripts/verify-ui-flow.mjs"),
       },
     {
         label: "home-detailed-path-panel-boundary",

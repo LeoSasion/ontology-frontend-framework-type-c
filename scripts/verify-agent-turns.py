@@ -60,6 +60,80 @@ with tempfile.TemporaryDirectory(prefix="aibi-agent-turn-") as temp:
     check("turn-reload", list_code == 0 and listed.get("turn", {}).get("turnKey") == turn_key and len(listed.get("events") or []) == len(events), listed)
     check("terminal-cancel-idempotent", cancel_code == 0 and canceled.get("changed") is False and canceled.get("turn", {}).get("turnKey") == turn_key, canceled)
 
+    import_code, imported = run_cli(
+        env,
+        "import-commit",
+        str(ROOT / "validation-inputs" / "orders.csv"),
+        "--table",
+        "orders",
+        "--name",
+        "Orders",
+        "--mode",
+        "create",
+        "--yes",
+    )
+    grounded_code, grounded = run_cli(env, "agent-turn-run", "--read-only", "按 channel 汇总 net_sales")
+    grounded_answer = grounded.get("answer") or {}
+    grounded_unit = grounded_answer.get("analysisUnit") or {}
+    grounded_plan = grounded.get("evidencePlan") or {}
+    verify_code, unit_verification = run_cli(env, "analysis-unit-verify", "--unit", str(grounded_unit.get("unitKey") or "missing"))
+    check("grounded-fixture-imported", import_code == 0 and imported.get("ok") is True, imported)
+    check(
+        "agent-turn-enriches-analysis-unit-before-planning",
+        grounded_code == 0
+        and grounded_unit.get("status") == "ready"
+        and grounded_unit.get("queryReceiptKey") == (grounded_answer.get("queryPlanReceipt") or {}).get("receiptKey")
+        and any(node.get("operator") == "unit" for node in (grounded_plan.get("workflowGraph") or {}).get("nodes") or []),
+        grounded,
+    )
+    check(
+        "agent-turn-analysis-unit-recalculates",
+        verify_code == 0
+        and unit_verification.get("unitKey") == grounded_unit.get("unitKey")
+        and unit_verification.get("rowsFingerprintMatches") is True
+        and unit_verification.get("calculationMatches") is True,
+        unit_verification,
+    )
+
+    root_branch_code, root_branch = run_cli(env, "agent-turn-run", "请用 net_sales 按 channel 生成柱状图")
+    root_branch_answer = root_branch.get("answer") or {}
+    root_analysis_run = root_branch_answer.get("analysisRun") or {}
+    root_analysis_run_key = str(root_analysis_run.get("run_key") or "")
+    root_action_key = str((root_branch_answer.get("actionDraft") or {}).get("actionKey") or "")
+    root_session_key = str((root_branch.get("session") or {}).get("sessionKey") or "")
+    root_turn_key = str((root_branch.get("turn") or {}).get("turnKey") or "")
+    confirm_root_code, confirm_root = run_cli(env, "confirm-action", root_action_key, "--yes")
+    branch_code, branch = run_cli(
+        env,
+        "agent-turn-run",
+        "--session",
+        root_session_key,
+        "--parent-run",
+        root_analysis_run_key,
+        "--branch-label",
+        "按分类比较",
+        "请用 net_sales 按 category 生成柱状图",
+    )
+    branch_answer = branch.get("answer") or {}
+    branch_analysis_run = branch_answer.get("analysisRun") or {}
+    check(
+        "analysis-run-root-confirmed-before-branch",
+        root_branch_code == 0
+        and bool(root_analysis_run_key)
+        and bool(root_action_key)
+        and confirm_root_code == 0
+        and confirm_root.get("confirmed") is True,
+        {"root": root_branch, "confirmation": confirm_root},
+    )
+    check(
+        "agent-turn-preserves-analysis-run-branch-contract",
+        branch_code == 0
+        and branch_analysis_run.get("parent_run_key") == root_analysis_run_key
+        and branch_analysis_run.get("branch_label") == "按分类比较"
+        and (branch.get("turn") or {}).get("parentTurnKey") == root_turn_key,
+        branch,
+    )
+
 result = {"ok": all(item["ok"] for item in checks), "schema": "aibi-agent-turns-verify/v1", "checks": checks, "failedChecks": [item["label"] for item in checks if not item["ok"]]}
 print(json.dumps(result, ensure_ascii=False, indent=2))
 raise SystemExit(0 if result["ok"] else 1)

@@ -2652,7 +2652,19 @@ def main() -> int:
         elif args.command == "agent-workflow-graph":
             result = agent_workflow_graph_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "agent-turn-run":
-            result = run_agent_turn_command(args, ask_runner=ask_command, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+            result = run_agent_turn_command(
+                args,
+                ask_runner=ask_command,
+                answer_enricher=lambda answer: attach_analysis_unit(
+                    answer,
+                    open_db=open_db,
+                    active_workspace_id=active_workspace_id,
+                    now_iso=now_iso,
+                ),
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                now_iso=now_iso,
+            )
         elif args.command == "agent-turns":
             result = agent_turns_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "agent-turn-cancel":

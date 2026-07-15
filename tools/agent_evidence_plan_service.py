@@ -18,13 +18,42 @@ AGENT_CAPABILITIES = {
     "agent.answer.compose": "read-only",
 }
 
+_BLOCKER_SUMMARY_KEYS = ("kind", "mention", "reason", "code", "message", "status")
+
 
 def _hash(value: Any) -> str:
     encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], input_refs: list[str], required_evidence: list[str], output_schema: str, status: str = "completed", blockers: list[str] | None = None, artifact_refs: list[Any] | None = None, evidence_refs: list[Any] | None = None) -> dict[str, Any]:
+def _blocker_text(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if isinstance(value, dict):
+        summary = []
+        for key in _BLOCKER_SUMMARY_KEYS:
+            item = value.get(key)
+            if isinstance(item, str) and item.strip():
+                summary.append(item.strip())
+            elif isinstance(item, (int, float, bool)):
+                summary.append(str(item))
+        if summary:
+            return " · ".join(dict.fromkeys(summary))
+    try:
+        return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        return "unreadable-blocker"
+
+
+def _normalize_blockers(values: Any) -> list[str]:
+    items = values if isinstance(values, (list, tuple)) else ([] if values is None else [values])
+    normalized = [_blocker_text(item) for item in items]
+    return list(dict.fromkeys(item for item in normalized if item))
+
+
+def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], input_refs: list[str], required_evidence: list[str], output_schema: str, status: str = "completed", blockers: list[Any] | None = None, artifact_refs: list[Any] | None = None, evidence_refs: list[Any] | None = None) -> dict[str, Any]:
     mutation_mode = AGENT_CAPABILITIES[capability_id]
     input_payload = {"inputRefs": input_refs, "dependsOn": depends_on}
     output_payload = {"artifacts": artifact_refs or [], "evidence": evidence_refs or [], "status": status}
@@ -39,7 +68,7 @@ def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], inp
         "outputSchema": output_schema,
         "mutationMode": mutation_mode,
         "status": status,
-        "blockers": list(blockers or []),
+        "blockers": _normalize_blockers(blockers),
         "retryPolicy": {"mode": "none", "maxAttempts": 1},
         "completionChecks": ["workspace-bound", "schema-valid", "evidence-complete"],
         "artifactRefs": list(artifact_refs or []),
@@ -62,7 +91,8 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
     execution_dep = "step-003-semantic"
     if receipt:
         receipt_status = str(receipt.get("status") or "blocked")
-        steps.append(_step(key="step-004-query", kind="query", capability_id="agent.query.execute", depends_on=[execution_dep], input_refs=["answer.semanticPlan"], required_evidence=["query-plan-receipt"], output_schema="aibi-query-plan-receipt/v1", status="completed" if receipt_status == "executed" else "blocked", blockers=[] if receipt_status == "executed" else list(receipt.get("unresolved") or ["query-not-executed"]), evidence_refs=[{"receiptKey": receipt.get("receiptKey")}]))
+        receipt_blockers = _normalize_blockers(receipt.get("unresolved")) or ["query-not-executed"]
+        steps.append(_step(key="step-004-query", kind="query", capability_id="agent.query.execute", depends_on=[execution_dep], input_refs=["answer.semanticPlan"], required_evidence=["query-plan-receipt"], output_schema="aibi-query-plan-receipt/v1", status="completed" if receipt_status == "executed" else "blocked", blockers=[] if receipt_status == "executed" else receipt_blockers, evidence_refs=[{"receiptKey": receipt.get("receiptKey")}]))
         execution_dep = "step-004-query"
     if action.get("status") == "draft":
         steps.append(_step(key="step-005-draft", kind="draft", capability_id="agent.action.draft", depends_on=[execution_dep], input_refs=["answer.actionDraft"], required_evidence=[], output_schema="aibi-action-draft/v1", status="waiting-confirmation", artifact_refs=[{"actionKey": action.get("actionKey")}]))
@@ -148,7 +178,7 @@ def finalize_evidence_plan(plan: dict[str, Any], validation: dict[str, Any]) -> 
     for step in finalized.get("steps") or []:
         if step.get("capabilityId") == "agent.completion.verify":
             step["status"] = "completed" if validation.get("safeToPresent") else "failed"
-            step["blockers"] = list(validation.get("blockers") or [])
+            step["blockers"] = _normalize_blockers(validation.get("blockers"))
             step["outputFingerprint"] = validation.get("fingerprint")
         if step.get("capabilityId") == "agent.answer.compose":
             step["status"] = "completed" if validation.get("safeToPresent") else "blocked"

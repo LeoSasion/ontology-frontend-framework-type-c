@@ -67,6 +67,17 @@ async function persistProviderEvaluation(
   return cli(args);
 }
 
+export function buildAgentAskTurnArgs(body: Record<string, unknown>, prompt: string) {
+  const args = ["agent-turn-run"];
+  if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+  if (body.sessionKey) args.push("--session", String(body.sessionKey));
+  if (body.parentRunKey) args.push("--parent-run", String(body.parentRunKey));
+  if (body.branchLabel) args.push("--branch-label", String(body.branchLabel));
+  if (body.reviewedStaleRefs === true) args.push("--review-stale-context");
+  args.push(prompt || "生成分析计划");
+  return args;
+}
+
 export async function handleAgentApi(options: AgentRoutesOptions) {
   const { cli, request, response, root, url } = options;
 
@@ -215,12 +226,7 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
   if (url.pathname === "/api/agent/ask" && request.method === "POST") {
     const body = await readBody(request);
     const prompt = String(body.prompt ?? "");
-    const args = ["agent-turn-run"];
-    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
-    if (body.sessionKey) args.push("--session", String(body.sessionKey));
-    if (body.reviewedStaleRefs === true) args.push("--review-stale-context");
-    args.push(prompt || "生成分析计划");
-    const turnResult = await cli(args);
+    const turnResult = await cli(buildAgentAskTurnArgs(body, prompt));
     const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
       ? turnResult.answer as Record<string, unknown>
       : turnResult;

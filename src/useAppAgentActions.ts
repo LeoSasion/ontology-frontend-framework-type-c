@@ -35,23 +35,38 @@ export function useAppAgentActions({
   setWorkbench,
 }: AppAgentActionsOptions) {
   const requestRef = useRef(0);
-  const sessionRef = useRef<{ workspaceId: string; sessionKey: string }>({ workspaceId: "", sessionKey: "" });
   const storageKey = `aibi.agentSession.${activeWorkspaceId}`;
   const activeSessionKey = () => {
-    if (sessionRef.current.workspaceId === activeWorkspaceId && sessionRef.current.sessionKey) return sessionRef.current.sessionKey;
     if (typeof window === "undefined") return "";
-    return window.localStorage.getItem(storageKey) ?? "";
+    try {
+      return window.localStorage.getItem(storageKey) ?? "";
+    } catch {
+      return "";
+    }
   };
   const rememberSession = (sessionKey: string) => {
-    sessionRef.current = { workspaceId: activeWorkspaceId, sessionKey };
-    if (typeof window !== "undefined") window.localStorage.setItem(storageKey, sessionKey);
+    if (typeof window === "undefined") return;
+    try {
+      window.localStorage.setItem(storageKey, sessionKey);
+    } catch {
+      // Session continuity is optional when browser storage is disabled.
+    }
+  };
+  const requestWithSessionRecovery = (request: (sessionKey?: string) => Promise<AgentAskResult>) => {
+    const sessionKey = activeSessionKey() || undefined;
+    return request(sessionKey).catch((error) => {
+      if (!sessionKey || !String(error).includes("Unknown Agent Session")) throw error;
+      rememberSession("");
+      return request();
+    });
   };
   const handleAsk = useCallback(async (prompt: string) => {
     const requestId = ++requestRef.current;
     try {
-      const nextAgent = await askAgent(prompt, { workspaceId: activeWorkspaceId, sessionKey: activeSessionKey() || undefined });
+      const nextAgent = await requestWithSessionRecovery((sessionKey) => askAgent(prompt, { workspaceId: activeWorkspaceId, sessionKey }));
       if (requestRef.current !== requestId || nextAgent.workspaceId !== activeWorkspaceId) return null;
       setAgent(nextAgent);
+      if (nextAgent.agentSession?.sessionKey) rememberSession(nextAgent.agentSession.sessionKey);
       setActionDrafts(await refreshActionDrafts());
       if (nextAgent.requiresConfirmation) {
         navigateTo({
@@ -71,10 +86,9 @@ export function useAppAgentActions({
 
   const handleAskBranch = useCallback(async (prompt: string, parentRunKey: string, branchLabel = "") => {
     try {
-      const nextAgent = await askAgent(prompt, { parentRunKey, branchLabel, workspaceId: activeWorkspaceId, sessionKey: activeSessionKey() || undefined });
+      const nextAgent = await requestWithSessionRecovery((sessionKey) => askAgent(prompt, { parentRunKey, branchLabel, workspaceId: activeWorkspaceId, sessionKey }));
       if (nextAgent.workspaceId !== activeWorkspaceId) return null;
       setAgent(nextAgent);
-      if (nextAgent.agentSession?.sessionKey) rememberSession(nextAgent.agentSession.sessionKey);
       if (nextAgent.agentSession?.sessionKey) rememberSession(nextAgent.agentSession.sessionKey);
       setActionDrafts(await refreshActionDrafts());
       navigateTo({
@@ -93,7 +107,7 @@ export function useAppAgentActions({
 
   const handleAskReadOnly = useCallback(async (prompt: string) => {
     try {
-      const nextAgent = await askAgentReadOnly(prompt, activeWorkspaceId, activeSessionKey() || undefined);
+      const nextAgent = await requestWithSessionRecovery((sessionKey) => askAgentReadOnly(prompt, activeWorkspaceId, sessionKey));
       if (nextAgent.workspaceId !== activeWorkspaceId) return;
       setAgent(nextAgent);
       if (nextAgent.agentSession?.sessionKey) rememberSession(nextAgent.agentSession.sessionKey);

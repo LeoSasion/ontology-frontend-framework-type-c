@@ -92,6 +92,8 @@ def build_parser() -> argparse.ArgumentParser:
     agent_turn_run.add_argument("prompt")
     agent_turn_run.add_argument("--workspace", default="")
     agent_turn_run.add_argument("--parent-turn", default="")
+    agent_turn_run.add_argument("--parent-run", default="")
+    agent_turn_run.add_argument("--branch-label", default="")
     agent_turn_run.add_argument("--session", default="")
     agent_turn_run.add_argument("--review-stale-context", action="store_true")
     agent_turn_run.add_argument("--read-only", action="store_true")

@@ -50,7 +50,15 @@ def list_turn_events(connection: sqlite3.Connection, *, workspace_id: str, turn_
     return [{"schema": EVENT_SCHEMA, "sequence": int(row["event_sequence"]), "workspaceId": row["workspace_id"], "turnKey": row["turn_key"], "stepKey": row["step_key"], "eventType": row["event_type"], "status": row["status"], "summary": row["public_summary"], "payload": _load(row["payload_json"], {}), "createdAt": row["created_at"]} for row in rows]
 
 
-def run_agent_turn_command(args: argparse.Namespace, *, ask_runner: Callable[[argparse.Namespace], dict[str, Any]], open_db: Callable[[], sqlite3.Connection], active_workspace_id: Callable[[sqlite3.Connection], str], now_iso: Callable[[], str]) -> dict[str, Any]:
+def run_agent_turn_command(
+    args: argparse.Namespace,
+    *,
+    ask_runner: Callable[[argparse.Namespace], dict[str, Any]],
+    answer_enricher: Callable[[dict[str, Any]], dict[str, Any]],
+    open_db: Callable[[], sqlite3.Connection],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
+    now_iso: Callable[[], str],
+) -> dict[str, Any]:
     with open_db() as connection:
         workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
@@ -77,9 +85,16 @@ def run_agent_turn_command(args: argparse.Namespace, *, ask_runner: Callable[[ar
         )
         append_turn_event(connection, workspace_id=workspace_id, turn_key=turn_key, event_type="accepted", status="running", summary="Agent 回合已接受", now=now)
         connection.commit()
-    ask_args = argparse.Namespace(prompt=str(args.prompt), read_only=bool(getattr(args, "read_only", False)), workspace=workspace_id, parent_run="", branch_label="", session_context=session_context)
+    ask_args = argparse.Namespace(
+        prompt=str(args.prompt),
+        read_only=bool(getattr(args, "read_only", False)),
+        workspace=workspace_id,
+        parent_run=str(getattr(args, "parent_run", "") or "").strip(),
+        branch_label=str(getattr(args, "branch_label", "") or "").strip(),
+        session_context=session_context,
+    )
     try:
-        answer = ask_runner(ask_args)
+        answer = answer_enricher(ask_runner(ask_args))
     except Exception as error:
         with open_db() as connection:
             now = now_iso()
