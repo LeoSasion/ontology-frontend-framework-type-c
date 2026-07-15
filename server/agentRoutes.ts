@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { enrichAgentResultWithProvider } from "./agentProviderRuntime";
-import { deepSeekProviderForProject } from "./deepseekProvider";
+import { buildGroundedAgentContext, enrichAgentResultWithProvider } from "./agentProviderRuntime";
+import { agentRuntimeRegistryForProject, shadowEvaluateProviders } from "./agentRuntimeProfile";
 import { readBody, sendJson } from "./serverRuntime";
 
 type AgentRoutesOptions = {
@@ -11,11 +11,94 @@ type AgentRoutesOptions = {
   url: URL;
 };
 
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+async function selectedRuntimeProfile(cli: AgentRoutesOptions["cli"], workspaceId: string) {
+  const result = await cli(["agent-runtime-profiles", "--workspace", workspaceId]);
+  return String(result.selectedProfileId ?? "deterministic");
+}
+
+async function persistProviderEvaluation(
+  cli: AgentRoutesOptions["cli"],
+  workspaceId: string,
+  auditValue: unknown,
+  shadow = false,
+) {
+  const audit = record(auditValue);
+  const usage = record(audit.usage);
+  const validation = record(audit.validation);
+  const outboundValidation = record(audit.outboundValidation);
+  const providerStatus = String(audit.status ?? "skipped");
+  const status = providerStatus === "ready" ? "passed"
+    : providerStatus === "fallback" ? "fallback"
+      : providerStatus.includes("blocked") ? "blocked" : "skipped";
+  const args = [
+    "agent-provider-evaluation-record",
+    "--workspace", workspaceId,
+    "--profile", String(audit.profileId ?? "deterministic"),
+    "--profile-fingerprint", String(audit.profileFingerprint ?? ""),
+    "--provider", String(audit.provider ?? "deterministic"),
+    "--model", String(audit.model ?? "local-bi-runtime"),
+    "--request-fingerprint", String(audit.requestHash ?? ""),
+    "--context-fingerprint", String(outboundValidation.contextFingerprint ?? ""),
+    "--status", status,
+    "--validation-status", String(validation.status ?? "not-run"),
+    "--duration-ms", String(audit.durationMs ?? 0),
+    "--estimated-cost-usd", String(audit.estimatedCostUsd ?? 0),
+    "--attempts", String(audit.attempts ?? 0),
+    "--fallback-reason", String(audit.fallbackReason ?? ""),
+    "--audit-json", JSON.stringify({
+      schema: "aibi-agent-provider-audit/v1",
+      serverSideOnly: true,
+      secretExposed: false,
+      rawRowsExposed: false,
+      providerCanWrite: false,
+      semanticAuthority: "deterministic-local-bi",
+      validationStatus: String(validation.status ?? "not-run"),
+      validationChecks: record(validation.checks),
+    }),
+  ];
+  if (usage.promptTokens !== null && usage.promptTokens !== undefined) args.push("--prompt-tokens", String(usage.promptTokens));
+  if (usage.completionTokens !== null && usage.completionTokens !== undefined) args.push("--completion-tokens", String(usage.completionTokens));
+  if (usage.totalTokens !== null && usage.totalTokens !== undefined) args.push("--total-tokens", String(usage.totalTokens));
+  if (shadow) args.push("--shadow");
+  return cli(args);
+}
+
 export async function handleAgentApi(options: AgentRoutesOptions) {
   const { cli, request, response, root, url } = options;
 
   if (url.pathname === "/api/agent/provider" && request.method === "GET") {
-    sendJson(response, 200, { ok: true, ...deepSeekProviderForProject(root).status(), secretExposed: false });
+    const workspaceId = url.searchParams.get("workspaceId") ?? "default";
+    const selectedProfileId = await selectedRuntimeProfile(cli, workspaceId);
+    const registry = agentRuntimeRegistryForProject(root, selectedProfileId);
+    sendJson(response, 200, { ok: true, ...registry.provider.status(), profiles: registry.profiles, secretExposed: false, providerCanWrite: false });
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/runtime-profiles" && request.method === "GET") {
+    const workspaceId = url.searchParams.get("workspaceId") ?? "default";
+    const persisted = await cli(["agent-runtime-profiles", "--workspace", workspaceId]);
+    const registry = agentRuntimeRegistryForProject(root, String(persisted.selectedProfileId ?? "deterministic"));
+    sendJson(response, 200, { ...persisted, runtimeProfiles: registry.profiles, providerCanWrite: false });
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/runtime-profiles/select" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["agent-runtime-profile-set", "--workspace", String(body.workspaceId ?? "default"), "--profile", String(body.profileId ?? "deterministic")];
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/provider/evaluations" && request.method === "GET") {
+    const args = ["agent-provider-evaluations", "--workspace", url.searchParams.get("workspaceId") ?? "default", "--limit", url.searchParams.get("limit") ?? "30"];
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
     return true;
   }
 
@@ -141,8 +224,26 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
       ? turnResult.answer as Record<string, unknown>
       : turnResult;
-    const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, { ...result, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
+    const workspaceId = String(turnResult.workspaceId ?? body.workspaceId ?? "default");
+    const selectedProfileId = await selectedRuntimeProfile(cli, workspaceId);
+    const registry = agentRuntimeRegistryForProject(root, selectedProfileId);
+    const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult, provider: registry.provider });
+    const evaluation = await persistProviderEvaluation(cli, workspaceId, record(record(result.llm).audit)).catch(() => null);
+    const shadowProfiles = Array.isArray(body.shadowProfiles) ? body.shadowProfiles.map(String) : [];
+    const shadow = shadowProfiles.length && deterministicResult.answerCard
+      ? await shadowEvaluateProviders(root, shadowProfiles, buildGroundedAgentContext(prompt, deterministicResult))
+      : null;
+    if (shadow) {
+      for (const run of shadow.runs) {
+        await persistProviderEvaluation(cli, workspaceId, {
+          ...run,
+          status: run.ok ? "ready" : "fallback",
+          requestHash: run.requestHash,
+          outboundValidation: { contextFingerprint: run.requestHash },
+        }, true).catch(() => null);
+      }
+    }
+    sendJson(response, 200, { ...result, runtimeProfile: registry.profiles.find((item) => item.selected), providerEvaluation: evaluation, shadowEvaluation: shadow, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 
@@ -158,8 +259,12 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
       ? turnResult.answer as Record<string, unknown>
       : turnResult;
-    const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, { ...result, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
+    const workspaceId = String(turnResult.workspaceId ?? body.workspaceId ?? "default");
+    const selectedProfileId = await selectedRuntimeProfile(cli, workspaceId);
+    const registry = agentRuntimeRegistryForProject(root, selectedProfileId);
+    const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult, provider: registry.provider });
+    const evaluation = await persistProviderEvaluation(cli, workspaceId, record(record(result.llm).audit)).catch(() => null);
+    sendJson(response, 200, { ...result, runtimeProfile: registry.profiles.find((item) => item.selected), providerEvaluation: evaluation, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 

@@ -43,6 +43,10 @@ COMMAND_DOMAINS: dict[str, str] = {
     "agent-session-resume": "agent",
     "agent-session-fork": "agent",
     "agent-context-compact": "agent",
+    "agent-runtime-profiles": "agent",
+    "agent-runtime-profile-set": "agent",
+    "agent-provider-evaluations": "agent",
+    "agent-provider-evaluation-record": "agent",
     "workspace-create": "workspace",
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
@@ -166,6 +170,8 @@ IMMEDIATE_RUNTIME_WRITES = {
     "agent-session-create",
     "agent-session-fork",
     "agent-context-compact",
+    "agent-runtime-profile-set",
+    "agent-provider-evaluation-record",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
 

@@ -104,6 +104,22 @@ const invalidFetch = (async () => new Response(JSON.stringify(providerPayload(in
 const invalidRun = await createDeepSeekProvider({ config, fetchImpl: invalidFetch }).generate(context);
 check("provider-rejects-ungrounded-number", !invalidRun.ok && invalidRun.errorCode === "provider_invalid_grounding");
 
+const extraSchemaKey = JSON.stringify({
+  ...JSON.parse(validNarrative),
+  sql: "SELECT * FROM forbidden",
+});
+const extraSchemaFetch = (async () => new Response(JSON.stringify(providerPayload(extraSchemaKey)), { status: 200 })) as typeof fetch;
+const extraSchemaRun = await createDeepSeekProvider({ config, fetchImpl: extraSchemaFetch }).generate(context);
+check("provider-rejects-fields-outside-exact-json-schema", !extraSchemaRun.ok && extraSchemaRun.validation.status === "failed" && extraSchemaRun.validation.checks.exactSchema === false);
+
+const unknownEvidence = JSON.stringify({
+  ...JSON.parse(validNarrative),
+  citedEvidence: ["unknown-provider-claim"],
+});
+const unknownEvidenceFetch = (async () => new Response(JSON.stringify(providerPayload(unknownEvidence)), { status: 200 })) as typeof fetch;
+const unknownEvidenceRun = await createDeepSeekProvider({ config, fetchImpl: unknownEvidenceFetch }).generate(context);
+check("provider-rejects-unknown-evidence-refs", !unknownEvidenceRun.ok && unknownEvidenceRun.validation.checks.evidenceRefs === false);
+
 const unauthorizedFetch = (async () => new Response(JSON.stringify({ error: { message: "do not expose this body" } }), { status: 401 })) as typeof fetch;
 const unauthorizedRun = await createDeepSeekProvider({ config, fetchImpl: unauthorizedFetch }).generate(context);
 check("provider-sanitizes-http-error", !unauthorizedRun.ok && unauthorizedRun.errorCode === "provider_http_401" && unauthorizedRun.attempts === 1 && !JSON.stringify(unauthorizedRun).includes("do not expose"));

@@ -21,6 +21,7 @@ export interface WorkspaceStatus {
     sourceIntelligenceRuns?: number;
     connectors?: number;
     agentSessions?: number;
+    providerEvaluations?: number;
   };
   sourceRuns: SourceRunSummary[];
   health: {

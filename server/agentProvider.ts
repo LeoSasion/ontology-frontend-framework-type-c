@@ -7,12 +7,22 @@ export type AgentProviderUsage = {
 };
 
 export type AgentProviderStatus = {
+  profileId: string;
+  profileFingerprint: string;
   provider: string;
   model: string;
   configured: boolean;
   enabled: boolean;
   mode: "provider" | "deterministic";
   baseUrl: string;
+  wireApi: "none" | "openai-chat-completions";
+  structuredOutput: "native-contract" | "json-object" | "prompt-contract";
+  contextWindow: number;
+  reasoningBudget: "none" | "low" | "medium";
+  maxOutputTokens: number;
+  retries: number;
+  stages: string[];
+  outboundPolicy: "deterministic-only" | "grounded-context-v1";
 };
 
 export type GroundedAgentContext = {
@@ -75,6 +85,13 @@ export type AgentProviderRun = {
   durationMs: number;
   requestHash: string;
   usage: AgentProviderUsage | null;
+  estimatedCostUsd: number;
+  profileId: string;
+  profileFingerprint: string;
+  validation: {
+    status: "passed" | "failed" | "not-run";
+    checks: Record<string, boolean>;
+  };
   narrative: AgentProviderNarrative | null;
   errorCode: string | null;
 };

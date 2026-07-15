@@ -129,6 +129,8 @@ export interface AgentAskResult {
       certainty: "grounded" | "needs_clarification" | string;
     } | null;
     audit?: {
+      profileId?: string;
+      profileFingerprint?: string;
       provider?: string;
       model?: string;
       configured?: boolean;
@@ -144,8 +146,12 @@ export interface AgentAskResult {
         completionTokens?: number | null;
         totalTokens?: number | null;
       } | null;
+      estimatedCostUsd?: number;
+      validation?: { status?: string; checks?: Record<string, boolean> };
+      outboundValidation?: { contextFingerprint?: string; outboundRawRowCount?: number; outboundSensitiveFieldCount?: number };
       serverSideOnly?: boolean;
       secretExposed?: boolean;
+      rawRowsExposed?: boolean;
       contextBoundary?: string;
       fallbackReason?: string | null;
       regressionStatus?: string;
@@ -197,6 +203,17 @@ export interface AgentAskResult {
     status: string;
     selected?: { skillId: string; version: string; fingerprint: string; status: string; missingRoles: string[]; missingDomainPacks: string[] } | null;
   };
+  runtimeProfile?: {
+    schema: string;
+    profileId: string;
+    profileFingerprint: string;
+    provider: string;
+    model: string;
+    selected: boolean;
+    providerCanWrite?: false;
+  };
+  providerEvaluation?: Record<string, unknown> | null;
+  shadowEvaluation?: { schema: string; deterministicAuthority: boolean; providerCanWrite: false; runs: Array<Record<string, unknown>> } | null;
   agentTurn?: AgentTurn;
   agentSession?: AgentSession;
   sessionContext?: { schema: string; sessionKey: string; turnCount: number; staleRefs: Array<Record<string, unknown>>; fingerprint: string; longTermBusinessMemoryPromoted: boolean };

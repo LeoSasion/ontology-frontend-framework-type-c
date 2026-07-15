@@ -615,6 +615,56 @@
   padding: 12px;
 }
 
+.runtimeProfilePanel {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px;
+}
+
+.runtimeProfileGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.runtimeProfileCard {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-raised, var(--surface));
+  color: var(--text);
+  text-align: left;
+}
+
+.runtimeProfileCard.selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+.runtimeProfileCard span,
+.runtimeProfileCard small,
+.runtimeProfileAudit {
+  color: var(--muted);
+}
+
+.runtimeProfileCard em {
+  color: var(--accent);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.runtimeProfileAudit,
+.settingsInlineMessage {
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
 @container settings-panel (max-width: 980px) {
   .settingsGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -645,7 +695,8 @@
   .themePaletteGrid,
   .settingsSandboxGrid,
   .closureGrid,
-  .configMigrationSteps {
+  .configMigrationSteps,
+  .runtimeProfileGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 

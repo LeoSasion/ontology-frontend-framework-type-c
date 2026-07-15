@@ -32,6 +32,14 @@ Resume 会实时核对引用对象。缺失 Turn、Receipt、Analysis Run 或 Ac
 
 Skill 只能引用已登记 Agent Capability，并声明步骤模板、必需证据、阻塞规则、输出 schema、确认模式和固定资源上限。Python、JavaScript、Shell、SQL、HTML、URL、任意工具键和跨 AIBI 仓库路径在安装前阻断。`aibi-agent-policy-hooks/v1` 使用固定校验器复核工作区、能力、声明纯度、资源和证据引用；Hook 本身不是脚本扩展点。
 
+## Agent Runtime Profile 与 Provider 评估
+
+`aibi-agent-runtime-profile/v1` 将 Provider、模型、wire API、结构化输出、context window、输出预算、超时和重试从业务语义中分离。工作区默认选择 `deterministic`；可选 `deepseek` 或显式 loopback `local-openai`。Profile 切换先预演再确认，只改变解释层，不能改变 Intent、字段、Capability、SQL/Receipt、草案或确认边界。
+
+Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行、样例记录、密钥、本地路径、邮箱和手机号不出站。返回值必须精确匹配固定 JSON shape，并通过数字 grounding、evidence ref、动作声明和 Capability/字段声明门禁；任一失败回落到本地确定性答案。
+
+`aibi-agent-provider-evaluation/v1` 只保存脱敏 request/context fingerprint、Profile、模型、耗时、token、估算成本、重试、降级和校验状态。Shadow evaluation 可用同一上下文比较已审查 Profile，但 Provider 写 Receipt/草案计数固定为零；设置页只展示工作区选择和回归摘要，不暴露凭据或上下文。
+
 ## 规划流程
 
 1. 从当前工作区注册表、字段语义和指标构建候选，排除内部 `__*` 字段。
@@ -73,6 +81,7 @@ npm run verify:agent-intent
 npm run verify:agent-turns
 npm run verify:agent-sessions
 npm run verify:analytical-skills
+npm run verify:runtime-profiles
 npm run verify:composite-relationships
 npm run verify:ui-semantic
 ```

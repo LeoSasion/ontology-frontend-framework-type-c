@@ -118,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-analytical-skill-") as temp:
     enabled_external = [item for item in (configured.get("runtime") or {}).get("enabledAnalyticalSkills", []) if item.get("skillId") == "external-demo"]
     isolated_external = [item for item in (isolated.get("enabledAnalyticalSkills") or []) if item.get("skillId") == "external-demo"]
 
-    check("schema-v6-bootstrap", status_code == 0 and schema_version == 6, schema_version)
+    check("schema-v7-bootstrap", status_code == 0 and schema_version == 7, schema_version)
     check("builtin-runtime-defaults", catalog_code == 0 and len(catalog.get("enabledAnalyticalSkills") or []) == 7, catalog)
     check("lint-contract", lint_code == 0 and linted.get("valid") is True and len((linted.get("manifest") or {}).get("fingerprint") or "") == 64, linted)
     check("install-requires-confirmation", preview_code == 0 and preview.get("requiresConfirmation") is True and preview.get("dryRun") is True, preview)

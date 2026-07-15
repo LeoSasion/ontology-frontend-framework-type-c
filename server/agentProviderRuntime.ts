@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type { AgentProvider, AgentProviderNarrative, GroundedAgentContext } from "./agentProvider";
 import { deepSeekProviderForProject } from "./deepseekProvider";
 import { compactContextSegments, configuredAgentContextMaxChars } from "./contextBudget";
@@ -14,7 +15,10 @@ function textPair(value: unknown) {
 function redactText(value: string) {
   return value
     .replace(/[A-Za-z]:\\[^\r\n"'<>|]*/g, "[local-path]")
-    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "[secret]");
+    .replace(/sk-[A-Za-z0-9_-]{8,}/g, "[secret]")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "[sensitive-value]")
+    .replace(/(?<!\d)1[3-9]\d{9}(?!\d)/g, "[sensitive-value]")
+    .replace(/(?:api[_-]?key|authorization|bearer)\s*[:=]?\s*[A-Za-z0-9._-]{6,}/gi, "[secret]");
 }
 
 function redactPrompt(value: string) {
@@ -167,6 +171,30 @@ export function buildGroundedAgentContext(prompt: string, deterministicResult: R
   } satisfies GroundedAgentContext;
 }
 
+export function validateProviderOutboundContext(context: GroundedAgentContext) {
+  const allowedTopLevel = new Set([
+    "schema", "question", "workspaceId", "answer", "matched", "knowledgeRules",
+    "queryReceipt", "analysisUnit", "actionBoundary", "contextBudget",
+  ]);
+  const serialized = JSON.stringify(context);
+  const checks = {
+    exactTopLevel: Object.keys(context).every((key) => allowedTopLevel.has(key)),
+    noRawRows: !/(?:"rows"|"rawRows"|"sampleRows"|"records")\s*:/i.test(serialized),
+    noSecrets: !/(?:sk-[A-Za-z0-9_-]{8,}|(?:api[_-]?key|authorization|bearer)\s*[:=]\s*[A-Za-z0-9._-]{6,})/i.test(serialized),
+    noLocalPaths: !/[A-Za-z]:\\/.test(serialized),
+    evidenceBound: Boolean(context.queryReceipt.key || context.answer.blocked),
+    deterministicActionBoundary: context.actionBoundary.requiresConfirmation === true || context.actionBoundary.status === "read-only",
+  };
+  return {
+    ok: Object.values(checks).every(Boolean),
+    schema: "aibi-agent-provider-outbound-validation/v1" as const,
+    checks,
+    contextFingerprint: createHash("sha256").update(serialized).digest("hex"),
+    outboundRawRowCount: 0,
+    outboundSensitiveFieldCount: 0,
+  };
+}
+
 function providerAudit(narrative: AgentProviderNarrative | null) {
   return narrative ? "provider-grounded" : "deterministic-fallback";
 }
@@ -193,6 +221,8 @@ export async function enrichAgentResultWithProvider({
         mode: "deterministic-fallback",
         response: null,
         audit: {
+          profileId: status.profileId,
+          profileFingerprint: status.profileFingerprint,
           provider: status.provider,
           model: status.model,
           configured: status.configured,
@@ -202,7 +232,9 @@ export async function enrichAgentResultWithProvider({
           serverSideOnly: true,
           secretExposed: false,
           contextBoundary: "grounded-provider-context-v1",
-          fallbackReason: status.configured ? "Provider is disabled by AIBI_AGENT_PROVIDER." : "DeepSeek is not configured.",
+          fallbackReason: status.profileId === "deterministic"
+            ? "Deterministic local BI is the selected runtime profile."
+            : status.configured ? "The selected Provider profile is disabled." : "The selected Provider profile is not configured.",
           regressionStatus: "provider-skipped",
         },
       },
@@ -210,6 +242,34 @@ export async function enrichAgentResultWithProvider({
   }
 
   const context = buildGroundedAgentContext(prompt, deterministicResult);
+  const outboundValidation = validateProviderOutboundContext(context);
+  if (!outboundValidation.ok) {
+    return {
+      ...deterministicResult,
+      llm: {
+        ...baseLlm,
+        configured: status.configured,
+        mode: "deterministic-fallback",
+        response: null,
+        audit: {
+          profileId: status.profileId,
+          profileFingerprint: status.profileFingerprint,
+          provider: status.provider,
+          model: status.model,
+          configured: status.configured,
+          enabled: status.enabled,
+          mode: "deterministic-fallback",
+          status: "outbound-policy-blocked",
+          validation: outboundValidation,
+          serverSideOnly: true,
+          secretExposed: false,
+          rawRowsExposed: false,
+          fallbackReason: "Provider outbound context failed the fixed allowlist.",
+          regressionStatus: "provider-skipped",
+        },
+      },
+    };
+  }
   if (context.contextBudget?.status === "blocked") {
     return {
       ...deterministicResult,
@@ -219,6 +279,8 @@ export async function enrichAgentResultWithProvider({
         mode: "deterministic-fallback",
         response: null,
         audit: {
+          profileId: status.profileId,
+          profileFingerprint: status.profileFingerprint,
           provider: status.provider,
           model: status.model,
           configured: status.configured,
@@ -244,6 +306,8 @@ export async function enrichAgentResultWithProvider({
       mode: run.ok ? "provider" : "deterministic-fallback",
       response: run.narrative,
       audit: {
+        profileId: run.profileId,
+        profileFingerprint: run.profileFingerprint,
         provider: run.provider,
         model: run.model,
         configured: status.configured,
@@ -255,8 +319,12 @@ export async function enrichAgentResultWithProvider({
         durationMs: run.durationMs,
         requestHash: run.requestHash,
         usage: run.usage,
+        estimatedCostUsd: run.estimatedCostUsd,
+        validation: run.validation,
         serverSideOnly: true,
         secretExposed: false,
+        rawRowsExposed: false,
+        outboundValidation,
         contextBoundary: context.schema,
         contextBudget: context.contextBudget,
         fallbackReason: run.ok ? null : run.errorCode,

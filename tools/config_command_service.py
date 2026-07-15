@@ -29,6 +29,7 @@ CONFIG_TABLES = [
     "analytical_skills",
     "workspace_analytical_skills",
     "workspace_domain_packs",
+    "workspace_agent_runtime_profiles",
     "action_drafts",
 ]
 

@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `130`
+Command count: `134`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -10,7 +10,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 
 | Domain | Commands |
 |---|---:|
-| `agent` | 11 |
+| `agent` | 15 |
 | `analysis` | 4 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
@@ -41,10 +41,10 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 55 |
+| `dry-run-confirm` | 56 |
 | `evidence-receipt` | 8 |
-| `read-only` | 54 |
-| `runtime-receipt` | 8 |
+| `read-only` | 56 |
+| `runtime-receipt` | 9 |
 
 ## Commands
 
@@ -57,6 +57,10 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `add-relationship-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--relationship`, `--type`, `--title`, `--subtitle`, `--group`, `--measure`, `...` |
 | `add-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--type`, `--table`, `--view`, `--title`, `--subtitle`, `--dimension`, `...` |
 | `agent-context-compact` | `agent` | `runtime-receipt` | `no` | `no` | `--session`, `--level`, `--workspace` |
+| `agent-provider-evaluation-record` | `agent` | `runtime-receipt` | `no` | `no` | `--workspace`, `--profile`, `--profile-fingerprint`, `--provider`, `--model`, `--request-fingerprint`, `--context-fingerprint`, `--status`, `...` |
+| `agent-provider-evaluations` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--limit` |
+| `agent-runtime-profile-set` | `agent` | `dry-run-confirm` | `yes` | `no` | `--profile`, `--workspace`, `--yes` |
+| `agent-runtime-profiles` | `agent` | `read-only` | `no` | `no` | `--workspace` |
 | `agent-session-create` | `agent` | `runtime-receipt` | `no` | `no` | `--title`, `--workspace` |
 | `agent-session-fork` | `agent` | `runtime-receipt` | `no` | `no` | `session`, `--from-turn`, `--title`, `--workspace` |
 | `agent-session-resume` | `agent` | `read-only` | `no` | `no` | `session`, `--workspace` |

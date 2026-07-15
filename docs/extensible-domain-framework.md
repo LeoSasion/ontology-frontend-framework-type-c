@@ -75,16 +75,17 @@ HTTP allowlist 使用 `AIBI_HTTP_CONNECTOR_ALLOWLIST`，SQLite allowlist 使用 
 
 ## Provider
 
-默认 `AIBI_AGENT_PROVIDER=deterministic`，从不发送外部请求。显式选择 `deepseek` 后，AIBI-C 先在本地完成字段、关系、查询和 Receipt，再发送有界、脱敏、证据优先的 `aibi-agent-provider-context/v1`；无密钥、超时、限流或无效响应直接降级。
+工作区默认选择 `deterministic`，从不发送外部请求。Runtime Profile 还登记 `deepseek` 和显式 loopback `local-openai`；其他远程 Provider 与非回环 OpenAI-compatible origin 默认拒绝。AIBI-C 始终先在本地完成字段、关系、查询和 Receipt，再发送有界、脱敏、证据优先的 `aibi-agent-provider-context/v1`；无密钥、超时、限流或无效响应直接降级。
 
 可以出站：当前问题、本地答案摘要、有界指标值、显示名称、已选择字段/聚合/筛选/关系、规则标识和证据状态。
 
 不得出站：源文件、原始行、编译 SQL、动作 payload、数据库、密钥、凭据引用、绝对路径、其他 AIBI 仓库标识和模型私有推理。
 
-Provider 生成的数字必须存在于本地证据；结构错误或瞬态故障最多重试一次。Context Budget 优先保留口径、阻塞、确认边界和 Receipt，必要上下文本身超限时跳过 Provider。配置项和默认值只由根目录 [.env.example](../.env.example) 维护。
+Provider 返回必须精确匹配固定 JSON shape；数字必须存在于本地证据，evidence ref 必须来自出站上下文，且不得声明字段绑定、Capability、SQL、工具或已完成写入。重试数、context window、结构化输出和输出预算由 Profile 限制。Context Budget 优先保留口径、阻塞、确认边界和 Receipt，必要上下文本身超限时跳过 Provider。Profile 选择和脱敏评估回执持久化，密钥仅在服务端环境；配置项和默认值只由根目录 [.env.example](../.env.example) 维护。
 
 ```powershell
 npm run verify:provider
+npm run verify:runtime-profiles
 npm run verify:provider-live
 ```
 

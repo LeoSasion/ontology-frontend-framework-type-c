@@ -120,6 +120,38 @@ def build_parser() -> argparse.ArgumentParser:
     agent_context_compact.add_argument("--level", type=int, required=True, choices=[1, 2, 3, 4])
     agent_context_compact.add_argument("--workspace", default="")
 
+    agent_runtime_profiles = sub.add_parser("agent-runtime-profiles", description="List workspace Agent Runtime Profiles and the selected provider boundary.")
+    agent_runtime_profiles.add_argument("--workspace", default="")
+
+    agent_runtime_profile_set = sub.add_parser("agent-runtime-profile-set", description="Preview or confirm the workspace Agent Runtime Profile selection.")
+    agent_runtime_profile_set.add_argument("--profile", required=True, choices=["deterministic", "deepseek", "local-openai"])
+    agent_runtime_profile_set.add_argument("--workspace", default="")
+    agent_runtime_profile_set.add_argument("--yes", action="store_true")
+
+    agent_provider_evaluations = sub.add_parser("agent-provider-evaluations", description="List the redacted workspace Provider evaluation dashboard.")
+    agent_provider_evaluations.add_argument("--workspace", default="")
+    agent_provider_evaluations.add_argument("--limit", type=int, default=30)
+
+    agent_provider_evaluation_record = sub.add_parser("agent-provider-evaluation-record", description="Record one redacted terminal Provider evaluation receipt.")
+    agent_provider_evaluation_record.add_argument("--workspace", default="")
+    agent_provider_evaluation_record.add_argument("--profile", required=True, choices=["deterministic", "deepseek", "local-openai"])
+    agent_provider_evaluation_record.add_argument("--profile-fingerprint", default="")
+    agent_provider_evaluation_record.add_argument("--provider", required=True)
+    agent_provider_evaluation_record.add_argument("--model", required=True)
+    agent_provider_evaluation_record.add_argument("--request-fingerprint", default="")
+    agent_provider_evaluation_record.add_argument("--context-fingerprint", default="")
+    agent_provider_evaluation_record.add_argument("--status", required=True, choices=["passed", "fallback", "blocked", "failed", "skipped"])
+    agent_provider_evaluation_record.add_argument("--validation-status", default="not-run")
+    agent_provider_evaluation_record.add_argument("--duration-ms", type=int, default=0)
+    agent_provider_evaluation_record.add_argument("--prompt-tokens", type=int)
+    agent_provider_evaluation_record.add_argument("--completion-tokens", type=int)
+    agent_provider_evaluation_record.add_argument("--total-tokens", type=int)
+    agent_provider_evaluation_record.add_argument("--estimated-cost-usd", type=float, default=0)
+    agent_provider_evaluation_record.add_argument("--attempts", type=int, default=0)
+    agent_provider_evaluation_record.add_argument("--fallback-reason", default="")
+    agent_provider_evaluation_record.add_argument("--shadow", action="store_true")
+    agent_provider_evaluation_record.add_argument("--audit-json", default="{}")
+
     sub.add_parser("status")
     sub.add_parser("quality-doctor")
 

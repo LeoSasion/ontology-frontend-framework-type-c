@@ -134,19 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 E：Provider Runtime Profile 与评估体系
-
-目标：从当前 deterministic/DeepSeek 二选一扩展为受控 Provider Registry，同时保证任何模型都服从同一业务合同。
-
-1. Provider、模型和 Runtime Profile 分离；支持 DeepSeek 与显式配置的本地 OpenAI-compatible endpoint，其他远程 Provider 逐个审查。
-2. 按模型能力选择结构化输出、context window、reasoning budget 和重试策略，不能选择不同的业务语义词表。
-3. 所有 Provider 输出必须通过 JSON Schema、数字 grounding、字段候选、Capability 和 evidence ref 校验。
-4. 记录脱敏的请求 fingerprint、模型、Profile、耗时、token、估算成本、重试、降级和验证结果。
-5. 支持 shadow evaluation：同一 Intent/Context 离线比较多个 Profile，但只有确定性主路径可以写 Receipt 或草案。
-6. 建立固定评估集和回归看板，不以单次主观回答决定默认模型。
-
-退出条件：切换 Provider/Profile 不改变相同 Intent、Capability、Receipt 和确认边界；Provider 故障不影响本地 BI；敏感字段和原始行零出站。
-
 ### 阶段 F：受限工作流图与只读专家
 
 目标：在已有阶段稳定后，再吸收 AWEL 的 Branch/Join 和多角色协作，而不是立即构建自由多 Agent。
@@ -177,14 +164,14 @@ flowchart TD
   A["已交付：业务意图与上下文"] --> B["已交付：证据计划与事件"]
   B --> C["已交付：C Analytical Skill"]
   B --> D["已交付：D Session 与 Context"]
-  A --> E["E Runtime Profile 与评估"]
+  A --> E["已交付：E Runtime Profile 与评估"]
   C --> F["F 受限工作流图"]
   D --> F
   E --> F
   B --> X["P2 复杂跨表"]
 ```
 
-业务意图、上下文、证据计划、事件、声明式 Skill、固定 Policy Hook、可恢复 Session、Fork 与证据感知快照已经交付；E 是当前主链；F 和复杂跨表不得提前绕过前置合同。
+业务意图、上下文、证据计划、事件、声明式 Skill、固定 Policy Hook、可恢复 Session、Fork、证据感知快照、受控 Provider Registry、出站门禁与评估回执已经交付；F 是当前主链，复杂跨表不得提前绕过前置合同。
 
 ## 评估与发布指标
 

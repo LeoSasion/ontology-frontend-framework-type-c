@@ -12,11 +12,22 @@ import type {
 
 export type DeepSeekProviderConfig = {
   apiKey: string | null;
-  baseUrl: "https://api.deepseek.com";
+  baseUrl: string;
   model: string;
   enabled: boolean;
   timeoutMs: number;
   maxTokens: number;
+  profileId?: string;
+  profileFingerprint?: string;
+  provider?: string;
+  structuredOutput?: "json-object" | "prompt-contract";
+  contextWindow?: number;
+  reasoningBudget?: "none" | "low" | "medium";
+  retries?: number;
+  promptCostPerMillion?: number;
+  completionCostPerMillion?: number;
+  apiKeyRequired?: boolean;
+  endpointConfigured?: boolean;
 };
 
 type DeepSeekProviderOptions = {
@@ -70,6 +81,14 @@ export function loadDeepSeekProviderConfig(projectRoot: string): DeepSeekProvide
     enabled: configuredMode === "deepseek" || (configuredMode === "auto" && Boolean(apiKey)),
     timeoutMs: boundedInteger(process.env.DEEPSEEK_TIMEOUT_MS ?? localEnv.DEEPSEEK_TIMEOUT_MS, 20_000, 3_000, 60_000),
     maxTokens: boundedInteger(process.env.DEEPSEEK_MAX_TOKENS ?? localEnv.DEEPSEEK_MAX_TOKENS, 600, 128, 2_000),
+    profileId: "deepseek",
+    provider: "deepseek",
+    structuredOutput: "json-object",
+    contextWindow: boundedInteger(process.env.DEEPSEEK_CONTEXT_WINDOW ?? localEnv.DEEPSEEK_CONTEXT_WINDOW, 64_000, 4_096, 1_000_000),
+    reasoningBudget: "low",
+    retries: boundedInteger(process.env.DEEPSEEK_RETRIES ?? localEnv.DEEPSEEK_RETRIES, 1, 0, 3),
+    promptCostPerMillion: Number(process.env.DEEPSEEK_PROMPT_COST_PER_MILLION ?? localEnv.DEEPSEEK_PROMPT_COST_PER_MILLION ?? 0) || 0,
+    completionCostPerMillion: Number(process.env.DEEPSEEK_COMPLETION_COST_PER_MILLION ?? localEnv.DEEPSEEK_COMPLETION_COST_PER_MILLION ?? 0) || 0,
   };
 }
 
@@ -98,15 +117,33 @@ function stringArray(value: unknown, maxItems: number, maxLength: number) {
     : [];
 }
 
-function parseNarrative(content: string, context: GroundedAgentContext): AgentProviderNarrative | null {
+function parseNarrative(content: string, context: GroundedAgentContext): { narrative: AgentProviderNarrative | null; checks: Record<string, boolean> } {
+  const checks: Record<string, boolean> = {
+    jsonObject: false,
+    exactSchema: false,
+    scalarTypes: false,
+    evidenceRefs: false,
+    numbersGrounded: false,
+    noActionClaims: false,
+    noCapabilityOrFieldClaims: false,
+  };
   let parsed: Record<string, unknown>;
   try {
     parsed = JSON.parse(content) as Record<string, unknown>;
   } catch {
-    return null;
+    return { narrative: null, checks };
   }
+  checks.jsonObject = Boolean(parsed) && typeof parsed === "object" && !Array.isArray(parsed);
+  const allowedKeys = ["summary", "rationale", "clarification", "nextActions", "citedEvidence", "certainty"];
+  checks.exactSchema = Object.keys(parsed).length === allowedKeys.length && Object.keys(parsed).every((key) => allowedKeys.includes(key));
   const summary = typeof parsed.summary === "string" ? parsed.summary.trim().slice(0, 600) : "";
-  if (!summary) return null;
+  checks.scalarTypes = Boolean(summary)
+    && Array.isArray(parsed.rationale)
+    && (parsed.clarification === null || typeof parsed.clarification === "string")
+    && Array.isArray(parsed.nextActions)
+    && Array.isArray(parsed.citedEvidence)
+    && ["grounded", "needs_clarification"].includes(String(parsed.certainty ?? ""));
+  if (!checks.exactSchema || !checks.scalarTypes) return { narrative: null, checks };
   const clarification = typeof parsed.clarification === "string" && parsed.clarification.trim()
     ? parsed.clarification.trim().slice(0, 360)
     : null;
@@ -118,20 +155,26 @@ function parseNarrative(content: string, context: GroundedAgentContext): AgentPr
     "knowledgeRule",
     ...context.queryReceipt.evidenceTypes,
   ]);
+  const requestedEvidence = stringArray(parsed.citedEvidence, 6, 80);
+  checks.evidenceRefs = requestedEvidence.every((item) => knownEvidence.has(item));
   const narrative: AgentProviderNarrative = {
     summary,
     rationale: stringArray(parsed.rationale, 4, 260),
     clarification,
     nextActions: stringArray(parsed.nextActions, 3, 220),
-    citedEvidence: stringArray(parsed.citedEvidence, 6, 80).filter((item) => knownEvidence.has(item)),
+    citedEvidence: requestedEvidence,
     certainty,
   };
   const serializedContext = JSON.stringify(context);
   const groundedNumbers = new Set(serializedContext.match(/-?\d+(?:\.\d+)?/g) ?? []);
   const outputNumbers = JSON.stringify(narrative).match(/-?\d+(?:\.\d+)?/g) ?? [];
-  if (outputNumbers.some((number) => !groundedNumbers.has(number))) return null;
-  if (/(?:已|已经)(?:执行|写入|删除|发布|导入|保存)|(?:执行|写入|删除|发布|导入|保存)(?:完成|成功)/.test(JSON.stringify(narrative))) return null;
-  return narrative;
+  checks.numbersGrounded = !outputNumbers.some((number) => !groundedNumbers.has(number));
+  checks.noActionClaims = !/(?:已|已经)(?:执行|写入|删除|发布|导入|保存)|(?:执行|写入|删除|发布|导入|保存)(?:完成|成功)/.test(JSON.stringify(narrative));
+  checks.noCapabilityOrFieldClaims = !/(?:capability|tool|sql|字段绑定|字段候选|执行器)\s*[:=]/i.test(JSON.stringify(narrative));
+  return {
+    narrative: Object.values(checks).every(Boolean) ? narrative : null,
+    checks,
+  };
 }
 
 function providerErrorCode(error: unknown) {
@@ -140,15 +183,30 @@ function providerErrorCode(error: unknown) {
 }
 
 export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekProviderOptions): AgentProvider {
+  const providerName = config.provider ?? "deepseek";
+  const profileId = config.profileId ?? "deepseek";
+  const profileFingerprint = config.profileFingerprint ?? createHash("sha256").update(`aibi-agent-runtime-profile/v1:${profileId}`).digest("hex");
+  const retries = Math.max(0, Math.min(config.retries ?? 1, 3));
+  const credentialReady = config.endpointConfigured !== false && (config.apiKeyRequired === false || Boolean(config.apiKey));
   return {
     status(): AgentProviderStatus {
       return {
-        provider: "deepseek",
+        profileId,
+        profileFingerprint,
+        provider: providerName,
         model: config.model,
-        configured: Boolean(config.apiKey),
-        enabled: config.enabled && Boolean(config.apiKey),
-        mode: config.enabled && config.apiKey ? "provider" : "deterministic",
+        configured: credentialReady,
+        enabled: config.enabled && credentialReady,
+        mode: config.enabled && credentialReady ? "provider" : "deterministic",
         baseUrl: config.baseUrl,
+        wireApi: "openai-chat-completions",
+        structuredOutput: config.structuredOutput ?? "json-object",
+        contextWindow: config.contextWindow ?? 64_000,
+        reasoningBudget: config.reasoningBudget ?? "low",
+        maxOutputTokens: config.maxTokens,
+        retries,
+        stages: ["explain", "completion-review", "shadow-evaluation"],
+        outboundPolicy: "grounded-context-v1",
       };
     },
 
@@ -156,25 +214,30 @@ export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekPr
       const startedAt = Date.now();
       const runId = randomUUID();
       const requestHash = createHash("sha256").update(JSON.stringify(context)).digest("hex");
-      if (!config.enabled || !config.apiKey) {
+      if (!config.enabled || !credentialReady) {
         return {
           ok: false,
-          provider: "deepseek",
+          provider: providerName,
           model: config.model,
           runId,
           attempts: 0,
           durationMs: Date.now() - startedAt,
           requestHash,
           usage: null,
+          estimatedCostUsd: 0,
+          profileId,
+          profileFingerprint,
+          validation: { status: "not-run", checks: {} },
           narrative: null,
-          errorCode: config.apiKey ? "provider_disabled" : "provider_not_configured",
+          errorCode: credentialReady ? "provider_disabled" : "provider_not_configured",
         };
       }
 
       let lastErrorCode = "provider_failed";
       let lastUsage: AgentProviderUsage | null = null;
       let attemptsMade = 0;
-      for (let attempt = 1; attempt <= 2; attempt += 1) {
+      let lastValidation: AgentProviderRun["validation"] = { status: "not-run", checks: {} };
+      for (let attempt = 1; attempt <= retries + 1; attempt += 1) {
         attemptsMade = attempt;
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -183,7 +246,7 @@ export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekPr
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${config.apiKey}`,
+              ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
             },
             body: JSON.stringify({
               model: config.model,
@@ -191,7 +254,7 @@ export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekPr
                 { role: "system", content: SYSTEM_PROMPT },
                 { role: "user", content: `Explain this evidence context as JSON:\n${JSON.stringify(context)}` },
               ],
-              response_format: { type: "json_object" },
+              ...(config.structuredOutput === "prompt-contract" ? {} : { response_format: { type: "json_object" } }),
               temperature: 0.1,
               max_tokens: config.maxTokens,
               stream: false,
@@ -201,18 +264,28 @@ export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekPr
           const payload = await response.json().catch(() => ({})) as Record<string, unknown>;
           lastUsage = usageFrom(payload);
           const content = choiceContent(payload);
-          const narrative = response.ok && content ? parseNarrative(content, context) : null;
-          if (response.ok && narrative) {
+          const parsedNarrative = response.ok && content ? parseNarrative(content, context) : { narrative: null, checks: {} };
+          lastValidation = content
+            ? { status: parsedNarrative.narrative ? "passed" : "failed", checks: parsedNarrative.checks }
+            : { status: "not-run", checks: {} };
+          if (response.ok && parsedNarrative.narrative) {
+            const promptTokens = lastUsage?.promptTokens ?? 0;
+            const completionTokens = lastUsage?.completionTokens ?? 0;
+            const estimatedCostUsd = (promptTokens * (config.promptCostPerMillion ?? 0) + completionTokens * (config.completionCostPerMillion ?? 0)) / 1_000_000;
             return {
               ok: true,
-              provider: "deepseek",
+              provider: providerName,
               model: config.model,
               runId,
               attempts: attempt,
               durationMs: Date.now() - startedAt,
               requestHash,
               usage: lastUsage,
-              narrative,
+              estimatedCostUsd,
+              profileId,
+              profileFingerprint,
+              validation: lastValidation,
+              narrative: parsedNarrative.narrative,
               errorCode: null,
             };
           }
@@ -229,13 +302,17 @@ export function createDeepSeekProvider({ config, fetchImpl = fetch }: DeepSeekPr
       }
       return {
         ok: false,
-        provider: "deepseek",
+        provider: providerName,
         model: config.model,
         runId,
         attempts: attemptsMade,
         durationMs: Date.now() - startedAt,
         requestHash,
         usage: lastUsage,
+        estimatedCostUsd: 0,
+        profileId,
+        profileFingerprint,
+        validation: lastValidation,
         narrative: null,
         errorCode: lastErrorCode,
       };

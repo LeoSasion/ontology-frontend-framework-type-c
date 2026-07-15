@@ -21,9 +21,9 @@
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
 | 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具 |
-| Provider | 稳定可选 | deterministic 默认；DeepSeek 只接收有界脱敏上下文，失败自动降级 |
+| Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v6、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot 和 Skill 状态已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用 |
+| 本地运维 | 稳定 | SQLite schema v7、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile 选择与 Provider 评估已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
@@ -40,6 +40,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
 - 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
+- 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。
 
 ## 架构归属
@@ -64,6 +65,7 @@ npm run build
 npm run verify
 npm run verify:analytical-skills
 npm run verify:agent-sessions
+npm run verify:runtime-profiles
 npm run verify:domain-packs
 npm run verify:domain-regressions
 npm run verify:connector-adapters

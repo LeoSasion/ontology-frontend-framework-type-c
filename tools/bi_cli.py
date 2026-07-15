@@ -102,6 +102,7 @@ from source_intelligence_job_service import (
 from workflow_command_service import capability_contracts_command, context_budget_command, workflow_plan_command
 from agent_turn_service import agent_turns_command, cancel_agent_turn_command, run_agent_turn_command
 from agent_session_service import agent_context_compact_command, agent_session_create_command, agent_session_fork_command, agent_session_resume_command, agent_sessions_command
+from agent_runtime_profile_service import agent_provider_evaluation_record_command, agent_provider_evaluations_command, agent_runtime_profile_set_command, agent_runtime_profiles_command
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -2659,6 +2660,14 @@ def main() -> int:
             result = agent_session_fork_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "agent-context-compact":
             result = agent_context_compact_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "agent-runtime-profiles":
+            result = agent_runtime_profiles_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "agent-runtime-profile-set":
+            result = agent_runtime_profile_set_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "agent-provider-evaluations":
+            result = agent_provider_evaluations_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "agent-provider-evaluation-record":
+            result = agent_provider_evaluation_record_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "status":
             result = status_command(args)
         elif args.command == "quality-doctor":

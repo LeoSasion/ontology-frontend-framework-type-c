@@ -9,6 +9,7 @@ import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePref
 
 const TrustContextSettingsPanel = lazy(() => import("./TrustContextSettingsPanel"));
 const SettingsDomainPackPanel = lazy(() => import("./SettingsDomainPackPanel").then((module) => ({ default: module.SettingsDomainPackPanel })));
+const SettingsAgentRuntimeProfilePanel = lazy(() => import("./SettingsAgentRuntimeProfilePanel"));
 
 type SettingsPanelProps = {
   workbench: WorkbenchPayload;
@@ -124,6 +125,10 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
       </div>
 
       <div className="settingsGrid">
+        <Suspense fallback={<div className="settingsLoading"><Bilingual zh="正在加载 Agent Runtime Profile…" en="Loading Agent Runtime Profile…" /></div>}>
+          <SettingsAgentRuntimeProfilePanel workspaceId={status.workspace.id} />
+        </Suspense>
+
         <SettingsThemePreferencePanel
           busyKey={busyKey}
           draftPreferences={draftPreferences}
