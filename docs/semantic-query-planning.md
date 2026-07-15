@@ -10,6 +10,14 @@
 
 `aibi-agent-clarification/v1` 把全部未决字段合并为一次澄清，每个候选都必须声明表级来源。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。
 
+## Evidence Plan 与 Agent Turn
+
+`aibi-agent-evidence-plan/v1` 将意图、上下文、语义规划、白名单查询、草案、完成复核和答案组织为类型化 Step。Step 必须引用固定 Agent Capability，声明依赖、输入/输出指纹、mutation mode、所需证据、阻塞项和完成检查；不存在任意 Operator 或模型工具调用。
+
+`aibi-agent-turn/v1` 与 `aibi-agent-turn-event/v1` 持久化在当前工作区。事件序号严格递增，支持从 `after-sequence` 续读；公开事件不包含私有推理、密钥或原始行。`POST /api/agent/turns` 创建回合，`GET /api/agent/turns/:id/events` 以 SSE 回放事件；现有 `/api/agent/ask` 和 `/api/agent/explain` 复用同一 Turn 服务。
+
+完成前必须生成 `aibi-agent-completion-validation/v1`，检查计划、工作区、Intent/Context schema、上下文新鲜度、指纹和答案。语义歧义是可安全呈现的 `blocked`，合同损坏是 `failed`；二者不能退化为无证据答案。
+
 ## 规划流程
 
 1. 从当前工作区注册表、字段语义和指标构建候选，排除内部 `__*` 字段。
@@ -48,6 +56,7 @@
 ```powershell
 npm run verify:semantic-plan
 npm run verify:agent-intent
+npm run verify:agent-turns
 npm run verify:composite-relationships
 npm run verify:ui-semantic
 ```

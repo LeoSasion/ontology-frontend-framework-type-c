@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 3 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 4 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(

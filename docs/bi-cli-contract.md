@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `116`
+Command count: `119`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -10,7 +10,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 
 | Domain | Commands |
 |---|---:|
-| `agent` | 3 |
+| `agent` | 6 |
 | `analysis` | 4 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -42,8 +42,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 52 |
 | `evidence-receipt` | 8 |
-| `read-only` | 48 |
-| `runtime-receipt` | 3 |
+| `read-only` | 49 |
+| `runtime-receipt` | 5 |
 
 ## Commands
 
@@ -55,6 +55,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `add-recommended-widgets` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--table`, `--limit`, `--allow-duplicates`, `--yes` |
 | `add-relationship-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--relationship`, `--type`, `--title`, `--subtitle`, `--group`, `--measure`, `...` |
 | `add-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--type`, `--table`, `--view`, `--title`, `--subtitle`, `--dimension`, `...` |
+| `agent-turn-cancel` | `agent` | `runtime-receipt` | `no` | `no` | `turn`, `--workspace` |
+| `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--read-only` |
+| `agent-turns` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--turn`, `--after-sequence`, `--limit` |
 | `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
 | `analysis-unit-build` | `analysis` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--kind`, `--rows-json`, `--title`, `--preferred-chart` |
 | `analysis-unit-verify` | `analysis` | `read-only` | `no` | `no` | `--unit` |

@@ -483,6 +483,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
             providerResponse={result.llm.response}
             intentFrame={result.intentFrame}
             clarificationBundle={result.clarification}
+            evidencePlan={result.evidencePlan}
             semanticPlan={result.semanticPlan}
             executionPlan={result.executionPlan}
             tableNameByKey={tableNameByKey}

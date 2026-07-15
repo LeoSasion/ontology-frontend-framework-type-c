@@ -28,29 +28,86 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/agent/turns" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["agent-turn-run", String(body.prompt ?? "生成分析计划")];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    if (body.parentTurnKey) args.push("--parent-turn", String(body.parentTurnKey));
+    if (body.readOnly === true) args.push("--read-only");
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  const turnEventsMatch = url.pathname.match(/^\/api\/agent\/turns\/([^/]+)\/events$/);
+  if (turnEventsMatch && request.method === "GET") {
+    const args = ["agent-turns", "--turn", decodeURIComponent(turnEventsMatch[1]), "--after-sequence", url.searchParams.get("after") ?? "0", "--limit", url.searchParams.get("limit") ?? "500"];
+    const workspaceId = url.searchParams.get("workspaceId");
+    if (workspaceId) args.push("--workspace", workspaceId);
+    const result = await cli(args);
+    const events = Array.isArray(result.events) ? result.events : [];
+    response.writeHead(200, {
+      "content-type": "text/event-stream; charset=utf-8",
+      "cache-control": "no-store",
+      connection: "close",
+    });
+    for (const event of events) {
+      const value = event && typeof event === "object" && !Array.isArray(event) ? event as Record<string, unknown> : {};
+      response.write(`id: ${String(value.sequence ?? "")}\n`);
+      response.write(`event: ${String(value.eventType ?? "message")}\n`);
+      response.write(`data: ${JSON.stringify(value)}\n\n`);
+    }
+    response.end();
+    return true;
+  }
+
+  const turnCancelMatch = url.pathname.match(/^\/api\/agent\/turns\/([^/]+)\/cancel$/);
+  if (turnCancelMatch && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["agent-turn-cancel", decodeURIComponent(turnCancelMatch[1])];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  const turnMatch = url.pathname.match(/^\/api\/agent\/turns\/([^/]+)$/);
+  if (turnMatch && request.method === "GET") {
+    const args = ["agent-turns", "--turn", decodeURIComponent(turnMatch[1])];
+    const workspaceId = url.searchParams.get("workspaceId");
+    if (workspaceId) args.push("--workspace", workspaceId);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 404 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/agent/ask" && request.method === "POST") {
     const body = await readBody(request);
     const prompt = String(body.prompt ?? "");
-    const args = ["ask"];
+    const args = ["agent-turn-run"];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
-    if (body.parentRunKey) args.push("--parent-run", String(body.parentRunKey));
-    if (body.branchLabel) args.push("--branch-label", String(body.branchLabel));
     args.push(prompt || "生成分析计划");
-    const deterministicResult = await cli(args);
+    const turnResult = await cli(args);
+    const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
+      ? turnResult.answer as Record<string, unknown>
+      : turnResult;
     const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, result);
+    sendJson(response, 200, { ...result, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 
   if (url.pathname === "/api/agent/explain" && request.method === "POST") {
     const body = await readBody(request);
     const prompt = String(body.prompt ?? "");
-    const args = ["ask", "--read-only"];
+    const args = ["agent-turn-run", "--read-only"];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
     args.push(prompt || "说明当前工作区可回答的问题");
-    const deterministicResult = await cli(args);
+    const turnResult = await cli(args);
+    const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
+      ? turnResult.answer as Record<string, unknown>
+      : turnResult;
     const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, result);
+    sendJson(response, 200, { ...result, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 

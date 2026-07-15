@@ -40,6 +40,65 @@ export interface SemanticContextBundle {
   fingerprint: string;
 }
 
+export interface AgentEvidencePlanStep {
+  stepKey: string;
+  kind: string;
+  capabilityId: string;
+  dependsOn: string[];
+  inputRefs: string[];
+  inputFingerprint: string;
+  requiredEvidence: string[];
+  outputSchema: string;
+  mutationMode: string;
+  status: string;
+  blockers: string[];
+  retryPolicy: Record<string, unknown>;
+  completionChecks: string[];
+  artifactRefs: Array<Record<string, unknown>>;
+  evidenceRefs: Array<Record<string, unknown>>;
+  outputFingerprint: string;
+}
+
+export interface AgentEvidencePlan {
+  schema: "aibi-agent-evidence-plan/v1" | string;
+  workspaceId: string;
+  turnKey: string;
+  planVersion: number;
+  status: string;
+  steps: AgentEvidencePlanStep[];
+  registeredCapabilities: string[];
+  fingerprint: string;
+}
+
+export interface AgentTurnEvent {
+  schema: "aibi-agent-turn-event/v1" | string;
+  sequence: number;
+  workspaceId: string;
+  turnKey: string;
+  stepKey?: string | null;
+  eventType: string;
+  status: string;
+  summary: string;
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface AgentTurn {
+  schema: "aibi-agent-turn/v1" | string;
+  turnKey: string;
+  workspaceId: string;
+  sessionKey?: string | null;
+  parentTurnKey?: string | null;
+  prompt: string;
+  status: string;
+  evidencePlan: AgentEvidencePlan;
+  validation: Record<string, unknown>;
+  contextFingerprint: string;
+  createdAt: string;
+  updatedAt: string;
+  finishedAt?: string | null;
+}
+
 export interface AgentAskResult {
   ok: boolean;
   workspaceId: string;
@@ -118,6 +177,9 @@ export interface AgentAskResult {
   intentFrame?: BusinessIntentFrame;
   semanticContext?: SemanticContextBundle;
   clarification?: AgentClarification;
+  agentTurn?: AgentTurn;
+  evidencePlan?: AgentEvidencePlan;
+  turnEvents?: AgentTurnEvent[];
   analysisUnit?: AnalysisUnit;
   chartAdapter?: ChartAdapter;
   context?: {

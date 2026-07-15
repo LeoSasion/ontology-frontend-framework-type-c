@@ -16,14 +16,14 @@
 | 语义与关系 | 稳定受控 | 组合字段消歧、复合键、版本失效、筛选、预聚合和放大阻断进入 Receipt |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
-| Agent 与证据 | 稳定高级 | `Intent Frame` 解析任务、指标、维度、时间、筛选、粒度与输出；`Semantic Context Bundle` 统一字段、规则、记忆和 Pack 来源；歧义集中澄清，本地答案权威 |
+| Agent 与证据 | 稳定高级 | Intent/Context 统一业务语义；复杂问答生成受限 Evidence Plan、严格序号 Turn Event 和 Completion Validation；API/CLI 同源，前端可见紧凑进度与阻塞 |
 | Durable Job 与 Workflow | 稳定初版 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
 | 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |
 | 通用领域扩展 | 稳定受控 | 声明式 Domain Pack 支持签名、lint、安装、升级、卸载、冲突和工作区启停；默认停用 |
 | Provider | 稳定可选 | deterministic 默认；DeepSeek 只接收有界脱敏上下文，失败自动降级 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v3、DuckDB schema v1；兼容检查、隔离迁移、恢复点和双库回滚可用 |
+| 本地运维 | 稳定 | SQLite schema v4、DuckDB schema v1；Agent Turn/事件持久化已版本化；兼容检查、隔离迁移、恢复点和双库回滚可用 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。

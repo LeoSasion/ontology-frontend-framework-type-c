@@ -99,6 +99,7 @@ from source_intelligence_job_service import (
     source_intelligence_job_run_command,
 )
 from workflow_command_service import capability_contracts_command, context_budget_command, workflow_plan_command
+from agent_turn_service import agent_turns_command, cancel_agent_turn_command, run_agent_turn_command
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -2623,6 +2624,12 @@ def main() -> int:
             result = workflow_plan_command(args, parser)
         elif args.command == "context-budget":
             result = context_budget_command(args)
+        elif args.command == "agent-turn-run":
+            result = run_agent_turn_command(args, ask_runner=ask_command, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "agent-turns":
+            result = agent_turns_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "agent-turn-cancel":
+            result = cancel_agent_turn_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "status":
             result = status_command(args)
         elif args.command == "quality-doctor":

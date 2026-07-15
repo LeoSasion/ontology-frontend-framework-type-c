@@ -6,6 +6,7 @@ import { Bilingual, biText } from "./Bilingual";
 
 const AgentProviderNarrative = lazy(() => import("./AgentProviderNarrative").then((module) => ({ default: module.AgentProviderNarrative })));
 const AgentSemanticPlan = lazy(() => import("./AgentSemanticPlan").then((module) => ({ default: module.AgentSemanticPlan })));
+const AgentEvidencePlan = lazy(() => import("./AgentEvidencePlan").then((module) => ({ default: module.AgentEvidencePlan })));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
@@ -16,6 +17,7 @@ type AgentAnswerCardProps = {
   providerResponse?: AgentAskResult["llm"]["response"];
   intentFrame?: AgentAskResult["intentFrame"];
   clarificationBundle?: AgentAskResult["clarification"];
+  evidencePlan?: AgentAskResult["evidencePlan"];
   semanticPlan?: AgentAskResult["semanticPlan"];
   executionPlan?: AgentAskResult["executionPlan"];
   tableNameByKey?: Map<string, string>;
@@ -60,7 +62,7 @@ function intentTypeText(taskType?: string) {
   return labels[taskType ?? ""] ?? taskType ?? biText("分析", "Analysis");
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, clarificationBundle, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
@@ -112,6 +114,11 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
             {clarificationBundle?.required ? <p>{clarificationBundle.message}</p> : <p>{biText("字段均保留表级来源；写入仍需确认。", "Every field keeps table provenance; writes still require confirmation.")}</p>}
           </div>
         </details>
+      ) : null}
+      {evidencePlan ? (
+        <Suspense fallback={null}>
+          <AgentEvidencePlan plan={evidencePlan} />
+        </Suspense>
       ) : null}
       {semanticPlan && semanticPlan.status !== "not-applicable" ? (
         <Suspense fallback={null}>

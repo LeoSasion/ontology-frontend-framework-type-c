@@ -35,6 +35,9 @@ COMMAND_DOMAINS: dict[str, str] = {
     "capability-contracts": "system",
     "workflow-plan": "workflow",
     "context-budget": "context",
+    "agent-turn-run": "agent",
+    "agent-turns": "agent",
+    "agent-turn-cancel": "agent",
     "workspace-create": "workspace",
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
@@ -147,6 +150,8 @@ IMMEDIATE_RUNTIME_WRITES = {
     "export-config",
     "cli-contract",
     "export-analysis",
+    "agent-turn-run",
+    "agent-turn-cancel",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
 

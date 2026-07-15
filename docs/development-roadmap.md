@@ -134,36 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 B：证据计划与流式 Agent Turn
-
-目标：把复杂分析从“单个 ask 函数一次完成”升级为可检查、可取消、可恢复的受限计划。
-
-后端：
-
-1. 新建 `agent_evidence_plan_service.py` 和计划静态验证器。
-2. 将现有 Semantic Plan、Workflow Stage、Capability Contract、Job、Receipt 和 Unit 组合为统一 Step 生命周期。
-3. 计划生成后先校验工作区、资源、依赖、mutation mode、证据需求和输出 schema，再执行任何 Step。
-4. 短步骤仍可同步完成，但必须发出相同事件；长步骤转入 Durable Job，并从相同 Step 继续。
-5. 新增 Completion Verifier：复核计划完成度、证据完整性、数据新鲜度、结果绑定和未决项；失败时只能阻断或生成新计划版本。
-6. 计划重建必须产生新 `planVersion` 和 fingerprint，旧计划保留为历史，不原地改写。
-
-API/CLI：
-
-- `POST /api/agent/turns` 创建 Turn；`GET /api/agent/turns/:id/events` 使用 SSE 返回事件。
-- CLI 增加机器可读的 Turn 运行、查看与取消入口；JSON 模式输出 NDJSON 事件。
-- 所有入口复用同一业务服务，不允许 API 与 CLI 各自实现规划逻辑。
-
-前端：简单问题只显示最终答案；复杂问题显示紧凑计划进度、当前 Step、阻塞原因和证据完成度。技术 payload 默认收起。
-
-验收：
-
-- 事件序号严格递增，重复订阅可从 last sequence 恢复，终态后不再变化。
-- 计划中不存在未登记 Capability；禁止能力在执行前阻断。
-- 取消不留下半成品业务状态；写入 Step 仍只在现有确认面发生。
-- 完成复核能发现 stale Receipt、缺失 Unit、Pack 变化、结果指纹不匹配和未完成依赖。
-
-退出条件：一个单表图表、一个安全跨表分析、一个阻塞比率和一个长任务均通过相同 Turn/Plan/Event 合同。
-
 ### 阶段 C：受限 Analytical Skill
 
 目标：吸收 DB-GPT/Open Interpreter 的 Skills 优点，让业务分析方法可复用，但不打开脚本和任意工具执行。
@@ -196,7 +166,7 @@ API/CLI：
 4. Receipt、Unit、Plan、确认/拒绝历史、未决项和当前对象不能被压缩掉；大型结果只保留指纹与安全快照引用。
 5. 不自动生成长期业务记忆；只有明确晋级的 Confirmed Query、Context Term/Rule 和手工语义可跨 Session 召回。
 
-迁移：首个持久化阶段预计将 SQLite schema 从当前 v3 递增到 v4；真正合入时必须以当时版本为基线递增，走隔离副本、恢复点、配置导出与双库复检。
+迁移：Agent Turn 已在 SQLite v4 持久化；Session 与 Snapshot 合入时必须从 v4 递增，走隔离副本、恢复点和双库复检。
 
 退出条件：重启后可恢复 Session；Fork 不污染父链；压缩前后关键对象、证据和阻塞结论一致；跨工作区 Session 不可见。
 
@@ -240,7 +210,7 @@ API/CLI：
 
 ```mermaid
 flowchart TD
-  A["已交付：业务意图与上下文"] --> B["B 证据计划与事件"]
+  A["已交付：业务意图与上下文"] --> B["已交付：证据计划与事件"]
   B --> C["C Analytical Skill"]
   B --> D["D Session 与 Context"]
   A --> E["E Runtime Profile 与评估"]
@@ -250,7 +220,7 @@ flowchart TD
   B --> X["P2 复杂跨表"]
 ```
 
-业务意图与上下文合同已经交付；B 是当前主链。C、D、E 可在 B 稳定后按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
+业务意图、上下文、证据计划与事件合同已经交付；C 是当前主链。D、E 可按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
 
 ## 评估与发布指标
 

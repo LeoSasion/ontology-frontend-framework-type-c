@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 3
+CURRENT_SQLITE_SCHEMA_VERSION = 4
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -811,6 +811,39 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON analysis_job_events(workspace_id, event_sequence);
         CREATE INDEX IF NOT EXISTS idx_analysis_job_events_job_sequence
           ON analysis_job_events(workspace_id, job_key, event_sequence);
+        CREATE TABLE IF NOT EXISTS agent_turns (
+          turn_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          session_key TEXT,
+          parent_turn_key TEXT,
+          prompt TEXT NOT NULL,
+          status TEXT NOT NULL,
+          intent_json TEXT NOT NULL,
+          context_json TEXT NOT NULL,
+          plan_json TEXT NOT NULL,
+          result_json TEXT NOT NULL,
+          validation_json TEXT NOT NULL,
+          context_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          finished_at TEXT,
+          PRIMARY KEY(workspace_id, turn_key)
+        );
+        CREATE TABLE IF NOT EXISTS agent_turn_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          turn_key TEXT NOT NULL,
+          step_key TEXT,
+          event_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          public_summary TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_turns_workspace_updated
+          ON agent_turns(workspace_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_agent_turn_events_turn_sequence
+          ON agent_turn_events(workspace_id, turn_key, event_sequence);
         """
     )
     connection.execute(

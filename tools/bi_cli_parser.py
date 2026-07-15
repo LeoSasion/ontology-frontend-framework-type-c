@@ -78,6 +78,22 @@ def build_parser() -> argparse.ArgumentParser:
     context_budget.add_argument("--segments-json", required=True)
     context_budget.add_argument("--max-chars", type=int, default=12_000)
 
+    agent_turn_run = sub.add_parser("agent-turn-run", description="Run one evidence-planned Agent turn and persist its public event stream.")
+    agent_turn_run.add_argument("prompt")
+    agent_turn_run.add_argument("--workspace", default="")
+    agent_turn_run.add_argument("--parent-turn", default="")
+    agent_turn_run.add_argument("--read-only", action="store_true")
+
+    agent_turns = sub.add_parser("agent-turns", description="List or inspect workspace Agent turns and events.")
+    agent_turns.add_argument("--workspace", default="")
+    agent_turns.add_argument("--turn", default="")
+    agent_turns.add_argument("--after-sequence", type=int, default=0)
+    agent_turns.add_argument("--limit", type=int, default=30)
+
+    agent_turn_cancel = sub.add_parser("agent-turn-cancel", description="Cancel a non-terminal Agent turn.")
+    agent_turn_cancel.add_argument("turn")
+    agent_turn_cancel.add_argument("--workspace", default="")
+
     sub.add_parser("status")
     sub.add_parser("quality-doctor")
 
