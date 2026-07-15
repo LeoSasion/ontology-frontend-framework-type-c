@@ -88,13 +88,25 @@ export function applyThemePalette(theme: ThemePaletteConfig | undefined) {
       root.style.setProperty(variable, value);
     }
   }
+  const primary = hexToRgb(theme.tokens?.primaryHover ?? theme.tokens?.primary);
+  const onAccent = primary && relativeLuminance(primary) > 0.48 ? "#062b33" : "#ffffff";
+  const borderToken = theme.tokens?.border ?? "#d7e0ec";
+  const textToken = theme.tokens?.text ?? "#172033";
+  const strongBorder = `color-mix(in srgb, ${borderToken} 72%, ${textToken} 28%)`;
+  root.style.setProperty("--on-accent", onAccent);
+  root.style.setProperty("--bi-on-accent", onAccent);
+  root.style.setProperty("--line-strong", strongBorder);
+  root.style.setProperty("--bi-border-strong", strongBorder);
+  root.style.setProperty("--border", borderToken);
+  root.style.setProperty("--border-soft", `color-mix(in srgb, ${borderToken} 74%, transparent)`);
+  root.style.setProperty("--text-muted", theme.tokens?.muted ?? "#5f6b7b");
+  root.style.setProperty("--ink-muted", theme.tokens?.muted ?? "#5f6b7b");
   const activeRail = hexToRgb(theme.tokens?.railActive);
   const activeRailText = activeRail && relativeLuminance(activeRail) < 0.45
     ? "#ffffff"
     : theme.tokens?.primaryHover ?? theme.tokens?.primary ?? "#116A82";
   const railSurface = hexToRgb(theme.tokens?.railMid) ?? hexToRgb(theme.tokens?.railTop) ?? hexToRgb(theme.tokens?.railBottom);
   const mutedToken = theme.tokens?.muted ?? "#5f6b7b";
-  const textToken = theme.tokens?.text ?? "#172033";
   const railMuted = railSurface && relativeLuminance(railSurface) < 0.45
     ? `color-mix(in srgb, #ffffff 78%, ${theme.tokens?.railMid ?? theme.tokens?.railTop ?? "#0f2d37"})`
     : `color-mix(in srgb, ${mutedToken} 58%, ${textToken})`;
@@ -106,6 +118,8 @@ export function applyThemePalette(theme: ThemePaletteConfig | undefined) {
         themeKey: theme.themeKey,
         mode: theme.mode,
         tokens: theme.tokens ?? {},
+        onAccent,
+        strongBorder,
         railActiveText: activeRailText,
         railMuted,
       }));

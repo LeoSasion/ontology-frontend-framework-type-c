@@ -144,17 +144,9 @@ export function AppMainView({
       <HomeOverview
         status={status}
         workbench={workbench}
-        query={query}
         agent={agent}
         onAsk={handleHomeAsk}
-        onQuery={async () => {
-          await handleQuery();
-          openSection("dashboards");
-        }}
         onSourceIntelligenceRun={handleSourceIntelligenceRun}
-        onBusinessDashboardOperation={handleBusinessDashboardOperation}
-        onSetSemantic={handleSetSemantic}
-        onOpenBusinessStep={onOpenBusinessStep}
         onOpenSection={openSection}
       />
     );
@@ -257,6 +249,7 @@ export function AppMainView({
       relationshipPreview={relationshipPreview}
       formulaPreview={formulaPreview}
       focusedTableKey={focusedTableKey}
+      onTableFocus={(tableKey) => navigateTo({ section: "sources", tableKey })}
       onPreview={handlePreview}
       onCommitImport={handleCommitImport}
       onPreviewFolderImport={handlePreviewFolderImport}
@@ -283,10 +276,9 @@ export function AppMainView({
       onFormulaSave={handleSaveFormula}
       onFormulaDelete={handleDeleteFormula}
       onSourceIntelligenceRun={handleSourceIntelligenceRun}
-      onBusinessDashboardOperation={handleBusinessDashboardOperation}
       onAsk={handleAgentCommandAsk}
       onOpenBusinessStep={onOpenBusinessStep}
-      onOpenDashboard={() => navigateTo({ section: "dashboards", tableKey: focusedTableKey })}
+      onOpenAnalysis={() => navigateTo({ section: "agent", tableKey: focusedTableKey })}
     />
   );
 }

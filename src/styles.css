@@ -1,10 +1,7 @@
 @import "./components/reusablePatterns.css";
-@import "./components/agentCommandDock.css";
 @import "./components/workspaceShared.css";
 @import "./components/sourceWorkbenchCore.css";
 @import "./components/dashboardCanvasCore.css";
-@import "./components/inspectorCore.css";
-@import "./components/homeIntelligenceCore.css";
 
 :root {
   color-scheme: light;
@@ -30,6 +27,23 @@
   --amber: #7a4308;
   --amber-soft: #fff3e0;
   --danger: #a83f38;
+  --danger-strong: #8f2f29;
+  --danger-soft: #fff0ee;
+  --success: #15803d;
+  --success-strong: #166534;
+  --success-soft: #edf9f1;
+  --success-text: #166534;
+  --warning: #b45309;
+  --warning-strong: #8a4307;
+  --warning-soft: #fff7e8;
+  --green: var(--success);
+  --green-soft: var(--success-soft);
+  --border: var(--line);
+  --border-soft: #e8edf4;
+  --text-muted: var(--muted);
+  --ink-muted: var(--muted);
+  --on-accent: #ffffff;
+  --focus-ring: color-mix(in srgb, var(--accent) 24%, transparent);
   --shadow: 0 18px 42px rgb(39 52 48 / 10%);
   --bi-font-sans: Inter, "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
   --bi-bg: #f5f7fb;
@@ -39,10 +53,13 @@
   --bi-muted: #5f6b7b;
   --bi-border: #d7e0ec;
   --bi-border-soft: #e8edf4;
+  --bi-border-strong: #b9c6d6;
   --bi-accent: #0e7490;
   --bi-accent-strong: #155e75;
   --bi-accent-soft: #e7f6f8;
   --bi-accent-tint: #ccecf1;
+  --bi-accent-border: #8bd8e6;
+  --bi-on-accent: var(--on-accent);
   --bi-rail-top: #eef4f8;
   --bi-rail-mid: #e8f0f6;
   --bi-rail-bottom: #dbe8f0;
@@ -84,8 +101,13 @@ button {
 }
 
 button:disabled {
-  cursor: progress;
+  cursor: not-allowed;
   opacity: 0.68;
+}
+
+[aria-busy="true"] button:disabled,
+button[data-loading="true"]:disabled {
+  cursor: progress;
 }
 
 .appShell {

@@ -6,19 +6,20 @@ import { applyThemePalette, getUserPreferences, hasStoredThemeSnapshot, resolveT
 import { businessSectionForStep, type BusinessPathStepKey } from "./businessPathModel";
 import { actionErrorResult, connectingStatus, preferredLandingSection, type ApiMode, type LoadState } from "./appWorkspaceModel";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
-import { AgentCommandDock, AppMainView, BusinessPathBar, InspectorLoadingPanel, InspectorPanel, ModuleLoadingPanel, TopBar, agentCommandDockPreloader, allSectionPreloaders, businessPathBarPreloader, inspectorPreloader, preloadModules, scheduleIdlePreload, sectionPreloaders } from "./appLazyModules";
+import { AppMainView, ModuleLoadingPanel, TopBar, allSectionPreloaders, preloadModules, scheduleIdlePreload, sectionPreloaders, topBarPreloader } from "./appLazyModules";
 import { useAppAgentActions } from "./useAppAgentActions";
 import { useAppDataActions } from "./useAppDataActions";
 import { useAppDashboardActions } from "./useAppDashboardActions";
 import { useAppSettingsActions } from "./useAppSettingsActions";
 import { useAppWorkspaceActions } from "./useAppWorkspaceActions";
-import { useInspectorController } from "./useInspectorController";
 import type { ActionDraft, AgentAskResult, DashboardPayload, EvidenceFocus, FormulaPreviewPayload, ImportPreview, QueryResult, RelationshipPreviewPayload, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import { buildWorkspaceFlow, resolveSectionForFlow } from "./workspaceFlowModel";
 import {
   evidenceFocusFromNavigation,
   navigationContextFromEvidence,
+  navigationContextForSection,
   navigationContextFromTarget,
+  mergeNavigationContext,
   readNavigationTarget,
   sameNavigationTarget,
   writeNavigationUrl,
@@ -98,7 +99,7 @@ export default function App() {
   }, [section]);
 
   useEffect(() => scheduleIdlePreload(() => {
-    preloadModules([...allSectionPreloaders, inspectorPreloader, agentCommandDockPreloader, businessPathBarPreloader]);
+    preloadModules([...allSectionPreloaders, topBarPreloader]);
   }), []);
 
   useEffect(() => {
@@ -124,13 +125,19 @@ export default function App() {
     agentRequiresConfirmation: agentHasPendingDraft,
   }), [agentHasPendingDraft, dashboards.dashboards.length, displayStatus, pendingDraftCount, workbench]);
   const navigateTo = useCallback((target: AppNavigationTarget) => {
+    const resolvedSection = target.allowLocked ? target.section : resolveSectionForFlow(target.section, workspaceFlow);
+    const requestedContext = mergeNavigationContext(navigationContext, navigationContextFromTarget(target));
+    const mergedContext: AppNavigationContext = {
+      ...requestedContext,
+      dashboardKey: target.dashboardKey ?? (activeDashboardKey !== "default" ? activeDashboardKey : navigationContext.dashboardKey),
+      viewKey: target.viewKey ?? (activeViewKey || navigationContext.viewKey),
+      origin: resolvedSection === "evidence" ? target.origin : undefined,
+    };
     const resolvedTarget: AppNavigationTarget = {
-      ...navigationContext,
-      ...target,
-      section: target.allowLocked ? target.section : resolveSectionForFlow(target.section, workspaceFlow),
-      dashboardKey: target.dashboardKey ?? (activeDashboardKey !== "default" ? activeDashboardKey : undefined),
-      viewKey: target.viewKey ?? (activeViewKey || undefined),
-      origin: target.section === "evidence" ? target.origin : undefined,
+      section: resolvedSection,
+      ...navigationContextForSection(resolvedSection, mergedContext),
+      evidenceFocus: target.evidenceFocus,
+      allowLocked: target.allowLocked,
     };
     if (target.dashboardKey) setActiveDashboardKey(target.dashboardKey);
     if (target.viewKey) setActiveViewKey(target.viewKey);
@@ -151,10 +158,12 @@ export default function App() {
 
   useEffect(() => {
     const target: AppNavigationTarget = {
-      ...navigationContext,
       section,
-      dashboardKey: activeDashboardKey !== "default" ? activeDashboardKey : undefined,
-      viewKey: activeViewKey || undefined,
+      ...navigationContextForSection(section, {
+        ...navigationContext,
+        dashboardKey: activeDashboardKey !== "default" ? activeDashboardKey : navigationContext.dashboardKey,
+        viewKey: activeViewKey || navigationContext.viewKey,
+      }),
     };
     const nextUrl = writeNavigationUrl(window.location.href, target);
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -235,54 +244,41 @@ export default function App() {
     });
   }, [navigateTo, section]);
 
-  const handleOpenBusinessStep = useCallback((step: BusinessPathStepKey) => {
+  const handleOpenSectionForStep = useCallback((step: BusinessPathStepKey) => {
     openSection(businessSectionForStep(step));
   }, [openSection]);
 
-  const activeDashboardName = dashboards.dashboards.find((dashboard) => dashboard.dashboard_key === activeDashboardKey)?.name ?? activeDashboardKey;
-  const activeViewName = workbench.savedViews.find((view) => view.view_key === activeViewKey)?.name ?? activeViewKey;
   const focusedTable = workbench.tables.find((table) => table.table_key === navigationContext.tableKey) ?? workbench.tables[0];
-  const activeTableName = focusedTable?.display_name ?? status.sourceRuns[0]?.name ?? "";
-  const inspector = useInspectorController(openSection);
 
   return (
     <div
       className="appShell"
-      data-inspector-state={inspector.expanded ? "expanded" : "collapsed"}
-      data-inspector-pinned={inspector.pinned ? "true" : "false"}
       data-language={resolvedLanguage}
       data-load-state={loadState}
       lang={resolvedLanguage === "zh" ? "zh-CN" : "en"}
     >
       <Sidebar
-        activeDashboardKey={activeDashboardKey}
         activeSection={section}
         actionDrafts={actionDrafts}
-        agent={agent}
-        dashboards={dashboards}
-        onDashboardSelect={setActiveDashboardKey}
         onSectionChange={openSection}
         onWorkspaceCreate={workspaceActions.handleWorkspaceCreate}
         onWorkspaceDelete={workspaceActions.handleWorkspaceDelete}
         onWorkspaceRename={workspaceActions.handleWorkspaceRename}
         onWorkspaceSelect={workspaceActions.handleWorkspaceSelect}
         status={displayStatus}
-        workbench={workbench}
         flow={workspaceFlow}
       />
       <main className="contentShell">
         <Suspense fallback={null}>
-          <TopBar activeSection={section} status={displayStatus} apiMode={apiMode} />
+          <TopBar
+            activeSection={section}
+            apiMode={apiMode}
+            flow={workspaceFlow}
+            onOpenAgent={() => openSection("agent")}
+            pendingDraftCount={pendingDraftCount}
+            status={displayStatus}
+          />
         </Suspense>
-        {loadState === "ready" ? (
-          <Suspense fallback={null}>
-            <BusinessPathBar
-              activeSection={section}
-              flow={workspaceFlow}
-              onOpenStep={handleOpenBusinessStep}
-            />
-          </Suspense>
-        ) : null}
         <Suspense fallback={<ModuleLoadingPanel section={section} language={resolvedLanguage} />}>
           <AppMainView
             actionDrafts={actionDrafts}
@@ -297,7 +293,7 @@ export default function App() {
             focusedTableKey={focusedTable?.table_key ?? navigationContext.tableKey ?? ""}
             formulaPreview={formulaPreview}
             lastActionResult={lastActionResult}
-            onOpenBusinessStep={handleOpenBusinessStep}
+            onOpenBusinessStep={handleOpenSectionForStep}
             onOpenEvidence={handleOpenEvidence}
             openSection={openSection}
             navigateTo={navigateTo}
@@ -315,40 +311,6 @@ export default function App() {
           />
         </Suspense>
       </main>
-      {loadState === "ready" ? <Suspense fallback={null}>
-        <AgentCommandDock
-          activeSection={section}
-          actionDrafts={actionDrafts}
-          agent={agent}
-          onAsk={agentActions.handleAgentCommandAsk}
-          onOpenAgent={() => openSection("agent")}
-          onOpenSection={openSection}
-          status={displayStatus}
-        />
-      </Suspense> : null}
-      <Suspense fallback={<InspectorLoadingPanel language={resolvedLanguage} />}>
-        <InspectorPanel
-          activeSection={section}
-          status={displayStatus}
-          preview={preview}
-          agent={agent}
-          actionDrafts={actionDrafts}
-          evidenceFocus={evidenceFocus}
-          activeDashboardName={activeDashboardName}
-          activeViewName={activeViewName}
-          activeTableName={activeTableName}
-          lastActionResult={lastActionResult}
-          actionQueueDisabled={loadState === "loading" || apiMode !== "live"}
-          inspectorCollapsed={!inspector.expanded}
-          inspectorPinned={inspector.pinned}
-          onCollapseInspector={inspector.collapse}
-          onExpandInspector={inspector.expand}
-          onPinInspectorToggle={inspector.togglePinned}
-          onOpenAgent={inspector.openAgent}
-          onOpenEvidence={inspector.openEvidence}
-          onOpenSection={inspector.openAndExpand}
-        />
-      </Suspense>
     </div>
   );
 }

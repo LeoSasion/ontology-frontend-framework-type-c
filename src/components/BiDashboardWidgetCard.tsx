@@ -259,7 +259,7 @@ function BarWidget({ widget, rows, onPointClick }: { widget: BiDashboardWidget; 
         const height = `${Math.max(8, (Math.abs(row.value) / max) * 100)}%`;
         const width = `${Math.max(8, (Math.abs(row.value) / max) * 100)}%`;
         return (
-          <button className="bBarItem" key={`${row.label}-${index}`} onClick={() => onPointClick(row)} type="button">
+          <button aria-label={biText(`${row.label}，${formatWidgetValue(row.value, widget)}，查看明细`, `${row.label}, ${formatWidgetValue(row.value, widget)}, view details`)} className="bBarItem" key={`${row.label}-${index}`} onClick={() => onPointClick(row)} type="button">
             <span>{widget.rankingMode === "ranked" ? `${index + 1}. ${row.label}` : row.label}</span>
             <div className="bBarTrack">
               <div className="bBarFill" style={widget.barOrientation === "horizontal" ? { width } : { height }} />
@@ -278,6 +278,10 @@ function LineWidget({ widget, rows }: { widget: BiDashboardWidget; rows: BiDashb
   const area = `${points} 100,100 0,100`;
   return (
     <div className="bLineWrap">
+      <span className="srOnly">
+        {biText("折线图数据：", "Line chart data: ")}
+        {rows.map((row) => `${row.label} ${formatWidgetValue(row.value, widget)}`).join("；")}
+      </span>
       <svg className="bLineSvg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
         {widget.areaFill ? <polygon points={area} fill={color} opacity="0.12" /> : null}
         <polyline points={points} fill="none" stroke={color} strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
@@ -305,9 +309,10 @@ function PieWidget({ widget, rows, onPointClick }: { widget: BiDashboardWidget; 
       <div className={widget.pieShape === "pie" ? "bPieChart pie" : "bPieChart donut"} style={{ background: `conic-gradient(${gradient})` }} />
       <div className="bPieLegend">
         {rows.slice(0, 5).map((row, index) => (
-          <button key={`${row.label}-${index}`} onClick={() => onPointClick(row)} type="button">
+          <button aria-label={biText(`${row.label}，${formatWidgetValue(row.value, widget)}，查看明细`, `${row.label}, ${formatWidgetValue(row.value, widget)}, view details`)} key={`${row.label}-${index}`} onClick={() => onPointClick(row)} type="button">
             <i style={{ background: colors[index % colors.length] }} />
-            {row.label}
+            <span>{row.label}</span>
+            <small>{formatWidgetValue(row.value, widget)}</small>
           </button>
         ))}
       </div>
@@ -370,6 +375,7 @@ function SlicerWidget({
     return (
       <div className="bSlicerDropdown">
         <select
+          aria-label={biText(`${widget.title} 筛选`, `${widget.title} filter`)}
           data-testid={`b-slicer-select-${widget.id}`}
           value={selectedValues[0] ?? ""}
           onChange={(event) => {

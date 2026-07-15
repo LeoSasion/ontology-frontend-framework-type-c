@@ -28,7 +28,7 @@ type AgentPendingChangesPanelProps = {
   runningActionKey: string | null;
   resolveDraftTarget: (draft: ActionDraft) => string;
   onConfirmDryRun: (actionKey: string) => Promise<void>;
-  onConfirmAction: (actionKey: string) => Promise<void>;
+  onConfirmAction: (actionKey: string, draft?: ActionDraft) => Promise<void>;
   onRejectAction: (actionKey: string) => Promise<void>;
   onRunAction: (actionKey: string, task: () => Promise<void>) => Promise<void>;
 };
@@ -74,7 +74,7 @@ export function AgentPendingChangesPanel({
               data-testid="agent-current-draft-confirm"
               disabled={runningActionKey === activeActionKey}
               onClick={async () => {
-                await onRunAction(activeActionKey, () => onConfirmAction(activeActionKey));
+                await onRunAction(activeActionKey, () => onConfirmAction(activeActionKey, currentDraft));
               }}
               type="button"
             >
@@ -144,7 +144,7 @@ export function AgentPendingChangesPanel({
               <button className="secondaryButton" data-testid={`agent-draft-preview-${draft.action_key}`} disabled={runningActionKey === draft.action_key} onClick={() => onConfirmDryRun(draft.action_key)} type="button">
                 {biText("预演", "Preview")}
               </button>
-              <button className="primaryButton" data-testid={`agent-draft-confirm-${draft.action_key}`} disabled={runningActionKey === draft.action_key} onClick={() => onRunAction(draft.action_key, () => onConfirmAction(draft.action_key))} type="button">
+              <button className="primaryButton" data-testid={`agent-draft-confirm-${draft.action_key}`} disabled={runningActionKey === draft.action_key} onClick={() => onRunAction(draft.action_key, () => onConfirmAction(draft.action_key, draft))} type="button">
                 {biText("确认", "Confirm")}
               </button>
               <button className="secondaryButton dangerButton" data-testid={`agent-draft-reject-${draft.action_key}`} disabled={runningActionKey === draft.action_key} onClick={() => onRunAction(draft.action_key, () => onRejectAction(draft.action_key))} type="button">

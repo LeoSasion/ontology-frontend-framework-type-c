@@ -206,24 +206,29 @@ export function appendSourceContractChecks(context) {
         ok: existsSync(join(root, "src", "components", "SourceWorkbenchHeader.tsx")) &&
           sourceWorkbenchSource.includes('import { SourceWorkbenchHeader } from "./SourceWorkbenchHeader"') &&
           sourceWorkbenchSource.includes("<SourceWorkbenchHeader") &&
-          !sourceWorkbenchSource.includes('data-testid="import-preview-button"') &&
-          !sourceWorkbenchSource.includes('data-testid="source-intelligence-run-button"') &&
           sourceWorkbenchHeaderSource.includes("type SourceWorkbenchHeaderProps") &&
+          sourceWorkbenchHeaderSource.includes("接入并准备数据") &&
+          sourceWorkbenchHeaderSource.includes("字段、公式和关系只在需要时展开") &&
+          sourceWorkbenchHeaderSource.includes('aria-live="polite"') &&
           !sourceWorkbenchHeaderSource.includes('data-testid="import-preview-button"') &&
           !sourceWorkbenchHeaderSource.includes('data-testid="import-dry-run-button"') &&
           !sourceWorkbenchHeaderSource.includes('data-testid="import-confirm-button"') &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-preview-button"') &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-preview"') &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           !sourceWorkbenchHeaderSource.includes('data-testid="source-intelligence-run-button"') &&
+          sourceWorkbenchImportPanelSource.split('data-testid="source-import-preview-button"').length === 2 &&
+          sourceWorkbenchImportPanelSource.includes("function checkSource()") &&
+          sourceWorkbenchImportPanelSource.includes('return runBusy("preview", runImportPreviewAction)') &&
+          sourceWorkbenchImportPanelSource.includes('return runBusy("folder-preview", runFolderImportPreviewAction)') &&
+          sourceWorkbenchImportPanelSource.includes("检查来源") &&
+          !sourceWorkbenchImportPanelSource.includes('data-testid="import-preview-button"') &&
+          !sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-preview"') &&
+          sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           !sourceWorkbenchHeaderSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA_COMMAND") &&
           !sourceWorkbenchHeaderSource.includes("aTestdata0305SourceIntelligenceOptions()") &&
-          sourceWorkbenchHeaderSource.includes('aria-live="polite"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-receipt" role="status"') &&
           sourceWorkbenchImportPanelSource.includes("导入去重规则") &&
           sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
           !sourceWorkbenchSource.includes('data-testid="source-expert-details"') &&
-          sourceWorkbenchHeaderSource.includes("先导入或选择本地数据路径"),
+          sourceWorkbenchHeaderSource.includes("所有写入都会先预检并等待确认"),
       },
     {
         label: "source-workbench-model-boundary",
@@ -262,34 +267,27 @@ export function appendSourceContractChecks(context) {
       },
     {
         label: "frontend-business-first-copy-boundary",
-        ok: appSource.includes("BusinessPathBar") &&
-          appSource.includes('from "./appLazyModules"') &&
-          appSource.includes("<BusinessPathBar") &&
-          appSource.includes('loadState === "ready"') &&
-          appSource.includes("handleOpenBusinessStep") &&
-          businessPathModelSource.includes('export type BusinessPathStepKey = "data" | "chart" | "evidence" | "confirm"') &&
-          businessPathModelSource.includes("businessSectionForStep") &&
-          businessPathModelSource.includes("businessStepForSection") &&
-          businessPathBarSource.includes('data-testid="global-business-path"') &&
-          businessPathBarSource.includes('data-testid={`business-path-${step.key}`}') &&
-          businessPathBarSource.includes("每一步跳到唯一页面处理") &&
-          homeOverviewSource.includes("从一条业务路径进入，不在首页重复配置") &&
-          homeOverviewSource.includes("同一件事只保留一个承接页") &&
-          homeActionDockSource.includes('onOpenStep("chart")') &&
-          homeActionDockSource.includes("生成一个图表") &&
-          homeOverviewSource.includes("<HomeOperatingSummaryPanel") &&
-          homeOperatingSummaryPanelSource.includes("生成证据摘要") &&
-          homeOperatingSummaryPanelSource.includes("这些问题会自动使用当前工作区和证据摘要") &&
-          homeOperatingSummaryPanelSource.includes("常见问题不用配置") &&
-          homeOperatingSummaryPanelSource.includes("动作边界") &&
-          sourceWorkbenchHeaderSource.includes("数据入口") &&
-          sourceWorkbenchHeaderSource.includes("先检查文件，再让系统生成证据摘要和看板建议") &&
+        ok: !appSource.includes("<BusinessPathBar") &&
+          !appSource.includes("handleOpenBusinessStep") &&
+          !appSource.includes('data-testid="global-business-path"') &&
+          homeOverviewSource.includes('data-testid="workspace-primary-task"') &&
+          homeOverviewSource.includes('aria-label={biText("可信分析流程", "Trusted analysis flow")}') &&
+          homeOverviewSource.includes('label: biText("接入数据", "Connect data")') &&
+          homeOverviewSource.includes('label: biText("准备证据", "Prepare evidence")') &&
+          homeOverviewSource.includes('label: biText("提出问题", "Ask a question")') &&
+          homeOverviewSource.includes('label: biText("核对结果", "Review result")') &&
+          !homeOverviewSource.includes("<HomeActionDock") &&
+          !homeOverviewSource.includes("<HomeOperatingSummaryPanel") &&
+          sourceWorkbenchHeaderSource.includes("接入并准备数据") &&
+          sourceWorkbenchHeaderSource.includes("粘贴一个文件或文件夹路径") &&
           sourceWorkbenchDataEntryPanelSource.includes("证据摘要") &&
           !sourceWorkbenchDataEntryPanelSource.includes("生成样例摘要") &&
+          sourceWorkbenchActionPanelSource.includes("下一步") &&
           sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
           sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
-          !sidebarAssetSectionsSource.includes("生成证据摘要") &&
-          inspectorPanelModelSource.includes("生成摘要、创建看板") &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe-cards"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-agent-question-starter"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-index-suggestion"') &&
           bWidgetKitSource.includes("sourceIntelligenceRuns") &&
           biDashboardWidgetFactorySource.includes("sourceIntelligenceRuns") &&
           bWidgetKitOverviewSource.includes("等待证据摘要") &&
@@ -303,81 +301,70 @@ export function appendSourceContractChecks(context) {
       },
     {
         label: "source-workbench-dashboard-next-action",
-        ok: sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-next-action"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe-facts"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe-cards"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-agent-draft"') &&
-          sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeCards") &&
-          sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeEvidenceCount") &&
-          sourceWorkbenchActionPanelSource.includes("证据到看板配方") &&
-          sourceWorkbenchActionPanelSource.includes("优先使用") &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-business-dashboard-preview"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-business-dashboard-create"') &&
-          sourceWorkbenchActionPanelSource.includes('disabled={!dashboardRecipeReady || busy === "source-business-dashboard-preview"}') &&
-          sourceWorkbenchActionPanelSource.includes('disabled={!dashboardRecipeReady || busy === "source-business-dashboard-create"}') &&
-          sourceWorkbenchSource.includes("onBusinessDashboardOperation") &&
-          sourceWorkbenchSource.includes("op: confirm ? \"create\" : \"draft\"") &&
-          sourceWorkbenchSource.includes("onOpenDashboard()") &&
-          stylesSource.includes(".sourceDashboardRecipe") &&
-          stylesSource.includes(".sourceDashboardRecipeFacts") &&
-          stylesSource.includes(".sourceDashboardRecipeCards") &&
+        ok: sourceWorkbenchActionPanelSource.includes('data-testid="source-next-analysis"') &&
+          sourceWorkbenchActionPanelSource.includes("{sourceProfileComplete ? (") &&
+          sourceWorkbenchActionPanelSource.includes('onClick={onOpenAnalysis}') &&
+          sourceWorkbenchActionPanelSource.includes('zh="开始分析" en="Start analysis"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-guide-details"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-business-dashboard-preview"') &&
+          !sourceWorkbenchActionPanelSource.includes("dashboardRecipeReady") &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-next-action"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe-facts"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-recipe-cards"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-dashboard-agent-draft"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-business-dashboard-create"') &&
+          !sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeCards") &&
+          !sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeEvidenceCount") &&
+          !sourceWorkbenchSource.includes("onBusinessDashboardOperation") &&
+          !sourceWorkbenchSource.includes("runBusinessDashboard") &&
+          !sourceWorkbenchSource.includes("onOpenDashboard") &&
           byLabel["cli-business-dashboard-draft"].parsed?.ok === true &&
           Boolean(byLabel["cli-business-dashboard-create-confirm"].parsed?.createdDashboardKey),
       },
     {
         label: "source-workbench-index-agent-draft-entry",
-        ok: sourceWorkbenchActionPanelSource.includes('data-testid="source-index-suggestion"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid="source-index-agent-draft"') &&
-          sourceWorkbenchSource.includes("indexCandidateName") &&
+        ok: !sourceWorkbenchActionPanelSource.includes('data-testid="source-index-suggestion"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-index-agent-draft"') &&
+          !sourceWorkbenchActionPanelSource.includes("让 Agent 起草索引") &&
+          !sourceWorkbenchActionPanelSource.includes("确认前不会创建 DuckDB 索引") &&
+          !sourceWorkbenchActionPanelSource.includes("indexCandidateName") &&
           sourceWorkbenchModelSource.includes("const indexCandidateField = groupFields.find") &&
           sourceWorkbenchModelSource.includes("indexCandidateName: indexCandidateField?.field_name") &&
-          sourceWorkbenchActionPanelSource.includes("让 Agent 起草索引") &&
-          sourceWorkbenchActionPanelSource.includes("确认前不会创建 DuckDB 索引") &&
-          sourceWorkbenchActionPanelSource.includes("onAsk(biText(`给 ${selectedTableKey} 的 ${indexCandidateName} 建索引来优化查询`") &&
-          appSource.includes("onAsk={handleAgentCommandAsk}") &&
-          stylesSource.includes(".sourceIndexSuggestion") &&
-          stylesSource.includes(".sourceIndexFacts") &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
+          sourceWorkbenchSource.includes("{showExpertWorkbench ? (") &&
           byLabel["cli-agent-index-draft"].parsed?.requiresConfirmation === true &&
           byLabel["cli-agent-index-draft"].parsed?.actionDraft?.kind === "index.create",
       },
     {
         label: "source-workbench-agent-question-starter",
-        ok: existsSync(join(root, "src", "components", "SourceWorkbenchAgentStarter.tsx")) &&
-          sourceWorkbenchActionPanelSource.includes('import { SourceWorkbenchAgentStarter, type SourceAgentPrompt } from "./SourceWorkbenchAgentStarter"') &&
-          sourceWorkbenchActionPanelSource.includes("<SourceWorkbenchAgentStarter") &&
+        ok: !sourceWorkbenchActionPanelSource.includes("<SourceWorkbenchAgentStarter") &&
           !sourceWorkbenchActionPanelSource.includes('data-testid="source-agent-question-starter"') &&
           !sourceWorkbenchActionPanelSource.includes("sourceAgentPrompts.map((item)") &&
-          sourceWorkbenchAgentStarterSource.includes("export type SourceAgentPrompt") &&
-          sourceWorkbenchAgentStarterSource.includes('import { AgentPromptGrid, type AgentPromptGridItem } from "./AgentPromptGrid"') &&
-          sourceWorkbenchAgentStarterSource.includes("<AgentPromptGrid") &&
-          sourceWorkbenchAgentStarterSource.includes('data-testid="source-agent-question-starter"') &&
-          sourceWorkbenchAgentStarterSource.includes('testId="source-agent-prompt-grid"') &&
-          sourceWorkbenchAgentStarterSource.includes('itemTestIdPrefix="source-agent-prompt"') &&
-          sourceWorkbenchGuidanceModelSource.includes("const sourceAgentPrompts") &&
-          sourceWorkbenchGuidanceModelSource.includes('"can-answer"') &&
-          sourceWorkbenchGuidanceModelSource.includes('"find-gaps"') &&
-          sourceWorkbenchGuidanceModelSource.includes('"draft-dashboard"') &&
-          sourceWorkbenchGuidanceModelSource.includes("不要创建任何草案") &&
-          sourceWorkbenchGuidanceModelSource.includes("先不要直接写入") &&
+          !sourceWorkbenchSource.includes("<SourceWorkbenchAgentStarter") &&
+          homeOverviewSource.includes('id="workspace-question"') &&
+          homeOverviewSource.includes('className="workspaceQuestionForm" data-testid="workspace-question-form" onSubmit={submitQuestion}') &&
+          homeOverviewSource.includes('className="workspaceQuestionStarters"') &&
+          homeOverviewSource.includes("只读回答直接展示；任何真实写入都会停在确认步骤") &&
           agentPromptGridSource.includes("export type AgentPromptGridItem") &&
           agentPromptGridSource.includes("export function AgentPromptGrid") &&
           agentPromptGridSource.includes('data-testid={`${itemTestIdPrefix}-${item.key}`}') &&
-          agentPromptGridSource.includes("onAsk(item.prompt)") &&
-          stylesSource.includes(".sourceAgentStarter") &&
-          stylesSource.includes(".agentPromptGrid") &&
-          stylesSource.includes(".sourceAgentStarter .agentPromptGrid button"),
+          agentPromptGridSource.includes("onAsk(item.prompt)"),
       },
     {
         label: "source-workbench-beginner-import-plan",
         ok: sourceWorkbenchActionPanelSource.includes('data-testid="beginner-import-plan"') &&
-          sourceWorkbenchActionPanelSource.includes('data-testid={`beginner-plan-${item.key}`}') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid={`beginner-plan-${currentPlan.key}`}') &&
+          sourceWorkbenchActionPanelSource.includes("beginnerPlan.find((item) => item.key === currentPlanKey)") &&
+          !sourceWorkbenchActionPanelSource.includes("beginnerPlan.map((item)") &&
           !sourceWorkbenchActionPanelSource.includes('data-testid="beginner-plan-check-file"') &&
           !sourceWorkbenchActionPanelSource.includes('data-testid="beginner-plan-import-data"') &&
           sourceWorkbenchActionPanelSource.includes('data-testid="beginner-plan-refresh-profile"') &&
           sourceWorkbenchActionPanelSource.includes('data-testid="beginner-evidence-guard"') &&
           sourceWorkbenchActionPanelSource.includes('data-testid="source-guide-details"') &&
-          sourceWorkbenchActionPanelSource.includes("更多引导和高级建议") &&
+          sourceWorkbenchActionPanelSource.includes("其他数据动作") &&
+          sourceWorkbenchImportPanelSource.includes('data-testid="source-import-preview-button"') &&
+          !sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-preview"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-summary"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-impact"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-safety"') &&
@@ -394,12 +381,12 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportControllerSource.includes("...previewSummary") &&
           sourceWorkbenchGuidanceModelSource.includes("const recommendedPrimaryAction") &&
           /hasImportedTables\s*\?\s*sourceProfileComplete/.test(sourceWorkbenchGuidanceModelSource) &&
-          sourceWorkbenchGuidanceModelSource.includes('"draft-dashboard"') &&
+          sourceWorkbenchGuidanceModelSource.includes('"start-analysis"') &&
           sourceWorkbenchGuidanceModelSource.includes("sourceProfileComplete") &&
           sourceWorkbenchGuidanceModelSource.includes("previewReadable") &&
           sourceWorkbenchGuidanceModelSource.includes("hasImportedTables") &&
-          sourceWorkbenchGuidanceModelSource.includes('measureFields[0]?.field_name ?? ""') &&
-          sourceWorkbenchGuidanceModelSource.includes('groupFields[0]?.field_name ?? ""'),
+          !sourceWorkbenchGuidanceModelSource.includes("measureFields") &&
+          !sourceWorkbenchGuidanceModelSource.includes("groupFields"),
       },
     {
         label: "source-workbench-guidance-model-boundary",
@@ -413,12 +400,12 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchGuidanceModelSource.includes("export function buildSourceWorkbenchGuidance(") &&
           sourceWorkbenchGuidanceModelSource.includes("export type RecommendedPrimaryAction") &&
           sourceWorkbenchGuidanceModelSource.includes("export type BeginnerPlanItem") &&
-          sourceWorkbenchGuidanceModelSource.includes("export type SourceAgentPrompt") &&
-          sourceWorkbenchGuidanceModelSource.includes("export type DashboardRecipeCard") &&
+          !sourceWorkbenchGuidanceModelSource.includes("export type SourceAgentPrompt") &&
+          !sourceWorkbenchGuidanceModelSource.includes("export type DashboardRecipeCard") &&
           sourceWorkbenchGuidanceModelSource.includes("sourceProfileRunningLabel") &&
-          sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeCards") &&
+          !sourceWorkbenchGuidanceModelSource.includes("dashboardRecipeReady") &&
           sourceWorkbenchGuidanceModelSource.includes("beginnerPlan") &&
-          sourceWorkbenchGuidanceModelSource.includes("sourceAgentPrompts"),
+          !sourceWorkbenchGuidanceModelSource.includes("sourceAgentPrompts"),
       },
     {
         label: "source-workbench-receipt-model-boundary",
@@ -500,7 +487,7 @@ export function appendSourceContractChecks(context) {
         label: "source-workbench-contracts-boundary",
         ok: existsSync(join(root, "src", "sourceWorkbenchContracts.ts")) &&
           sourceWorkbenchSource.includes('from "../sourceWorkbenchContracts"') &&
-          sourceWorkbenchSource.includes("type { QueryOptions, SourceWorkbenchProps }") &&
+          sourceWorkbenchSource.includes("type { QueryOptions, RelationshipSaveOptions, SourceWorkbenchProps }") &&
           !sourceWorkbenchSource.includes("type SourceWorkbenchProps =") &&
           !sourceWorkbenchSource.includes("type SemanticSetOptions =") &&
           !sourceWorkbenchSource.includes("type MetricQueryOptions =") &&
@@ -547,13 +534,17 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchSource.includes('data-testid="source-index-suggestion"') &&
           !sourceWorkbenchSource.includes('data-testid="beginner-import-plan"') &&
           sourceWorkbenchActionPanelSource.includes("type SourceWorkbenchActionPanelProps") &&
-          sourceWorkbenchActionPanelSource.includes('type SourceAgentPrompt } from "./SourceWorkbenchAgentStarter"') &&
-          sourceWorkbenchActionPanelSource.includes("type DashboardRecipeCard") &&
           sourceWorkbenchActionPanelSource.includes("RecommendedPrimaryAction") &&
-          sourceWorkbenchActionPanelSource.includes("runBusinessDashboard: (confirm: boolean) => Promise<void>") &&
           sourceWorkbenchActionPanelSource.includes("runSourceProfile: (label: string, options: SourceIntelligenceRunOptions) => Promise<void>") &&
-          sourceWorkbenchActionPanelSource.includes("<SourceWorkbenchAgentStarter") &&
-          sourceWorkbenchActionPanelSource.includes("dashboardRecipeCards.map((card)") &&
+          sourceWorkbenchActionPanelSource.includes("beginnerPlan.find((item) => item.key === currentPlanKey)") &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-evidence-guard"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-next-analysis"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-guide-details"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
+          !sourceWorkbenchActionPanelSource.includes("<SourceWorkbenchAgentStarter") &&
+          !sourceWorkbenchActionPanelSource.includes("dashboardRecipeCards.map((card)") &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-index-suggestion"') &&
+          !sourceWorkbenchActionPanelSource.includes('data-testid="source-business-dashboard-create"') &&
           sourceWorkbenchActionPanelSource.includes("setShowAdvanced((current) => !current)"),
       },
     {

@@ -9,7 +9,7 @@ import {
   launchChrome,
   navigate,
   setViewport,
-  waitForAppReady,
+  waitFor,
 } from "./ui-verify-chrome.mjs";
 import { postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
@@ -17,6 +17,7 @@ const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8787";
 const url = process.env.AIBI_UI_URL ?? `${baseUrl}/?section=views`;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-visual-"));
 const viewports = [
+  { key: "mobile", label: "mobile", width: 390, height: 844 },
   { key: "compact-landscape", label: "compact landscape", width: 1280, height: 720 },
   { key: "landscape", label: "landscape", width: 1440, height: 900 },
   { key: "portrait-pc", label: "portrait PC", width: 900, height: 1440 },
@@ -104,7 +105,7 @@ function visualMetrics() {
   return {
     title: document.title,
     url: location.href,
-    connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+    connected: Boolean(document.querySelector(".appShell")) && !document.querySelector('[data-testid="service-diagnostics"]'),
     isViewsRoute: new URL(location.href).searchParams.get("section") === "views",
     hasViewWorkspace: Boolean(document.querySelector(".viewWorkspaceGrid")),
     hasViewQueryPanel: Boolean(document.querySelector(".viewQueryPanel")),
@@ -130,6 +131,37 @@ function visualMetrics() {
   };
 }
 
+async function waitForVisualReady(client, workspaceId, timeoutMs = 25000) {
+  return waitFor(client, (expectedWorkspaceId) => {
+    const text = document.body?.innerText || "";
+    const selectedWorkspace = document.querySelector('select[aria-label="选择工作区"]')?.value || "";
+    const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+    const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
+    const hasServiceDiagnostics = Boolean(document.querySelector('[data-testid="service-diagnostics"]'));
+    const hasViewWorkspace = Boolean(document.querySelector(".viewWorkspaceGrid"));
+    const hasViewQueryPanel = Boolean(document.querySelector(".viewQueryPanel"));
+    return {
+      ok: Boolean(document.querySelector(".appShell")) &&
+        selectedWorkspace === expectedWorkspaceId &&
+        hasViewWorkspace &&
+        hasViewQueryPanel &&
+        !hasErrorBoundary &&
+        !hasFrameworkOverlay &&
+        !hasServiceDiagnostics,
+      title: document.title,
+      url: location.href,
+      connected: !hasServiceDiagnostics,
+      hasShell: Boolean(document.querySelector(".appShell")),
+      hasViewWorkspace,
+      hasViewQueryPanel,
+      hasErrorBoundary,
+      hasFrameworkOverlay,
+      hasServiceDiagnostics,
+      workspace: selectedWorkspace,
+    };
+  }, workspaceId, { timeoutMs, intervalMs: 250 });
+}
+
 const checks = [];
 const viewportResults = [];
 let browserInfo = null;
@@ -138,7 +170,7 @@ let lifecycle = null;
 let bootstrap = null;
 
 try {
-  const run = await withTemporaryWorkspace("v", async () => {
+  const run = await withTemporaryWorkspace("v", async ({ temporaryWorkspaceId }) => {
     const imported = await postJson("/api/import/commit", {
       filePath: join(process.cwd(), "validation-inputs", "orders.csv"),
       table: "visual_records",
@@ -163,10 +195,10 @@ try {
       for (const viewport of viewports) {
         await setViewport(browser.client, viewport);
         await navigate(browser.client, url);
-        let ready = await waitForAppReady(browser.client, null, 25000);
+        let ready = await waitForVisualReady(browser.client, temporaryWorkspaceId, 25000);
         if (!ready.ok) {
           await navigate(browser.client, `${url}&retry=${Date.now()}`);
-          ready = await waitForAppReady(browser.client, null, 25000);
+          ready = await waitForVisualReady(browser.client, temporaryWorkspaceId, 25000);
         }
         const metrics = await evaluate(browser.client, visualMetrics, null, 10000);
         const screenshot = await captureScreenshot(browser.client, join(screenshotDir, `${viewport.key}-${viewport.width}x${viewport.height}.png`));

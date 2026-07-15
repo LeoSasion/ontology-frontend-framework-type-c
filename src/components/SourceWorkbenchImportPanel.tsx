@@ -43,6 +43,16 @@ export function SourceWorkbenchImportPanel({
   runImportPolicyAction,
 }: SourceWorkbenchImportPanelProps) {
   const createTargetLabel = preview.suggestedDisplayName || targetName || preview.suggestedTableKey || targetTable;
+  const sourceLooksLikeFile = /\.(?:csv|tsv|xlsx?|xlsm)$/i.test(filePath.trim());
+  const sourceCheckBusy = busy === "preview" || busy === "folder-preview";
+
+  function checkSource() {
+    if (sourceLooksLikeFile) {
+      return runBusy("preview", runImportPreviewAction);
+    }
+    return runBusy("folder-preview", runFolderImportPreviewAction);
+  }
+
   return (
     <article className="workbenchPanel widePanel sourceImportPanel">
       <div className="tileHeader">
@@ -64,25 +74,20 @@ export function SourceWorkbenchImportPanel({
         </label>
         <div className="buttonRow tight importCheckActions">
           <button
-            className="secondaryButton compactAction"
-            data-testid="import-preview-button"
-            disabled={busy === "preview"}
-            onClick={() => runBusy("preview", runImportPreviewAction)}
+            className="primaryButton compactAction"
+            data-testid="source-import-preview-button"
+            disabled={sourceCheckBusy || !filePath.trim()}
+            onClick={() => void checkSource()}
             type="button"
           >
             <Icon name="source" />
-            <Bilingual zh="检查文件" en="Check file" />
+            {sourceCheckBusy ? biText("正在检查…", "Checking…") : biText("检查来源", "Check source")}
           </button>
-          <button
-            className="secondaryButton compactAction"
-            data-testid="folder-import-preview-button"
-            disabled={busy === "folder-preview"}
-            onClick={() => runBusy("folder-preview", runFolderImportPreviewAction)}
-            type="button"
-          >
-            <Icon name="source" />
-            <Bilingual zh="检查文件夹" en="Check folder" />
-          </button>
+          <span className="importSourceHint">
+            {sourceLooksLikeFile
+              ? biText("已识别为文件", "Detected as a file")
+              : biText("自动按文件夹检查；文件路径请保留扩展名", "Checking as a folder; keep the extension for file paths")}
+          </span>
         </div>
       </div>
       <details className="advancedDetails compactAdvanced">
@@ -227,15 +232,6 @@ export function SourceWorkbenchImportPanel({
               <span>{preview.matchedTable ? biText("会合并到已有表", "Merges into an existing table") : biText("会新建工作区表", "Creates a workspace table")}</span>
             </div>
             <div className="buttonRow tight">
-              <button
-                className="miniButton"
-                data-testid="import-confirmation-preview"
-                disabled={busy === "import-dry"}
-                onClick={() => runBusy("import-dry", () => runImportCommitAction(false))}
-                type="button"
-              >
-                {biText("预演影响", "Preview impact")}
-              </button>
               <button
                 className="primaryButton compactAction"
                 data-testid="import-confirmation-confirm"

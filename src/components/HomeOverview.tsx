@@ -1,281 +1,214 @@
 import "./homeOverview.css";
-import { useMemo, useState } from "react";
-import type { AgentAskResult, QueryResult, WorkbenchPayload, WorkspaceStatus } from "../types";
-import type { BusinessDashboardOptions } from "../dashboardCanvasContracts";
+import { FormEvent, useMemo, useState } from "react";
+import type { AgentAskResult, WorkbenchPayload, WorkspaceStatus } from "../types";
 import type { SourceIntelligenceRunOptions } from "../sourceIntelligenceRunModel";
-import { buildDataQualityDoctor, buildSandboxComparison, buildScenarioPacks, type ScenarioPack } from "../productIntelligenceModel";
-import { buildMetricRepairPlan } from "../metricRepairModel";
-import { buildHomeGuideSteps, buildHomeReadiness, numberValue, objectRecord, recordArray, stringValue } from "../homeOverviewModel";
-import type { BusinessPathStepKey } from "../businessPathModel";
-import { buildProductActivation } from "../productActivationModel";
-import { useQualityDoctor } from "../useQualityDoctor";
+import { latestUsableSourceIntelligenceRun } from "../workspaceFlowModel";
 import { Bilingual, biText } from "./Bilingual";
-import { HomeActionDock } from "./HomeActionDock";
-import { HomeDetailedPathPanel } from "./HomeDetailedPathPanel";
-import { HomeOperatingSummaryPanel } from "./HomeOperatingSummaryPanel";
-import { HomeProductIntelligencePanel } from "./HomeProductIntelligencePanel";
-import { HomeScenarioPacksPanel } from "./HomeScenarioPacksPanel";
-import { HomeWorkspaceStartGuide } from "./HomeWorkspaceStartGuide";
-import { ProductActivationPanel } from "./ProductActivationPanel";
+import { Icon } from "./Icons";
 import type { AppSection } from "./Sidebar";
 
 type HomeOverviewProps = {
   status: WorkspaceStatus;
   workbench: WorkbenchPayload;
-  query: QueryResult;
   agent: AgentAskResult;
   onAsk: (prompt: string) => Promise<void>;
-  onQuery: () => Promise<void>;
   onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions) => Promise<Record<string, unknown> | void>;
-  onBusinessDashboardOperation: (options: BusinessDashboardOptions) => Promise<Record<string, unknown>>;
-  onSetSemantic: (options: { table: string; field: string; role: string; tags?: string[]; usage?: string[]; confidence?: number; note?: string; confirm?: boolean; stayOnPage?: boolean }) => Promise<Record<string, unknown>>;
-  onOpenBusinessStep: (step: BusinessPathStepKey) => void;
   onOpenSection: (section: AppSection) => void;
 };
 
-export function HomeOverview({ status, workbench, query, agent, onAsk, onQuery, onSourceIntelligenceRun, onBusinessDashboardOperation, onSetSemantic, onOpenBusinessStep, onOpenSection }: HomeOverviewProps) {
-  const [busy, setBusy] = useState<"profile" | "dashboardDraft" | "dashboardCreate" | "query" | "ask" | null>(null);
-  const [dashboardPlan, setDashboardPlan] = useState<Record<string, unknown> | null>(null);
+const questionStarters = [
+  {
+    zh: "按时间查看一个核心指标的变化",
+    en: "Show how one key metric changes over time",
+  },
+  {
+    zh: "比较不同类别的结果差异",
+    en: "Compare results across categories",
+  },
+  {
+    zh: "找出异常值和需要补充的数据",
+    en: "Find anomalies and missing data",
+  },
+];
+
+export function HomeOverview({ status, workbench, agent, onAsk, onSourceIntelligenceRun, onOpenSection }: HomeOverviewProps) {
+  const [prompt, setPrompt] = useState("");
+  const [busy, setBusy] = useState<"profile" | "ask" | null>(null);
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
-  const rows = Array.isArray(query.rows) ? query.rows : [];
   const latestRun = sourceIntelligenceRuns[0];
-  const topRow = rows[0];
-  const topValue = Number(topRow?.value ?? 0);
-  const hasData = status.counts.tables > 0;
-  const qualityDoctorResult = useQualityDoctor(hasData, workbench);
+  const latestUsableRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns);
+  const hasData = status.counts.tables > 0 || workbench.tables.length > 0;
+  const hasCurrentEvidence = Boolean(latestUsableRun);
+  const hasDashboard = status.counts.dashboards > 0;
+  const hasPendingDraft = agent.requiresConfirmation === true || (status.counts.actionDrafts ?? 0) > 0;
+  const currentStep = !hasData ? 0 : !hasCurrentEvidence ? 1 : hasPendingDraft ? 3 : 2;
   const mainTable = workbench.tables[0];
-  const latestDashboardDraft = agent.requiresConfirmation && agent.actionDraft?.status === "draft" ? agent.actionDraft : null;
-  const dashboardProposal = objectRecord(dashboardPlan?.proposed);
-  const dashboardDraft = objectRecord(dashboardPlan?.draft);
-  const dashboardPlanTitle = stringValue(dashboardProposal?.dashboardName) || biText("分析看板", "Analysis dashboard");
-  const dashboardPlanKey = stringValue(dashboardPlan?.createdDashboardKey) || stringValue(dashboardPlan?.savedDashboardKey) || stringValue(dashboardProposal?.dashboardKey);
-  const dashboardPlanTable = stringValue(dashboardProposal?.defaultTableKey) || stringValue(dashboardDraft?.defaultTableKey) || mainTable?.table_key || "-";
-  const dashboardPlanWidgetCount = numberValue(dashboardProposal?.widgetCount) || numberValue(dashboardPlan?.templateCount) || numberValue(dashboardPlan?.savedDashboardModules);
-  const dashboardPlanNeedsConfirmation = dashboardPlan?.requiresConfirmation === true || dashboardPlan?.dryRun === true;
-  const scenarioPacks = useMemo(() => buildScenarioPacks(status, workbench), [status, workbench]);
-  const qualityDoctor = useMemo(() => buildDataQualityDoctor(status, workbench, {
-    ok: true,
-    dryRun: true,
-    file: "",
-    suggestedTableKey: mainTable?.table_key ?? "",
-    profile: { rowCount: mainTable?.row_count ?? 0, columnCount: mainTable?.column_count ?? 0, fields: [], measures: [], dimensions: [], identityKeys: [], warnings: [] },
-    mergePolicyPreview: { mode: "preview", uniqueFields: [], conflictRule: "skip", willWrite: false },
-    sourcePipelineContract: { version: 1, stages: [] },
-  }), [mainTable, status, workbench]);
-  const sandboxComparison = useMemo(() => buildSandboxComparison(status, workbench), [status, workbench]);
-  const liveQualityDoctor = objectRecord(qualityDoctorResult);
-  const liveMetricSql = objectRecord(liveQualityDoctor?.metricSql);
-  const liveQualityIssues = recordArray(liveQualityDoctor?.issues);
-  const liveMissingSemantics = recordArray(liveMetricSql?.missingSemantics);
-  const liveFailedMetricSamples = recordArray(liveMetricSql?.failedSamples);
-  const liveRepairDraft = objectRecord(liveMetricSql?.repairDraft);
-  const liveScore = numberValue(liveQualityDoctor?.score) || qualityDoctor.score;
-  const liveTone = stringValue(liveQualityDoctor?.tone) || qualityDoctor.tone;
-  const liveSummary = stringValue(liveQualityDoctor?.summary) || qualityDoctor.summary;
-  const liveMetricPlanned = numberValue(liveMetricSql?.planned) || latestRun?.metric_sql_plan_count || 0;
-  const liveMetricExecutable = numberValue(liveMetricSql?.executable) || latestRun?.metric_sql_executable_count || 0;
-  const liveMetricBlocked = numberValue(liveMetricSql?.blocked);
-  const liveMetricRate = numberValue(liveMetricSql?.rate);
-  const metricRepairPlan = useMemo(() => buildMetricRepairPlan(qualityDoctorResult, workbench), [qualityDoctorResult, workbench]);
+  const workspaceName = status.workspace?.name || biText("当前工作区", "Current workspace");
+  const workflowSteps = useMemo(() => [
+    { key: "data", label: biText("接入数据", "Connect data"), detail: biText("本地文件或连接器", "Local files or connectors"), section: "sources" as AppSection },
+    { key: "evidence", label: biText("准备证据", "Prepare evidence"), detail: biText("字段、关系与可执行口径", "Fields, relationships, and executable definitions"), section: "sources" as AppSection },
+    { key: "question", label: biText("提出问题", "Ask a question"), detail: biText("描述答案或图表", "Describe an answer or chart"), section: "agent" as AppSection },
+    { key: "review", label: biText("核对结果", "Review result"), detail: biText("来源、口径与回执", "Sources, definitions, and receipts"), section: "evidence" as AppSection },
+  ], []);
 
-  const readiness = useMemo(() => buildHomeReadiness({
-    dashboardCount: status.counts.dashboards,
-    hasData,
-    latestRun,
-  }), [hasData, latestRun, status.counts.dashboards]);
-  const activation = useMemo(() => buildProductActivation({
-    status,
-    workbench,
-    agentRequiresConfirmation: agent.requiresConfirmation,
-  }), [agent.requiresConfirmation, status, workbench]);
-  const guideSteps = useMemo(() => buildHomeGuideSteps({
-    agentRequiresConfirmation: agent.requiresConfirmation,
-    dashboardCount: status.counts.dashboards,
-    hasData,
-    hasLatestDashboardDraft: Boolean(latestDashboardDraft),
-    latestRun,
-    tableCount: status.counts.tables,
-  }), [agent.requiresConfirmation, hasData, latestDashboardDraft, latestRun, status.counts.dashboards, status.counts.tables]);
-
-  async function runBusy<T>(key: Exclude<typeof busy, null>, task: () => Promise<T>, nextSection?: AppSection) {
-    setBusy(key);
+  async function submitQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const normalizedPrompt = prompt.trim();
+    if (!normalizedPrompt || busy) return;
+    setBusy("ask");
     try {
-      await task();
-      if (nextSection) onOpenSection(nextSection);
+      await onAsk(normalizedPrompt);
+      setPrompt("");
+      onOpenSection("agent");
     } finally {
       setBusy(null);
     }
   }
 
-  async function runDashboardTemplate(confirm: boolean) {
-    const result = await onBusinessDashboardOperation({
-      op: confirm ? "create" : "draft",
-      name: biText("分析看板", "Analysis dashboard"),
-      table: mainTable?.table_key,
-      limit: 10,
-      confirm,
-    });
-    setDashboardPlan(result);
-    if (confirm && (typeof result.createdDashboardKey === "string" || typeof result.savedDashboardKey === "string")) {
-      onOpenSection("dashboards");
+  async function generateEvidence() {
+    if (busy) return;
+    setBusy("profile");
+    try {
+      await onSourceIntelligenceRun();
+    } finally {
+      setBusy(null);
     }
-  }
-
-  async function runScenarioPrompt(pack: ScenarioPack) {
-    await runBusy("ask", () => onAsk(pack.prompt), "agent");
-  }
-
-  async function previewScenarioTemplate(pack: ScenarioPack) {
-    if (!pack.template) {
-      await runScenarioPrompt(pack);
-      return;
-    }
-    await runBusy("dashboardDraft", async () => {
-      const result = await onBusinessDashboardOperation({
-        op: "draft",
-        name: pack.title,
-        table: mainTable?.table_key,
-        template: pack.template,
-        limit: pack.template === "erp-units" ? 24 : 10,
-        confirm: false,
-      });
-      setDashboardPlan(result);
-    }, "dashboards");
-  }
-
-  async function askMetricRepairReason() {
-    await runBusy("ask", () => onAsk(biText(
-      "解释当前指标 SQL 为什么不可执行，优先说明缺失字段语义、影响哪些指标、哪些字段可以作为确认草案。只读回答，不写入。",
-      "Explain why current metric SQL is not executable. Prioritize missing field semantics, affected metrics, and candidate field-confirmation drafts. Read-only answer, no writes.",
-    )), "agent");
   }
 
   return (
-    <section className="mainPanel overviewPanel" aria-labelledby="overview-title">
-      <div className="overviewHero">
+    <section className="mainPanel workspaceHome" aria-labelledby="workspace-home-title">
+      <div className="workspaceHomeIntro">
         <div>
-          <p className="kicker">{biText("分析起步台", "Analysis start")}</p>
-          <h2 id="overview-title">
-            <Bilingual zh="从一条业务路径进入，不在首页重复配置" en="Use one business path instead of repeated setup" />
+          <span className="workspaceHomeLabel">{workspaceName}</span>
+          <h2 id="workspace-home-title">
+            <Bilingual zh="从一个问题开始" en="Start with one question" />
           </h2>
           <p>
             <Bilingual
-              zh="同一件事只保留一个承接页：数据源负责接入，看板负责生成图表，证据页负责核对，AI 助手负责确认写入。"
-              en="Each business task has one owning page: sources connect data, dashboards create charts, evidence verifies, and AI approves writes."
+              zh="系统负责检查数据、计算结果并保留证据；高级建模只在需要时出现。"
+              en="The system checks data, calculates results, and keeps evidence. Advanced modeling appears only when needed."
             />
           </p>
         </div>
-        {hasData ? <div className="readinessCard">
-          <span className={hasData ? "statusBadge ok" : "statusBadge warn"}>
-            {readiness.label}
-          </span>
-          <strong>{status.counts.tables}</strong>
-          <span>{biText("张数据表可用", "tables available")}</span>
-          <p>{readiness.detail}</p>
-        </div> : null}
+        <dl className="workspaceFacts" aria-label={biText("工作区概览", "Workspace summary")}>
+          <div><dt><Bilingual zh="数据表" en="Tables" /></dt><dd>{status.counts.tables}</dd></div>
+          <div><dt><Bilingual zh="证据运行" en="Evidence runs" /></dt><dd>{status.counts.sourceIntelligenceRuns ?? 0}</dd></div>
+          <div><dt><Bilingual zh="看板" en="Boards" /></dt><dd>{status.counts.dashboards}</dd></div>
+        </dl>
       </div>
 
-      <ProductActivationPanel
-        activation={activation}
-        onOpenStep={onOpenBusinessStep}
-      />
+      <ol className="workspaceJourney" data-testid="workspace-journey" aria-label={biText("可信分析流程", "Trusted analysis flow")}>
+        {workflowSteps.map((step, index) => {
+          const state = index < currentStep ? "complete" : index === currentStep ? "current" : "upcoming";
+          return (
+            <li className={state} key={step.key}>
+              <button
+                aria-current={state === "current" ? "step" : undefined}
+                disabled={state === "upcoming"}
+                onClick={() => onOpenSection(step.section)}
+                type="button"
+              >
+                <span className="journeyMarker">{state === "complete" ? <Icon name="check" /> : index + 1}</span>
+                <span><strong>{step.label}</strong><small>{step.detail}</small></span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
 
-      {hasData ? (
-        <>
-          <details className="advancedDetails homeShortcutDetails" data-testid="home-shortcut-details">
-            <summary>{biText("其他快捷入口", "Other shortcuts")}</summary>
-            <HomeActionDock
-              agentRequiresConfirmation={agent.requiresConfirmation}
-              hasData={hasData}
-              onOpenStep={onOpenBusinessStep}
-              tableCount={status.counts.tables}
-            />
-          </details>
+      <div className="workspacePrimaryTask" data-testid="workspace-primary-task">
+        {!hasData ? (
+          <div className="workspaceTaskEmpty">
+            <span className="workspaceTaskIcon"><Icon name="source" /></span>
+            <div>
+              <h3><Bilingual zh="先接入一份真实数据" en="Connect one real dataset first" /></h3>
+              <p><Bilingual zh="支持本地 CSV、Excel、文件夹或已配置的 Connector。系统会先预检，不会直接写入。" en="Use a local CSV, Excel file, folder, or configured connector. The system previews before any write." /></p>
+            </div>
+            <button className="primaryButton" data-testid="workspace-connect-data" onClick={() => onOpenSection("sources")} type="button">
+              <Bilingual zh="接入数据" en="Connect data" />
+            </button>
+          </div>
+        ) : !hasCurrentEvidence ? (
+          <div className="workspaceTaskEmpty">
+            <span className="workspaceTaskIcon"><Icon name="evidence" /></span>
+            <div>
+              <h3><Bilingual zh="生成证据摘要，再开始提问" en="Prepare evidence before asking" /></h3>
+              <p>
+                {latestRun?.freshness?.usableForPlanning === false
+                  ? biText("数据已经变化，旧证据不可继续用于规划。重新运行后再分析。", "The data changed, so previous evidence cannot be used for planning. Run it again before analysis.")
+                  : biText("系统会检查字段候选、关系路径和可执行指标，并明确无法判断的部分。", "The system checks field candidates, relationship paths, and executable metrics, and clearly marks unresolved items.")}
+              </p>
+            </div>
+            <button className="primaryButton" data-testid="workspace-prepare-evidence" disabled={busy === "profile"} onClick={() => void generateEvidence()} type="button">
+              {busy === "profile" ? biText("正在生成…", "Preparing…") : biText("生成证据摘要", "Prepare evidence")}
+            </button>
+          </div>
+        ) : hasPendingDraft ? (
+          <div className="workspaceTaskEmpty">
+            <span className="workspaceTaskIcon"><Icon name="check" /></span>
+            <div>
+              <h3><Bilingual zh="核对等待确认的修改" en="Review the pending change" /></h3>
+              <p><Bilingual zh="确认前不会写入数据、关系、视图或看板；也可以直接拒绝草案。" en="Nothing writes to data, relationships, views, or boards before approval. You can also reject the draft." /></p>
+            </div>
+            <button className="primaryButton" data-testid="workspace-review-draft" onClick={() => onOpenSection("agent")} type="button">
+              <Bilingual zh="去核对" en="Review change" />
+            </button>
+          </div>
+        ) : (
+          <div className="workspaceQuestionTask">
+            <div className="workspaceQuestionLead">
+              <span className="workspaceTaskIcon"><Icon name="agent" /></span>
+              <div>
+                <h3><Bilingual zh="你想从数据里知道什么？" en="What do you want to know from the data?" /></h3>
+                <p>
+                  {mainTable
+                    ? biText(`当前从「${mainTable.display_name}」开始；字段不明确时，系统会一次性列出候选。`, `Starting from “${mainTable.display_name}”. If a field is ambiguous, the system lists candidates once.`)
+                    : biText("描述答案、比较对象或想看的图表。", "Describe the answer, comparison, or chart you need.")}
+                </p>
+              </div>
+            </div>
+            <form className="workspaceQuestionForm" data-testid="workspace-question-form" onSubmit={submitQuestion}>
+              <label htmlFor="workspace-question"><Bilingual zh="分析问题" en="Analysis question" /></label>
+              <div>
+                <textarea
+                  id="workspace-question"
+                  aria-describedby="workspace-question-help"
+                  disabled={busy === "ask"}
+                  onChange={(event) => setPrompt(event.target.value)}
+                  placeholder={biText("例如：按月份比较各产品的收入变化，并标出异常月份", "For example: compare monthly revenue by product and flag unusual months")}
+                  rows={3}
+                  value={prompt}
+                />
+                <button className="primaryButton" disabled={busy === "ask" || !prompt.trim()} type="submit">
+                  <Icon name="query" />
+                  {busy === "ask" ? biText("正在分析…", "Analyzing…") : biText("开始分析", "Analyze")}
+                </button>
+              </div>
+              <small id="workspace-question-help"><Bilingual zh="只读回答直接展示；任何真实写入都会停在确认步骤。" en="Read-only answers appear immediately. Any real write stops for review." /></small>
+            </form>
+            <div className="workspaceQuestionStarters" aria-label={biText("问题示例", "Question examples")}>
+              {questionStarters.map((starter) => (
+                <button disabled={busy === "ask"} key={starter.zh} onClick={() => setPrompt(biText(starter.zh, starter.en))} type="button">
+                  <Bilingual {...starter} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
-          {scenarioPacks.length ? <details className="advancedDetails homeBetaDetails">
-            <summary>{biText("更多：整套看板 Beta", "More: full dashboard beta")}</summary>
-            <HomeScenarioPacksPanel
-              busy={busy}
-              onPreviewScenarioTemplate={(pack) => void previewScenarioTemplate(pack)}
-              onRunScenarioPrompt={(pack) => void runScenarioPrompt(pack)}
-              scenarioPacks={scenarioPacks}
-            />
-          </details> : null}
-
-          <details className="advancedDetails homeProductIntelligenceDetails">
-            <summary>{biText("查看数据质量和语义建议", "Review data quality and semantic suggestions")}</summary>
-            <HomeProductIntelligencePanel
-              askMetricRepairReason={askMetricRepairReason}
-              busy={busy}
-              liveFailedMetricSamples={liveFailedMetricSamples}
-              liveMetricBlocked={liveMetricBlocked}
-              liveMetricExecutable={liveMetricExecutable}
-              liveMetricPlanned={liveMetricPlanned}
-              liveMetricRate={liveMetricRate}
-              liveMissingSemantics={liveMissingSemantics}
-              liveQualityDoctor={liveQualityDoctor}
-              liveQualityIssues={liveQualityIssues}
-              liveRepairDraft={liveRepairDraft}
-              liveScore={liveScore}
-              liveSummary={liveSummary}
-              liveTone={liveTone}
-              metricRepairPlan={metricRepairPlan}
-              onOpenSection={onOpenSection}
-              onSetSemantic={onSetSemantic}
-              onSourceIntelligenceRun={onSourceIntelligenceRun}
-              qualityDoctor={qualityDoctor}
-              sandboxComparison={sandboxComparison}
-              workbench={workbench}
-            />
-          </details>
-        </>
-      ) : null}
-
-      {hasData ? (
-        <details className="advancedDetails homeSecondaryDetails" data-testid="home-secondary-path-details">
-          <summary>{biText("查看工作区路径和后续动作", "View workspace path and next actions")}</summary>
-          <HomeWorkspaceStartGuide guideSteps={guideSteps} onOpenSection={onOpenSection} readiness={readiness} />
+      <div className="workspaceSecondaryActions">
+        {hasDashboard && hasCurrentEvidence ? <button data-testid="workspace-open-board" onClick={() => onOpenSection("dashboards")} type="button"><Icon name="dashboard" /><span><Bilingual zh="打开最近看板" en="Open latest board" /></span></button> : null}
+        {hasCurrentEvidence ? <button onClick={() => onOpenSection("evidence")} type="button"><Icon name="evidence" /><span><Bilingual zh="核对证据" en="Review evidence" /></span></button> : null}
+        <button onClick={() => onOpenSection("sources")} type="button"><Icon name="source" /><span><Bilingual zh="管理数据" en="Manage data" /></span></button>
+        <details>
+          <summary><Bilingual zh="高级工具" en="Advanced tools" /></summary>
+          <div>
+            <button onClick={() => onOpenSection("views")} type="button"><Bilingual zh="明细视图" en="Detail views" /></button>
+            <button onClick={() => onOpenSection("settings")} type="button"><Bilingual zh="设置与迁移" en="Settings and migration" /></button>
+          </div>
         </details>
-      ) : null}
-
-      {hasData ? (
-        <details className="advancedDetails homeSecondaryDetails" data-testid="home-detailed-path-details">
-          <summary>{biText("查看数据到看板的完整路径", "View full data-to-dashboard path")}</summary>
-          <HomeDetailedPathPanel
-            agentRequiresConfirmation={agent.requiresConfirmation}
-            busy={busy}
-            dashboardPlan={dashboardPlan}
-            dashboardPlanKey={dashboardPlanKey}
-            dashboardPlanNeedsConfirmation={dashboardPlanNeedsConfirmation}
-            dashboardPlanTable={dashboardPlanTable}
-            dashboardPlanTitle={dashboardPlanTitle}
-            dashboardPlanWidgetCount={dashboardPlanWidgetCount}
-            mainTable={mainTable}
-            onAsk={onAsk}
-            onOpenSection={onOpenSection}
-            onSourceIntelligenceRun={onSourceIntelligenceRun}
-            runBusy={runBusy}
-            runDashboardTemplate={runDashboardTemplate}
-          />
-        </details>
-      ) : null}
-
-      {hasData ? (
-        <details className="advancedDetails homeSecondaryDetails" data-testid="home-operating-summary-details">
-          <summary>{biText("查看运营摘要和快捷问题", "View operating summary and quick questions")}</summary>
-          <HomeOperatingSummaryPanel
-            busy={busy}
-            latestDashboardDraft={latestDashboardDraft}
-            latestRun={latestRun}
-            onAsk={onAsk}
-            onOpenSection={onOpenSection}
-            onQuery={onQuery}
-            runBusy={runBusy}
-            topRow={topRow}
-            topValue={topValue}
-          />
-        </details>
-      ) : null}
+      </div>
     </section>
   );
 }

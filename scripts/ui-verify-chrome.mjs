@@ -341,18 +341,22 @@ export async function getAppReadyState(client, sectionTestId) {
     const text = document.body?.innerText || "";
     const hasSection = testId ? Boolean(document.querySelector(`[data-testid="${testId}"]`)) : true;
     const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+    const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
+    const hasServiceDiagnostics = Boolean(document.querySelector('[data-testid="service-diagnostics"]'));
     return {
       ok: Boolean(document.querySelector(".appShell")) &&
         hasSection &&
-        (text.includes("数据服务已连接") || text.includes("Data service connected")) &&
-        !hasErrorBoundary,
+        !hasServiceDiagnostics &&
+        !hasErrorBoundary &&
+        !hasFrameworkOverlay,
       title: document.title,
       url: location.href,
-      connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+      connected: !hasServiceDiagnostics,
       hasShell: Boolean(document.querySelector(".appShell")),
       hasSection,
       hasErrorBoundary,
-      hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
+      hasFrameworkOverlay,
+      hasServiceDiagnostics,
       workspace: document.querySelector('select[aria-label="选择工作区"]')?.value || "",
     };
   }, sectionTestId);
@@ -363,18 +367,22 @@ export async function waitForAppReady(client, sectionTestId, timeoutMs = 20000) 
     const text = document.body?.innerText || "";
     const hasSection = testId ? Boolean(document.querySelector(`[data-testid="${testId}"]`)) : true;
     const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+    const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
+    const hasServiceDiagnostics = Boolean(document.querySelector('[data-testid="service-diagnostics"]'));
     return {
       ok: Boolean(document.querySelector(".appShell")) &&
         hasSection &&
-        (text.includes("数据服务已连接") || text.includes("Data service connected")) &&
-        !hasErrorBoundary,
+        !hasServiceDiagnostics &&
+        !hasErrorBoundary &&
+        !hasFrameworkOverlay,
       title: document.title,
       url: location.href,
-      connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+      connected: !hasServiceDiagnostics,
       hasShell: Boolean(document.querySelector(".appShell")),
       hasSection,
       hasErrorBoundary,
-      hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
+      hasFrameworkOverlay,
+      hasServiceDiagnostics,
       workspace: document.querySelector('select[aria-label="选择工作区"]')?.value || "",
     };
   }, sectionTestId, { timeoutMs, intervalMs: 250 });

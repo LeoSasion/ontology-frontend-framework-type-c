@@ -28,22 +28,6 @@
           },
           railActiveText: "#ffffff"
         };
-        function readThemeFromWorkbench() {
-          try {
-            var request = new XMLHttpRequest();
-            request.open("GET", "/api/workbench?limit=1", false);
-            request.send(null);
-            if (request.status < 200 || request.status >= 300) return null;
-            var payload = JSON.parse(request.responseText || "{}");
-            var preferences = payload.preferences || {};
-            var palettes = Array.isArray(payload.themePalettes) ? payload.themePalettes : [];
-            return palettes.filter(function (theme) { return theme && theme.enabled !== false; }).find(function (theme) {
-              return theme.themeKey === preferences.themeKey;
-            }) || null;
-          } catch (error) {
-            return null;
-          }
-        }
         function readStoredTheme() {
           try {
             var raw = window.localStorage.getItem("aibiHybrid.themeSnapshot");
@@ -84,11 +68,20 @@
           if (theme.railActiveText) {
             root.style.setProperty("--bi-rail-active-text", theme.railActiveText);
           }
+          var onAccent = theme.onAccent || (mode === "dark" ? "#062b33" : "#ffffff");
+          root.style.setProperty("--on-accent", onAccent);
+          root.style.setProperty("--bi-on-accent", onAccent);
+          if (theme.strongBorder) {
+            root.style.setProperty("--line-strong", theme.strongBorder);
+            root.style.setProperty("--bi-border-strong", theme.strongBorder);
+          }
           try {
             window.localStorage.setItem("aibiHybrid.themeSnapshot", JSON.stringify({
               themeKey: theme.themeKey,
               mode: mode,
               tokens: theme.tokens,
+              onAccent: onAccent,
+              strongBorder: theme.strongBorder,
               railActiveText: theme.railActiveText
             }));
           } catch (error) {
@@ -96,7 +89,7 @@
           }
         }
         try {
-          var theme = readStoredTheme() || readThemeFromWorkbench();
+          var theme = readStoredTheme();
           if (!theme && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
             theme = fallbackDarkTheme;
           }

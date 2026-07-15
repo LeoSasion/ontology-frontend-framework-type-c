@@ -1,5 +1,6 @@
 import type { EvidenceFocus, SourceIntelligenceRunSummary } from "./types";
 import { biText } from "./components/Bilingual";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 
 function evidenceBusinessIdentifier(value: unknown, fallback: string) {
   const text = typeof value === "string" ? value.trim() : "";
@@ -11,7 +12,7 @@ function evidenceBusinessIdentifier(value: unknown, fallback: string) {
 export function sourceRunFromFocus(focus: EvidenceFocus | null | undefined, runs: SourceIntelligenceRunSummary[]) {
   const sourceIntelligenceRef = focus?.refs.find((ref) => ref.startsWith("source-intelligence:"));
   const runKey = sourceIntelligenceRef?.replace("source-intelligence:", "");
-  return runKey ? runs.find((run) => run.run_key === runKey) : runs[0];
+  return runKey ? runs.find((run) => run.run_key === runKey) : latestUsableSourceIntelligenceRun(runs);
 }
 
 export function evidenceLabel(ref: string) {

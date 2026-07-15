@@ -7,6 +7,7 @@ import {
   type BiDashboardWidget,
 } from "../biDashboardModel";
 import type { DashboardPage, DashboardPayload, EvidenceFocus, QueryResult, TableQueryPayload, WorkbenchPayload } from "../types";
+import { latestUsableSourceIntelligenceRun } from "../workspaceFlowModel";
 import { biText } from "./Bilingual";
 import { BiDashboardDrilldownSheet, type DrilldownOperationReceipt, type DrilldownPointFilter, type DrilldownState } from "./BiDashboardDrilldownSheet";
 import { BiDashboardWidgetCard, type SlicerSelections } from "./BiDashboardWidgetCard";
@@ -24,7 +25,7 @@ export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, 
   const widgets = useMemo(() => buildBiDashboardWidgets({ dashboard, dashboards, query, workbench }), [dashboard, dashboards, query, workbench]);
   const widgetTypeSet = useMemo(() => new Set(widgets.map((widget) => widget.type)), [widgets]);
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
-  const latestRun = sourceIntelligenceRuns[0];
+  const latestRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns);
   const evidenceState = latestRun
     ? biText(`证据来自 ${latestRun.label}`, `Evidence from ${latestRun.label}`)
     : biText("先生成证据摘要，证据会自动挂到结果卡片上", "Create an evidence summary first; evidence will attach to result cards automatically");

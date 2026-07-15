@@ -14,6 +14,7 @@ import { summarizeDashboardWidgetPlan } from "./dashboardCanvasPlanModel";
 import { analyzeDashboardSourceSwitch } from "./dashboardCanvasSourceSwitchModel";
 import { buildDashboardSourceSwitchViewModel } from "./dashboardCanvasSourceSwitchViewModel";
 import { buildDashboardSummaryModel } from "./dashboardCanvasSummaryModel";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 
 type DashboardCanvasViewModelOptions = {
   dashboard: DashboardPage;
@@ -43,7 +44,7 @@ export function buildDashboardCanvasViewModel({
   workbench,
 }: DashboardCanvasViewModelOptions) {
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
-  const latestRun = sourceIntelligenceRuns[0];
+  const latestRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns);
   const dashboardSummary = buildDashboardSummaryModel({
     query,
     defaultTableKey: dashboard.default_table_key,

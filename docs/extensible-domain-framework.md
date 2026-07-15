@@ -1,120 +1,124 @@
-# 通用领域扩展框架
+# 通用扩展运行框架
 
-本文件定义 AIBI-C 从固定业务假设迁移到自由、通用、可扩展框架时的唯一架构合同。产品结果见 [PRD](PRD.md)，交付顺序见 [未来开发队列](development-roadmap.md)，当前完成度见 [实现状态](implementation-status.md)。
+本文件是 AIBI-C 扩展运行时的唯一技术合同，统一维护 Core、Domain Pack、Knowledge Pack、Connector Adapter、Provider 和领域分析单元的边界。产品要求见 [PRD](PRD.md)，当前完成度见 [实现状态](implementation-status.md)。
 
-## 目标
-
-AIBI-C 默认只理解结构事实，不默认理解电商、ERP、资金、订单、售后、保单或任何客户名称。领域知识必须以可发现、可启用、可停用、可审计的 Domain Pack 提供；数据接入能力由 Connector Adapter 独立提供，两者不得互相暗含。
-
-## 三层边界
+## 分层职责
 
 | 层级 | 负责 | 禁止 |
 | --- | --- | --- |
-| Core | 工作区、表、字段类型、结构角色、关系证据、查询、Receipt、Unit、Job、草案与确认 | 领域字段别名、业务公式、行业缺口、厂商或客户默认值 |
-| Domain Pack | 领域语义、角色别名、指标规则、分析单元、确认问法和适用证据 | 自动启用、直接写库、任意 SQL、绕过关系与版本校验 |
-| Connector Adapter | 来源发现、凭据引用、只读预览、同步计划和确认导入 | 注入领域语义、自动启用领域包、在预览阶段写业务状态 |
+| Core | 工作区、结构角色、关系证据、查询、Receipt、Unit、Job、草案与确认 | 行业别名、业务公式、厂商或客户默认值 |
+| Domain Pack | 领域语义、指标、规则、分析单元、确认问法和适用证据 | 自动启用、直接写库、任意代码或绕过验证 |
+| Knowledge Pack | Pack 可引用的版本化业务粒度、状态、去重和连接规则 | 训练数据、固定答案、会话记忆或脱离字段证据运行 |
+| Connector Adapter | 来源发现、凭据引用、只读预览、同步计划和确认导入 | 注入领域语义、自动启用 Pack、预览阶段写入 |
+| Provider | 解释本地结果或提出一次必要澄清 | 工具权限、事实裁决、确认写入或生成无证据数字 |
+| 领域单元库 | 根据当前字段证据选择可解释的指标与图表单元 | 固定模板、缺字段补零或默认进入新手路径 |
 
-## 通用内核合同
+## 通用 Core
 
-- 字段只自动推断 `identifier`、`time`、`numeric`、`category`、`status`、`text` 等结构角色。
-- 关系候选只基于规范化名称、类型兼容、值重叠、基数、复合键、版本和行膨胀；业务 token 只能由已启用领域包追加。
-- 默认分析只生成行数、可安全聚合的数值、时间趋势、分类拆分和明细核查，不生成行业专属缺口。
-- Agent 不以销售、金额、渠道、退款、成本等名称优先选择字段；相同结构证据必须得到相同优先级。
-- Core 不读取 Domain Pack 文件来改变默认行为；只有工作区启用清单可将 Pack 注入一次请求的运行上下文。
+- 只自动推断 `identifier`、`time`、`numeric`、`category`、`status`、`text` 等结构角色。
+- 关系候选只使用名称、类型、值重叠、基数、复合键、版本和行膨胀；行业 token 只能由已启用 Pack 追加。
+- 默认分析只生成行数、安全数值聚合、时间趋势、分类拆分和明细核查。
+- 相同结构证据必须得到相同优先级，不能因销售、资金、订单、售后等名称静默偏置。
+- 只有当前工作区启用清单可以把 Pack 注入一次请求的运行上下文。
 
-## Domain Pack Manifest
+## Domain Pack
 
-每个 Pack 必须有稳定 `packId` 与版本，并声明：
+### Manifest 与安装
 
-- 显示名称、用途、兼容 Core 版本和来源；
-- 字段角色与别名，及每条别名的领域作用域；
-- 指标、公式、分析单元和必需/可选语义；
-- 可用入口：Agent、Source Intelligence、关系提示、看板单元或确认问法；
-- 正向、阻塞、不匹配和多 Pack 冲突测试；
-- 不包含凭据、业务数据、绝对路径或可执行任意代码。
+每个 Pack 使用稳定 `packId` 和版本，声明显示名称、用途、Core 兼容范围、来源、字段角色、别名、指标、规则、分析单元、入口、冲突与测试。Manifest 不得包含凭据、业务数据、绝对路径或任意可执行代码。
 
-Manifest 由统一注册表校验。未知字段、重复 `packId`、越权能力或不兼容版本在注册阶段阻断。
+外部 Pack 只接受声明式 JSON 与静态资源，并提供规范化来源、`keyId` 和 HMAC-SHA256 签名；Python、JavaScript、SQL、HTML 和第三方运行时代码在注册阶段阻断。内置 Pack 使用 `builtin` 来源，不伪装成外部签名包。
 
-外部 Pack 采用只含声明式 JSON 与静态资源的 package；不得包含 Python、JavaScript、SQL 或其他可执行文件。外部 package 还必须声明规范化来源、`keyId` 和 HMAC-SHA256 签名，签名只使用服务端信任键引用，密钥值不得写入 Manifest、数据库、日志或回执。内置 Pack 以 `builtin` 来源发布，不伪装成外部签名包。
-
-安装、升级和卸载都先返回 dry-run：列出版本变化、冲突、受影响工作区和启用状态。确认升级时，只有 Manifest 显式声明从旧版本到新版本的迁移，才可保留启用状态；否则先停用并要求重新审阅。卸载只移除安装副本并停用相关工作区，不改写历史 Receipt 或证据。
-
-Manifest 的 `conflicts` 必须显式列出互斥 Pack 或互斥贡献；注册表在启用前统一判定，不以目录顺序决胜。`uiContributions` 只允许受限的双语标题、说明、标签和只读卡片，不接受 HTML、脚本、事件处理器、任意组件路径或运行时代码。
-
-最小外部 package 是一个目录，包含 `manifest.json` 和 Manifest 引用的静态文件。签名值为移除 `signature` 后、按 key 排序且无空白的 UTF-8 JSON 的 HMAC-SHA256 十六进制摘要：
-
-```json
-{
-  "schema": "aibi-domain-pack/v1",
-  "packId": "example-domain",
-  "version": "1.0.0",
-  "displayName": {"zh": "示例领域", "en": "Example domain"},
-  "description": {"zh": "只提供声明式语义。", "en": "Declarative semantics only."},
-  "source": {"publisher": "Example team", "reference": "urn:example:domain-pack"},
-  "coreCompatibility": {"min": 1, "max": 1},
-  "capabilities": ["agentKnowledge"],
-  "signature": {"algorithm": "hmac-sha256", "keyId": "example-key", "value": "<hex>"}
-}
-```
-
-开发者链路：
+安装、升级、卸载和工作区启停都先 dry-run，列出版本、冲突、受影响工作区与对象。升级只有在 Manifest 声明兼容迁移时保留启用状态；卸载不改写历史 Receipt 或证据。冲突按声明和证据解析，禁止按目录或加载顺序决胜。
 
 ```powershell
 python tools/bi_cli.py --json domain-pack-lint --package <package-directory>
 python tools/bi_cli.py --json domain-pack-install --package <package-directory>
 python tools/bi_cli.py --json domain-pack-install --package <package-directory> --yes
-python tools/bi_cli.py --json domain-pack-set --pack example-domain --state enabled --yes
-python tools/bi_cli.py --json domain-pack-uninstall --pack example-domain --yes
+python tools/bi_cli.py --json domain-pack-set --pack <pack-id> --state enabled --yes
+python tools/bi_cli.py --json domain-pack-uninstall --pack <pack-id> --yes
 ```
 
-服务端通过 `AIBI_DOMAIN_PACK_TRUST_KEYS` 提供 `keyId -> secret` JSON 映射；安装目录可由 `AIBI_DOMAIN_PACK_ROOT` 覆盖。任何真实密钥都只放本地 `.env` 或进程环境。
+信任键由 `AIBI_DOMAIN_PACK_TRUST_KEYS` 提供，安装目录可用 `AIBI_DOMAIN_PACK_ROOT` 覆盖；真实密钥只存在本地环境。
 
-## 工作区启用与优先级
+### 工作区状态与迁移
 
-- 新工作区 `enabledDomainPacks=[]`，迁移旧工作区也不得静默启用。
-- 启用或停用属于工作区配置写入，必须预演、显示影响、显式确认并生成回执。
-- Pack 只影响启用后的新计划；既有 Receipt、Unit 和结果保留原 Pack 版本，不被原地重解释。
-- 多 Pack 同时命中时，显式表/字段选择优先，其次是手工语义，再其次是 Pack 证据；无法唯一决胜时集中澄清一次。
-- 停用 Pack 后，其建议和模板不再出现；依赖该 Pack 的保存对象标记为需要复核，不自动删除。
+- 新工作区和迁移后的旧工作区都保持 `enabledDomainPacks=[]`。
+- 启停只影响后续计划；历史 Receipt、Unit 和结果保留创建时的 Pack 版本。
+- 显式字段选择优先于手工语义，手工语义优先于 Pack 建议；仍冲突时集中澄清一次。
+- 停用后不再展示该 Pack 的建议；依赖对象进入复核状态，不自动删除。
+- `workspace_domain_packs` 属于 SQLite 版本化 schema 和配置导出合同；表结构变化必须提升 `user_version`，备份/恢复必须保留启用状态。
 
-## 前后端运行合同
+## Knowledge Pack
 
-后端公开统一目录：可用 Pack、工作区已启用 Pack、可用 Adapter 及其状态。Agent、Source Intelligence、关系推荐和看板单元从同一个运行上下文读取这些信息，不各自维护领域常量。
+当前内置资产 `knowledge/platform-commerce.v1.json` 是 `platform-commerce` Pack 的只读知识源，只有当前工作区显式启用后才参与匹配。它描述抖音、淘宝/天猫和聚水潭导出中的退款、主单去重、多包裹、虚拟商品、订单版本、可归属售后、物流异常和阈值口径；这些规则不是默认知识，也不证明存在平台直连。
 
-前端只渲染后端声明为可用的能力。未实现的 API、ERP 或数据库 Adapter 不显示为可操作入口；领域模板只在对应 Pack 已启用且当前字段证据满足时出现。前端不得维护另一份字段别名或业务指标优先级。
+运行顺序固定为：验证 Pack 已启用 -> 匹配当前字段结构 -> 匹配窄意图 -> 验证粒度、状态、去重与关系 -> 执行审阅过的只读查询 -> 在 Receipt 中记录规则和证据。缺少分子、分母、键或状态时阻断，不能近似聚合。
 
-P1 首批远程 Adapter 固定为 `http-json/v1` 与 `sqlite-table/v1`。HTTP 只访问服务端 allowlist 中的 origin，限制页数、行数、响应字节和超时，默认不重试，并只通过 `env:NAME` 引用凭据；SQLite 只打开 allowlist 中的本地数据库文件和显式表名，不接受 SQL。两者的预览与同步计划都只返回有界标量，确认同步时才把同一指纹快照交给通用导入边界。
-
-HTTP allowlist 由 `AIBI_HTTP_CONNECTOR_ALLOWLIST` 提供逗号分隔的精确 origin；SQLite allowlist 由 `AIBI_SQLITE_CONNECTOR_ALLOWLIST` 提供逗号分隔的精确文件或目录。典型命令：
+新增或修改知识规则必须提供结构匹配条件、统计口径、白名单只读查询、正向/阻塞/不匹配测试以及来源与版本说明。禁止只增加提示词或固定答案。
 
 ```powershell
-python tools/bi_cli.py --json save-connector --name RemoteRows --type api --endpoint https://api.example.com/rows --resource data.items --credential-ref env:REMOTE_ROWS_TOKEN --target-table remote_rows --yes
-python tools/bi_cli.py --json save-connector --name LocalDb --type database --endpoint C:\data\source.sqlite --resource source_rows --target-table local_rows --yes
-python tools/bi_cli.py --json preview-connector --connector RemoteRows --limit 20
-python tools/bi_cli.py --json sync-connector --connector RemoteRows
-python tools/bi_cli.py --json sync-connector --connector RemoteRows --yes
+npm run verify:platform-knowledge
+npm run verify:platform-commerce
 ```
 
-## 证据与隔离
+## Connector Adapter
 
-- Source Intelligence Run、Query Receipt、Analysis Unit、Pack 建议和导出必须绑定工作区、表版本、schema fingerprint、source fingerprint 和 Pack 版本集合。
-- 当前数据指纹不兼容时，旧运行只可作为历史证据，不得成为“最新可执行结果”。
-- 自动化使用临时工作区和临时数据库；验证输入不得写入用户当前工作区。
-- 清理不兼容历史运行必须先 dry-run，列出引用者与影响，确认后执行并保留回执。
-- 比率、转化率、占比、率值等复合统计在没有已验证分子/分母计划时必须澄清，不能退化为 `COUNT(*)` 或任意单字段聚合。
-- `source fingerprint` 必须从当前输入资源重新计算；来源变化、删除或不可读都使旧 Run 失效。没有 current Run 时返回空的当前规划输入，而不是回退到最新 stale Run。
-- 直接 Query 与 Agent Query 使用同一 Domain Pack 运行上下文并写入相同来源的 Pack provenance。
+前端只展示后端声明为可用的 Adapter，不维护第二份能力状态。所有 Adapter 的预览和同步计划只返回有界标量；确认同步时才把相同来源指纹交给通用导入边界。
 
-## 兼容与迁移
+- `local-tabular/v1`：当前工作区登记的 CSV/XLSX/XLSM。
+- `http-json/v1`：仅 allowlist origin、GET、UTF-8 JSON、可选点路径和有界分页；凭据只允许 `env:NAME`。
+- `sqlite-table/v1`：仅 allowlist 本地文件和显式非系统表；不接受 SQL。
+- ERP 直连 Adapter 当前保持 `unavailable`。
 
-现有 `platform-commerce.v1` 和 ERP 单元库保留为 AIBI-C 自有可选 Pack，不再参与默认路径。迁移分两步：先建立注册表与空默认，再把旧入口改为显式 Pack 调用。旧命令在过渡期可返回弃用提示，但不得靠隐藏默认重新启用。
+HTTP allowlist 使用 `AIBI_HTTP_CONNECTOR_ALLOWLIST`，SQLite allowlist 使用 `AIBI_SQLITE_CONNECTOR_ALLOWLIST`。跨工作区、符号链接链、其他 AIBI 仓库、任意请求、字面凭据和未允许资源在访问前阻断。
 
-`workspace_domain_packs` 属于受版本控制的元数据 schema 与配置导出合同。新增或变更该表必须提升 SQLite `user_version`，由隔离迁移、恢复点和双库回滚处理；配置导出/恢复必须保留每个工作区的 Pack 状态。旧 Dashboard Action 的确认回放必须显式传递其工作区，不能依赖当前活动工作区或旧参数位置。
+## Provider
 
-## 完成定义
+默认 `AIBI_AGENT_PROVIDER=deterministic`，从不发送外部请求。显式选择 `deepseek` 后，AIBI-C 先在本地完成字段、关系、查询和 Receipt，再发送有界、脱敏、证据优先的 `aibi-agent-provider-context/v1`；无密钥、超时、限流或无效响应直接降级。
 
-- 使用完全中性的传感器、项目/教育或科研数据时，默认流程不出现电商、ERP、资金、订单、售后或保单语义。
-- 启用某个 Pack 后只增加该 Pack 声明的建议；停用后恢复通用结果。
-- 两个 Pack 可同时存在，冲突可解释且不按加载顺序决胜。
-- 前端、API、CLI、Agent 和 Job 对 Pack/Adapter 状态一致。
-- 用户工作区、临时验证工作区和历史证据之间无数据或“最新运行”串扰。
+可以出站：当前问题、本地答案摘要、有界指标值、显示名称、已选择字段/聚合/筛选/关系、规则标识和证据状态。
+
+不得出站：源文件、原始行、编译 SQL、动作 payload、数据库、密钥、凭据引用、绝对路径、其他 AIBI 仓库标识和模型私有推理。
+
+Provider 生成的数字必须存在于本地证据；结构错误或瞬态故障最多重试一次。Context Budget 优先保留口径、阻塞、确认边界和 Receipt，必要上下文本身超限时跳过 Provider。配置项和默认值只由根目录 [.env.example](../.env.example) 维护。
+
+```powershell
+npm run verify:provider
+npm run verify:provider-live
+```
+
+普通回归只使用确定性 mock；`verify:provider-live` 仅在显式验证真实外部路径时运行。
+
+## ERP 领域单元库
+
+`tools/erp_dashboard_unit_library.py` 是 ERP 单元、字段别名组、评分、省略规则和公开参考的唯一事实源。只有 `erp-units` Pack 已启用时，系统才按当前字段证据选择指标、图表、表格和筛选器；缺少必需字段的单元必须省略并解释，不能渲染为零值。
+
+选择流程：读取当前工作区字段 -> 验证 Pack -> 匹配角色 -> 删除缺必需字段单元 -> 按证据评分 -> 在上限内选择 -> 返回命中、覆盖、省略原因和所需字段。每个组件保存 Pack 版本、单元 key、匹配字段、来源和证据引用。
+
+```powershell
+python tools/bi_cli.py --json erp-unit-library --summary
+python tools/bi_cli.py --json erp-unit-library --select --summary --table <table-key> --limit 24
+python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
+npm run verify:erp-units
+npm run verify:multi-domain-beta
+```
+
+整套 ERP 看板保持 Beta，不与默认可信单图入口竞争。
+
+## 证据、新鲜度与隔离
+
+- Source Intelligence Run、Query Receipt、Analysis Unit、Pack 建议和导出绑定工作区、表版本、schema/source/data 指纹和 Pack 版本集合。
+- 来源变化、删除或不可读都会使旧 Run 失效；没有 current Run 时返回空的当前规划输入，不回退到最新 stale Run。
+- 直接 Query 与 Agent Query 使用同一 Pack 上下文并记录相同 provenance。
+- 历史对象不被新 Pack 版本重解释；清理前 dry-run，列出引用者和影响，确认后保留回执。
+- 自动化使用临时工作区和临时数据库，验证输入不得写入用户当前工作区。
+- 旧 Dashboard Action 的确认回放显式传递其工作区，不能依赖当前活动工作区。
+
+## 完成标准
+
+- 中性数据默认不出现任何行业语义。
+- 启用一个 Pack 只增加其声明能力，停用后恢复通用结果。
+- 多 Pack 并存时冲突可解释且不按加载顺序决胜。
+- 前端、API、CLI、Agent 和 Job 对 Pack 与 Adapter 状态一致。
+- 用户工作区、临时验证工作区与历史证据之间无数据或“最新运行”串扰。

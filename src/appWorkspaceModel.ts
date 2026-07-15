@@ -12,20 +12,15 @@ export function preferredLandingSection(
   dashboards: DashboardPayload,
   pendingDraftCount?: number,
 ): AppSection {
-  const dashboardCount = status.counts?.dashboards ?? 0;
-  const tableCount = status.counts?.tables ?? 0;
-  const sourceRunCount = status.sourceRuns?.length ?? 0;
-  const sourceProfileCount = workbench.sourceIntelligenceRuns?.length ?? 0;
   const resolvedPendingDraftCount = Number.isFinite(Number(pendingDraftCount))
     ? Number(pendingDraftCount)
     : status.counts?.actionDrafts ?? 0;
-  const hasDashboard = dashboardCount > 0 || dashboards.dashboards.length > 0;
-  const hasProfile = sourceProfileCount > 0 || (status.counts?.sourceIntelligenceRuns ?? 0) > 0;
-  const hasSource = tableCount > 0 || sourceRunCount > 0 || workbench.tables.length > 0;
   if (resolvedPendingDraftCount > 0) return "agent";
-  if (hasDashboard) return "dashboards";
-  if (hasProfile) return "dashboards";
-  if (hasSource) return "sources";
+  // Stable states always return to the single workspace landing. The landing owns
+  // the next-best action instead of silently dropping users into a deep tool.
+  void status;
+  void workbench;
+  void dashboards;
   return "home";
 }
 

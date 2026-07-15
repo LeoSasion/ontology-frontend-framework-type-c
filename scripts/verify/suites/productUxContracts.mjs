@@ -109,57 +109,35 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "frontend-inspector-selected-context",
-        ok: inspectorPanelSource.includes("activeSection: AppSection") &&
-          inspectorPanelSource.includes("evidenceFocus?: EvidenceFocus | null") &&
-          inspectorPanelSource.includes('import { InspectorContextPanel } from "./InspectorContextPanel"') &&
-          inspectorPanelSource.includes("<InspectorContextPanel") &&
-          inspectorContextPanelSource.includes("data-testid=\"inspector-selected-context\"") &&
-          inspectorContextPanelSource.includes("data-testid=\"inspector-selected-context-chips\"") &&
-          inspectorContextPanelSource.includes("data-testid=\"inspector-open-evidence\"") &&
-          inspectorContextPanelSource.includes("sectionContext(activeSection") &&
-          inspectorPanelModelSource.includes("export function drawerActionsForSection") &&
-          inspectorPanelModelSource.includes("export function sectionContext") &&
-          inspectorContextPanelSource.includes("drawerActionsForSection(activeSection)") &&
-          inspectorPanelModelSource.includes("检查摘要") &&
-          inspectorPanelModelSource.includes("改看板") &&
-          appSource.includes("activeSection={section}") &&
+        ok: !appEntrySource.includes("<InspectorPanel") &&
+          !appEntrySource.includes("<InspectorContextPanel") &&
+          appEntrySource.includes("const [navigationContext, setNavigationContext]") &&
+          appEntrySource.includes("navigationContextForSection(resolvedSection, mergedContext)") &&
+          appEntrySource.includes("setNavigationContext(navigationContextFromTarget(resolvedTarget))") &&
           appSource.includes("evidenceFocus={evidenceFocus}") &&
-          appSource.includes("activeDashboardName={activeDashboardName}") &&
-          appSource.includes("activeViewName={activeViewName}") &&
-          appEntrySource.includes("onOpenEvidence={inspector.openEvidence}") &&
-          inspectorControllerSource.includes('openSection("evidence")') &&
-          appSource.includes("const activeDashboardName ="),
+          appSource.includes("focusedTableKey={focusedTable?.table_key") &&
+          appSource.includes("activeDashboardKey={activeDashboardKey}") &&
+          appSource.includes("activeViewKey={activeViewKey}") &&
+          appEntrySource.includes("const handleOpenEvidence = useCallback") &&
+          appEntrySource.includes('section: "evidence"') &&
+          appMainViewSource.includes("onOpenEvidence={onOpenEvidence}") &&
+          appMainViewSource.includes('navigateTo({ section: "agent", tableKey: evidenceFocus?.tableKey'),
       },
     {
         label: "frontend-collapsible-inspector",
-        ok: inspectorControllerSource.includes("inspectorPreferenceStorageKey") &&
-          inspectorControllerSource.includes("initialInspectorPreference") &&
-          inspectorControllerSource.includes("export function useInspectorController") &&
-          inspectorControllerSource.includes("window.localStorage.setItem") &&
-          appEntrySource.includes("const inspector = useInspectorController(openSection)") &&
-          appEntrySource.includes("data-inspector-state={inspector.expanded ? \"expanded\" : \"collapsed\"}") &&
-          appEntrySource.includes("inspectorCollapsed={!inspector.expanded}") &&
-          appEntrySource.includes("onCollapseInspector={inspector.collapse}") &&
-          appEntrySource.includes("onExpandInspector={inspector.expand}") &&
-          appEntrySource.includes("onPinInspectorToggle={inspector.togglePinned}") &&
-          inspectorPanelSource.includes("inspectorCollapsed: boolean") &&
-          inspectorPanelSource.includes("inspectorPinned: boolean") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-expand\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-collapse\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-pin\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-mini-evidence\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-mini-tasks\"") &&
-          inspectorPanelSource.includes("data-testid=\"inspector-mini-safety\"") &&
-          stylesSource.includes('.appShell[data-inspector-state="collapsed"]') &&
-          stylesSource.includes(".inspectorCollapsed") &&
-          stylesSource.includes(".inspectorMiniButton"),
+        ok: !appEntrySource.includes("useInspectorController") &&
+          !appEntrySource.includes("<InspectorPanel") &&
+          !appEntrySource.includes("data-inspector-state") &&
+          !appEntrySource.includes("onCollapseInspector") &&
+          !appEntrySource.includes("onExpandInspector") &&
+          !appLazyModulesSource.includes("loadInspectorPanel") &&
+          !appLazyModulesSource.includes("inspectorPreloader") &&
+          appEntrySource.includes('<main className="contentShell">') &&
+          appEntrySource.includes("<AppMainView"),
       },
     {
         label: "frontend-inspector-friendly-action-error",
-        ok: inspectorPanelSource.includes('import { InspectorTaskQueuePanel } from "./InspectorTaskQueuePanel"') &&
-          inspectorPanelSource.includes("<InspectorTaskQueuePanel") &&
-          inspectorTaskQueuePanelSource.includes("actionResultSummary(lastActionResult)") &&
-          inspectorTaskQueuePanelSource.includes("import { actionKindLabel, actionNextStep, actionResultSummary, payloadTarget }") &&
+        ok: !appEntrySource.includes("<InspectorPanel") &&
           actionRecoveryModelSource.includes("export function buildActionRecovery") &&
           actionRecoveryModelSource.includes("query-table") &&
           actionRecoveryModelSource.includes("dashboard-recovery") &&
@@ -169,31 +147,14 @@ export function appendProductUxContractChecks(context) {
           appWorkspaceModelSource.includes("actionRecoveryFromError(error) ?? buildActionRecovery(action, error)") &&
           appWorkspaceModelSource.includes("targetSection: recovery.targetSection") &&
           appWorkspaceModelSource.includes("recovery,") &&
-          inspectorPanelModelSource.includes('import { actionRecoveryFromResult } from "./actionRecoveryModel"') &&
-          inspectorPanelModelSource.includes("const recovery = actionRecoveryFromResult(result)") &&
-          inspectorPanelModelSource.includes("steps: recovery.steps") &&
-          inspectorPanelModelSource.includes("targetSection: recovery.targetSection") &&
-          inspectorPanelModelSource.includes("function friendlyActionError") &&
-          inspectorPanelModelSource.includes("No analyzable CSV/XLSX spreadsheet was found") &&
-          inspectorPanelModelSource.includes("证据摘要没有完成") &&
-          inspectorTaskQueuePanelSource.includes('data-testid="last-action-recovery-steps"') &&
-          inspectorTaskQueuePanelSource.includes('data-testid="last-action-recovery-open-section"') &&
-          inspectorTaskQueuePanelSource.includes("getAppSection(latestSummary.targetSection)") &&
-          inspectorTaskQueuePanelSource.includes("onOpenSection(latestSummary.targetSection!)") &&
-          inspectorTaskQueuePanelSource.includes("visibleActionSafeState") &&
-          inspectorControllerSource.includes("const openAndExpand = useCallback") &&
-          appEntrySource.includes("onOpenSection={inspector.openAndExpand}") &&
-          inspectorTaskQueuePanelSource.includes("data-testid=\"last-action-technical\"") &&
-          inspectorTaskQueuePanelSource.includes("visibleActionSummary ${latestSummary.tone}") &&
-          inspectorTaskQueuePanelSource.includes("查看错误原文") &&
+          agentPanelSource.includes("lastActionResult: Record<string, unknown> | null") &&
+          agentPanelSource.includes("const activeActionResult =") &&
+          agentPendingChangesPanelSource.includes("actionResultHeadline(activeActionResult)") &&
+          agentPendingChangesPanelSource.includes("actionResultDetail(activeActionResult, currentDraft)") &&
+          agentPendingChangesPanelSource.includes('data-testid="agent-action-result"') &&
+          agentPendingChangesPanelSource.includes('<details className="advancedDetails compactAdvanced agentActionTechnical"') &&
           appDataActionsSource.includes('action: "source-intelligence"') &&
-          appDataActionsSource.includes("throw error") &&
-          stylesSource.includes(".visibleActionSummary.failed") &&
-          stylesSource.includes(".visibleActionSummaryBody") &&
-          stylesSource.includes(".visibleActionSafeState") &&
-          stylesSource.includes(".visibleActionRecoverySteps") &&
-          stylesSource.includes(".visibleActionRecoveryAction") &&
-          stylesSource.includes(".visibleActionTechnical"),
+          appDataActionsSource.includes("throw error"),
       },
     {
         label: "frontend-inspector-action-queue-business-first",
@@ -255,58 +216,19 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "frontend-agent-dock-beginner-task-entry",
-        ok: agentCommandDockSource.includes("data-testid=\"agent-command-dock\"") &&
-          !appSource.includes('section !== "agent"') &&
-          appSource.includes("<AgentCommandDock") &&
-          agentCommandDockSource.includes('data-testid="floating-agent-button"') &&
-          agentCommandDockSource.includes('data-testid="floating-agent-panel"') &&
-          agentCommandDockSource.includes('setAssistantOpen(true)') &&
-          agentCommandDockSource.includes('setAssistantOpen(false)') &&
-          agentCommandDockSource.includes('aria-label={biText("全局 AI 助手"') &&
-          agentCommandDockSource.includes('getAppSection(activeSection)') &&
-          agentCommandDockSource.includes('import { resolveAgentPromptRoute, type AgentPromptRoute } from "../agentPromptRouting"') &&
-          agentCommandDockSource.includes("const [routeHint, setRouteHint] = useState<AgentPromptRoute | null>(null)") &&
-          agentCommandDockSource.includes("const route = resolveAgentPromptRoute(normalizedPrompt, status)") &&
-          agentCommandDockSource.includes("onOpenSection(route.section)") &&
-          agentCommandDockSource.includes("await onAsk(normalizedPrompt, route.section)") &&
-          agentCommandDockSource.includes('data-testid="agent-route-hint"') &&
-          agentPromptRoutingSource.includes("export function resolveAgentPromptRoute") &&
-          agentPromptRoutingSource.includes('section: "sources"') &&
-          agentPromptRoutingSource.includes('section: "views"') &&
-          agentPromptRoutingSource.includes('section: "dashboards"') &&
-          agentPromptRoutingSource.includes('section: "evidence"') &&
-          agentPromptRoutingSource.includes('section: "settings"') &&
+        ok: !appSource.includes("<AgentCommandDock") &&
+          !appLazyModulesSource.includes("loadAgentCommandDock") &&
+          !appLazyModulesSource.includes("agentDockPreloader") &&
+          appEntrySource.includes('onOpenAgent={() => openSection("agent")}') &&
+          appMainViewSource.includes('if (section === "agent")') &&
+          appMainViewSource.includes("<AgentPanel") &&
+          appMainViewSource.includes("onOpenSources={() => openSection(\"sources\")}") &&
+          agentPanelSource.includes("<AgentPromptComposer") &&
+          agentPanelSource.includes("<AgentPendingChangesPanel") &&
           appAgentActionsSource.includes("targetSection?: AppSection") &&
           appAgentActionsSource.includes("if (nextAgent?.requiresConfirmation)") &&
           appAgentActionsSource.includes('section: targetSection ?? "agent"') &&
-          appAgentActionsSource.includes("tableKey: nextAgent?.matched.table?.table_key") &&
-          agentCommandDockSource.includes("aria-busy={busy}") &&
-          agentCommandDockSource.includes("data-testid=\"agent-task-strip\"") &&
-          agentCommandDockSource.includes("data-testid=\"agent-task-sources\"") &&
-          agentCommandDockSource.includes("data-testid=\"agent-task-dashboard\"") &&
-          /data-testid="agent-task-dashboard"\s+disabled=\{busy\}/.test(agentCommandDockSource) &&
-          agentCommandDockSource.includes("data-testid=\"agent-task-evidence\"") &&
-          /data-testid="agent-task-ask"\s+disabled=\{busy\}/.test(agentCommandDockSource) &&
-          agentCommandDockSource.includes("data-testid=\"agent-decision-lane\"") &&
-          agentCommandDockSource.includes("data-testid={`agent-decision-${item.key}`}") &&
-          agentCommandDockSource.includes("data-testid={`agent-decision-${item.key}`} disabled={busy}") &&
-          /disabled=\{busy\}\s+key=\{item\.(key|zh)\}/.test(agentCommandDockSource) &&
-          agentCommandDockSource.includes("Can answer") &&
-          agentCommandDockSource.includes("Review needed") &&
-          agentCommandDockSource.includes("Missing data") &&
-          agentCommandDockSource.includes("sourceIntelligenceCount") &&
-          agentCommandDockSource.includes("hasEvidenceProfile") &&
-          agentCommandDockSource.includes("onOpenSection(\"sources\")") &&
-          agentCommandDockSource.includes("onOpenSection(\"evidence\")") &&
-          agentCommandDockSource.includes("根据当前字段和证据起草一个最合适的图表，先不要直接写入") &&
-          stylesSource.includes(".agentCommandDock.floating") &&
-          stylesSource.includes(".agentFloatButton") &&
-          stylesSource.includes(".agentFloatPanel") &&
-          stylesSource.includes(".agentRouteHint") &&
-          stylesSource.includes('.appShell[data-inspector-state="expanded"] .agentCommandDock.floating') &&
-          stylesSource.includes(".agentDockDecisionLane") &&
-          stylesSource.includes(".agentDockShortcuts button") &&
-          stylesSource.includes("min-height: 34px"),
+          appAgentActionsSource.includes("tableKey: nextAgent?.matched.table?.table_key"),
       },
     {
         label: "frontend-dashboard-readiness-panel",
@@ -324,17 +246,17 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "frontend-import-to-dashboard-wizard",
-        ok: sourceWorkbenchActionPanelSource.includes('data-testid="import-to-dashboard-wizard"') &&
-          sourceWorkbenchActionPanelSource.includes('<details className="sourceGuideDetails"') &&
-          sourceWorkbenchActionPanelSource.includes("这些文件是什么业务？") &&
-          sourceWorkbenchActionPanelSource.includes("证据摘要是否完整？") &&
-          sourceWorkbenchActionPanelSource.includes("先看什么问题？") &&
-          sourceWorkbenchActionPanelSource.includes("source-agent-import-guide") &&
-          !sourceWorkbenchActionPanelSource.includes("beginner-plan-import-data") &&
-          sourceWorkbenchActionPanelSource.includes('disabled={!dashboardRecipeReady || busy === "source-business-dashboard-create"}') &&
-          stylesSource.includes(".importToDashboardWizard") &&
-          stylesSource.includes(".wizardQuestionGrid") &&
-          stylesSource.includes(".wizardActions"),
+        ok: !sourceWorkbenchActionPanelSource.includes('data-testid="import-to-dashboard-wizard"') &&
+          !sourceWorkbenchActionPanelSource.includes("这些文件是什么业务？") &&
+          !sourceWorkbenchActionPanelSource.includes("证据摘要是否完整？") &&
+          !sourceWorkbenchActionPanelSource.includes("source-agent-import-guide") &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-import-plan"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-plan-refresh-profile"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-evidence-guard"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-next-analysis"') &&
+          sourceWorkbenchActionPanelSource.includes('<details className="sourceGuideDetails" data-testid="source-guide-details">') &&
+          sourceWorkbenchActionPanelSource.includes("生成证据摘要后再进入分析与看板。") &&
+          sourceWorkbenchActionPanelSource.includes("数据模型与管理"),
       },
     {
         label: "frontend-settings-sandbox-boundary",
@@ -437,15 +359,14 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "settings-acceptance-evidence-panel-component-boundary",
-        ok: existsSync(join(root, "src", "components", "SettingsAcceptanceEvidencePanel.tsx")) &&
-          settingsPanelSource.includes('import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePanel"') &&
-          settingsPanelSource.includes("<SettingsAcceptanceEvidencePanel") &&
+        ok: !settingsPanelSource.includes('import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePanel"') &&
+          !settingsPanelSource.includes("<SettingsAcceptanceEvidencePanel") &&
           !settingsPanelSource.includes("const closureItems") &&
           !settingsPanelSource.includes('data-testid="settings-closure-workbench"') &&
           !settingsPanelSource.includes('className="settingsEvidenceList"') &&
-          settingsAcceptanceEvidencePanelSource.includes("export function SettingsAcceptanceEvidencePanel") &&
-          settingsAcceptanceEvidencePanelSource.includes('className="settingsEvidenceList"') &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-workbench"'),
+          settingsPanelSource.includes("<SettingsSandboxBoundaryPanel") &&
+          settingsPanelSource.includes("<SettingsConfigPortabilityPanel") &&
+          settingsPanelSource.includes("<SettingsThemePreferencePanel"),
       },
     {
         label: "frontend-no-sample-debug-entry",
@@ -493,11 +414,11 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "implementation-status-handoff",
-        ok: implementationStatusSource.includes("# AIBI-C Implementation Status") &&
-          implementationStatusSource.includes("## Current Release Boundary") &&
-          implementationStatusSource.includes("## Capability Status") &&
-          implementationStatusSource.includes("## Known Limitations") &&
-          implementationStatusSource.includes("## Architecture Ownership") &&
+        ok: implementationStatusSource.includes("# AIBI-C 实现状态") &&
+          implementationStatusSource.includes("## 当前发布边界") &&
+          implementationStatusSource.includes("## 能力状态") &&
+          implementationStatusSource.includes("## 已知限制") &&
+          implementationStatusSource.includes("## 架构归属") &&
           implementationStatusSource.includes("npm run verify") &&
           implementationStatusSource.includes("python tools/bi_cli.py --json status") &&
           implementationStatusSource.includes("single-user and local-only"),
@@ -517,8 +438,15 @@ export function appendProductUxContractChecks(context) {
           agentPendingChangesPanelSource.includes("data-testid=\"agent-current-draft-reject\"") &&
           agentPendingChangesPanelSource.includes("data-testid={`agent-draft-reject-${draft.action_key}`}") &&
           agentPendingChangesPanelSource.includes("onConfirmDryRun(draft.action_key)") &&
-          agentPendingChangesPanelSource.includes("onConfirmAction(draft.action_key)") &&
+          agentPanelSource.includes("onConfirmAction: (actionKey: string, draft?: ActionDraft) => Promise<void>") &&
+          agentPendingChangesPanelSource.includes("onConfirmAction: (actionKey: string, draft?: ActionDraft) => Promise<void>") &&
+          agentPendingChangesPanelSource.includes("onConfirmAction(activeActionKey, currentDraft)") &&
+          agentPendingChangesPanelSource.includes("onConfirmAction(draft.action_key, draft)") &&
           agentPendingChangesPanelSource.includes("onRejectAction(draft.action_key)") &&
+          appAgentActionsSource.includes('import { confirmedActionNavigationTarget } from "./agentActionNavigationModel"') &&
+          appAgentActionsSource.includes("const handleConfirmAction = useCallback(async (actionKey: string, draft?: ActionDraft)") &&
+          appAgentActionsSource.includes("confirmedActionNavigationTarget(actionKey, result, draft)") &&
+          appAgentActionsSource.includes("navigateTo(target)") &&
           agentPanelSource.includes("currentDraftIsPending") &&
           agentPanelModelSource.includes("dashboard.copy") &&
           agentPanelModelSource.includes("dashboard.rename") &&

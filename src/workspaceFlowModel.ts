@@ -1,6 +1,14 @@
 import type { AppSection } from "./appSections";
 import type { BusinessPathStepKey } from "./businessPathModel";
-import type { WorkbenchPayload, WorkspaceStatus } from "./types";
+import type { SourceIntelligenceRunSummary, WorkbenchPayload, WorkspaceStatus } from "./types";
+
+export function isSourceIntelligenceRunUsable(run: SourceIntelligenceRunSummary) {
+  return run.freshness?.usableForPlanning !== false;
+}
+
+export function latestUsableSourceIntelligenceRun(runs: SourceIntelligenceRunSummary[]) {
+  return runs.find(isSourceIntelligenceRunUsable);
+}
 
 export type WorkspaceFlowStage = "connect" | "profile" | "chart" | "evidence" | "confirm";
 
@@ -60,7 +68,10 @@ export function buildWorkspaceFlow({
   const metricCount = positiveCount(status?.counts.metrics, metrics.length);
   const relationshipCount = positiveCount(status?.counts.relationships, relationships.length);
   const sourceRunCount = positiveCount(status?.counts.sourceRuns, sourceRuns.length);
-  const sourceProfileCount = positiveCount(status?.counts.sourceIntelligenceRuns, sourceIntelligenceRuns.length);
+  const usableSourceProfileCount = sourceIntelligenceRuns.filter(isSourceIntelligenceRunUsable).length;
+  const sourceProfileCount = sourceIntelligenceRuns.length
+    ? usableSourceProfileCount
+    : positiveCount(status?.counts.sourceIntelligenceRuns, 0);
   const resolvedDashboardCount = positiveCount(dashboardCount ?? status?.counts.dashboards, 0);
   const resolvedDraftCount = positiveCount(pendingDraftCount ?? status?.counts.actionDrafts, agentRequiresConfirmation ? 1 : 0);
 

@@ -510,9 +510,15 @@ export function appendDashboardViewContractExtendedChecks(context) {
           appWorkspaceModelSource.includes('export type ApiMode = "loading" | "live" | "fallback"') &&
           appWorkspaceModelSource.includes("export const connectingStatus: WorkspaceStatus") &&
           appWorkspaceModelSource.includes('notes: ["Connecting to local data service..."]') &&
-          appSource.includes('apiMode === "loading" ? connectingStatus : status') &&
+          appWorkspaceModelSource.includes("tables: 0") &&
+          appWorkspaceModelSource.includes("sourceRuns: []") &&
+          appSource.includes('const displayStatus = apiMode === "loading" ? connectingStatus : status') &&
+          appSource.includes("status: displayStatus") &&
+          appSource.includes("status={displayStatus}") &&
+          !appSource.includes("fallbackSample") &&
           topBarSource.includes('apiMode === "loading"') &&
-          topBarSource.includes('biText("正在连接", "Connecting")'),
+          topBarSource.includes('biText("正在连接本地服务", "Connecting to local services")') &&
+          topBarSource.includes('data-testid="service-diagnostics"'),
       }
   );
 }

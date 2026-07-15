@@ -50,7 +50,7 @@ type AgentPanelProps = {
   onAsk: (prompt: string) => Promise<void>;
   onAskBranch: (prompt: string, parentRunKey: string, branchLabel?: string) => Promise<void>;
   onConfirmDryRun: (actionKey: string) => Promise<void>;
-  onConfirmAction: (actionKey: string) => Promise<void>;
+  onConfirmAction: (actionKey: string, draft?: ActionDraft) => Promise<void>;
   onRejectAction: (actionKey: string) => Promise<void>;
   onOpenSources: () => void;
 };
@@ -412,7 +412,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       <section className="mainPanel" aria-labelledby="agent-title">
         <div className="panelHeader">
           <div>
-            <p className="kicker">{biText("受控 Agent", "Controlled Agent")}</p>
+            <p className="kicker">{biText("分析", "Analyze")}</p>
             <h2 id="agent-title">
               <Bilingual zh="先接入数据，再让 AI 生成图表或回答" en="Add data before asking AI for charts or answers" />
             </h2>
@@ -435,7 +435,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
           </p>
           <div className="noDataRouteActions">
             <button className="primaryButton" onClick={onOpenSources} type="button">
-              <Bilingual zh="去数据源页" en="Go to Sources" />
+              <Bilingual zh="去接入数据" en="Connect data" />
             </button>
             <button
               className="secondaryButton"
@@ -455,9 +455,9 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     <section className="mainPanel" aria-labelledby="agent-title">
       <div className="panelHeader">
         <div>
-          <p className="kicker">{biText("受控 Agent", "Controlled Agent")}</p>
+          <p className="kicker">{biText("分析", "Analyze")}</p>
           <h2 id="agent-title">
-            <Bilingual zh="自然语言到证据链计划" en="Natural language to evidence-backed plan" />
+            <Bilingual zh="问数据一个问题" en="Ask your data a question" />
           </h2>
         </div>
         <div className="statusPill">

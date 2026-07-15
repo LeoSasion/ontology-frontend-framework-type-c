@@ -136,135 +136,63 @@ export function appendAppArchitectureContractExtendedChecks(context) {
 
     {
         label: "frontend-home-four-action-import-proof",
-        ok: homeOverviewSource.includes("<ProductActivationPanel") &&
-          homeOverviewSource.includes('data-testid="home-shortcut-details"') &&
-          homeOverviewSource.includes("<HomeActionDock") &&
-          homeOverviewSource.includes("<HomeOperatingSummaryPanel") &&
-          homeOperatingSummaryPanelSource.includes('className="quickQuestionBox"') &&
-          homeOperatingSummaryPanelSource.includes('className="operatingSummaryGrid"') &&
-          homeOperatingSummaryPanelSource.includes('className="trustGrid"') &&
-          homeOperatingSummaryPanelSource.includes("buildStarterQuestions(latestRun)") &&
-          !homeOverviewSource.includes('className="quickQuestionBox"') &&
-          !homeOverviewSource.includes('className="operatingSummaryGrid"') &&
-          homeActionDockSource.includes('data-testid="home-action-dock"') &&
-          homeActionDockSource.includes('data-testid="home-action-import"') &&
-          homeActionDockSource.includes('data-testid="home-action-chart"') &&
-          homeActionDockSource.includes('data-testid="home-action-ask"') &&
-          homeActionDockSource.includes('data-testid="home-action-confirm"') &&
-          !homeOverviewSource.includes("HomeRealDataValidationPanel") &&
-          !homeOverviewSource.includes("getBCostMonitorValidation") &&
-          !homeOverviewSource.includes("matchedNonTextWidgets") &&
-          productActivationPanelSource.includes('testId = "product-activation-panel"') &&
-          productActivationPanelSource.includes('data-testid="product-activation-primary"') &&
-          productActivationModelSource.includes("export function buildProductActivation") &&
-          stylesSource.includes(".homeActionDock") &&
-          stylesSource.includes(".productActivationPanel") &&
-          stylesSource.includes(".homeActionCard.primary") &&
-          homeOverviewSource.includes("<HomeDetailedPathPanel") &&
-          homeDetailedPathPanelSource.includes('data-testid="home-detailed-path"'),
+        ok: (homeOverviewSource.match(/data-testid="workspace-primary-task"/g) ?? []).length === 1 &&
+          homeOverviewSource.includes("const currentStep = !hasData ? 0 : !hasCurrentEvidence ? 1 : hasPendingDraft ? 3 : 2") &&
+          homeOverviewSource.includes('className="workspaceTaskEmpty"') &&
+          homeOverviewSource.includes('className="workspaceQuestionTask"') &&
+          homeOverviewSource.includes("async function generateEvidence()") &&
+          homeOverviewSource.includes("async function submitQuestion(event: FormEvent<HTMLFormElement>)") &&
+          homeOverviewSource.includes('onOpenSection("agent")') &&
+          homeOverviewSource.includes('className="workspaceSecondaryActions"') &&
+          !homeOverviewSource.includes("ProductActivationPanel") &&
+          !homeOverviewSource.includes("HomeActionDock") &&
+          !homeOverviewSource.includes("HomeOperatingSummaryPanel") &&
+          !homeOverviewSource.includes("HomeDetailedPathPanel") &&
+          !homeOverviewSource.includes('data-testid="home-action-dock"'),
       },
     {
         label: "frontend-no-data-onboarding-ux-boundary",
-        ok: homeOverviewSource.includes("<ProductActivationPanel") &&
-          homeOverviewSource.includes("buildProductActivation({") &&
-          homeOverviewSource.includes("useQualityDoctor(hasData, workbench)") &&
-          /if \(!enabled\) \{\s*setResult\(null\);\s*return;\s*\}/.test(useQualityDoctorSource) &&
-          /\{hasData \? \(\s*<>/.test(homeOverviewSource) &&
-          !homeOverviewSource.includes('data-testid="home-first-run-focus"') &&
-          homeOverviewSource.includes("homeBetaDetails") &&
-          homeOverviewSource.includes('data-testid="home-secondary-path-details"') &&
-          homeOverviewSource.includes('data-testid="home-detailed-path-details"') &&
-          homeOverviewSource.includes('data-testid="home-operating-summary-details"') &&
-          homeActionDockSource.includes('className={hasData ? "homeActionDock" : "homeActionDock firstRun"}') &&
-          homeActionDockSource.includes('disabled={!hasData}') &&
-          productActivationModelSource.includes('ProductActivationStepKey = "connect" | "profile" | "chart" | "evidence" | "confirm"') &&
-          productActivationModelSource.includes("const activeStepKey: ProductActivationStepKey = flow.activeStage") &&
+        ok: homeOverviewSource.includes("const hasData = status.counts.tables > 0 || workbench.tables.length > 0") &&
+          homeOverviewSource.includes("{!hasData ? (") &&
+          homeOverviewSource.includes("先接入一份真实数据") &&
+          homeOverviewSource.includes("系统会先预检，不会直接写入") &&
+          homeOverviewSource.includes('onClick={() => onOpenSection("sources")}') &&
+          homeOverviewSource.includes(") : !hasCurrentEvidence ? (") &&
+          homeOverviewSource.includes("生成证据摘要，再开始提问") &&
+          homeOverviewSource.includes('disabled={busy === "profile"}') &&
           workspaceFlowModelSource.includes("export function buildWorkspaceFlow") &&
-          workspaceFlowModelSource.includes("export function isBusinessStepLockedByFlow") &&
           workspaceFlowModelSource.includes("export function resolveSectionForFlow") &&
           appSource.includes("const workspaceFlow = useMemo(() => buildWorkspaceFlow") &&
           appSource.includes("resolveSectionForFlow(section, workspaceFlow)") &&
           sidebarSource.includes("isSectionLockedByFlow") &&
-          businessPathBarSource.includes("isBusinessStepLockedByFlow") &&
-          productActivationModelSource.includes("Charts and evidence appear only after a real import") &&
-          productActivationModelSource.includes("full industry boards remain beta") &&
-          productActivationPanelSource.includes("const step = activation.primaryStep") &&
-          productActivationPanelSource.includes('data-testid={`product-activation-step-${step.key}`}') &&
-          !productActivationPanelSource.includes("activation.steps.map") &&
           sourceWorkbenchStateSource.includes("const hasData = tables.length > 0 || status.counts.tables > 0") &&
           sourceWorkbenchStateSource.includes("const showExpertWorkbench = showAdvanced") &&
           sourceWorkbenchStateSource.includes("if (!focusedTableKey || !tableKeySet.has(focusedTableKey)) return") &&
-          !sourceWorkbenchSource.includes("ProductActivationPanel") &&
-          sourceWorkbenchViewSource.includes("onOpenDashboard={onOpenDashboard}") &&
-          !sourceWorkbenchViewSource.includes('data-testid="source-no-data-guide"') &&
           sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
-          !sourceWorkbenchViewSource.includes('data-testid="source-expert-details"') &&
-          dashboardCanvasSource.includes("onOpenBusinessStep: (step: BusinessPathStepKey) => void") &&
-          dashboardCanvasSource.includes('testId="dashboard-product-activation"') &&
-          !dashboardCanvasSource.includes('data-testid="dashboard-no-data-route"') &&
-          evidenceViewSource.includes('data-testid="evidence-next-action"') &&
-          !evidenceViewSource.includes("ProductActivationPanel") &&
-          dashboardCanvasSource.includes('data-testid="dashboard-guided-edit-details"') &&
-          dashboardCanvasSource.includes('data-testid="dashboard-advanced-edit-details"') &&
-          dashboardCanvasSource.includes('data-testid="dashboard-contract-details"') &&
           agentPanelSource.includes("onOpenSources: () => void") &&
           agentPanelSource.includes('data-testid="agent-no-data-route"') &&
-          agentPanelSource.includes('data-testid="agent-suggestion-details"') &&
-          agentPanelSource.includes('data-testid="agent-evidence-audit-details"') &&
-          agentPanelSource.includes('data-testid="agent-task-packet-details"') &&
-          evidenceViewSource.includes("onOpenBusinessStep: (step: BusinessPathStepKey) => void") &&
-          evidenceViewSource.includes("useQualityDoctor(hasData, workbench)") &&
-          /if \(!enabled\) \{\s*setResult\(null\);\s*return;\s*\}/.test(useQualityDoctorSource) &&
-          evidenceViewSource.includes('data-testid="evidence-open-sources"') &&
-          !evidenceViewSource.includes('data-testid="evidence-no-data-route"') &&
-          evidenceViewSource.includes('data-testid="evidence-explanation-details"') &&
-          evidenceViewSource.includes('data-testid="evidence-receipts-details"') &&
-          viewWorkspaceSource.includes('data-testid="view-dashboard-bridge-details"') &&
-          viewWorkspaceSource.includes('data-testid="view-agent-task-details"') &&
-          viewWorkspaceSource.includes('data-testid="view-manage-details"') &&
           settingsPanelSource.includes('data-testid="settings-sandbox-details"') &&
-          settingsPanelSource.includes('data-testid="settings-acceptance-details"') &&
           settingsPanelSource.includes('data-testid="settings-config-portability-details"') &&
-          sidebarWorkspaceCardSource.includes('<details className="workspaceManageDetails">') &&
-          sidebarAssetSectionsSource.includes('data-testid="sidebar-source-asset-details"') &&
-          sidebarAssetSectionsSource.includes('data-testid="sidebar-dashboard-asset-details"') &&
-          sidebarAssetSectionsSource.includes('data-testid="sidebar-evidence-asset-details"') &&
-          businessPathBarSource.includes('className={compact ? "businessPathBar compact" : "businessPathBar"}') &&
-          agentCommandDockSource.includes("const shouldMinimize = !hasTables && !assistantOpen && activeSection !== \"agent\"") &&
-          agentCommandDockSource.includes("onboardingMinimized") &&
-          !stylesSource.includes(".firstRunFocusPanel") &&
-          !stylesSource.includes(".sourceNoDataGuide") &&
-          stylesSource.includes(".productActivationSteps") &&
-          stylesSource.includes(".productActivationFactGrid") &&
-          stylesSource.includes(".sourceBeginnerMode .workbenchGrid") &&
-          stylesSource.includes(".noDataRoutePanel") &&
-          stylesSource.includes(".workspaceManageDetails") &&
-          stylesSource.includes(".workspaceManageDetails:not([open]) > :not(summary)") &&
-          stylesSource.includes(".progressiveDetails") &&
-          stylesSource.includes(".dashboardProgressiveGrid") &&
-          stylesSource.includes(".evidenceProgressiveGrid") &&
-          stylesSource.includes(".sidebarAssetDetails") &&
-          stylesSource.includes(".homeIntelligenceGrid") &&
-          stylesSource.includes(".sandboxCompareFacts") &&
-          stylesSource.includes(".sandboxVersionHints") &&
-          stylesSource.includes(".businessPathBar.compact") &&
-          stylesSource.includes(".agentCommandDock.onboardingMinimized"),
+          !settingsPanelSource.includes('data-testid="settings-acceptance-details"') &&
+          !appSource.includes("<BusinessPathBar") &&
+          !appSource.includes("<AgentCommandDock") &&
+          !homeOverviewSource.includes("ProductActivationPanel"),
       },
     {
         label: "product-ux-acceptance-documentation-boundary",
-        ok: productUxStandardDocSource.includes("## First Success Flow Standard") &&
-          productUxStandardDocSource.includes("## Object Ownership Matrix") &&
-          productUxStandardDocSource.includes("## Delete And Rollback Standard") &&
-          productUxStandardDocSource.includes("docs/product-acceptance-matrix.md") &&
-          productAcceptanceMatrixDocSource.includes("Empty workspace") &&
-          productAcceptanceMatrixDocSource.includes("Create one chart") &&
-          productAcceptanceMatrixDocSource.includes("Delete source or object") &&
-          productAcceptanceMatrixDocSource.includes("Production no-demo boundary") &&
+        ok: productUxStandardDocSource.includes("## 首次成功流程") &&
+          productUxStandardDocSource.includes("## 对象归属与路由") &&
+          productUxStandardDocSource.includes("## 确认与删除") &&
+          productUxStandardDocSource.includes("product-acceptance-matrix.md") &&
+          productAcceptanceMatrixDocSource.includes("空工作区") &&
+          productAcceptanceMatrixDocSource.includes("创建单图") &&
+          productAcceptanceMatrixDocSource.includes("删除来源或对象") &&
+          productAcceptanceMatrixDocSource.includes("生产无演示数据") &&
           productAcceptanceMatrixDocSource.includes("validation-inputs") &&
           docsReadmeSource.includes("product-acceptance-matrix.md") &&
-          prdDocSource.includes("## Requirement Ownership") &&
+          prdDocSource.includes("## 需求事实归属") &&
           !prdDocSource.includes("source-intelligence fixtures") &&
-          implementationStatusSource.includes("Product activation shows only the current necessary step"),
+          implementationStatusSource.includes("“工作区”只显示当前必要任务"),
       },
     {
         label: "frontend-production-copy-no-example-placeholders",
@@ -283,18 +211,18 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           docsReadmeSource.includes("development-roadmap.md") &&
           docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
           prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
-          developmentRoadmapDocSource.includes("## 先记住一条主流程") &&
+          developmentRoadmapDocSource.includes("## 不变的主流程") &&
           developmentRoadmapDocSource.includes("## 当前队列") &&
           !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
           !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
-          implementationStatusSource.includes("| Verifiable analysis units | Stable initial |") &&
-          implementationStatusSource.includes("| Safe read-only connector adapter | Stable controlled |") &&
+          implementationStatusSource.includes("| Analysis Unit 与图表适配 | 稳定初版 |") &&
+          implementationStatusSource.includes("| Connector Adapter | 稳定受控 |") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("### P0.") &&
           !developmentRoadmapDocSource.includes("### P1.") &&
           developmentRoadmapDocSource.includes("### P2. 更复杂的跨表执行") &&
-          developmentRoadmapDocSource.includes("## 明确暂时不做") &&
+          developmentRoadmapDocSource.includes("## 暂不开发") &&
           !developmentRoadmapDocSource.includes("npm run preflight"),
       },
     {
@@ -309,16 +237,14 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "home-detailed-path-panel-boundary",
-        ok: existsSync(join(root, "src", "components", "HomeDetailedPathPanel.tsx")) &&
-          homeOverviewSource.includes('import { HomeDetailedPathPanel } from "./HomeDetailedPathPanel"') &&
-          homeOverviewSource.includes("<HomeDetailedPathPanel") &&
-          !homeOverviewSource.includes('data-testid="home-detailed-path"') &&
-          homeDetailedPathPanelSource.includes("type HomeDetailedPathPanelProps") &&
-          homeDetailedPathPanelSource.includes("runDashboardTemplate: (confirm: boolean) => Promise<void>") &&
-          homeDetailedPathPanelSource.includes("onSourceIntelligenceRun: () => Promise<Record<string, unknown> | void>") &&
-          homeDetailedPathPanelSource.includes("查看更多数据源、通用看板和 Agent 路径") &&
-          homeDetailedPathPanelSource.includes("预览看板草案") &&
-          homeDetailedPathPanelSource.includes("帮我生成分析看板并说明证据"),
+        ok: !homeOverviewSource.includes('import { HomeDetailedPathPanel } from "./HomeDetailedPathPanel"') &&
+          !homeOverviewSource.includes("<HomeDetailedPathPanel") &&
+          !homeOverviewSource.includes("runDashboardTemplate") &&
+          homeOverviewSource.includes('className="workspaceSecondaryActions"') &&
+          homeOverviewSource.includes("<details>") &&
+          homeOverviewSource.includes("高级工具") &&
+          homeOverviewSource.includes('onOpenSection("views")') &&
+          homeOverviewSource.includes('onOpenSection("settings")'),
       },
     {
         label: "frontend-state-driven-landing",
@@ -333,13 +259,18 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appNavigationModelSource.includes('viewKey: "view"') &&
           appSource.includes('from "./appWorkspaceModel"') &&
           appWorkspaceModelSource.includes("export function preferredLandingSection") &&
-          appWorkspaceModelSource.includes("if (hasDashboard) return \"dashboards\"") &&
-          appWorkspaceModelSource.includes("if (hasSource) return \"sources\"") &&
+          appWorkspaceModelSource.includes('if (resolvedPendingDraftCount > 0) return "agent"') &&
+          appWorkspaceModelSource.includes('return "home"') &&
+          !appWorkspaceModelSource.includes('return "dashboards"') &&
+          !appWorkspaceModelSource.includes('return "sources"') &&
           appSource.includes("explicitInitialSectionRef") &&
           appSource.includes("autoLandingAppliedRef") &&
           appSource.includes('import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel"') &&
           appRefreshModelSource.includes("export async function refreshStatusDashboardsWorkbenchDrafts") &&
           appSource.includes("setSection(preferredLandingSection(surface.status, surface.workbench, surface.dashboards, surface.actionDrafts.length))") &&
+          appNavigationModelSource.includes('if (section === "home" || section === "settings") return {}') &&
+          appSource.includes("navigationContextForSection(resolvedSection, mergedContext)") &&
+          appSource.includes("navigationContextForSection(section, {") &&
           !appSource.includes("setSection(\"home\");"),
       },
     {
@@ -360,10 +291,12 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appAgentActionsSource.includes("confirmAction(actionKey, true, true, activeWorkspaceId)") &&
           appAgentActionsSource.includes("nextAgent.workspaceId !== activeWorkspaceId") &&
           appAgentActionsSource.includes("result.workspaceId !== activeWorkspaceId") &&
-          appAgentActionsSource.includes('section: "dashboards"') &&
+          appAgentActionsSource.includes('from "./agentActionNavigationModel"') &&
+          appAgentActionsSource.includes("const target = confirmedActionNavigationTarget(actionKey, result, draft)") &&
+          appAgentActionsSource.includes("navigateTo(target)") &&
           appAgentActionsSource.includes('section: "agent"') &&
           appAgentActionsSource.includes("actionKey: nextAgent.actionDraft?.actionKey") &&
-          appAgentActionsSource.includes("dashboardKey: typeof result.createdDashboardKey") &&
+          !appAgentActionsSource.includes("dashboardKey: typeof result.createdDashboardKey") &&
           !appSource.includes("const handleAsk = useCallback") &&
           !appSource.includes("const handleConfirmAction = useCallback") &&
           !appSource.includes("const handleRejectAction = useCallback"),
@@ -414,7 +347,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           biCliRuntimeSource.includes('layout = {"version": 1, "grid": "12-col", "widgets": [], "globalFilters": []}') &&
           !biCliRuntimeSource.includes('("bar", "渠道净销售"') &&
           !biCliRuntimeSource.includes('("table", "订单明细"') &&
-          productUxStandardDocSource.includes("Creating an empty dashboard creates only the dashboard container") &&
+          productUxStandardDocSource.includes("创建空看板只创建看板容器") &&
           byLabel["cli-source-intelligence-no-input-blocked"].ok === true &&
           String(byLabel["cli-source-intelligence-no-input-blocked"].parsed?.error ?? "").includes("requires imported source paths"),
       },
@@ -441,13 +374,18 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-workspace-switcher",
-        ok: sidebarWorkspaceCardSource.includes('data-testid="workspace-switcher"') &&
+        ok: sidebarSource.includes('id="workspace-switcher"') &&
+          sidebarSource.includes('aria-label={biText("选择工作区", "Select workspace")}') &&
+          sidebarSource.includes("workspaces.map((workspace) =>") &&
           sidebarSource.includes("onWorkspaceCreate") &&
           sidebarSource.includes("onWorkspaceSelect") &&
           sidebarSource.includes("onWorkspaceDelete") &&
-          sidebarSource.includes("selectWorkspaceFromInput") &&
-          sidebarSource.includes("createWorkspaceFromInput") &&
-          sidebarSource.includes("deleteWorkspaceFromInput") &&
+          sidebarSource.includes("onWorkspaceRename") &&
+          sidebarSource.includes('className="sidebarWorkspaceManager"') &&
+          sidebarSource.includes("async function createWorkspace()") &&
+          sidebarSource.includes("async function renameWorkspace()") &&
+          sidebarSource.includes("async function previewWorkspaceDelete()") &&
+          sidebarSource.includes("async function confirmWorkspaceDelete()") &&
           appSource.includes('from "./useAppWorkspaceActions"') &&
           appSource.includes("useAppWorkspaceActions({") &&
           appWorkspaceActionsSource.includes("createWorkspace(name, false)") &&
@@ -459,59 +397,37 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "sidebar-workspace-card-component-boundary",
-        ok: existsSync(join(root, "src", "components", "SidebarWorkspaceCard.tsx")) &&
-          sidebarSource.includes('const SidebarWorkspaceCard = lazy(() => import("./SidebarWorkspaceCard"))') &&
-          sidebarSource.includes("<SidebarWorkspaceCard") &&
-          !sidebarSource.includes('data-testid="workspace-switcher"') &&
-          sidebarWorkspaceCardSource.includes("type SidebarWorkspaceCardProps") &&
-          sidebarWorkspaceCardSource.includes("createWorkspaceFromInput: () => Promise<Record<string, unknown> | void>") &&
-          sidebarWorkspaceCardSource.includes("selectWorkspaceFromInput: (workspaceId: string) => Promise<void>") &&
-          sidebarWorkspaceCardSource.includes("deleteWorkspaceFromInput: (workspaceId: string, confirm?: boolean)") &&
-          sidebarWorkspaceCardSource.includes('data-testid="workspace-delete-list"') &&
-          sidebarWorkspaceCardSource.includes("deletableWorkspaces") &&
-          !sidebarWorkspaceCardSource.includes("window.confirm") &&
-          sidebarWorkspaceCardSource.includes('data-testid="workspace-delete-preview"') &&
-          sidebarWorkspaceCardSource.includes("工作区沙盒") &&
-          sidebarWorkspaceCardSource.includes("写入类动作仍必须先生成草案并确认") &&
-          sidebarWorkspaceCardSource.includes('title={currentWorkspace.name}') &&
-          hasCssRule(stylesSource, ".assetPanel", "overflow-x: hidden;", "overflow-y: auto;") &&
-          hasCssRule(stylesSource, ".assetSectionTitle strong", "text-overflow: ellipsis;", "white-space: nowrap;") &&
-          verifyUiRealImportSource.includes("ui-real-import-no-asset-panel-x-overflow") &&
-          verifyUiRealImportSource.includes("ui-evidence-${evidenceViewport.key}-narrow-grid-collapses") &&
-          verifyUiRealImportSource.includes("real-import-evidence-${evidenceViewport.key}.png"),
+        ok: !sidebarSource.includes("SidebarWorkspaceCard") &&
+          !sidebarSource.includes('import("./SidebarWorkspaceCard")') &&
+          sidebarSource.includes('className="sidebarWorkspaceControl"') &&
+          sidebarSource.includes('id="workspace-switcher"') &&
+          sidebarSource.includes('<details className="sidebarWorkspaceManager">') &&
+          sidebarSource.includes('className="sidebarWorkspaceManagerBody"') &&
+          sidebarSource.includes('className="sidebarDeletePreview"') &&
+          sidebarSource.includes("deletePreview.requiresConfirmation !== true") &&
+          !sidebarSource.includes("window.confirm"),
       },
     {
         label: "ui-flow-visible-production-state-boundary",
         ok: verifyUiFlowSource.includes("const isVisible = (element)") &&
           verifyUiFlowSource.includes('element.closest("details:not([open])")') &&
           verifyUiFlowSource.includes('visibleCount(\'[data-testid="source-coverage-item"]\')') &&
-          verifyUiFlowSource.includes('visible("source-next-dashboard") || visible("source-dashboard-next-action")') &&
+          verifyUiFlowSource.includes('visible("source-next-analysis") || visible("beginner-plan-refresh-profile")') &&
           verifyUiFlowSource.includes("const dashboardList = Array.isArray(dashboards.dashboards)") &&
           verifyUiFlowSource.includes("Array.isArray(dashboards.dashboards) && dashboardCount >= 0"),
       },
     {
         label: "sidebar-asset-sections-component-boundary",
-        ok: existsSync(join(root, "src", "components", "SidebarAssetSections.tsx")) &&
-          sidebarSource.includes('from "../sidebarAssetModules"') &&
-          sidebarAssetModulesSource.includes("export const SidebarAssetSections = lazy") &&
-          sidebarSource.includes("<SidebarAssetSections") &&
-          sidebarSource.includes("assetSectionsMounted ? <Suspense") &&
-          !sidebarSource.includes('aria-labelledby="source-assets-title"') &&
-          !sidebarSource.includes('aria-labelledby="dashboard-assets-title"') &&
-          sidebarAssetSectionsSource.includes("type SidebarAssetSectionsProps") &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="source-assets-title"') &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="dashboard-assets-title"') &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="agent-assets-title"') &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="evidence-assets-title"') &&
-          sidebarAssetSectionsSource.includes("全局提问与确认") &&
-          sidebarAssetSectionsSource.includes("右下角都可以直接提问") &&
-          !sidebarAssetSectionsSource.includes('aria-labelledby="start-assets-title"') &&
-          !sidebarAssetSectionsSource.includes("可执行指标") &&
-          !sidebarAssetSectionsSource.includes("homeNextSection") &&
-          !sidebarAssetSectionsSource.includes("primaryAssetRow") &&
-          !sidebarAssetSectionsSource.includes("promptStack") &&
-          !sidebarAssetSectionsSource.includes("用自然语言改看板") &&
-          sidebarAssetSectionsSource.includes('aria-labelledby="settings-assets-title"'),
+        ok: !sidebarSource.includes('from "../sidebarAssetModules"') &&
+          !sidebarSource.includes("SidebarAssetSections") &&
+          !sidebarSource.includes("assetSectionsMounted") &&
+          sidebarSource.includes('className="workspaceNav"') &&
+          sidebarSource.includes("primarySections.map((sectionKey) =>") &&
+          sidebarSource.includes('className="sidebarAdvancedNav"') &&
+          sidebarSource.includes('activeSection === "views"') &&
+          sidebarSource.includes('className="sidebarFooter"') &&
+          !sidebarSource.includes("source-assets-title") &&
+          !sidebarSource.includes("dashboard-assets-title"),
       },
     {
         label: "frontend-app-section-model-boundary",
@@ -522,11 +438,17 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appSectionsSource.includes("export function getAppSection") &&
           appSectionsSource.includes("export function isAppSection") &&
           sidebarSource.includes('from "../appSections"') &&
-          sidebarSource.includes("primaryAppSections.map") &&
-          sidebarSource.includes("utilityAppSections.map") &&
+          appSectionsSource.includes('zh: "工作区"') &&
+          appSectionsSource.includes('zh: "数据"') &&
+          appSectionsSource.includes('zh: "分析"') &&
+          appSectionsSource.includes('zh: "看板"') &&
+          sidebarSource.includes('const primarySections: AppSection[] = ["home", "sources", "agent", "dashboards", "evidence"]') &&
+          sidebarSource.includes('className="sidebarAdvancedNav"') &&
+          sidebarSource.includes('activeSection === "views"') &&
           topBarSource.includes("getAppSection(activeSection)") &&
           appLazyModulesSource.includes("getAppSection(section)") &&
-          appNavigationModelSource.includes("isAppSection(sectionParam) ? sectionParam : \"home\""),
+          appNavigationModelSource.includes("isAppSection(sectionParam) ? sectionParam : \"home\"") &&
+          appNavigationModelSource.includes('if (section === "home" || section === "settings") return {}'),
       },
     {
         label: "frontend-desktop-shell-fluid-width",
@@ -554,19 +476,22 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-home-draft-state-requires-confirmation",
-        ok: homeOverviewSource.includes('agent.requiresConfirmation && agent.actionDraft?.status === "draft"'),
+        ok: homeOverviewSource.includes("const hasPendingDraft = agent.requiresConfirmation === true || (status.counts.actionDrafts ?? 0) > 0") &&
+          homeOverviewSource.includes(") : hasPendingDraft ? (") &&
+          homeOverviewSource.includes('data-testid="workspace-review-draft"') &&
+          homeOverviewSource.includes("核对等待确认的修改") &&
+          homeOverviewSource.indexOf('data-testid="workspace-review-draft"') < homeOverviewSource.indexOf('data-testid="workspace-question-form"') &&
+          homeOverviewSource.includes('onClick={() => onOpenSection("agent")}'),
       },
     {
         label: "frontend-home-dashboard-preview-visible",
-        ok: homeOverviewSource.includes("const [dashboardPlan, setDashboardPlan]") &&
-          homeOverviewSource.includes("setDashboardPlan(result)") &&
-          homeDetailedPathPanelSource.includes('data-testid="home-dashboard-preview-result"') &&
-          homeDetailedPathPanelSource.includes('data-testid="home-dashboard-preview-confirm"') &&
-          homeDetailedPathPanelSource.includes('data-testid="home-dashboard-preview-open"') &&
-          homeDetailedPathPanelSource.includes("runDashboardTemplate(false)") &&
-          homeDetailedPathPanelSource.includes("runDashboardTemplate(true)") &&
-          homeOverviewSource.includes("op: confirm ? \"create\" : \"draft\"") &&
-          !homeOverviewSource.includes("runBusinessDashboardOperation({ op: \"create\""),
+        ok: !homeOverviewSource.includes("const [dashboardPlan, setDashboardPlan]") &&
+          !homeOverviewSource.includes("runDashboardTemplate") &&
+          !homeOverviewSource.includes("runBusinessDashboardOperation") &&
+          homeOverviewSource.includes("const hasDashboard = status.counts.dashboards > 0") &&
+          homeOverviewSource.includes('{hasDashboard && hasCurrentEvidence ? <button data-testid="workspace-open-board"') &&
+          homeOverviewSource.includes('onClick={() => onOpenSection("dashboards")}') &&
+          homeOverviewSource.includes("打开最近看板"),
       },
     {
         label: "frontend-product-intelligence-model",
@@ -581,42 +506,18 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-home-scenario-quality-sandbox-panels",
-        ok: homeOverviewSource.includes("buildScenarioPacks(status, workbench)") &&
-          homeOverviewSource.includes("buildDataQualityDoctor(status, workbench") &&
-          homeOverviewSource.includes("buildSandboxComparison(status, workbench)") &&
-          homeOverviewSource.includes("buildMetricRepairPlan(qualityDoctorResult, workbench)") &&
-          homeOverviewSource.includes("<HomeScenarioPacksPanel") &&
-          homeOverviewSource.includes("<HomeProductIntelligencePanel") &&
-          homeScenarioPacksPanelSource.includes('data-testid="home-scenario-packs"') &&
-          homeScenarioPacksPanelSource.includes('data-testid={`scenario-pack-${pack.key}`}') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-product-intelligence"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-data-quality-doctor"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-quality-metric-sql"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-quality-missing-semantics"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-quality-repair-draft"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-quality-failed-metrics"') &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-metric-repair-wizard"') &&
-          homeProductIntelligencePanelSource.includes('actionsTestId="home-semantic-binding-drafts"') &&
-          homeProductIntelligencePanelSource.includes('loopTestId="home-semantic-confirm-loop"') &&
-          homeProductIntelligencePanelSource.includes("onSetSemantic={onSetSemantic}") &&
-          homeProductIntelligencePanelSource.includes("onSourceIntelligenceRun={onSourceIntelligenceRun}") &&
-          homeOverviewSource.includes("useQualityDoctor(hasData, workbench)") &&
-          useQualityDoctorSource.includes("getQualityDoctor()") &&
-          homeProductIntelligencePanelSource.includes('data-testid="home-sandbox-compare"') &&
-          homeOverviewSource.includes("runScenarioPrompt") &&
-          homeOverviewSource.includes("previewScenarioTemplate") &&
-          stylesSource.includes(".scenarioPackPanel") &&
-          stylesSource.includes(".qualityDoctorPanel") &&
-          stylesSource.includes(".qualityDoctorMetricSql") &&
-          stylesSource.includes(".metricSemanticChips") &&
-          stylesSource.includes(".metricRepairDraft") &&
-          stylesSource.includes(".metricRepairWizard") &&
-          stylesSource.includes(".semanticBindingDrafts") &&
-          stylesSource.includes(".semanticRepairLoop") &&
-          stylesSource.includes(".semanticBindingActions") &&
-          stylesSource.includes(".semanticRepairResult") &&
-          stylesSource.includes(".metricFailureSamples") &&
-          stylesSource.includes(".sandboxComparePanel"),
+        ok: !homeOverviewSource.includes("buildScenarioPacks") &&
+          !homeOverviewSource.includes("buildDataQualityDoctor") &&
+          !homeOverviewSource.includes("buildSandboxComparison") &&
+          !homeOverviewSource.includes("buildMetricRepairPlan") &&
+          !homeOverviewSource.includes("HomeScenarioPacksPanel") &&
+          !homeOverviewSource.includes("HomeProductIntelligencePanel") &&
+          !homeOverviewSource.includes("useQualityDoctor") &&
+          !homeOverviewSource.includes("runScenarioPrompt") &&
+          !homeOverviewSource.includes("previewScenarioTemplate") &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="source-expert-toggle"') &&
+          sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
+          settingsPanelSource.includes('data-testid="settings-sandbox-details"'),
       },
     {
         label: "frontend-semantic-confirm-loop-component",

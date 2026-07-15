@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { emptyDashboardPayload, emptyWorkspaceStatus, emptyWorkbenchPayload } from "../src/emptyWorkspaceData";
 import { preferredLandingSection } from "../src/appWorkspaceModel";
+import { mergeNavigationContext, navigationContextForSection } from "../src/appNavigationModel";
 import type { DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "../src/types";
 
 function statusWith(counts: Partial<WorkspaceStatus["counts"]>): WorkspaceStatus {
@@ -25,18 +26,21 @@ function dashboardsWith(count = 0): DashboardPayload {
 }
 
 assert.equal(preferredLandingSection(statusWith({}), workbenchWith(), dashboardsWith()), "home");
-assert.equal(preferredLandingSection(statusWith({ tables: 1 }), workbenchWith(), dashboardsWith()), "sources");
-assert.equal(preferredLandingSection(statusWith({ tables: 1 }), workbenchWith(1), dashboardsWith()), "dashboards");
-assert.equal(preferredLandingSection(statusWith({ tables: 1, dashboards: 1 }), workbenchWith(1), dashboardsWith(1)), "dashboards");
+assert.equal(preferredLandingSection(statusWith({ tables: 1 }), workbenchWith(), dashboardsWith()), "home");
+assert.equal(preferredLandingSection(statusWith({ tables: 1 }), workbenchWith(1), dashboardsWith()), "home");
+assert.equal(preferredLandingSection(statusWith({ tables: 1, dashboards: 1 }), workbenchWith(1), dashboardsWith(1)), "home");
 assert.equal(preferredLandingSection(statusWith({ tables: 1, actionDrafts: 1 }), workbenchWith(1), dashboardsWith(1), 1), "agent");
+assert.deepEqual(navigationContextForSection("home", { tableKey: "orders", dashboardKey: "sales" }), {});
+assert.deepEqual(navigationContextForSection("sources", { tableKey: "orders", dashboardKey: "sales", viewKey: "detail", sourceRunKey: "run-1" }), { tableKey: "orders", sourceRunKey: "run-1" });
+assert.deepEqual(navigationContextForSection("dashboards", { tableKey: "orders", dashboardKey: "sales", viewKey: "detail" }), { tableKey: "orders", dashboardKey: "sales" });
+assert.deepEqual(mergeNavigationContext({ tableKey: "orders" }, { dashboardKey: "sales" }), { tableKey: "orders", dashboardKey: "sales", viewKey: undefined, sourceRunKey: undefined, actionKey: undefined, origin: undefined });
 
 console.log(JSON.stringify({
   ok: true,
   checks: [
     "empty workspace opens Home",
-    "unprofiled data opens Sources",
-    "profiled data without a chart opens Dashboards",
-    "existing chart stays on Dashboards",
+    "stable workspaces open the single Workspace landing",
     "pending writes open Agent",
+    "navigation context is scoped to the owning page",
   ],
 }));

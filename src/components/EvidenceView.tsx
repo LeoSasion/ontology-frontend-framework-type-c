@@ -64,7 +64,7 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
       <section className="mainPanel" aria-labelledby="evidence-title">
         <div className="panelHeader">
           <div>
-            <p className="kicker">{biText("证据链", "Evidence chain")}</p>
+            <p className="kicker">{biText("核对", "Review")}</p>
             <h2 id="evidence-title">
               <Bilingual zh="还没有证据可核对" en="No evidence to review yet" />
             </h2>
@@ -114,7 +114,7 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
     <section className="mainPanel" aria-labelledby="evidence-title">
       <div className="panelHeader">
         <div>
-          <p className="kicker">{biText("证据链", "Evidence chain")}</p>
+          <p className="kicker">{biText("核对", "Review")}</p>
           <h2 id="evidence-title">
             <Bilingual zh="证据与回执" en="Evidence and receipts" />
           </h2>

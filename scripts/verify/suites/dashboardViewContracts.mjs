@@ -103,13 +103,15 @@ export function appendDashboardViewContractChecks(context) {
         ok: evidenceViewSource.includes("证据摘要回执") &&
           evidenceViewSource.includes("可用问题") &&
           evidenceViewSource.includes("业务连接") &&
-          evidenceViewSource.includes('data-testid="evidence-technical-ref-details"') &&
-          evidenceViewSource.includes('data-testid="evidence-receipt-technical-details"') &&
+          evidenceViewSource.includes('<details className="advancedDetails compactAdvanced" data-testid="evidence-technical-ref-details">') &&
+          evidenceViewSource.includes('<details className="advancedDetails compactAdvanced" data-testid="evidence-receipt-technical-details">') &&
           !evidenceViewSource.includes("<h3><Bilingual zh=\"Source Intelligence 回执\"") &&
           !evidenceViewSource.includes("可执行指标 SQL") &&
           sourceWorkbenchModelSource.includes("证据摘要生成失败") &&
           sourceWorkbenchModelSource.includes("证据摘要需要 CSV") &&
-          sourceWorkbenchActionPanelSource.includes("当前证据摘要"),
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-evidence-guard"') &&
+          sourceWorkbenchActionPanelSource.includes('data-testid="beginner-plan-refresh-profile"') &&
+          sourceWorkbenchActionPanelSource.includes("生成证据摘要后再进入分析与看板。"),
       },
     {
         label: "frontend-evidence-agent-source-intelligence-business-first",

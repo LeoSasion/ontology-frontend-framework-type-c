@@ -138,6 +138,11 @@ for (const retiredReference of [
   "m10-analysis-export-2026-07-14/SUMMARY.md",
   "m11-connector-adapter-2026-07-14/SUMMARY.md",
   "release-readiness-2026-07-13/SUMMARY.md",
+  "agent-knowledge-packs.md",
+  "agent-provider-runtime.md",
+  "erp-dashboard-unit-library.md",
+  "release-2026-07-14/SUMMARY.md",
+  "platform-commerce-agent-validation-2026-07-13/SUMMARY.md",
 ]) {
   check(
     `retired-reference-absent:${retiredReference}`,

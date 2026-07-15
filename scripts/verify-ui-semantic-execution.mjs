@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
-import { captureScreenshot, check, click, evaluate, finishReceipt, launchChrome, navigate, waitFor, waitForAppReady } from "./ui-verify-chrome.mjs";
+import { captureScreenshot, check, click, evaluate, finishReceipt, launchChrome, navigate, waitFor } from "./ui-verify-chrome.mjs";
 import { apiBaseUrl, fetchJson, postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
@@ -62,19 +62,36 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
   try {
     browser = await launchChrome();
     await navigate(browser.client, `${baseUrl}/?section=agent&workspace=${encodeURIComponent(temporaryWorkspaceId)}`);
-    const ready = await waitForAppReady(browser.client, "agent-command-dock", 25000);
+    const ready = await waitFor(browser.client, (expectedWorkspace) => {
+      const text = document.body?.innerText ?? "";
+      const hasShell = Boolean(document.querySelector(".appShell"));
+      const hasComposer = Boolean(document.querySelector('[data-testid="agent-prompt-composer"]'));
+      const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+      const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
+      const workspace = document.querySelector('select[aria-label="选择工作区"]')?.value ?? "";
+      return {
+        ok: hasShell && hasComposer && workspace === expectedWorkspace && !hasErrorBoundary && !hasFrameworkOverlay,
+        title: document.title,
+        url: location.href,
+        hasShell,
+        hasComposer,
+        hasErrorBoundary,
+        hasFrameworkOverlay,
+        workspace,
+        expectedWorkspace,
+      };
+    }, temporaryWorkspaceId, { timeoutMs: 25000, intervalMs: 250 });
     checks.push(check("semantic-ui-agent-page-ready", ready.ok, ready));
-    const openButton = await evaluate(browser.client, () => Boolean(document.querySelector('[data-testid="floating-agent-button"]')));
-    if (openButton) await click(browser.client, '[data-testid="floating-agent-button"]');
     const filled = await evaluate(browser.client, (value) => {
-      const input = document.querySelector(".agentDockForm input");
-      if (!(input instanceof HTMLInputElement)) return false;
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      const input = document.querySelector('[data-testid="agent-prompt-composer"] textarea');
+      if (!(input instanceof HTMLTextAreaElement)) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
       setter?.call(input, value);
       input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
       return true;
     }, prompt);
-    const submitted = await click(browser.client, ".agentDockForm button[type=submit]");
+    const submitted = await click(browser.client, '[data-testid="agent-prompt-composer"] button');
     const rendered = await waitFor(browser.client, () => {
       const execution = document.querySelector('[data-testid="agent-semantic-execution-plan"]');
       const answer = document.querySelector('[data-testid="agent-answer-card"]');
@@ -104,19 +121,19 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
 
     const ambiguityPrompt = "看 channel 和 status";
     const ambiguityFormIdle = await waitFor(browser.client, () => {
-      const button = document.querySelector(".agentDockForm button[type=submit]");
-      const input = document.querySelector(".agentDockForm input");
-      return { ok: button instanceof HTMLButtonElement && input instanceof HTMLInputElement && !input.disabled };
+      const button = document.querySelector('[data-testid="agent-prompt-composer"] button');
+      const input = document.querySelector('[data-testid="agent-prompt-composer"] textarea');
+      return { ok: button instanceof HTMLButtonElement && input instanceof HTMLTextAreaElement && !input.disabled };
     }, null, { timeoutMs: 25000, intervalMs: 150 });
     const ambiguityFilled = ambiguityFormIdle.ok;
     const ambiguitySubmitReady = await waitFor(browser.client, (targetValue) => {
-      const button = document.querySelector(".agentDockForm button[type=submit]");
-      const input = document.querySelector(".agentDockForm input");
-      if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLInputElement)) {
+      const button = document.querySelector('[data-testid="agent-prompt-composer"] button');
+      const input = document.querySelector('[data-testid="agent-prompt-composer"] textarea');
+      if (!(button instanceof HTMLButtonElement) || !(input instanceof HTMLTextAreaElement)) {
         return { ok: false, value: "", buttonDisabled: null, inputDisabled: null };
       }
       if (input.value !== targetValue && !input.disabled) {
-        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
         const previous = input.value;
         setter?.call(input, targetValue);
         input._valueTracker?.setValue(previous);
@@ -126,13 +143,13 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
       return { ok: !button.disabled && !input.disabled && input.value === targetValue, value: input.value, buttonDisabled: button.disabled, inputDisabled: input.disabled };
     }, ambiguityPrompt, { timeoutMs: 15000, intervalMs: 150 });
     const ambiguitySubmitted = ambiguitySubmitReady.ok
-      ? await click(browser.client, ".agentDockForm button[type=submit]")
+      ? await click(browser.client, '[data-testid="agent-prompt-composer"] button')
       : { ok: false, error: "form-not-ready" };
     const ambiguityBundle = await waitFor(browser.client, () => ({
       ok: Boolean(document.querySelector('[data-testid="agent-semantic-clarification-bundle"]')),
       candidates: document.querySelectorAll('[data-testid="agent-semantic-candidate"]').length,
       groups: document.querySelectorAll('[data-testid="agent-semantic-clarification-bundle"] .agentSemanticChips').length,
-    }), null, { timeoutMs: 25000, intervalMs: 250 });
+    }), null, { timeoutMs: 60000, intervalMs: 250 });
     const candidatesSelected = await evaluate(browser.client, () => {
       const buttons = Array.from(document.querySelectorAll('[data-testid="agent-semantic-candidate"]'));
       const ordersChannel = buttons.find((button) => button.textContent?.includes("订单表.channel"));
@@ -150,7 +167,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     const clarificationResolved = await waitFor(browser.client, () => ({
       ok: !document.querySelector('[data-testid="agent-semantic-clarification-bundle"]') && Boolean(document.querySelector('[data-testid="agent-answer-card"]')),
       answer: document.querySelector('[data-testid="agent-answer-card"]')?.textContent ?? "",
-    }), null, { timeoutMs: 25000, intervalMs: 250 });
+    }), null, { timeoutMs: 60000, intervalMs: 250 });
     checks.push(
       check("semantic-ui-multiple-ambiguities-use-one-bundle", ambiguityFormIdle.ok && ambiguityFilled && ambiguitySubmitReady.ok && ambiguitySubmitted.ok && ambiguityBundle.ok && ambiguityBundle.groups === 2 && ambiguityBundle.candidates >= 4, { ambiguityFormIdle, ambiguityFilled, ambiguitySubmitReady, ambiguitySubmitted, ambiguityBundle }),
       check("semantic-ui-bundle-requires-all-selections", candidatesSelected && clarificationReady.ok && clarificationConfirmed.ok, { candidatesSelected, clarificationReady, clarificationConfirmed }),

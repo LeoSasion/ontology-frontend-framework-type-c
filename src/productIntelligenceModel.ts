@@ -1,4 +1,5 @@
 import type { AgentAskResult, EvidenceFocus, ImportPreview, WorkbenchPayload, WorkspaceStatus } from "./types";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 
 export type ProductSignalTone = "ok" | "warn" | "info" | "muted";
 
@@ -61,7 +62,7 @@ function percent(value: number) {
 }
 
 function latestSourceRun(workbench: WorkbenchPayload) {
-  return Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns[0] : undefined;
+  return latestUsableSourceIntelligenceRun(Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : []);
 }
 
 export function buildScenarioPacks(status: WorkspaceStatus, workbench: WorkbenchPayload): ScenarioPack[] {

@@ -2,28 +2,22 @@ import { getAppSection } from "./appSections";
 import type { AppSection } from "./components/Sidebar";
 import { lazyWithRetry } from "./lazyWithRetry";
 
-const loadAgentCommandDock = () => import("./components/AgentCommandDock").then((module) => ({ default: module.AgentCommandDock }));
 const loadAppMainView = () => import("./components/AppMainView").then((module) => ({ default: module.AppMainView }));
-const loadBusinessPathBar = () => import("./components/BusinessPathBar").then((module) => ({ default: module.BusinessPathBar }));
 const loadTopBar = () => import("./components/TopBar").then((module) => ({ default: module.TopBar }));
 const loadAgentPanel = () => import("./components/AgentPanel").then((module) => ({ default: module.AgentPanel }));
 const loadDashboardCanvas = () => import("./components/DashboardCanvas").then((module) => ({ default: module.DashboardCanvas }));
 const loadEvidenceView = () => import("./components/EvidenceView").then((module) => ({ default: module.EvidenceView }));
 const loadHomeOverview = () => import("./components/HomeOverview").then((module) => ({ default: module.HomeOverview }));
-const loadInspectorPanel = () => import("./components/InspectorPanel").then((module) => ({ default: module.InspectorPanel }));
 const loadSettingsPanel = () => import("./components/SettingsPanel").then((module) => ({ default: module.SettingsPanel }));
 const loadSourceWorkbench = () => import("./components/SourceWorkbench").then((module) => ({ default: module.SourceWorkbench }));
 const loadViewWorkspace = () => import("./components/ViewWorkspace").then((module) => ({ default: module.ViewWorkspace }));
 
-export const AgentCommandDock = lazyWithRetry(loadAgentCommandDock);
 export const AppMainView = lazyWithRetry(loadAppMainView);
-export const BusinessPathBar = lazyWithRetry(loadBusinessPathBar);
 export const TopBar = lazyWithRetry(loadTopBar);
 export const AgentPanel = lazyWithRetry(loadAgentPanel);
 export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas);
 export const EvidenceView = lazyWithRetry(loadEvidenceView);
 export const HomeOverview = lazyWithRetry(loadHomeOverview);
-export const InspectorPanel = lazyWithRetry(loadInspectorPanel);
 export const SettingsPanel = lazyWithRetry(loadSettingsPanel);
 export const SourceWorkbench = lazyWithRetry(loadSourceWorkbench);
 export const ViewWorkspace = lazyWithRetry(loadViewWorkspace);
@@ -39,9 +33,7 @@ export const sectionPreloaders: Record<AppSection, Array<() => Promise<unknown>>
 };
 
 export const allSectionPreloaders = Array.from(new Set(Object.values(sectionPreloaders).flat()));
-export const inspectorPreloader = loadInspectorPanel;
-export const agentCommandDockPreloader = loadAgentCommandDock;
-export const businessPathBarPreloader = loadBusinessPathBar;
+export const topBarPreloader = loadTopBar;
 
 export function preloadModules(loaders: Array<() => Promise<unknown>>) {
   void Promise.allSettled(loaders.map((loader) => loader()));

@@ -66,6 +66,40 @@ export function navigationContextFromTarget(target: AppNavigationTarget): AppNav
   };
 }
 
+export function navigationContextForSection(section: AppSection, context: AppNavigationContext): AppNavigationContext {
+  if (section === "home" || section === "settings") return {};
+  if (section === "sources") {
+    return { tableKey: context.tableKey, sourceRunKey: context.sourceRunKey };
+  }
+  if (section === "views") {
+    return { tableKey: context.tableKey, viewKey: context.viewKey };
+  }
+  if (section === "dashboards") {
+    return { tableKey: context.tableKey, dashboardKey: context.dashboardKey };
+  }
+  if (section === "evidence") {
+    return { ...context };
+  }
+  return {
+    tableKey: context.tableKey,
+    dashboardKey: context.dashboardKey,
+    viewKey: context.viewKey,
+    actionKey: context.actionKey,
+    origin: context.origin,
+  };
+}
+
+export function mergeNavigationContext(base: AppNavigationContext, next: AppNavigationContext): AppNavigationContext {
+  return {
+    tableKey: next.tableKey ?? base.tableKey,
+    dashboardKey: next.dashboardKey ?? base.dashboardKey,
+    viewKey: next.viewKey ?? base.viewKey,
+    sourceRunKey: next.sourceRunKey ?? base.sourceRunKey,
+    actionKey: next.actionKey ?? base.actionKey,
+    origin: next.origin ?? base.origin,
+  };
+}
+
 export function evidenceFocusFromNavigation(context: AppNavigationContext): EvidenceFocus | null {
   if (!context.tableKey && !context.dashboardKey && !context.viewKey && !context.sourceRunKey) return null;
   const refs = context.sourceRunKey ? [`source-intelligence:${context.sourceRunKey}`] : [];

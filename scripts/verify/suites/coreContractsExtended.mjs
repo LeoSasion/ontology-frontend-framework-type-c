@@ -340,12 +340,15 @@ export function appendCoreContractExtendedChecks(context) {
     {
         label: "frontend-theme-no-flash-bootstrap",
         ok: indexHtmlSource.includes("aibiHybrid.themeSnapshot") &&
-          indexHtmlSource.includes("readThemeFromWorkbench") &&
-          indexHtmlSource.includes('request.open("GET", "/api/workbench?limit=1", false)') &&
+          indexHtmlSource.includes("function readStoredTheme()") &&
+          indexHtmlSource.includes("var theme = readStoredTheme()") &&
+          !indexHtmlSource.includes("XMLHttpRequest") &&
+          !indexHtmlSource.includes("/api/workbench") &&
           indexHtmlSource.includes("fallbackDarkTheme") &&
           indexHtmlSource.includes('window.matchMedia("(prefers-color-scheme: dark)")') &&
           indexHtmlSource.includes("root.dataset.themeMode = mode") &&
           indexHtmlSource.includes("root.style.colorScheme = mode") &&
+          indexHtmlSource.includes('root.style.setProperty("--bi-on-accent", onAccent)') &&
           indexHtmlSource.includes('html[data-theme-mode="dark"]') &&
           appSource.includes("hasStoredThemeSnapshot") &&
           appSource.includes("if (!status.database && hasStoredThemeSnapshot())") &&

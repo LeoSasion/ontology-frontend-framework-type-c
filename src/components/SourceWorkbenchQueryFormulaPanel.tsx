@@ -220,13 +220,13 @@ export function SourceWorkbenchQueryFormulaPanel({
         </label>
         <textarea className="formulaInput" value={formulaExpression} onChange={(event) => setFormulaExpression(event.target.value)} aria-label={biText("公式表达式", "Formula expression")} />
         <div className="buttonRow tight">
-          <select value={formulaMode} onChange={(event) => setFormulaMode(event.target.value)}>
+          <select aria-label={biText("公式类型", "Formula type")} value={formulaMode} onChange={(event) => setFormulaMode(event.target.value)}>
             <option value="aggregate">{biText("聚合指标", "Aggregate metric")}</option>
             <option value="row">{biText("行级字段", "Row field")}</option>
           </select>
           <span className={formulaPreview.ok ? "statusBadge ok" : "statusBadge warn"}>{formulaPreview.ok ? biText("可编译", "Compiles") : biText("有错误", "Errors")}</span>
         </div>
-        <div className="formulaMeta">
+        <div className="formulaMeta" role="status" aria-live="polite">
           <span>{biText("依赖字段", "Depends on")}: {formulaPreview.dependencies.join(", ") || "-"}</span>
           {formulaPreview.errors.map((error) => <strong key={error}>{error}</strong>)}
           {formulaMutation?.requiresConfirmation ? <strong>{biText("保存预演已生成", "Save preview ready")}</strong> : null}

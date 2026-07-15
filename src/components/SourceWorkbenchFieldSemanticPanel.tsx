@@ -49,7 +49,7 @@ export function SourceWorkbenchFieldSemanticPanel({
       <div className="tileHeader">
         <h3><Bilingual zh="检查字段用途" en="Check field usage" /></h3>
         <div className="buttonRow tight">
-          <select value={selectedTableKey} onChange={(event) => setActiveTableKey(event.target.value)}>
+          <select aria-label={biText("选择要检查字段的表", "Choose a table for field review")} value={selectedTableKey} onChange={(event) => setActiveTableKey(event.target.value)}>
             {tables.map((table) => (
               <option key={table.table_key} value={table.table_key}>{table.display_name}</option>
             ))}
@@ -142,7 +142,7 @@ export function SourceWorkbenchFieldSemanticPanel({
                   <tr key={`${field.table_key}.${field.field_name}`}>
                     <td>{field.field_name}</td>
                     <td>
-                      <select value={draft.role} onChange={(event) => updateFieldDraft(field, { role: event.target.value })}>
+                      <select aria-label={biText(`${field.field_name} 的业务角色`, `Business role for ${field.field_name}`)} value={draft.role} onChange={(event) => updateFieldDraft(field, { role: event.target.value })}>
                         {fieldRoles.map((role) => {
                           const label = translateRole(role);
                           return <option key={role} value={role}>{biText(label.zh, label.en)}</option>;
@@ -150,7 +150,7 @@ export function SourceWorkbenchFieldSemanticPanel({
                       </select>
                     </td>
                     <td>
-                      <select value={draft.usage} onChange={(event) => updateFieldDraft(field, { usage: event.target.value })}>
+                      <select aria-label={biText(`${field.field_name} 的使用方式`, `Usage for ${field.field_name}`)} value={draft.usage} onChange={(event) => updateFieldDraft(field, { usage: event.target.value })}>
                         {fieldUsages.map((usage) => {
                           const label = translateUsage(usage);
                           return <option key={usage} value={usage}>{biText(label.zh, label.en)}</option>;

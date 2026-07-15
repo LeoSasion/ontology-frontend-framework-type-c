@@ -1,8 +1,10 @@
 import type { FolderImportPlan, FormulaMutationPayload, FormulaPreviewPayload, ImportPreview, QueryResult, RelationshipPreviewPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import type { BusinessPathStepKey } from "./businessPathModel";
-import type { BusinessDashboardOptions, RelationshipSaveOptions } from "./dashboardCanvasContracts";
+import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 import type { ConnectorOptions, ImportOptions, ImportPolicyOptions, MetricMutationOptions, SourceIntelligenceRunOptions } from "./sourceWorkbenchCommandModel";
 import type { NavigationOperationOptions } from "./sourceWorkbenchDraftModel";
+
+export type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 
 export type QueryOptions = {
   table?: string;
@@ -48,6 +50,7 @@ export type MetricQueryOptions = {
 
 export type SourceWorkbenchProps = {
   focusedTableKey?: string;
+  onTableFocus?: (tableKey: string) => void;
   status: WorkspaceStatus;
   preview: ImportPreview;
   query: QueryResult;
@@ -80,8 +83,7 @@ export type SourceWorkbenchProps = {
   onFormulaSave: (options: { id?: string; name: string; table: string; expression: string; mode?: string; dimension?: string; timeField?: string; valueFormat?: string; description?: string; confirm?: boolean }) => Promise<FormulaMutationPayload>;
   onFormulaDelete: (options: { formula: string; confirm?: boolean }) => Promise<FormulaMutationPayload>;
   onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions) => Promise<Record<string, unknown> | void>;
-  onBusinessDashboardOperation: (options: BusinessDashboardOptions) => Promise<Record<string, unknown>>;
   onAsk: (prompt: string) => Promise<void>;
   onOpenBusinessStep: (step: BusinessPathStepKey) => void;
-  onOpenDashboard: () => void;
+  onOpenAnalysis: () => void;
 };

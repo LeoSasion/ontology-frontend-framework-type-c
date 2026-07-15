@@ -15,6 +15,7 @@ import {
 } from "./biDashboardModel";
 import { toStringValue } from "./biDashboardValueModel";
 import type { DashboardPage, DashboardPayload, QueryResult, WorkbenchPayload } from "./types";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 
 function normalizeType(value: unknown): BiDashboardWidgetType {
   const type = String(value ?? "").trim().toLowerCase();
@@ -48,7 +49,7 @@ function clampInteger(value: unknown, fallback: number, min: number, max: number
 
 function latestRunEvidence(workbench: WorkbenchPayload): string[] {
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
-  const latestRun = sourceIntelligenceRuns[0];
+  const latestRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns);
   const base = ["query-runtime", "dashboard-widget-contract", "b-bi-cli-compatible"];
   if (!latestRun) return base;
   return [

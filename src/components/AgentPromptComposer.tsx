@@ -15,13 +15,14 @@ export function AgentPromptComposer({ isAsking, prompt, setPrompt, setPromptTouc
     <div className="agentComposer" data-testid="agent-prompt-composer">
       <textarea
         aria-label={biText("Agent 提问", "Agent prompt")}
+        placeholder={biText("例如：按月份比较各产品的收入变化，并标出异常月份", "For example: compare monthly revenue by product and flag unusual months")}
         value={prompt}
         onChange={(event) => {
           setPromptTouched(true);
           setPrompt(event.target.value);
         }}
       />
-      <button className="primaryButton" disabled={isAsking} onClick={() => void submit()} type="button">
+      <button className="primaryButton" disabled={isAsking || !prompt.trim()} onClick={() => void submit()} type="button">
         <Icon name="agent" />
         {isAsking ? biText("规划中", "Planning") : biText("提问", "Ask")}
       </button>

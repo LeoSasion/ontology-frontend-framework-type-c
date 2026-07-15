@@ -59,8 +59,8 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
         <strong>{biText("从当前结果继续比较", "Compare from this result")}</strong>
         {canBranch ? (
           <>
-            <input placeholder={biText("分支名称，可选", "Branch label, optional")} value={branchLabel} onChange={(event) => setBranchLabel(event.target.value)} />
-            <textarea placeholder={biText("描述下一项比较", "Describe the next comparison")} value={branchPrompt} onChange={(event) => setBranchPrompt(event.target.value)} />
+            <input aria-label={biText("比较分支名称，可选", "Comparison branch label, optional")} placeholder={biText("分支名称，可选", "Branch label, optional")} value={branchLabel} onChange={(event) => setBranchLabel(event.target.value)} />
+            <textarea aria-label={biText("下一项比较内容", "Next comparison request")} placeholder={biText("描述下一项比较", "Describe the next comparison")} value={branchPrompt} onChange={(event) => setBranchPrompt(event.target.value)} />
             <button className="secondaryButton" disabled={busy || !branchPrompt.trim()} onClick={() => void submitBranch()} type="button">{busy ? biText("生成中", "Creating") : biText("创建比较分支", "Create comparison branch")}</button>
           </>
         ) : <span>{biText("确认当前图表后才开放分支，避免从未核对结果继续推导。", "Branches unlock after the chart is confirmed, preventing analysis from unreviewed results.")}</span>}

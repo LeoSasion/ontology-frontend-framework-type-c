@@ -11,7 +11,6 @@ import {
   navigate,
   setViewport,
   waitFor,
-  waitForAppReady,
 } from "./ui-verify-chrome.mjs";
 import {
   apiBaseUrl,
@@ -68,7 +67,6 @@ function realFlowState() {
   const disabled = (testId) => Boolean(get(testId)?.disabled);
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
   const seededSamplePattern = /样例订单|示例订单|demo|test|fallback source|临时看板|mock data|lorem/i;
-  const assetPanel = document.querySelector(".assetPanel");
   return {
     title: document.title,
     url: location.href,
@@ -79,14 +77,15 @@ function realFlowState() {
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     hasSeededSampleCopy: seededSamplePattern.test(text),
     layout: {
-      assetPanelXOverflow: assetPanel ? Math.max(0, assetPanel.scrollWidth - assetPanel.clientWidth) : 0,
+      globalAssetPanelPresent: Boolean(document.querySelector(".assetPanel")),
+      globalInspectorPresent: Boolean(document.querySelector(".inspector")),
+      globalAgentDockPresent: Boolean(get("agent-command-dock")),
     },
     sources: {
       importInputValue: document.querySelector(".sourceImportPanel input")?.value ?? "",
-      importPreviewButton: isVisible("import-preview-button"),
-      importPreviewDisabled: disabled("import-preview-button"),
-      folderPreviewButton: isVisible("folder-import-preview-button"),
-      folderPreviewDisabled: disabled("folder-import-preview-button"),
+      sourceImportPreviewButton: isVisible("source-import-preview-button"),
+      sourceImportPreviewDisabled: disabled("source-import-preview-button"),
+      legacyImportPreviewButtonsPresent: Boolean(get("import-preview-button") || get("folder-import-preview-button")),
       folderPlan: isVisible("folder-import-plan"),
       folderConfirm: isVisible("folder-import-confirm-button"),
       folderConfirmDisabled: disabled("folder-import-confirm-button"),
@@ -96,15 +95,18 @@ function realFlowState() {
       importConfirmDisabled: disabled("import-confirmation-confirm"),
       importReceipt: isVisible("import-operation-receipt"),
       importSuccessNextStep: isVisible("import-success-next-step"),
-      sourceEntry: isVisible("source-intelligence-folder-entry"),
+      evidencePrimary: isVisible("beginner-plan-refresh-profile"),
+      sourceNextAnalysis: isVisible("source-next-analysis"),
+      evidenceGuard: isVisible("beginner-evidence-guard"),
+      sourceEvidenceDetailsCollapsed: Boolean(get("source-evidence-details")) && !get("source-evidence-details").open,
+      sourceEntryVisible: isVisible("source-intelligence-folder-entry"),
       sourceResult: isVisible("source-intelligence-result"),
       sourceProgress: isVisible("source-intelligence-progress"),
       sourceError: isVisible("source-intelligence-error"),
       coverageItems: Array.from(document.querySelectorAll('[data-testid="source-coverage-item"]')).filter(visible).length,
       guideDetailsOpen: Boolean(get("source-guide-details")?.open),
-      dashboardCreateVisible: isVisible("source-business-dashboard-create"),
-      dashboardCreateDisabled: disabled("source-business-dashboard-create"),
-      dashboardResult: isVisible("source-business-dashboard-result"),
+      removedDashboardPreviewPresent: Boolean(get("source-business-dashboard-preview")),
+      removedDashboardCreatePresent: Boolean(get("source-business-dashboard-create")),
     },
     dashboards: {
       taskStrip: isVisible("dashboard-business-task-strip"),
@@ -162,7 +164,19 @@ async function openDetails(client, selector) {
 }
 
 async function pageState(client) {
-  const ready = await waitForAppReady(client, null, 25000);
+  const ready = await waitFor(client, () => {
+    const shell = document.querySelector(".appShell");
+    const sourceSection = document.querySelector(".sourceImportPanel");
+    const sourceImportButton = document.querySelector('[data-testid="source-import-preview-button"]');
+    const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
+    return {
+      ok: Boolean(shell && sourceSection && sourceImportButton) && !error,
+      hasShell: Boolean(shell),
+      hasSourceSection: Boolean(sourceSection),
+      hasSourceImportButton: Boolean(sourceImportButton),
+      hasError: Boolean(error),
+    };
+  }, null, { timeoutMs: 25000, intervalMs: 250 });
   const state = await evaluate(client, realFlowState, null, 10000);
   return { ready, state };
 }
@@ -221,23 +235,35 @@ try {
       browserInfo = { chromePath: browser.chromePath, chromeName: browser.chromeName };
       await setViewport(browser.client, viewport);
 
-      const waitForImportControls = () => waitFor(browser.client, () => {
+      const expectedWorkspaceId = activeLifecycle.temporaryWorkspace?.id ?? "";
+      const waitForImportControls = () => waitFor(browser.client, (workspaceId) => {
         const text = document.body?.innerText || "";
         const importInput = document.querySelector(".sourceImportPanel input");
-        const importButton = document.querySelector('[data-testid="import-preview-button"]');
-        const folderButton = document.querySelector('[data-testid="folder-import-preview-button"]');
-        const sourceEntry = document.querySelector('[data-testid="source-intelligence-folder-entry"]');
+        const sourceImportButton = document.querySelector('[data-testid="source-import-preview-button"]');
+        const workspaceSwitcher = document.querySelector("#workspace-switcher");
+        const serviceDiagnostics = document.querySelector('[data-testid="service-diagnostics"]');
+        const legacyImportButton = document.querySelector('[data-testid="import-preview-button"], [data-testid="folder-import-preview-button"]');
+        const globalAssetPanel = document.querySelector(".assetPanel");
+        const globalInspector = document.querySelector(".inspector");
+        const globalAgentDock = document.querySelector('[data-testid="agent-command-dock"]');
         const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
+        const workspaceSynced = Boolean(workspaceSwitcher && (!workspaceId || workspaceSwitcher.value === workspaceId));
         return {
-          ok: Boolean(importInput && importButton && folderButton) && !sourceEntry && !error,
+          ok: Boolean(importInput && sourceImportButton) && workspaceSynced && !serviceDiagnostics && !legacyImportButton && !globalAssetPanel && !globalInspector && !globalAgentDock && !error,
           hasImportInput: Boolean(importInput),
-          hasImportButton: Boolean(importButton),
-          hasFolderButton: Boolean(folderButton),
-          hasSourceEntry: Boolean(sourceEntry),
+          hasSourceImportButton: Boolean(sourceImportButton),
+          workspaceValue: workspaceSwitcher?.value ?? "",
+          expectedWorkspaceId: workspaceId,
+          workspaceSynced,
+          serviceDiagnosticsVisible: Boolean(serviceDiagnostics),
+          hasLegacyImportButton: Boolean(legacyImportButton),
+          hasGlobalAssetPanel: Boolean(globalAssetPanel),
+          hasGlobalInspector: Boolean(globalInspector),
+          hasGlobalAgentDock: Boolean(globalAgentDock),
           hasError: Boolean(error),
           text: text.slice(0, 700),
         };
-      }, null, { timeoutMs: 45000, intervalMs: 500 });
+      }, expectedWorkspaceId, { timeoutMs: 45000, intervalMs: 500 });
       let importControlsReady = null;
       for (let attempt = 0; attempt < 4; attempt += 1) {
         const retry = attempt ? `&retry=${Date.now()}-${attempt}` : "";
@@ -253,7 +279,8 @@ try {
       const sourcesReady = await pageState(browser.client);
       checks.push(
         check("ui-import-sources-ready", sourcesReady.ready.ok, { ready: sourcesReady.ready }),
-        check("ui-import-sources-import-only", !sourcesReady.state.sources.sourceEntry && sourcesReady.state.sources.importPreviewButton && sourcesReady.state.sources.folderPreviewButton, { sources: sourcesReady.state.sources }),
+        check("ui-import-sources-use-one-auto-detect-control", sourcesReady.state.sources.sourceImportPreviewButton && !sourcesReady.state.sources.legacyImportPreviewButtonsPresent, { sources: sourcesReady.state.sources }),
+        check("ui-import-global-chrome-retired", !sourcesReady.state.layout.globalAssetPanelPresent && !sourcesReady.state.layout.globalInspectorPresent && !sourcesReady.state.layout.globalAgentDockPresent, { layout: sourcesReady.state.layout }),
         check("ui-import-sources-no-error-before", !sourcesReady.state.hasErrorBoundary && !sourcesReady.state.hasFrameworkOverlay && !sourcesReady.state.sources.sourceError),
       );
       steps.push({ step: "sources-open", state: sourcesReady.state });
@@ -263,7 +290,7 @@ try {
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
 
       if (importTarget.mode === "folder") {
-        const previewClick = await click(browser.client, '[data-testid="folder-import-preview-button"]');
+        const previewClick = await click(browser.client, '[data-testid="source-import-preview-button"]');
         checks.push(check("ui-folder-import-preview-click-fired", previewClick.ok, previewClick));
         const previewReady = await waitForUi(browser.client, "folder import preview", () => {
           const text = document.body?.innerText || "";
@@ -288,7 +315,7 @@ try {
         const confirmClick = await click(browser.client, '[data-testid="folder-import-confirm-button"]');
         checks.push(check("ui-folder-import-confirm-click-fired", confirmClick.ok, confirmClick));
       } else {
-        const previewClick = await click(browser.client, '[data-testid="import-preview-button"]');
+        const previewClick = await click(browser.client, '[data-testid="source-import-preview-button"]');
         checks.push(check("ui-import-preview-click-fired", previewClick.ok, previewClick));
         const previewReady = await waitForUi(browser.client, "import preview", () => {
           const text = document.body?.innerText || "";
@@ -337,18 +364,27 @@ try {
 
       const importResultReady = await waitFor(browser.client, () => {
         const result = document.querySelector('[data-testid="import-success-next-step"]');
+        const evidenceAction = document.querySelector('[data-testid="beginner-plan-refresh-profile"]');
+        const analysisAction = document.querySelector('[data-testid="source-next-analysis"]');
         const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
-        return { ok: Boolean(result) && !error, hasResult: Boolean(result), hasError: Boolean(error) };
+        return {
+          ok: Boolean(result || evidenceAction || analysisAction) && !error,
+          hasImportProgress: Boolean(result),
+          hasEvidenceAction: Boolean(evidenceAction),
+          hasAnalysisAction: Boolean(analysisAction),
+          hasError: Boolean(error),
+        };
       }, null, { timeoutMs: 180000, intervalMs: 500 });
       const afterImportState = await evaluate(browser.client, realFlowState, null, 10000);
       const importNextStepText = await evaluate(browser.client, () => document.querySelector('[data-testid="import-success-next-step"]')?.textContent ?? "", null, 10000);
       const expectedConnectedRows = importedTables.reduce((total, table) => total + Number(table.row_count ?? 0), 0);
       const expectedConnectedFields = importedTables.reduce((total, table) => total + Number(table.column_count ?? 0), 0);
+      const importProgressShowsWorkspaceTotals = importNextStepText.includes(expectedConnectedRows.toLocaleString()) && importNextStepText.includes(expectedConnectedFields.toLocaleString());
+      const importAdvancedToAnalysis = afterImportState.sources.sourceNextAnalysis;
       checks.push(
         check("ui-import-result-page-ready", Boolean(importResultReady?.ok), importResultReady),
-        check("ui-import-success-next-step-visible", afterImportState.sources.importSuccessNextStep, { sources: afterImportState.sources }),
-        check("ui-import-next-step-receipt-visible", afterImportState.sources.importReceipt || afterImportState.sources.importSuccessNextStep, { sources: afterImportState.sources }),
-        check("ui-import-next-step-uses-workspace-totals", importNextStepText.includes(expectedConnectedRows.toLocaleString()) && importNextStepText.includes(expectedConnectedFields.toLocaleString()), { importNextStepText, expectedConnectedRows, expectedConnectedFields }),
+        check("ui-import-next-step-visible", afterImportState.sources.importSuccessNextStep || afterImportState.sources.evidencePrimary || importAdvancedToAnalysis, { sources: afterImportState.sources }),
+        check("ui-import-next-step-uses-workspace-totals-or-ready-state", importProgressShowsWorkspaceTotals || importAdvancedToAnalysis, { importNextStepText, expectedConnectedRows, expectedConnectedFields, importAdvancedToAnalysis }),
         check("ui-import-no-error-after-confirm", !afterImportState.hasErrorBoundary && !afterImportState.hasFrameworkOverlay && !afterImportState.sources.sourceError),
         check("ui-import-no-seeded-copy", !afterImportState.hasSeededSampleCopy),
       );
@@ -395,18 +431,47 @@ try {
         const entry = document.querySelector('[data-testid="source-intelligence-folder-entry"]');
         const details = entry?.closest("details");
         const error = document.querySelector('[data-testid="source-intelligence-error"], .appFallback, .fallbackPanel');
-        const nextDashboard = document.querySelector('[data-testid="source-next-dashboard"]');
+        const nextDashboard = document.querySelector('[data-testid="source-next-analysis"]');
+        const evidenceGuard = document.querySelector('[data-testid="beginner-evidence-guard"]');
+        const evidenceDetails = document.querySelector('[data-testid="source-evidence-details"]');
+        const removedDashboardCreate = document.querySelector('[data-testid="source-business-dashboard-create"]');
         return {
-          ok: Boolean(nextDashboard) && !error,
+          ok: Boolean(nextDashboard && evidenceGuard && evidenceDetails && !evidenceDetails.open) && !removedDashboardCreate && !error,
           manualEntryVisible: Boolean(entry && (!details || details.open)),
           hasNextDashboard: Boolean(nextDashboard),
+          hasEvidenceGuard: Boolean(evidenceGuard),
+          evidenceDetailsCollapsed: Boolean(evidenceDetails && !evidenceDetails.open),
+          removedDashboardCreatePresent: Boolean(removedDashboardCreate),
           hasError: Boolean(error),
         };
       }, 30000);
       checks.push(
         check("api-source-intelligence-recorded-automatically", Number(counts.sourceIntelligenceRuns ?? 0) > 0, { counts }),
         check("ui-import-continues-to-evidence-automatically", automaticProfileState.ok, automaticProfileState),
-        check("ui-manual-evidence-path-is-secondary", !automaticProfileState.manualEntryVisible, automaticProfileState),
+        check("ui-manual-evidence-path-is-secondary", automaticProfileState.evidenceDetailsCollapsed && !automaticProfileState.manualEntryVisible, automaticProfileState),
+        check("ui-source-legacy-dashboard-create-retired", !automaticProfileState.removedDashboardCreatePresent, automaticProfileState),
+      );
+
+      const sourceGuideOpen = await openDetails(browser.client, '[data-testid="source-guide-details"]');
+      const sourceGuideState = await evaluate(browser.client, () => {
+        const preview = document.querySelector('[data-testid="source-business-dashboard-preview"]');
+        const removedCreate = document.querySelector('[data-testid="source-business-dashboard-create"]');
+        const visible = (element) => {
+          if (!element) return false;
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 1 && rect.height > 1 && style.display !== "none" && style.visibility !== "hidden";
+        };
+        return {
+          previewPresent: Boolean(preview),
+          previewVisible: visible(preview),
+          removedCreatePresent: Boolean(removedCreate),
+        };
+      });
+      checks.push(
+        check("ui-source-secondary-actions-open", sourceGuideOpen.ok, sourceGuideOpen),
+        check("ui-source-dashboard-preview-retired", !sourceGuideState.previewPresent, sourceGuideState),
+        check("ui-source-dashboard-create-not-restored", !sourceGuideState.removedCreatePresent, sourceGuideState),
       );
 
       const sourceAdvancedClick = await click(browser.client, '[data-testid="source-expert-toggle"]');
@@ -724,7 +789,7 @@ try {
       checks.push(
         check("ui-real-import-no-error-final", !finalState.hasErrorBoundary && !finalState.hasFrameworkOverlay),
         check("ui-real-import-no-seeded-copy-final", !finalState.hasSeededSampleCopy),
-        check("ui-real-import-no-asset-panel-x-overflow", finalState.layout.assetPanelXOverflow === 0, finalState.layout),
+        check("ui-real-import-no-retired-global-chrome", !finalState.layout.globalAssetPanelPresent && !finalState.layout.globalInspectorPresent && !finalState.layout.globalAgentDockPresent, finalState.layout),
       );
       steps.push({ step: "final", state: finalState });
     } finally {

@@ -150,8 +150,13 @@ export function appendAppArchitectureContractChecks(context) {
           actionRecoveryModelSource.includes("no-sample-fallback-for-core-action") &&
           appWorkspaceModelSource.includes('from "./emptyWorkspaceData"') &&
           appWorkspaceModelSource.includes("emptyWorkbenchPayload.formulaDsl") &&
-          appWorkspaceModelSource.includes("return \"dashboards\"") &&
-          appWorkspaceModelSource.includes("return \"sources\"") &&
+          appWorkspaceModelSource.includes('if (resolvedPendingDraftCount > 0) return "agent"') &&
+          appWorkspaceModelSource.includes('return "home"') &&
+          appWorkspaceModelSource.includes("void status") &&
+          appWorkspaceModelSource.includes("void workbench") &&
+          appWorkspaceModelSource.includes("void dashboards") &&
+          !appWorkspaceModelSource.includes('return "dashboards"') &&
+          !appWorkspaceModelSource.includes('return "sources"') &&
           !appSource.includes("function normalizeStatus(") &&
           !appSource.includes("function normalizeQuery(") &&
           !appSource.includes("function normalizeWorkbench(") &&
@@ -320,31 +325,27 @@ export function appendAppArchitectureContractChecks(context) {
         ok: appSource.includes("import { Suspense") &&
           appSource.includes('from "./appLazyModules"') &&
           appLazyModulesSource.includes('import { lazyWithRetry } from "./lazyWithRetry"') &&
-          appLazyModulesSource.includes('const loadAgentCommandDock = () => import("./components/AgentCommandDock")') &&
           appLazyModulesSource.includes('const loadAppMainView = () => import("./components/AppMainView")') &&
-          appLazyModulesSource.includes('const loadBusinessPathBar = () => import("./components/BusinessPathBar")') &&
           appLazyModulesSource.includes('const loadTopBar = () => import("./components/TopBar")') &&
           appLazyModulesSource.includes('const loadAgentPanel = () => import("./components/AgentPanel")') &&
           appLazyModulesSource.includes('const loadDashboardCanvas = () => import("./components/DashboardCanvas")') &&
           appLazyModulesSource.includes('const loadEvidenceView = () => import("./components/EvidenceView")') &&
           appLazyModulesSource.includes('const loadHomeOverview = () => import("./components/HomeOverview")') &&
-          appLazyModulesSource.includes('const loadInspectorPanel = () => import("./components/InspectorPanel")') &&
           appLazyModulesSource.includes('const loadSettingsPanel = () => import("./components/SettingsPanel")') &&
           appLazyModulesSource.includes('const loadSourceWorkbench = () => import("./components/SourceWorkbench")') &&
           appLazyModulesSource.includes('const loadViewWorkspace = () => import("./components/ViewWorkspace")') &&
           appLazyModulesSource.includes("export const AgentPanel = lazyWithRetry(loadAgentPanel)") &&
-          appLazyModulesSource.includes("export const AgentCommandDock = lazyWithRetry(loadAgentCommandDock)") &&
           appLazyModulesSource.includes("export const AppMainView = lazyWithRetry(loadAppMainView)") &&
-          appLazyModulesSource.includes("export const BusinessPathBar = lazyWithRetry(loadBusinessPathBar)") &&
           appLazyModulesSource.includes("export const TopBar = lazyWithRetry(loadTopBar)") &&
           appLazyModulesSource.includes("export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas)") &&
           appLazyModulesSource.includes("export const EvidenceView = lazyWithRetry(loadEvidenceView)") &&
           appLazyModulesSource.includes("export const HomeOverview = lazyWithRetry(loadHomeOverview)") &&
-          appLazyModulesSource.includes("export const InspectorPanel = lazyWithRetry(loadInspectorPanel)") &&
           appLazyModulesSource.includes("export const SettingsPanel = lazyWithRetry(loadSettingsPanel)") &&
           appLazyModulesSource.includes("export const SourceWorkbench = lazyWithRetry(loadSourceWorkbench)") &&
           appLazyModulesSource.includes("export const ViewWorkspace = lazyWithRetry(loadViewWorkspace)") &&
           appLazyModulesSource.includes("export const sectionPreloaders: Record<AppSection") &&
+          appLazyModulesSource.includes("export const allSectionPreloaders") &&
+          appLazyModulesSource.includes("export const topBarPreloader = loadTopBar") &&
           appLazyModulesSource.includes("export function scheduleIdlePreload") &&
           appLazyModulesSource.includes("requestIdleCallback") &&
           agentPanelSource.includes('import "./agentEvidenceWorkspace.css"') &&
@@ -364,10 +365,10 @@ export function appendAppArchitectureContractChecks(context) {
           globalStylesSource.includes(".statusPill.compact {") &&
           hasCssRule(globalStylesSource, ".taskEvidenceRow summary", "cursor: pointer;") &&
           appLazyModulesSource.includes("export function ModuleLoadingPanel") &&
-          appLazyModulesSource.includes("export function InspectorLoadingPanel") &&
           appSource.includes("preloadModules(sectionPreloaders[section])") &&
-          appSource.includes("preloadModules([...allSectionPreloaders, inspectorPreloader, agentCommandDockPreloader, businessPathBarPreloader])") &&
-          appSource.includes("loadState === \"ready\"") &&
+          appSource.includes("preloadModules([...allSectionPreloaders, topBarPreloader])") &&
+          appSource.includes('setLoadState("ready")') &&
+          appSource.includes("data-load-state={loadState}") &&
           appLazyModulesSource.includes('import { getAppSection } from "./appSections"') &&
           appLazyModulesSource.includes('function sectionText(section: AppSection, language: "zh" | "en", field: "loading" | "loadingDetail")') &&
           !appSource.includes("lazy(loadAgentPanel)") &&
@@ -377,7 +378,6 @@ export function appendAppArchitectureContractChecks(context) {
           !appSource.includes('import { DashboardCanvas } from "./components/DashboardCanvas"') &&
           !appSource.includes('import { EvidenceView } from "./components/EvidenceView"') &&
           !appSource.includes('import { HomeOverview } from "./components/HomeOverview"') &&
-          !appSource.includes('import { InspectorPanel } from "./components/InspectorPanel"') &&
           !appSource.includes('import { SettingsPanel } from "./components/SettingsPanel"') &&
           !appSource.includes('import { SourceWorkbench } from "./components/SourceWorkbench"') &&
           !appSource.includes('import { ViewWorkspace } from "./components/ViewWorkspace"') &&
@@ -390,19 +390,19 @@ export function appendAppArchitectureContractChecks(context) {
           appLazyModulesSource.includes("dashboardModuleLoadingPanel") &&
           appLazyModulesSource.includes("dashboardLoadingFrame") &&
           appSectionsSource.includes("Preparing metrics, filters, widgets, and evidence entry points.") &&
-          appLazyModulesSource.includes("function InspectorLoadingPanel") &&
-          appLazyModulesSource.includes('data-testid="lazy-inspector-loading"') &&
-          appLazyModulesSource.includes("inspectorLoadingStack") &&
           appSource.includes("<Suspense fallback={<ModuleLoadingPanel section={section} language={resolvedLanguage} />}>") &&
-          appSource.includes("<Suspense fallback={<InspectorLoadingPanel language={resolvedLanguage} />}>") &&
+          !appLazyModulesSource.includes("loadAgentCommandDock") &&
+          !appLazyModulesSource.includes("loadBusinessPathBar") &&
+          !appLazyModulesSource.includes("loadInspectorPanel") &&
+          !appSource.includes("<AgentCommandDock") &&
+          !appSource.includes("<BusinessPathBar") &&
+          !appSource.includes("<InspectorPanel") &&
           stylesSource.includes(".moduleLoadingPanel") &&
           stylesSource.includes(".moduleLoadingFlow") &&
           stylesSource.includes(".moduleLoadingSupport") &&
           stylesSource.includes(".dashboardLoadingGrid") &&
           stylesSource.includes(".dashboardLoadingMetric") &&
-          stylesSource.includes(".dashboardLoadingChart") &&
-          stylesSource.includes(".inspectorLoadingPanel") &&
-          stylesSource.includes(".inspectorLoadingStack"),
+          stylesSource.includes(".dashboardLoadingChart"),
       },
     {
         label: "frontend-core-api-strict-no-sample-fallback",
@@ -491,12 +491,11 @@ export function appendAppArchitectureContractChecks(context) {
           topBarSource.includes('data-testid="service-diagnostics-technical"') &&
           topBarSource.includes('data-testid="service-diagnostics-commands"') &&
           topBarSource.includes('data-testid="service-diagnostics-notes"') &&
-          topBarSource.includes("查看启动命令和端口") &&
-          topBarSource.includes("npm run dev") &&
-          topBarSource.includes("npm run api") &&
-          topBarSource.includes("前端 8686 · API 8787") &&
-          topBarSource.includes("等待导入数据") &&
-          topBarSource.includes("没有可用数据表") &&
+          topBarSource.includes("启动命令和端口") &&
+          topBarSource.includes("npm run local:start") &&
+          topBarSource.includes("界面 8686 · API 8787") &&
+          topBarSource.includes("本地数据服务尚未就绪") &&
+          !topBarSource.includes("npm run api") &&
           packageJson.scripts?.dev === "node scripts/dev.mjs" &&
           packageJson.scripts?.["dev:ui"] === "vite" &&
           devScriptSource.includes("portIsOpen(8787)") &&
@@ -517,32 +516,30 @@ export function appendAppArchitectureContractChecks(context) {
       },
     {
         label: "frontend-home-workspace-start-guide",
-        ok: homeOverviewSource.includes("<HomeWorkspaceStartGuide") &&
-          homeWorkspaceStartGuideSource.includes("data-testid=\"workspace-start-guide\"") &&
-          homeWorkspaceStartGuideSource.includes("data-testid=\"workspace-start-guide-primary\"") &&
-          homeWorkspaceStartGuideSource.includes("data-testid={`workspace-guide-step-${step.key}`}") &&
-          homeWorkspaceStartGuideSource.includes("data-testid=\"workspace-start-guide-boundary\"") &&
-          homeWorkspaceStartGuideSource.includes("Follow the business path before learning configuration") &&
-          homeOverviewSource.includes("buildHomeGuideSteps({") &&
-          ["source", "profile", "dashboard", "ask"].every((key) => homeOverviewModelSource.includes(`key: "${key}"`)) &&
-          homeWorkspaceStartGuideSource.includes("Imports, deletes, overwrites, relationship saves, and dashboard writes become drafts or previews before execution."),
+        ok: homeOverviewSource.includes('className="workspaceJourney"') &&
+          homeOverviewSource.includes('aria-label={biText("可信分析流程", "Trusted analysis flow")}') &&
+          ["data", "evidence", "question", "review"].every((key) => homeOverviewSource.includes(`{ key: "${key}"`)) &&
+          homeOverviewSource.includes('aria-current={state === "current" ? "step" : undefined}') &&
+          homeOverviewSource.includes('disabled={state === "upcoming"}') &&
+          homeOverviewSource.includes('data-testid="workspace-primary-task"') &&
+          !homeOverviewSource.includes("HomeWorkspaceStartGuide") &&
+          !homeOverviewSource.includes("buildHomeGuideSteps"),
       },
     {
         label: "frontend-home-overview-model-boundary",
-        ok: homeOverviewSource.includes('from "../homeOverviewModel"') &&
-          homeOverviewModelSource.includes("export function buildStarterQuestions") &&
-          homeOverviewModelSource.includes("export type GuideStep") &&
-          homeOverviewModelSource.includes("export function buildHomeReadiness") &&
-          homeOverviewModelSource.includes("export function buildHomeGuideSteps") &&
-          homeOverviewModelSource.includes("export function sourceDashboardCandidate") &&
-          homeOverviewModelSource.includes('from "./safeValue"') &&
-          homeOverviewModelSource.includes("export { numberValue, objectRecord, recordArray, stringValue }") &&
-          homeOverviewModelSource.includes("SourceIntelligenceDashboardCandidate") &&
-          homeOverviewSource.includes("buildHomeReadiness({") &&
-          homeOverviewSource.includes("buildHomeGuideSteps({") &&
-          !homeOverviewSource.includes("function sourceDashboardCandidate(") &&
-          !homeOverviewSource.includes("const starterQuestions = [") &&
-          !homeOverviewSource.includes("const guideSteps = useMemo<GuideStep[]>"),
+        ok: !homeOverviewSource.includes('from "../homeOverviewModel"') &&
+          homeOverviewSource.includes("const questionStarters = [") &&
+          homeOverviewSource.includes("const hasData =") &&
+          homeOverviewSource.includes("const latestUsableRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns)") &&
+          homeOverviewSource.includes("const hasCurrentEvidence = Boolean(latestUsableRun)") &&
+          homeOverviewSource.includes("const hasPendingDraft =") &&
+          homeOverviewSource.includes("const currentStep =") &&
+          homeOverviewSource.includes("const workflowSteps = useMemo(() => [") &&
+          homeOverviewSource.includes("async function submitQuestion") &&
+          homeOverviewSource.includes("async function generateEvidence") &&
+          !homeOverviewSource.includes("buildHomeReadiness") &&
+          !homeOverviewSource.includes("buildHomeGuideSteps") &&
+          !homeOverviewSource.includes("sourceDashboardCandidate"),
       },
     {
         label: "safe-value-helper-boundary",

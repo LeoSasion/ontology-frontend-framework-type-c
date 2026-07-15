@@ -6,6 +6,7 @@ import {
   refreshStatusAndDrafts,
   refreshStatusDashboardsWorkbenchDrafts,
 } from "./appRefreshModel";
+import { confirmedActionNavigationTarget } from "./agentActionNavigationModel";
 import type { AppSection } from "./components/Sidebar";
 import type { AppNavigationTarget } from "./appNavigationModel";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
@@ -121,7 +122,7 @@ export function useAppAgentActions({
     if (result.workspaceId === activeWorkspaceId) setLastActionResult(result);
   }, [activeWorkspaceId, setLastActionResult]);
 
-  const handleConfirmAction = useCallback(async (actionKey: string) => {
+  const handleConfirmAction = useCallback(async (actionKey: string, draft?: ActionDraft) => {
     const result = await confirmAction(actionKey, true, false, activeWorkspaceId);
     if (result.workspaceId !== activeWorkspaceId) return;
     const refreshed = await refreshStatusDashboardsWorkbenchDrafts();
@@ -130,14 +131,9 @@ export function useAppAgentActions({
     setDashboards(refreshed.dashboards);
     setWorkbench(refreshed.workbench);
     setActionDrafts(refreshed.actionDrafts);
-    if (typeof result.createdDashboardKey === "string") {
-      setActiveDashboardKey(result.createdDashboardKey);
-    }
-    navigateTo({
-      section: "dashboards",
-      actionKey,
-      dashboardKey: typeof result.createdDashboardKey === "string" ? result.createdDashboardKey : undefined,
-    });
+    const target = confirmedActionNavigationTarget(actionKey, result, draft);
+    if (target.section === "dashboards" && target.dashboardKey) setActiveDashboardKey(target.dashboardKey);
+    navigateTo(target);
   }, [activeWorkspaceId, navigateTo, setActionDrafts, setActiveDashboardKey, setDashboards, setLastActionResult, setStatus, setWorkbench]);
 
   const handleRejectAction = useCallback(async (actionKey: string) => {

@@ -11,7 +11,6 @@ import {
   navigate,
   setViewport,
   waitFor,
-  waitForAppReady,
 } from "./ui-verify-chrome.mjs";
 
 const apiBaseUrl = process.env.AIBI_API_BASE_URL ?? "http://127.0.0.1:8787";
@@ -58,21 +57,31 @@ function assertPageState() {
   return {
     title: document.title,
     url: location.href,
-    connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+    connected: Boolean(document.querySelector(".appShell")) && !get("service-diagnostics"),
     hasErrorBoundary,
     errorDetail: document.querySelector(".appFallback pre, .fallbackPanel pre")?.textContent?.trim() || "",
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     noSampleCopy: !/样例|示例|demo data|test data|fallback source|mock data|lorem/i.test(text),
+    chrome: {
+      singleSidebar: Boolean(document.querySelector(".workspaceSidebar")),
+      noGlobalBusinessPath: !get("global-business-path"),
+      noGlobalAgentDock: !get("agent-command-dock"),
+      noGlobalInspector: !document.querySelector(".inspector"),
+    },
     home: {
-      actionDock: Boolean(get("home-action-dock")),
-      importAction: Boolean(get("home-action-import")),
-      chartActionEnabled: Boolean(get("home-action-chart")) && !disabled("home-action-chart"),
+      primaryTask: visible("workspace-primary-task"),
+      journey: visible("workspace-journey"),
+      connectData: visible("workspace-connect-data"),
+      prepareEvidence: visible("workspace-prepare-evidence"),
+      questionForm: visible("workspace-question-form"),
+      reviewDraft: visible("workspace-review-draft"),
+      openBoard: visible("workspace-open-board"),
     },
     sources: {
       entry: visible("source-intelligence-folder-entry"),
-      importPreview: visible("import-preview-button"),
+      importPreview: visible("source-import-preview-button"),
       coverageItems: visibleCount('[data-testid="source-coverage-item"]'),
-      dashboardNextAction: visible("source-next-dashboard") || visible("source-dashboard-next-action") || visible("beginner-plan-refresh-profile"),
+      analysisNextAction: visible("source-next-analysis") || visible("beginner-plan-refresh-profile"),
       sourceError: visible("source-intelligence-error"),
     },
     dashboards: {
@@ -97,7 +106,23 @@ function assertPageState() {
 }
 
 async function readCurrentSection(client, testId) {
-  const ready = await waitForAppReady(client, testId, 25000);
+  const ready = await waitFor(client, (expectedTestId) => {
+    const text = document.body?.innerText || "";
+    const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+    return {
+      ok: Boolean(document.querySelector(".appShell")) &&
+        Boolean(document.querySelector(`[data-testid="${expectedTestId}"]`)) &&
+        !document.querySelector('[data-testid="service-diagnostics"]') &&
+        !hasErrorBoundary,
+      title: document.title,
+      url: location.href,
+      hasShell: Boolean(document.querySelector(".appShell")),
+      hasSection: Boolean(document.querySelector(`[data-testid="${expectedTestId}"]`)),
+      hasServiceDiagnostics: Boolean(document.querySelector('[data-testid="service-diagnostics"]')),
+      hasErrorBoundary,
+      hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
+    };
+  }, testId, { timeoutMs: 25000, intervalMs: 250 });
   const state = await evaluate(client, assertPageState, null, 10000);
   return { ready, state };
 }
@@ -133,8 +158,13 @@ try {
   const counts = status.counts ?? {};
   const hasData = Number(counts.tables ?? 0) > 0;
   const hasSourceIntelligence = Number(counts.sourceIntelligenceRuns ?? 0) > 0;
+  const latestUsableSourceIntelligenceRun = Array.isArray(workbench.sourceIntelligenceRuns)
+    ? workbench.sourceIntelligenceRuns.find((run) => run.freshness?.usableForPlanning !== false)
+    : null;
+  const hasCurrentEvidence = Boolean(latestUsableSourceIntelligenceRun);
   const dashboardList = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
   const dashboardCount = Number(counts.dashboards ?? dashboardList.length);
+  const hasPendingDraft = Number(drafts.pendingCount ?? drafts.actionDrafts?.length ?? 0) > 0;
   checks.push(
     check("api-live-status", status.ok === true && Boolean(status.database), { workspace: status.workspace, counts }),
     check("api-workspace-data-state-supported", hasData || Number(counts.tables ?? 0) === 0, { mode: hasData ? "data" : "empty", tables: counts.tables }),
@@ -147,7 +177,7 @@ try {
   await setViewport(browser.client, viewport);
 
   if (!hasData) {
-    const sourcesPage = await waitForSection(browser.client, "sources", "import-preview-button");
+    const sourcesPage = await waitForSection(browser.client, "sources", "source-import-preview-button");
     checks.push(
       check("ui-empty-sources-ready", sourcesPage.ready.ok, { ready: sourcesPage.ready }),
       check("ui-empty-sources-import-only", sourcesPage.state.sources.importPreview && !sourcesPage.state.sources.entry),
@@ -157,14 +187,14 @@ try {
     );
     steps.push({ section: "empty-sources", state: sourcesPage.state });
 
-    const dashboardLocked = await waitForSection(browser.client, "dashboards", "import-preview-button");
+    const dashboardLocked = await waitForSection(browser.client, "dashboards", "source-import-preview-button");
     checks.push(
       check("ui-empty-dashboard-routes-to-import", dashboardLocked.ready.ok && dashboardLocked.state.sources.importPreview && !dashboardLocked.state.sources.entry, { ready: dashboardLocked.ready, url: dashboardLocked.state.url }),
       check("ui-empty-dashboard-no-error", !dashboardLocked.state.hasErrorBoundary && !dashboardLocked.state.hasFrameworkOverlay),
     );
     steps.push({ section: "empty-dashboard-locked", state: dashboardLocked.state });
 
-    const evidenceLocked = await waitForSection(browser.client, "evidence", "import-preview-button");
+    const evidenceLocked = await waitForSection(browser.client, "evidence", "source-import-preview-button");
     checks.push(
       check("ui-empty-evidence-routes-to-import", evidenceLocked.ready.ok && evidenceLocked.state.sources.importPreview && !evidenceLocked.state.sources.entry, { ready: evidenceLocked.ready, url: evidenceLocked.state.url }),
       check("ui-empty-evidence-no-error", !evidenceLocked.state.hasErrorBoundary && !evidenceLocked.state.hasFrameworkOverlay),
@@ -183,70 +213,60 @@ try {
     const screenshot = await captureScreenshot(browser.client, join(screenshotDir, "ui-flow-empty-agent-ready.png"));
     steps.push({ section: "empty-agent-screenshot", screenshot });
   } else {
-    const home = await waitForSection(browser.client, "home", "home-action-dock");
+    const home = await waitForSection(browser.client, "home", "workspace-primary-task");
     checks.push(
       check("ui-home-ready", home.ready.ok, { ready: home.ready }),
-      check("ui-home-primary-import-visible", home.state.home.importAction),
-      check("ui-home-chart-action-enabled-with-data", home.state.home.chartActionEnabled),
+      check("ui-home-single-primary-task-visible", home.state.home.primaryTask),
+      check("ui-home-four-step-journey-visible", home.state.home.journey),
+      check(
+        "ui-home-primary-task-matches-evidence-state",
+        hasPendingDraft
+          ? home.state.home.reviewDraft && !home.state.home.questionForm
+          : hasCurrentEvidence
+          ? home.state.home.questionForm && !home.state.home.prepareEvidence
+          : home.state.home.prepareEvidence && !home.state.home.questionForm,
+        { hasCurrentEvidence, hasPendingDraft, home: home.state.home },
+      ),
+      check("ui-home-board-hidden-while-evidence-stale", hasCurrentEvidence || !home.state.home.openBoard, { hasCurrentEvidence, openBoard: home.state.home.openBoard }),
+      check("ui-shell-redundant-global-chrome-retired", home.state.chrome.singleSidebar && home.state.chrome.noGlobalBusinessPath && home.state.chrome.noGlobalAgentDock && home.state.chrome.noGlobalInspector, home.state.chrome),
       check("ui-home-no-error", !home.state.hasErrorBoundary && !home.state.hasFrameworkOverlay),
       check("ui-home-no-sample-copy", home.state.noSampleCopy),
     );
     steps.push({ section: "home", state: home.state });
 
-    const dashboardClick = await click(browser.client, '[data-testid="home-action-chart"]');
-    checks.push(check("ui-home-dashboard-click-fired", dashboardClick.ok, dashboardClick));
-    const dashboardAfterClick = await waitFor(browser.client, () => {
-      const text = document.body?.innerText || "";
-      return {
-        ok: location.search.includes("section=dashboards") && Boolean(document.querySelector('[data-testid="dashboard-business-task-strip"]')),
-        url: location.href,
-        connected: text.includes("数据服务已连接"),
-      };
-    }, null, { timeoutMs: 12000, intervalMs: 250 });
-    checks.push(check("ui-home-to-dashboard-jump", dashboardAfterClick.ok, { state: dashboardAfterClick }));
+    if (hasCurrentEvidence && dashboardCount > 0) {
+      const boardClick = await click(browser.client, '[data-testid="workspace-open-board"]');
+      checks.push(check("ui-home-board-click-fired", boardClick.ok, boardClick));
+      const dashboardsPage = await readCurrentSection(browser.client, "dashboard-business-task-strip");
+      checks.push(
+        check("ui-home-to-dashboard-jump", dashboardsPage.ready.ok && dashboardsPage.state.url.includes("section=dashboards"), { ready: dashboardsPage.ready, url: dashboardsPage.state.url }),
+        check("ui-dashboard-single-chart-prompt-visible", dashboardsPage.state.dashboards.chartPrompt && dashboardsPage.state.dashboards.createOneChart),
+        check("ui-dashboard-evidence-jump-visible", dashboardsPage.state.dashboards.evidenceJump),
+        check("ui-dashboard-secondary-settings-collapsed", dashboardsPage.state.dashboards.secondaryCollapsed),
+        check("ui-dashboard-no-error", !dashboardsPage.state.hasErrorBoundary && !dashboardsPage.state.hasFrameworkOverlay),
+      );
+      steps.push({ section: "dashboards", state: dashboardsPage.state });
 
-    const dashboardsPage = dashboardAfterClick.ok
-      ? await readCurrentSection(browser.client, "dashboard-business-task-strip")
-      : await waitForSection(browser.client, "dashboards", "dashboard-business-task-strip");
-    checks.push(
-      check("ui-dashboard-ready", dashboardsPage.ready.ok, { ready: dashboardsPage.ready }),
-      check("ui-dashboard-single-chart-prompt-visible", dashboardsPage.state.dashboards.chartPrompt && dashboardsPage.state.dashboards.createOneChart),
-      check("ui-dashboard-evidence-jump-visible", dashboardsPage.state.dashboards.evidenceJump),
-      check("ui-dashboard-secondary-settings-collapsed", dashboardsPage.state.dashboards.secondaryCollapsed),
-      check("ui-dashboard-no-error", !dashboardsPage.state.hasErrorBoundary && !dashboardsPage.state.hasFrameworkOverlay),
-      check("ui-dashboard-no-sample-copy", dashboardsPage.state.noSampleCopy),
-    );
-    steps.push({ section: "dashboards", state: dashboardsPage.state });
-
-    const moreClick = await click(browser.client, '[data-testid="dashboard-more-details"] > summary');
-    checks.push(check("ui-dashboard-more-opened", moreClick.ok, moreClick));
-    const evidenceClick = await click(browser.client, '[data-testid="dashboard-more-evidence"]');
-    checks.push(check("ui-dashboard-evidence-click-fired", evidenceClick.ok, evidenceClick));
-    const evidenceAfterClick = await waitFor(browser.client, () => ({
-      ok: location.search.includes("section=evidence") && Boolean(document.querySelector('[data-testid="evidence-business-summary"]')),
-      url: location.href,
-    }), null, { timeoutMs: 12000, intervalMs: 250 });
-    checks.push(check("ui-dashboard-to-evidence-jump", evidenceAfterClick.ok, { state: evidenceAfterClick }));
-
-    const evidencePage = evidenceAfterClick.ok
-      ? await readCurrentSection(browser.client, "evidence-business-summary")
-      : await waitForSection(browser.client, "evidence", "evidence-business-summary");
-    checks.push(
-      check("ui-evidence-ready", evidencePage.ready.ok, { ready: evidencePage.ready }),
-      check("ui-evidence-business-summary-visible", evidencePage.state.evidence.businessSummary),
-      check("ui-evidence-source-summary-visible", evidencePage.state.evidence.sourceSummary),
-      check("ui-evidence-raw-receipts-collapsed", evidencePage.state.evidence.receiptsCollapsed),
-      check("ui-evidence-no-error", !evidencePage.state.hasErrorBoundary && !evidencePage.state.hasFrameworkOverlay),
-      check("ui-evidence-no-sample-copy", evidencePage.state.noSampleCopy),
-    );
-    steps.push({ section: "evidence", state: evidencePage.state });
+      const moreClick = await click(browser.client, '[data-testid="dashboard-more-details"] > summary');
+      checks.push(check("ui-dashboard-more-opened", moreClick.ok, moreClick));
+      const evidenceClick = await click(browser.client, '[data-testid="dashboard-more-evidence"]');
+      checks.push(check("ui-dashboard-evidence-click-fired", evidenceClick.ok, evidenceClick));
+      const evidencePage = await readCurrentSection(browser.client, "evidence-next-action");
+      checks.push(
+        check("ui-dashboard-to-evidence-jump", evidencePage.ready.ok && evidencePage.state.url.includes("section=evidence"), { ready: evidencePage.ready, url: evidencePage.state.url }),
+        check("ui-evidence-source-summary-visible", evidencePage.state.evidence.sourceSummary),
+        check("ui-evidence-raw-receipts-collapsed", evidencePage.state.evidence.receiptsCollapsed),
+        check("ui-evidence-no-error", !evidencePage.state.hasErrorBoundary && !evidencePage.state.hasFrameworkOverlay),
+      );
+      steps.push({ section: "evidence", state: evidencePage.state });
+    }
 
     const sourcesPage = await waitForSection(browser.client, "sources", "beginner-import-plan");
     checks.push(
       check("ui-sources-ready", sourcesPage.ready.ok, { ready: sourcesPage.ready }),
       check("ui-sources-profile-entry-hidden-after-profile", !sourcesPage.state.sources.entry),
       check("ui-sources-raw-coverage-hidden-after-profile", sourcesPage.state.sources.coverageItems === 0, { coverageItems: sourcesPage.state.sources.coverageItems }),
-      check("ui-sources-dashboard-next-action-visible", sourcesPage.state.sources.dashboardNextAction),
+      check("ui-sources-analysis-next-action-visible", sourcesPage.state.sources.analysisNextAction),
       check("ui-sources-no-inline-source-error", !sourcesPage.state.sources.sourceError),
       check("ui-sources-no-error", !sourcesPage.state.hasErrorBoundary && !sourcesPage.state.hasFrameworkOverlay),
     );

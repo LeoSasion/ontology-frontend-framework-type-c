@@ -26,7 +26,7 @@ export function SourceWorkbenchView({
   formulaPreview,
   relationshipPreview,
   onAsk,
-  onOpenDashboard,
+  onOpenAnalysis,
   onInspectSource,
   onRenameSource,
   onDeleteSource,
@@ -67,7 +67,6 @@ export function SourceWorkbenchView({
   selectedMetrics,
   measureFields,
   groupFields,
-  indexCandidateName,
   selectedFormulaAssets,
   fieldSemanticReadiness,
   queryForm,
@@ -83,7 +82,6 @@ export function SourceWorkbenchView({
   sourceProfileLabel,
   sourceProfileResult,
   sourceProfileError,
-  businessDashboardResult,
   busy,
   showAdvanced,
   importController,
@@ -100,15 +98,8 @@ export function SourceWorkbenchView({
   sourceProfileComplete,
   sourceProfileRunning,
   sourceProfileRunningLabel,
-  dashboardMeasureName,
-  dashboardDimensionName,
-  dashboardTimeName,
-  dashboardRecipeReady,
-  dashboardRecipeEvidenceCount,
-  dashboardRecipeCards,
   recommendedPrimaryAction,
   beginnerPlan,
-  sourceAgentPrompts,
   hasData,
   showExpertWorkbench,
   setActiveTableKey,
@@ -136,7 +127,6 @@ export function SourceWorkbenchView({
   selectManagedSource,
   runBusy,
   runSourceProfile,
-  runBusinessDashboard,
   metricDraft,
   sourceProfileOptions,
   sourceRenameName,
@@ -173,32 +163,16 @@ export function SourceWorkbenchView({
 
         {hasData ? (
           <Suspense fallback={<SourceWorkbenchAdvancedLoading />}><SourceWorkbenchActionPanel
-            busy={busy}
             recommendedPrimaryAction={recommendedPrimaryAction}
             beginnerPlan={beginnerPlan}
             sourceProfileRunning={sourceProfileRunning}
             sourceProfileComplete={sourceProfileComplete}
             latestSourceProfile={latestSourceProfile}
-            relationshipsCount={relationships.length}
-            selectedMetricsCount={selectedMetrics.length}
-            dashboardRecipeReady={dashboardRecipeReady}
-            dashboardRecipeEvidenceCount={dashboardRecipeEvidenceCount}
-            dashboardRecipeCards={dashboardRecipeCards}
-            businessDashboardResult={businessDashboardResult}
-            selectedTableKey={selectedTableKey}
-            dashboardDimensionName={dashboardDimensionName}
-            dashboardMeasureName={dashboardMeasureName}
-            dashboardTimeName={dashboardTimeName}
-            indexCandidateName={indexCandidateName}
             showAdvanced={showAdvanced}
             setShowAdvanced={setShowAdvanced}
-            sourceAgentPrompts={sourceAgentPrompts}
-            runBusy={runBusy}
             sourceProfileOptions={sourceProfileOptions}
             runSourceProfile={runSourceProfile}
-            runBusinessDashboard={runBusinessDashboard}
-            onAsk={onAsk}
-            onOpenDashboard={onOpenDashboard}
+            onOpenAnalysis={onOpenAnalysis}
           /></Suspense>
         ) : null}
 

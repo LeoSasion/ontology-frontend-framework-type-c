@@ -1,48 +1,55 @@
 # AIBI-C 产品验收矩阵
 
-本矩阵只定义用户可观察的稳定行为。脚本拆分、测试数量和历史修复过程不在此重复。
+本矩阵只描述用户可观察的稳定行为。实现细节和检查数量不在此维护；日期结果见 [验收证据索引](../artifacts/README.md)。
 
-| Scenario | Expected behavior | Acceptance signal |
+## 核心旅程
+
+| 场景 | 操作 | 必须观察到 | 失败信号 |
+| --- | --- | --- | --- |
+| 空工作区 | 创建或打开无数据工作区 | 只引导接入真实数据；无图表、问题、业务结论或高级建模噪声 | 出现样例数据、默认问题、假指标或领域模板 |
+| 接入真实来源 | 检查 external real file or folder | 预检识别来源类型并展示目标、字段、行数、键、冲突和影响；确认前不写入 | 直接写入、重复预演、读取未允许路径 |
+| 生成证据 | 导入后生成证据摘要 | 展示当前来源、字段质量、关系候选、缺口与指纹 | 复用已失效 Run 或以历史结果替代当前证据 |
+| 创建单图 | 描述一个明确指标和维度 | 直接得到一个可核对的结果或草案；来源、口径和写入目标清晰 | 创建多组件模板、隐藏聚合或静默选择歧义字段 |
+| 确认写入 | 核对并确认草案 | 只有一个确认面；完成后打开真实对象并产生回执 | 重复确认、写入错误工作区或只显示临时成功提示 |
+| 连续分析 | 从已确认结果继续比较 | 新分支保留父 Receipt、Unit、动作和拒绝历史 | 从未确认或失效结果无血缘继续 |
+
+## 语义、跨表与领域边界
+
+| 场景 | 必须观察到 | 失败信号 |
 | --- | --- | --- |
-| Repository isolation | 开发、验证和运行不依赖其他 AIBI 工作树。 | root、origin、路径、符号链接和输入门禁通过；默认回归只使用 AIBI-C 的 `validation-inputs` 或系统临时目录。 |
-| Empty workspace | 不出现样例、默认对象或隐藏结论，只引导导入。 | Home、Sources、Dashboards、Evidence、AI 均基于真实空态。 |
-| Import one file or folder | 写入前能看懂目标、合并、去重、键和风险。 | external real file or folder 在临时工作区完成预演、一次确认、画像、路由和清理，不影响原工作区。 |
-| Create one chart | 无看板时也能从当前表生成一个图表。 | 明确请求只产生一个草案；模糊请求最多澄清一次；批准后只创建一个组件。 |
-| Generic AI question | 系统不猜行业和指标。 | 普通概览只使用当前表证据，不静默选择销售、退款或渠道字段。 |
-| Domain-neutral default | 新工作区只有通用结构能力。 | 中性数据在 UI、API、CLI、Agent、Source Intelligence 和 Receipt 中不出现电商、ERP、资金、订单、售后、保单或客户默认语义。 |
-| Domain Pack lifecycle | 领域知识按工作区显式启停且可追踪。 | 新旧工作区启用清单默认为空；启停需预演和确认；历史结果保留创建时 Pack 版本，停用后不再生成新建议。 |
-| External Domain Pack package | 外部 Pack 可受控安装和升级，但不能把代码带入 Core。 | lint、来源和签名先通过；安装/升级/卸载均 dry-run + confirm；可执行文件、未知贡献、冲突和未声明迁移在写入前阻断。 |
-| Domain Pack portability | 工作区配置迁移后不改变领域行为。 | 配置导出和恢复保留 `workspace_domain_packs`；schema 版本提升可被迁移预演、恢复点和回滚发现。 |
-| Multiple Domain Packs | 多领域并存不靠加载顺序猜测。 | 两个 Pack 独立命中；冲突按显式选择、手工语义和证据处理，无法唯一决胜时集中澄清。 |
-| Core, Pack and Adapter isolation | 数据接入与领域知识不互相暗含。 | 创建或同步 Connector 不改变 Pack；启用 Pack 不访问来源或凭据；未知能力在注册阶段阻断。 |
-| Ambiguous field resolution | 同名或近义字段不会被静默猜测。 | 多个未决字段合并在一个候选面；明确表名后绑定目标字段，回执保留候选与依据。 |
-| Multi-dimension semantic plan | 多个维度和指标先形成完整计划。 | 逐项列出字段角色、统计粒度、参与表和未决项，不遗漏后续字段。 |
-| Relationship safety | 推荐、复合键、筛选、预聚合和版本变化均受控。 | 名称相似不能单独通过；完整映射与行膨胀可审阅；数据变化使旧验证失效并阻断。 |
-| Semantic cross-table execution | 跨表问题只沿当前已验证路径执行。 | 单跳和严格线性两跳结果、计划哈希、最终粒度和 Receipt 一致；三跳、反向或不安全路径明确阻断。 |
-| Full industry dashboard Beta | Beta 不抢占单图入口。 | 写入前披露命中、省略、字段缺口与来源；缺字段组件不渲染。 |
-| Evidence and audit | 结果可核对、可导出且不重新解释。 | Receipt 关联来源、字段、关系、运行时、动作和缺口；技术诊断默认收起。 |
-| Evidence fingerprint compatibility | 最新证据只能属于当前数据与 Pack 上下文。 | 表版本、schema/source fingerprint 或 Pack 集合变化后，旧 Run/Receipt/Unit 只作为历史证据，不参与当前执行或最新结果选择。 |
-| Compound ratio safety | 未验证的比率问题不退化为普通聚合。 | 中英文 ratio/rate/占比/转化率/退款率请求缺少分子分母时只返回一次澄清；无 executed Receipt 或 ready Unit。 |
-| Verification workspace isolation | 自动化不污染用户工作区。 | 完整回归前后，用户工作区表、Run、Receipt、Unit、Pack 启用清单和当前对象指纹不变。 |
-| Trusted reuse and branch | 只有确认过的知识与结果可复用。 | 结构或关系变化使记忆失效；仅确认结果可创建带父级血缘的分支。 |
-| Durable background analysis | 长任务不绑死 HTTP，也不在重启后静默重复。 | 状态迁移、单调进度、有序事件、取消、worker 异常和重启恢复均可审计。 |
-| Unified workflow capability | 不同入口不能改变同一能力的权限和证据边界。 | CLI/API/Agent/Job 共用 `capabilityId` 与 Stage；未知能力和越权入口在执行前阻断。 |
-| Verifiable analysis units | 结论可复算，图表不由模型或字段顺序猜选。 | 六类 Unit 绑定 Receipt 指纹；冻结标量可复算；不兼容图表、替换结果和样本不足明确阻断。 |
-| Receipt-driven analysis export | Excel/报告与屏幕上的已验证结论一致。 | 相同 Receipt/Unit 产生确定性 ZIP、结构化工作簿、脱敏快照和哈希；不重新查询或写业务库。 |
-| Safe read-only connector adapter | 外部来源先以最小权限读取并形成计划。 | 预览有硬上限且不暴露绝对路径；跨工作区、符号链接、其他 AIBI 路径、字面凭据和任意查询在访问前阻断。 |
-| Allowlisted HTTP JSON Adapter | API 接入不会成为任意网络访问器。 | 非 allowlist origin、重定向越界、超时、超字节和字面凭据均阻断；超页/超行按上限截断；回执不含 Secret。 |
-| Allowlisted SQLite table Adapter | 数据库接入不接受任意 SQL。 | 仅 allowlist 文件和显式表可读；系统表、附加数据库、查询文本和越界路径在打开前阻断。 |
-| Confirm or reject write | 写入受控但没有重复确认。 | 一个审阅面展示目标、影响、证据、确认和拒绝。 |
-| Delete source or object | 删除可发现且受保护。 | 主页面先 dry-run 依赖与影响，确认后显示回执并落到有效对象。 |
-| Workspace and route isolation | 跨页与刷新不丢失当前对象。 | `table`、`view`、`dashboard`、`run`、`action` 随 URL 和历史恢复，不使用 fabricated fallback。 |
-| Production no-demo boundary | 产品不种入用户可见测试内容。 | 自动化可用 `validation-inputs`；生产空态的表、看板、草案和答案均为零。 |
-| Desktop visual ratios | 常见 PC 比例可扫描且不挤压。 | 1280×720、1440×900、900×1440、1100×1100 无全局溢出、重叠、裁切或逐字换行。 |
-| Local security and recovery | 本地数据不暴露，恢复不盲写。 | 仅回环监听；请求有界；备份含校验和；恢复默认预演并创建安全副本。 |
-| Local schema upgrade | 版本升级不静默覆盖工作区。 | 双库先只读检查和隔离预演；确认前创建恢复点；应用或复检失败时回滚，未来版本阻止启动。 |
+| 字段歧义 | 展示表级候选并集中澄清一次；显式表名可消歧 | 按列顺序、导入顺序或模型偏好决胜 |
+| 复合比率 | 没有已验证分子/分母时要求澄清 | 把退款率、转化率或占比退化为 `COUNT(*)` |
+| 多维问题 | Receipt 保留全部指标、维度、筛选、参与表和粒度 | 只处理首个命中字段 |
+| 安全跨表 | 展示已验证关系路径、版本和放大风险；不安全时阻断 | 推荐关系直接执行、失效关系继续查询 |
+| 中性数据 | 无 Pack 时只出现结构事实 | 出现电商、ERP、资金、订单、售后或保单语义 |
+| Pack 启停与冲突 | 显式预演和确认；启用只增加声明能力，停用恢复通用结果；冲突可解释 | 自动启用、按加载顺序决胜或改写历史结果 |
 
-## Required Verification
+## 对象、安全与恢复
+
+| 场景 | 必须观察到 | 失败信号 |
+| --- | --- | --- |
+| 路由恢复 | 刷新、前进、后退回到同一 `table`、`view`、`dashboard`、`run` 或 `action` | 跳到无关对象或保留不兼容上下文 |
+| 删除来源或对象 | 先列出依赖和影响，确认后删除并返回回执；拒绝不改变状态 | 未预演删除、残留不可见引用或误删其他工作区 |
+| Connector | 发现、预览、计划与确认导入分离；凭据仅显示是否配置 | 字面凭据泄露、任意网络/SQL、预览阶段写入 |
+| Job 取消与重启 | 取消需确认且仅作用于登记 worker；重启中断形成可审计终态 | 静默重跑、越权终止进程或进度倒退 |
+| 迁移与恢复 | 默认预演；确认前创建恢复点；失败恢复 SQLite 与 DuckDB | 原库在预演中变化、只恢复一库或无校验和 |
+| 工作区隔离 | 用户工作区、临时验证工作区和历史证据互不串扰 | 测试输入进入用户空间或跨工作区“最新结果”复用 |
+
+## 界面与生产边界
+
+| 场景 | 必须观察到 | 失败信号 |
+| --- | --- | --- |
+| 生产无演示数据 | 新工作区没有来自 `validation-inputs`、Fixtures 或测试脚本的可见内容 | 生产 UI 出现测试表、默认结论或示例提问 |
+| 响应式窗口 | 桌面和窄屏可访问工作区切换、全部主导航、高级工具和设置；无全局横向溢出 | 控件遮挡、正文逐字换行或靠隐藏核心入口适配 |
+| 空看板 | 只创建看板容器，组件列表为空 | 自动注入指标、图表或领域模板 |
+| 错误与空态 | 说明真实原因、影响和下一步；键盘焦点可达 | 只显示颜色、原始堆栈或无行动提示 |
+
+## 自动化门禁
 
 - `npm run verify:docs`
 - `npm run build`
 - `npm run verify`
+- `npm run verify:ui`
 - `npm run preflight`
+
+交付前以完整 `preflight` 为准；专项验证只能证明对应改动面，不能替代总门禁。

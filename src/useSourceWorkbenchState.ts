@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { FieldConfig, FormulaMutationPayload } from "./types";
-import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
-import type { QueryOptions, SourceWorkbenchProps } from "./sourceWorkbenchContracts";
+import type { QueryOptions, RelationshipSaveOptions, SourceWorkbenchProps } from "./sourceWorkbenchContracts";
 import {
   buildFieldSemanticReadiness,
   buildSourceWorkbenchCollections,
@@ -29,9 +28,11 @@ import { buildSourceWorkbenchGuidance } from "./sourceWorkbenchGuidanceModel";
 import { useSourceWorkbenchConnectorController } from "./useSourceWorkbenchConnectorController";
 import { useSourceWorkbenchImportController } from "./useSourceWorkbenchImportController";
 import { biText } from "./components/Bilingual";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 
 export function useSourceWorkbenchState({
   focusedTableKey,
+  onTableFocus,
   status,
   preview,
   query,
@@ -61,9 +62,7 @@ export function useSourceWorkbenchState({
   onFormulaSave,
   onFormulaDelete,
   onSourceIntelligenceRun,
-  onBusinessDashboardOperation,
   onAsk,
-  onOpenDashboard,
 }: SourceWorkbenchProps) {
   void onRemoveImportJob;
   void onInspectSource;
@@ -115,7 +114,14 @@ export function useSourceWorkbenchState({
     }
     return indexed;
   }, [fields]);
-  const [activeTableKey, setActiveTableKey] = useState(firstTableKey);
+  const [activeTableKey, setActiveTableKeyState] = useState(firstTableKey);
+  const setActiveTableKey = useCallback<Dispatch<SetStateAction<string>>>((nextValue) => {
+    setActiveTableKeyState((current) => {
+      const next = typeof nextValue === "function" ? nextValue(current) : nextValue;
+      if (next && next !== current) onTableFocus?.(next);
+      return next;
+    });
+  }, [onTableFocus]);
   const [managedSourceKey, setManagedSourceKey] = useState(firstTableKey);
   const [sourceRenameName, setSourceRenameName] = useState(tables[0]?.display_name ?? "");
   const [navigationModuleKey, setNavigationModuleKey] = useState(navigationModules[0]?.moduleKey ?? "");
@@ -130,7 +136,6 @@ export function useSourceWorkbenchState({
     selectedMetrics,
     measureFields,
     groupFields,
-    indexCandidateName,
     selectedFormulaAssets,
   } = useMemo(() => buildSourceWorkbenchSelection({
     tables,
@@ -170,7 +175,6 @@ export function useSourceWorkbenchState({
   const [sourceProfileLabel, setSourceProfileLabel] = useState(biText("证据摘要", "Source profile"));
   const [sourceProfileResult, setSourceProfileResult] = useState<Record<string, unknown> | null>(null);
   const [sourceProfileError, setSourceProfileError] = useState("");
-  const [businessDashboardResult, setBusinessDashboardResult] = useState<Record<string, unknown> | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const sourceProfileInFlightRef = useRef(false);
@@ -209,14 +213,14 @@ export function useSourceWorkbenchState({
   useEffect(() => {
     if (!firstTableKey) return;
     const firstTableName = tables[0]?.display_name ?? firstTableKey;
-    setActiveTableKey((current) => tableKeySet.has(current) ? current : firstTableKey);
+    setActiveTableKeyState((current) => tableKeySet.has(current) ? current : firstTableKey);
     setManagedSourceKey((current) => tableKeySet.has(current) ? current : firstTableKey);
     setSourceRenameName((current) => current || firstTableName);
   }, [firstTableKey, tableKeySet, tables]);
 
   useEffect(() => {
     if (!focusedTableKey || !tableKeySet.has(focusedTableKey)) return;
-    setActiveTableKey(focusedTableKey);
+    setActiveTableKeyState(focusedTableKey);
     setManagedSourceKey(focusedTableKey);
     setSourceRenameName(managedSourceDisplayName(tables, focusedTableKey));
   }, [focusedTableKey, tableKeySet, tables]);
@@ -333,24 +337,11 @@ export function useSourceWorkbenchState({
     }
   }
 
-  async function runBusinessDashboard(confirm: boolean) {
-    const result = await onBusinessDashboardOperation({
-      op: confirm ? "create" : "draft",
-      table: selectedTableKey,
-      limit: 10,
-      confirm,
-    });
-    setBusinessDashboardResult(result);
-    if (confirm && (typeof result.createdDashboardKey === "string" || typeof result.savedDashboardKey === "string")) {
-      onOpenDashboard();
-    }
-  }
-
   const { runtimeStatus, queryInfo, queryRuntime } = buildSourceWorkbenchRuntimeSummary(workbench, status, query);
   const effectiveMetricField = measureFields.some((field) => field.field_name === metricField) ? metricField : measureFields[0]?.field_name ?? "*";
   const effectiveMetricDimension = groupFields.some((field) => field.field_name === metricDimension) ? metricDimension : groupFields[0]?.field_name ?? "";
   const metricResultRows = resultRows(semanticMetricResult).slice(0, 5);
-  const latestSourceProfile = sourceIntelligenceRuns[0];
+  const latestSourceProfile = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns);
   const connectedRowCount = tables.reduce((total, table) => total + table.row_count, 0);
   const connectedFieldCount = tables.reduce((total, table) => total + table.column_count, 0);
   const guidance = buildSourceWorkbenchGuidance({
@@ -358,13 +349,7 @@ export function useSourceWorkbenchState({
     preview,
     tables,
     fields,
-    selectedFields,
-    measureFields,
-    groupFields,
-    relationships,
-    selectedMetrics,
     latestSourceProfile,
-    selectedTableKey,
   });
   const hasData = tables.length > 0 || status.counts.tables > 0;
   const showExpertWorkbench = showAdvanced;
@@ -406,7 +391,6 @@ export function useSourceWorkbenchState({
     selectedMetrics,
     measureFields,
     groupFields,
-    indexCandidateName,
     selectedFormulaAssets,
     fieldSemanticReadiness,
     queryForm,
@@ -422,7 +406,6 @@ export function useSourceWorkbenchState({
     sourceProfileLabel,
     sourceProfileResult,
     sourceProfileError,
-    businessDashboardResult,
     busy,
     showAdvanced,
     importController,
@@ -464,7 +447,6 @@ export function useSourceWorkbenchState({
     selectManagedSource,
     runBusy,
     runSourceProfile,
-    runBusinessDashboard,
     metricDraft,
     sourceProfileOptions,
     sourceRenameName,

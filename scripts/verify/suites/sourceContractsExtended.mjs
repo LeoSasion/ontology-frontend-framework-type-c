@@ -628,7 +628,7 @@ export function appendSourceContractExtendedChecks(context) {
           dashboardCanvasViewModelSource.includes("export function buildDashboardCanvasViewModel(") &&
           dashboardCanvasViewModelSource.includes("type DashboardCanvasViewModelOptions") &&
           dashboardCanvasViewModelSource.includes("const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns)") &&
-          dashboardCanvasViewModelSource.includes("const latestRun = sourceIntelligenceRuns[0]") &&
+          dashboardCanvasViewModelSource.includes("const latestRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns)") &&
           dashboardCanvasViewModelSource.includes("const dashboardSummary = buildDashboardSummaryModel({") &&
           dashboardCanvasViewModelSource.includes("const widgetPlanSummary = summarizeDashboardWidgetPlan(widgetPlan)") &&
           dashboardCanvasViewModelSource.includes("const sourceSwitchAnalysis = analyzeDashboardSourceSwitch({") &&
@@ -659,8 +659,10 @@ export function appendSourceContractExtendedChecks(context) {
           !dashboardBusinessTaskStripSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardBusinessTemplatePanelSource.includes('from "../dashboardCanvasContracts"') &&
           dashboardFilterWorkbenchSource.includes('from "../dashboardCanvasContracts"') &&
-          homeOverviewSource.includes('from "../dashboardCanvasContracts"') &&
-          (sourceWorkbenchSource.includes('from "../dashboardCanvasContracts"') || sourceWorkbenchSource.includes('from "./dashboardCanvasContracts"')) &&
+          !homeOverviewSource.includes('from "../dashboardCanvasContracts"') &&
+          !sourceWorkbenchSource.includes('from "../dashboardCanvasContracts"') &&
+          !sourceWorkbenchSource.includes('from "./dashboardCanvasContracts"') &&
+          sourceWorkbenchContractsSource.includes('from "./dashboardCanvasContracts"') &&
           sourceWorkbenchRelationshipPanelSource.includes('from "../dashboardCanvasContracts"') &&
           !dashboardCanvasSource.includes("op: \"recommend\" | \"addRecommended\" | \"add\" | \"addRelationship\" | \"set\" | \"copy\" | \"remove\"") &&
           !dashboardCanvasActionsSource.includes("type DashboardWidgetOperationOptions =") &&

@@ -3,7 +3,6 @@ import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { getUserPreferences, makeThemeCopy, resolveThemePalette } from "../theme";
 import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload, WorkspaceStatus } from "../types";
 import { Bilingual } from "./Bilingual";
-import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePanel";
 import { SettingsConfigPortabilityPanel } from "./SettingsConfigPortabilityPanel";
 import { SettingsSandboxBoundaryPanel } from "./SettingsSandboxBoundaryPanel";
 import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePreferencePanel";
@@ -164,13 +163,6 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
           <summary><Bilingual zh="业务术语、规则和确认问法" en="Business terms, rules, and confirmed queries" /></summary>
           <div className="progressiveDetailsBody single">
             <Suspense fallback={null}><TrustContextSettingsPanel /></Suspense>
-          </div>
-        </details>
-
-        <details className="progressiveDetails settingsProgressiveDetails" data-testid="settings-acceptance-details">
-          <summary><Bilingual zh="验收证据和测试范围" en="Acceptance evidence and test scope" /></summary>
-          <div className="progressiveDetailsBody single">
-            <SettingsAcceptanceEvidencePanel />
           </div>
         </details>
 

@@ -10,7 +10,6 @@ import {
   navigate,
   setViewport,
   waitFor,
-  waitForAppReady,
 } from "./ui-verify-chrome.mjs";
 import {
   apiBaseUrl,
@@ -58,30 +57,35 @@ function emptyWorkspaceState() {
     title: document.title,
     url: location.href,
     textSample: text.slice(0, 1000),
-    connected: text.includes("数据服务已连接") || text.includes("Data service connected"),
+    connected: Boolean(document.querySelector(".appShell")) && !get("service-diagnostics"),
     hasShell: Boolean(document.querySelector(".appShell")),
     hasErrorBoundary,
     hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
     hasSeededSampleCopy: seededSamplePattern.test(text),
-    importGuidanceText: /导入|接入数据|检查文件|本地文件|还没有可分析的数据表|暂无证据|先接入数据|import|connect data|local file|no analyzable table|no evidence/i.test(text),
+    importGuidanceText: /导入|接入数据|检查来源|本地文件|还没有可分析的数据表|暂无证据|先接入数据|import|connect data|check source|local file|no analyzable table|no evidence/i.test(text),
+    chrome: {
+      singleSidebar: Boolean(document.querySelector(".workspaceSidebar")),
+      noGlobalBusinessPath: !get("global-business-path"),
+      noGlobalAgentDock: !get("agent-command-dock"),
+      noGlobalInspector: !document.querySelector(".inspector"),
+    },
     home: {
-      actionDock: isVisible("home-action-dock"),
-      activationPanel: isVisible("product-activation-panel"),
-      importAction: isVisible("product-activation-step-data"),
-      chartActionVisible: isVisible("home-action-chart"),
-      chartActionDisabled: disabled("home-action-chart"),
+      primaryTask: isVisible("workspace-primary-task"),
+      journey: isVisible("workspace-journey"),
+      connectData: isVisible("workspace-connect-data"),
+      prepareEvidence: isVisible("workspace-prepare-evidence"),
+      questionForm: isVisible("workspace-question-form"),
     },
     sources: {
       importEntry: isVisible("source-intelligence-folder-entry"),
-      importPreviewButton: isVisible("import-preview-button"),
+      importPreviewButton: isVisible("source-import-preview-button"),
       coverageItems: Array.from(document.querySelectorAll('[data-testid="source-coverage-item"]')).filter(visible).length,
-      dashboardNextVisible: isVisible("source-dashboard-next-action"),
+      analysisNextVisible: isVisible("source-next-analysis"),
       guideDetailsOpen: Boolean(get("source-guide-details")?.open),
       sourceError: isVisible("source-intelligence-error"),
       keyboardOrder: {
         pathInput: focusIndex(importPathInput),
-        checkFile: focusIndex(get("import-preview-button")),
-        checkFolder: focusIndex(get("folder-import-preview-button")),
+        checkSource: focusIndex(get("source-import-preview-button")),
         advancedSettings: focusIndex(advancedSummary),
         positiveTabIndexCount: importPanel?.querySelectorAll('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])').length ?? 0,
       },
@@ -104,13 +108,27 @@ function emptyWorkspaceState() {
 
 async function openSection(client, section) {
   const selector = section === "home"
-    ? '[data-testid="product-activation-panel"]'
+    ? '[data-testid="workspace-primary-task"]'
     : section === "agent"
       ? '[data-testid="agent-no-data-route"]'
-      : '[data-testid="import-preview-button"]';
+      : '[data-testid="source-import-preview-button"]';
   const attempt = async (targetUrl) => {
     await navigate(client, targetUrl);
-    const shellReady = await waitForAppReady(client, null, 25000);
+    const shellReady = await waitFor(client, () => {
+      const text = document.body?.innerText || "";
+      const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
+      return {
+        ok: Boolean(document.querySelector(".appShell")) &&
+          !document.querySelector('[data-testid="service-diagnostics"]') &&
+          !hasErrorBoundary,
+        title: document.title,
+        url: location.href,
+        hasShell: Boolean(document.querySelector(".appShell")),
+        hasServiceDiagnostics: Boolean(document.querySelector('[data-testid="service-diagnostics"]')),
+        hasErrorBoundary,
+        hasFrameworkOverlay: Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay")),
+      };
+    }, null, { timeoutMs: 25000, intervalMs: 250 });
     const sectionReady = await waitFor(client, (expectedSelector) => {
       const element = document.querySelector(expectedSelector);
       const error = document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay");
@@ -167,8 +185,10 @@ try {
       const home = await openSection(browser.client, "home");
       checks.push(
         check("ui-empty-home-ready", home.ready.ok, { ready: home.ready }),
-        check("ui-empty-home-guides-to-import", home.state.home.importAction || home.state.importGuidanceText, { home: home.state.home, importGuidanceText: home.state.importGuidanceText }),
-        check("ui-empty-home-chart-not-active", !home.state.home.chartActionVisible || home.state.home.chartActionDisabled, { home: home.state.home }),
+        check("ui-empty-home-single-primary-task", home.state.home.primaryTask && home.state.home.journey, { home: home.state.home }),
+        check("ui-empty-home-guides-to-import", home.state.home.connectData && home.state.importGuidanceText, { home: home.state.home, importGuidanceText: home.state.importGuidanceText }),
+        check("ui-empty-home-analysis-gated", !home.state.home.prepareEvidence && !home.state.home.questionForm, { home: home.state.home }),
+        check("ui-empty-shell-redundant-global-chrome-retired", home.state.chrome.singleSidebar && home.state.chrome.noGlobalBusinessPath && home.state.chrome.noGlobalAgentDock && home.state.chrome.noGlobalInspector, home.state.chrome),
         check("ui-empty-home-no-error", !home.state.hasErrorBoundary && !home.state.hasFrameworkOverlay),
         check("ui-empty-home-no-seeded-copy", !home.state.hasSeededSampleCopy),
       );
@@ -179,13 +199,12 @@ try {
         check("ui-empty-sources-ready", sources.ready.ok, { ready: sources.ready }),
         check("ui-empty-sources-import-only", !sources.state.sources.importEntry && sources.state.sources.importPreviewButton),
         check("ui-empty-sources-no-coverage-list", sources.state.sources.coverageItems === 0, { sources: sources.state.sources }),
-        check("ui-empty-sources-next-action-collapsed", !sources.state.sources.dashboardNextVisible && !sources.state.sources.guideDetailsOpen, { sources: sources.state.sources }),
+        check("ui-empty-sources-next-action-collapsed", !sources.state.sources.analysisNextVisible && !sources.state.sources.guideDetailsOpen, { sources: sources.state.sources }),
         check("ui-empty-sources-keyboard-order", (() => {
           const order = sources.state.sources.keyboardOrder;
           return order.pathInput >= 0 &&
-            order.pathInput < order.checkFile &&
-            order.checkFile < order.checkFolder &&
-            order.checkFolder < order.advancedSettings &&
+            order.pathInput < order.checkSource &&
+            order.checkSource < order.advancedSettings &&
             order.positiveTabIndexCount === 0;
         })(), { keyboardOrder: sources.state.sources.keyboardOrder }),
         check("ui-empty-sources-no-error", !sources.state.hasErrorBoundary && !sources.state.hasFrameworkOverlay && !sources.state.sources.sourceError),
@@ -226,7 +245,11 @@ try {
       const homeScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "empty-home.png"));
       steps.push({ section: "home-screenshot", screenshot: homeScreenshot });
       await navigate(browser.client, `${baseUrl}/?section=sources`);
-      await waitForAppReady(browser.client, null, 25000);
+      await waitFor(browser.client, () => ({
+        ok: Boolean(document.querySelector('[data-testid="source-import-preview-button"]')) &&
+          !document.querySelector('[data-testid="service-diagnostics"]') &&
+          !document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay, .vite-error-overlay"),
+      }), null, { timeoutMs: 25000, intervalMs: 250 });
       const sourcesScreenshot = await captureScreenshot(browser.client, join(screenshotDir, "empty-sources.png"));
       steps.push({ section: "sources-screenshot", screenshot: sourcesScreenshot });
     } finally {
