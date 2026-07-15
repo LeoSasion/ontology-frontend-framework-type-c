@@ -16,7 +16,7 @@
 | 语义与关系 | 稳定受控 | 组合字段消歧、复合键、版本失效、筛选、预聚合和放大阻断进入 Receipt |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
-| Agent 与证据 | 稳定高级 | 本地答案权威；Query Receipt、Analysis Unit、可信语境和分支保留来源与失效状态 |
+| Agent 与证据 | 稳定高级 | `Intent Frame` 解析任务、指标、维度、时间、筛选、粒度与输出；`Semantic Context Bundle` 统一字段、规则、记忆和 Pack 来源；歧义集中澄清，本地答案权威 |
 | Durable Job 与 Workflow | 稳定初版 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
 | 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |

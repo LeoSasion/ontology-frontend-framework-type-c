@@ -1,6 +1,45 @@
 import type { CoreSemanticRuntime, SourcePipelineContract } from "./typesSource";
 import type { SelectionConfidence } from "./typesWorkspace";
 
+export interface BusinessIntentFrame {
+  schema: "aibi-agent-intent-frame/v1" | string;
+  taskType: "overview" | "comparison" | "trend" | "composition" | "ranking" | "anomaly" | "reconciliation" | "diagnosis" | string;
+  decisionGoal?: string | null;
+  measureConcepts: Array<{ concept: string; field: string; tableKey: string; role: string; source: string; confidence: number }>;
+  dimensionConcepts: Array<{ concept: string; field: string; tableKey: string; role: string; source: string; confidence: number }>;
+  otherConcepts: Array<{ concept: string; field: string; tableKey: string; role: string; source: string; confidence: number }>;
+  timeScope?: { expression: string; parts: Record<string, string> } | null;
+  filters: Array<{ fieldExpression: string; operator: string; value: string }>;
+  comparisons: string[];
+  requestedOutput: string;
+  grainExpectation: { fields: string[]; description: string };
+  constraints: Record<string, unknown>;
+  unresolved: Array<{ kind: string; mention: string; reason: string; candidateCount: number }>;
+  evidenceRefs: Array<Record<string, unknown>>;
+  confidence: Record<string, number>;
+  resolution: { taskTypeReason: string; providerRequired: boolean; silentDisambiguation: boolean };
+}
+
+export interface AgentClarification {
+  schema: "aibi-agent-clarification/v1" | string;
+  status: "required" | "not-required" | string;
+  required: boolean;
+  taskType: string;
+  items: Array<{ kind: string; mention: string; question: string; reason: string; candidates: SemanticFieldCandidate[] }>;
+  combined: boolean;
+  message?: string | null;
+}
+
+export interface SemanticContextBundle {
+  schema: "aibi-semantic-context-bundle/v1" | string;
+  workspaceId: string;
+  retrievalPolicy: { strategy: string; reranker: string; ambiguityGatePreserved: boolean };
+  sources: Record<string, unknown>;
+  missingSlots: Array<Record<string, unknown>>;
+  stale: boolean;
+  fingerprint: string;
+}
+
 export interface AgentAskResult {
   ok: boolean;
   workspaceId: string;
@@ -76,6 +115,9 @@ export interface AgentAskResult {
   semanticPlan?: SemanticQueryPlan;
   executionPlan?: SemanticQueryExecutionPlan | null;
   analysisRun?: AnalysisRun;
+  intentFrame?: BusinessIntentFrame;
+  semanticContext?: SemanticContextBundle;
+  clarification?: AgentClarification;
   analysisUnit?: AnalysisUnit;
   chartAdapter?: ChartAdapter;
   context?: {

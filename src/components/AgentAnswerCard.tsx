@@ -14,6 +14,8 @@ type AgentAnswerCardProps = {
   onAskCandidate?: (prompt: string) => void;
   onSelectSemanticCandidates?: (candidates: import("../typesAgent").SemanticFieldCandidate[]) => void;
   providerResponse?: AgentAskResult["llm"]["response"];
+  intentFrame?: AgentAskResult["intentFrame"];
+  clarificationBundle?: AgentAskResult["clarification"];
   semanticPlan?: AgentAskResult["semanticPlan"];
   executionPlan?: AgentAskResult["executionPlan"];
   tableNameByKey?: Map<string, string>;
@@ -49,7 +51,16 @@ function rowFieldValues(rows: Array<Record<string, unknown>>, role: string) {
     .filter(Boolean);
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, executionPlan, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
+function intentTypeText(taskType?: string) {
+  const labels: Record<string, string> = {
+    overview: biText("概览", "Overview"), comparison: biText("比较", "Comparison"), trend: biText("趋势", "Trend"),
+    composition: biText("构成", "Composition"), ranking: biText("排名", "Ranking"), anomaly: biText("异常核查", "Anomaly"),
+    reconciliation: biText("对账", "Reconciliation"), diagnosis: biText("诊断", "Diagnosis"),
+  };
+  return labels[taskType ?? ""] ?? taskType ?? biText("分析", "Analysis");
+}
+
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, clarificationBundle, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
@@ -83,6 +94,24 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
         <Suspense fallback={null}>
           <AgentProviderNarrative response={providerResponse} />
         </Suspense>
+      ) : null}
+      {intentFrame ? (
+        <details className="agentIntentFrame" data-testid="agent-intent-frame" open={Boolean(clarificationBundle?.required)}>
+          <summary>
+            <span>{biText("我理解的问题", "My understanding")}</span>
+            <strong>{intentTypeText(intentFrame.taskType)}</strong>
+          </summary>
+          <div className="agentIntentFrameBody">
+            <div className="agentIntentChips">
+              {intentFrame.measureConcepts.map((item) => <span key={`measure-${item.tableKey}-${item.field}`}>{biText("指标", "Measure")} · {item.tableKey}.{item.field}</span>)}
+              {intentFrame.dimensionConcepts.map((item) => <span key={`dimension-${item.tableKey}-${item.field}`}>{biText("维度", "Dimension")} · {item.tableKey}.{item.field}</span>)}
+              {intentFrame.timeScope?.expression ? <span>{biText("时间", "Time")} · {intentFrame.timeScope.expression}</span> : null}
+              <span>{biText("输出", "Output")} · {intentFrame.requestedOutput}</span>
+              <span>{biText("粒度", "Grain")} · {intentFrame.grainExpectation.description}</span>
+            </div>
+            {clarificationBundle?.required ? <p>{clarificationBundle.message}</p> : <p>{biText("字段均保留表级来源；写入仍需确认。", "Every field keeps table provenance; writes still require confirmation.")}</p>}
+          </div>
+        </details>
       ) : null}
       {semanticPlan && semanticPlan.status !== "not-applicable" ? (
         <Suspense fallback={null}>

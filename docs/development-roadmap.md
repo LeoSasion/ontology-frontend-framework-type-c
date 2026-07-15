@@ -134,30 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 A：业务意图与语义上下文
-
-目标：解决当前 `ask_command` 依赖多组顺序式启发规则、上下文召回分散和业务概念表达不足的问题。
-
-后端：
-
-1. 从 `tools/bi_cli.py` 拆出 `agent_intent_service.py`、`semantic_context_router.py` 和 `agent_clarification_service.py`。
-2. 建立 Intent Frame 的确定性抽取器；Provider 只能补充候选，不覆盖显式选择。
-3. 统一字段语义、指标、关系、Context Pack、Confirmed Query、Evidence Run 和 Domain Pack 的候选接口。
-4. 建立两阶段召回：确定性召回生成候选集，受控 reranker 只调整候选顺序。
-5. 缓存以 workspace、schema/data/semantic/relationship/Pack fingerprint 为键；任一版本变化立即失效。
-6. 为同比/环比、占比、转化、漏斗、对账、异常和诊断建立 task type 词法与结构测试，但不内置行业字段。
-
-前端：在分析输入下方展示“我理解的问题”，包括任务类型、指标、维度、时间、筛选、粒度和未决项；只在有歧义时出现一个集中澄清面。
-
-验收：
-
-- 构建不少于 200 条中性与多领域语义基准，覆盖中英文、别名、同名字段、两项以上维度、复合比率和跨表表达。
-- Intent Frame 必填槽位准确率达到 95%，字段绑定 precision 达到 98%；所有已选字段 100% 带表级来源。
-- 安全基准中静默消歧、比率退化计数和无证据行业推断均为 0。
-- Provider 关闭、超时或返回非法 schema 时，确定性路径结果不变。
-
-退出条件：Intent Frame、Context Bundle、澄清和指纹失效合同进入 CLI/API、类型定义、文档与全量回归。
-
 ### 阶段 B：证据计划与流式 Agent Turn
 
 目标：把复杂分析从“单个 ask 函数一次完成”升级为可检查、可取消、可恢复的受限计划。
@@ -264,7 +240,7 @@ API/CLI：
 
 ```mermaid
 flowchart TD
-  A["A 业务意图与上下文"] --> B["B 证据计划与事件"]
+  A["已交付：业务意图与上下文"] --> B["B 证据计划与事件"]
   B --> C["C Analytical Skill"]
   B --> D["D Session 与 Context"]
   A --> E["E Runtime Profile 与评估"]
@@ -274,7 +250,7 @@ flowchart TD
   B --> X["P2 复杂跨表"]
 ```
 
-阶段 A、B 是主链，必须先完成。C、D、E 可在 B 稳定后按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
+业务意图与上下文合同已经交付；B 是当前主链。C、D、E 可在 B 稳定后按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
 
 ## 评估与发布指标
 

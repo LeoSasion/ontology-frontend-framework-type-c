@@ -2,6 +2,14 @@
 
 生产问数必须先解决字段歧义和统计粒度，再判断关系路径是否可执行。规划器只生成结构化证据，不接受任意 SQL 或写入。
 
+## 业务意图与上下文合同
+
+`aibi-agent-intent-frame/v1` 将问题规范化为任务类型、指标、维度、时间、筛选、比较、输出、粒度和未决项。字段概念必须保留 `tableKey`、字段、角色、来源与置信度；Provider 不是必需依赖，也不能静默消歧。
+
+`aibi-semantic-context-bundle/v1` 在当前工作区统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack 与知识规则。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定意图、语义计划和来源。
+
+`aibi-agent-clarification/v1` 把全部未决字段合并为一次澄清，每个候选都必须声明表级来源。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。
+
 ## 规划流程
 
 1. 从当前工作区注册表、字段语义和指标构建候选，排除内部 `__*` 字段。
@@ -39,6 +47,7 @@
 
 ```powershell
 npm run verify:semantic-plan
+npm run verify:agent-intent
 npm run verify:composite-relationships
 npm run verify:ui-semantic
 ```

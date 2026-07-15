@@ -569,6 +569,47 @@
   background: color-mix(in srgb, var(--bi-surface) 94%, var(--accent-soft));
 }
 
+.agentIntentFrame {
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface));
+}
+
+.agentIntentFrame > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+
+.agentIntentFrameBody {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.agentIntentFrameBody p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.agentIntentChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.agentIntentChips span {
+  padding: 0.32rem 0.58rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+}
+
 .agentSemanticPlan.blocked {
   border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
 }

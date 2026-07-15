@@ -44,6 +44,9 @@ from agent_prompt_resolution import (
     select_agent_table,
     should_create_agent_draft,
 )
+from agent_intent_service import build_business_intent_frame
+from semantic_context_router import build_semantic_context_bundle
+from agent_clarification_service import build_agent_clarification
 from agent_recommended_commands import build_agent_recommended_commands
 from bi_cli_core import (
     DB_PATH,
@@ -1975,6 +1978,19 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             selected_table_key=semantic_selected_table_key,
             table_columns=table_columns,
         )
+        intent_frame = build_business_intent_frame(prompt, semantic_plan=semantic_plan)
+        semantic_context = build_semantic_context_bundle(
+            workspace_id=workspace_id,
+            intent_frame=intent_frame,
+            semantic_plan=semantic_plan,
+            selected_table=selected_table,
+            table_selection_confidence=table_confidence,
+            context_matches=context_matches,
+            recalled_queries=recalled_queries,
+            domain_pack_context=active_domain_pack_context,
+            knowledge_match=platform_match,
+        )
+        clarification = build_agent_clarification(intent_frame, semantic_context)
         semantic_execution = None
         semantic_targets = semantic_plan.get("joinPlan", {}).get("targets") or []
         if platform_match is None and semantic_plan["status"] == "ready" and semantic_targets:
@@ -2366,6 +2382,9 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         "semanticPlan": semantic_plan,
         "executionPlan": semantic_execution.get("executionPlan") if semantic_execution else None,
         "analysisRun": analysis_run,
+        "intentFrame": intent_frame,
+        "semanticContext": semantic_context,
+        "clarification": clarification,
         "context": {
             "matchedTermCount": len(context_matches["terms"]),
             "matchedRuleCount": len(context_matches["rules"]),

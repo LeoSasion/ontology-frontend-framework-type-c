@@ -481,6 +481,8 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
             answerEvidenceSteps={answerEvidenceSteps}
             answerQuery={answerQuery}
             providerResponse={result.llm.response}
+            intentFrame={result.intentFrame}
+            clarificationBundle={result.clarification}
             semanticPlan={result.semanticPlan}
             executionPlan={result.executionPlan}
             tableNameByKey={tableNameByKey}
