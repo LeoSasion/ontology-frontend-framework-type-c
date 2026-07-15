@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `125`
+Command count: `130`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -10,7 +10,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 
 | Domain | Commands |
 |---|---:|
-| `agent` | 6 |
+| `agent` | 11 |
 | `analysis` | 4 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
@@ -43,8 +43,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 55 |
 | `evidence-receipt` | 8 |
-| `read-only` | 52 |
-| `runtime-receipt` | 5 |
+| `read-only` | 54 |
+| `runtime-receipt` | 8 |
 
 ## Commands
 
@@ -56,8 +56,13 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `add-recommended-widgets` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--table`, `--limit`, `--allow-duplicates`, `--yes` |
 | `add-relationship-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--relationship`, `--type`, `--title`, `--subtitle`, `--group`, `--measure`, `...` |
 | `add-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--widget`, `--type`, `--table`, `--view`, `--title`, `--subtitle`, `--dimension`, `...` |
+| `agent-context-compact` | `agent` | `runtime-receipt` | `no` | `no` | `--session`, `--level`, `--workspace` |
+| `agent-session-create` | `agent` | `runtime-receipt` | `no` | `no` | `--title`, `--workspace` |
+| `agent-session-fork` | `agent` | `runtime-receipt` | `no` | `no` | `session`, `--from-turn`, `--title`, `--workspace` |
+| `agent-session-resume` | `agent` | `read-only` | `no` | `no` | `session`, `--workspace` |
+| `agent-sessions` | `agent` | `read-only` | `no` | `no` | `--session`, `--workspace`, `--limit` |
 | `agent-turn-cancel` | `agent` | `runtime-receipt` | `no` | `no` | `turn`, `--workspace` |
-| `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--read-only` |
+| `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--session`, `--review-stale-context`, `--read-only` |
 | `agent-turns` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--turn`, `--after-sequence`, `--limit` |
 | `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
 | `analysis-unit-build` | `analysis` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--kind`, `--rows-json`, `--title`, `--preferred-chart` |

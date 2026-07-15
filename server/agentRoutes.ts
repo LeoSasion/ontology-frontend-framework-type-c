@@ -28,11 +28,59 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/agent/sessions" && request.method === "GET") {
+    const args = ["agent-sessions", "--limit", url.searchParams.get("limit") ?? "30"];
+    const workspaceId = url.searchParams.get("workspaceId");
+    if (workspaceId) args.push("--workspace", workspaceId);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/sessions" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["agent-session-create", "--title", String(body.title ?? "新分析会话")];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  const sessionActionMatch = url.pathname.match(/^\/api\/agent\/sessions\/([^/]+)\/(resume|fork|compact)$/);
+  if (sessionActionMatch && request.method === "POST") {
+    const body = await readBody(request);
+    const sessionKey = decodeURIComponent(sessionActionMatch[1]);
+    const action = sessionActionMatch[2];
+    const args = action === "resume"
+      ? ["agent-session-resume", sessionKey]
+      : action === "fork"
+        ? ["agent-session-fork", sessionKey]
+        : ["agent-context-compact", "--session", sessionKey, "--level", String(body.level ?? 3)];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    if (action === "fork" && body.fromTurnKey) args.push("--from-turn", String(body.fromTurnKey));
+    if (action === "fork" && body.title) args.push("--title", String(body.title));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  const sessionMatch = url.pathname.match(/^\/api\/agent\/sessions\/([^/]+)$/);
+  if (sessionMatch && request.method === "GET") {
+    const args = ["agent-sessions", "--session", decodeURIComponent(sessionMatch[1])];
+    const workspaceId = url.searchParams.get("workspaceId");
+    if (workspaceId) args.push("--workspace", workspaceId);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 404 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/agent/turns" && request.method === "POST") {
     const body = await readBody(request);
     const args = ["agent-turn-run", String(body.prompt ?? "生成分析计划")];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
     if (body.parentTurnKey) args.push("--parent-turn", String(body.parentTurnKey));
+    if (body.sessionKey) args.push("--session", String(body.sessionKey));
+    if (body.reviewedStaleRefs === true) args.push("--review-stale-context");
     if (body.readOnly === true) args.push("--read-only");
     const result = await cli(args);
     sendJson(response, result.ok === false ? 409 : 200, result);
@@ -86,13 +134,15 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     const prompt = String(body.prompt ?? "");
     const args = ["agent-turn-run"];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    if (body.sessionKey) args.push("--session", String(body.sessionKey));
+    if (body.reviewedStaleRefs === true) args.push("--review-stale-context");
     args.push(prompt || "生成分析计划");
     const turnResult = await cli(args);
     const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
       ? turnResult.answer as Record<string, unknown>
       : turnResult;
     const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, { ...result, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
+    sendJson(response, 200, { ...result, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 
@@ -101,13 +151,15 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     const prompt = String(body.prompt ?? "");
     const args = ["agent-turn-run", "--read-only"];
     if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    if (body.sessionKey) args.push("--session", String(body.sessionKey));
+    if (body.reviewedStaleRefs === true) args.push("--review-stale-context");
     args.push(prompt || "说明当前工作区可回答的问题");
     const turnResult = await cli(args);
     const deterministicResult = turnResult.answer && typeof turnResult.answer === "object" && !Array.isArray(turnResult.answer)
       ? turnResult.answer as Record<string, unknown>
       : turnResult;
     const result = await enrichAgentResultWithProvider({ projectRoot: root, prompt, deterministicResult });
-    sendJson(response, 200, { ...result, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
+    sendJson(response, 200, { ...result, agentSession: turnResult.session, sessionContext: turnResult.sessionContext, agentTurn: turnResult.turn, evidencePlan: turnResult.evidencePlan, turnEvents: turnResult.events });
     return true;
   }
 

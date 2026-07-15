@@ -134,29 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 D：可恢复 Session、分支与上下文管理
-
-目标：吸收 Open Interpreter 的 resume/fork 和 DB-GPT 的分层 Context Management，同时严格区分“对话历史”和“已确认业务语境”。
-
-数据模型：
-
-- `agent_sessions`：工作区、标题、状态、当前 Turn、Runtime Profile 和上下文指纹；
-- `agent_turns`：问题、Intent、Context、Plan、终态、父 Turn 和结果引用；
-- `agent_turn_events`：严格序号事件；
-- `agent_context_snapshots`：压缩摘要、保留对象引用、原始证据位置和 fingerprint。
-
-行为：
-
-1. Resume 只在同一工作区恢复；目标对象已删除或版本变化时先显示失效面。
-2. Fork 创建新 Session/Turn，不修改原链；分析分支继续要求父 Receipt/Unit 已确认。
-3. 上下文分四层压缩：裁剪旧展示文本 -> 移除完整旧回合但保留对象引用 -> 生成结构化摘要 -> Provider overflow 后一次反应式压缩。
-4. Receipt、Unit、Plan、确认/拒绝历史、未决项和当前对象不能被压缩掉；大型结果只保留指纹与安全快照引用。
-5. 不自动生成长期业务记忆；只有明确晋级的 Confirmed Query、Context Term/Rule 和手工语义可跨 Session 召回。
-
-迁移：Agent Turn 与 Skill 状态已在 SQLite v5 持久化；Session 与 Snapshot 合入时必须从 v5 递增，走隔离副本、恢复点和双库复检。
-
-退出条件：重启后可恢复 Session；Fork 不污染父链；压缩前后关键对象、证据和阻塞结论一致；跨工作区 Session 不可见。
-
 ### 阶段 E：Provider Runtime Profile 与评估体系
 
 目标：从当前 deterministic/DeepSeek 二选一扩展为受控 Provider Registry，同时保证任何模型都服从同一业务合同。
@@ -199,7 +176,7 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 flowchart TD
   A["已交付：业务意图与上下文"] --> B["已交付：证据计划与事件"]
   B --> C["已交付：C Analytical Skill"]
-  B --> D["D Session 与 Context"]
+  B --> D["已交付：D Session 与 Context"]
   A --> E["E Runtime Profile 与评估"]
   C --> F["F 受限工作流图"]
   D --> F
@@ -207,7 +184,7 @@ flowchart TD
   B --> X["P2 复杂跨表"]
 ```
 
-业务意图、上下文、证据计划、事件、声明式 Skill 与固定 Policy Hook 已经交付；D 是当前主链，E 可按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
+业务意图、上下文、证据计划、事件、声明式 Skill、固定 Policy Hook、可恢复 Session、Fork 与证据感知快照已经交付；E 是当前主链；F 和复杂跨表不得提前绕过前置合同。
 
 ## 评估与发布指标
 

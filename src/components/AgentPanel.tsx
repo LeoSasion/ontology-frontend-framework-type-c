@@ -462,7 +462,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         </div>
         <div className="statusPill">
           <span className="dot ok" />
-          <span>{llmModeText(providerUsed)}</span>
+          <span>{result.agentSession ? `${biText("会话", "Session")} ${result.sessionContext?.turnCount ?? 1} · ` : ""}{llmModeText(providerUsed)}</span>
         </div>
       </div>
 

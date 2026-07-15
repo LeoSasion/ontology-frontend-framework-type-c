@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 5
+CURRENT_SQLITE_SCHEMA_VERSION = 6
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -831,6 +831,19 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON analysis_job_events(workspace_id, event_sequence);
         CREATE INDEX IF NOT EXISTS idx_analysis_job_events_job_sequence
           ON analysis_job_events(workspace_id, job_key, event_sequence);
+        CREATE TABLE IF NOT EXISTS agent_sessions (
+          session_key TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL,
+          current_turn_key TEXT,
+          parent_session_key TEXT,
+          forked_from_turn_key TEXT,
+          runtime_profile_id TEXT,
+          context_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS agent_turns (
           turn_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,
@@ -860,6 +873,23 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           payload_json TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS agent_context_snapshots (
+          snapshot_key TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL,
+          session_key TEXT NOT NULL,
+          through_turn_key TEXT,
+          compaction_level INTEGER NOT NULL,
+          summary_json TEXT NOT NULL,
+          preserved_refs_json TEXT NOT NULL,
+          stale_refs_json TEXT NOT NULL,
+          source_fingerprint TEXT NOT NULL,
+          fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_agent_sessions_workspace_updated
+          ON agent_sessions(workspace_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_agent_context_snapshots_session_created
+          ON agent_context_snapshots(workspace_id, session_key, created_at);
         CREATE INDEX IF NOT EXISTS idx_agent_turns_workspace_updated
           ON agent_turns(workspace_id, updated_at);
         CREATE INDEX IF NOT EXISTS idx_agent_turn_events_turn_sequence

@@ -2,17 +2,17 @@ import { fetchJson, fetchJsonStrict } from "./apiClient";
 import { emptyActionDrafts } from "./emptyWorkspaceData";
 import type { ActionDraftPayload, AgentAskResult } from "./types";
 
-export function askAgent(prompt: string, options: { parentRunKey?: string; branchLabel?: string; workspaceId?: string } = {}) {
+export function askAgent(prompt: string, options: { parentRunKey?: string; branchLabel?: string; workspaceId?: string; sessionKey?: string } = {}) {
   return fetchJsonStrict<AgentAskResult>("/api/agent/ask", {
     method: "POST",
     body: JSON.stringify({ prompt, ...options }),
   });
 }
 
-export function askAgentReadOnly(prompt: string, workspaceId?: string) {
+export function askAgentReadOnly(prompt: string, workspaceId?: string, sessionKey?: string) {
   return fetchJsonStrict<AgentAskResult>("/api/agent/explain", {
     method: "POST",
-    body: JSON.stringify({ prompt, workspaceId }),
+    body: JSON.stringify({ prompt, workspaceId, sessionKey }),
   });
 }
 

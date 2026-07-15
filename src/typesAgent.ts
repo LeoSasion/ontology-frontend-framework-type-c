@@ -100,6 +100,20 @@ export interface AgentTurn {
   finishedAt?: string | null;
 }
 
+export interface AgentSession {
+  schema: "aibi-agent-session/v1" | string;
+  sessionKey: string;
+  workspaceId: string;
+  title: string;
+  status: string;
+  currentTurnKey?: string | null;
+  parentSessionKey?: string | null;
+  forkedFromTurnKey?: string | null;
+  contextFingerprint: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AgentAskResult {
   ok: boolean;
   workspaceId: string;
@@ -184,6 +198,8 @@ export interface AgentAskResult {
     selected?: { skillId: string; version: string; fingerprint: string; status: string; missingRoles: string[]; missingDomainPacks: string[] } | null;
   };
   agentTurn?: AgentTurn;
+  agentSession?: AgentSession;
+  sessionContext?: { schema: string; sessionKey: string; turnCount: number; staleRefs: Array<Record<string, unknown>>; fingerprint: string; longTermBusinessMemoryPromoted: boolean };
   evidencePlan?: AgentEvidencePlan;
   turnEvents?: AgentTurnEvent[];
   analysisUnit?: AnalysisUnit;

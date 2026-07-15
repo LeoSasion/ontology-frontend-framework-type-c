@@ -46,8 +46,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-agent-turn-") as temp:
     list_code, listed = run_cli(env, "agent-turns", "--turn", turn_key, "--after-sequence", "0")
     cancel_code, canceled = run_cli(env, "agent-turn-cancel", turn_key)
 
-    check("schema-v5-bootstrap", status_code == 0 and schema_version == 5, {"status": status_code, "schemaVersion": schema_version})
+    check("schema-v6-bootstrap", status_code == 0 and schema_version == 6, {"status": status_code, "schemaVersion": schema_version})
     check("turn-run-contract", run_code == 0 and run.get("schema") == "aibi-agent-turn-run/v1" and turn_key.startswith("turn-"), run)
+    check("turn-has-durable-session", str((run.get("session") or {}).get("sessionKey") or "").startswith("session-") and turn.get("sessionKey") == (run.get("session") or {}).get("sessionKey"), run)
     check("evidence-plan-contract", plan.get("schema") == "aibi-agent-evidence-plan/v1" and len(plan.get("fingerprint") or "") == 64, plan)
     check("registered-capabilities-only", all(step.get("capabilityId") in plan.get("registeredCapabilities", []) for step in plan.get("steps") or []), plan)
     sequences = [event.get("sequence") for event in events]

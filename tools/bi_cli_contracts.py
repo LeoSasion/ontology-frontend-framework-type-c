@@ -38,6 +38,11 @@ COMMAND_DOMAINS: dict[str, str] = {
     "agent-turn-run": "agent",
     "agent-turns": "agent",
     "agent-turn-cancel": "agent",
+    "agent-session-create": "agent",
+    "agent-sessions": "agent",
+    "agent-session-resume": "agent",
+    "agent-session-fork": "agent",
+    "agent-context-compact": "agent",
     "workspace-create": "workspace",
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
@@ -158,6 +163,9 @@ IMMEDIATE_RUNTIME_WRITES = {
     "export-analysis",
     "agent-turn-run",
     "agent-turn-cancel",
+    "agent-session-create",
+    "agent-session-fork",
+    "agent-context-compact",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
 

@@ -82,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
     agent_turn_run.add_argument("prompt")
     agent_turn_run.add_argument("--workspace", default="")
     agent_turn_run.add_argument("--parent-turn", default="")
+    agent_turn_run.add_argument("--session", default="")
+    agent_turn_run.add_argument("--review-stale-context", action="store_true")
     agent_turn_run.add_argument("--read-only", action="store_true")
 
     agent_turns = sub.add_parser("agent-turns", description="List or inspect workspace Agent turns and events.")
@@ -93,6 +95,30 @@ def build_parser() -> argparse.ArgumentParser:
     agent_turn_cancel = sub.add_parser("agent-turn-cancel", description="Cancel a non-terminal Agent turn.")
     agent_turn_cancel.add_argument("turn")
     agent_turn_cancel.add_argument("--workspace", default="")
+
+    agent_session_create = sub.add_parser("agent-session-create", description="Create one workspace-bound durable Agent Session.")
+    agent_session_create.add_argument("--title", default="新分析会话")
+    agent_session_create.add_argument("--workspace", default="")
+
+    agent_sessions = sub.add_parser("agent-sessions", description="List or inspect durable Agent Sessions and their safe context snapshots.")
+    agent_sessions.add_argument("--session", default="")
+    agent_sessions.add_argument("--workspace", default="")
+    agent_sessions.add_argument("--limit", type=int, default=30)
+
+    agent_session_resume = sub.add_parser("agent-session-resume", description="Resume one Agent Session after checking preserved object references for staleness.")
+    agent_session_resume.add_argument("session")
+    agent_session_resume.add_argument("--workspace", default="")
+
+    agent_session_fork = sub.add_parser("agent-session-fork", description="Fork one Agent Session from a parent Turn without mutating the parent chain.")
+    agent_session_fork.add_argument("session")
+    agent_session_fork.add_argument("--from-turn", default="")
+    agent_session_fork.add_argument("--title", default="")
+    agent_session_fork.add_argument("--workspace", default="")
+
+    agent_context_compact = sub.add_parser("agent-context-compact", description="Create an evidence-preserving context snapshot without deleting Turn history.")
+    agent_context_compact.add_argument("--session", required=True)
+    agent_context_compact.add_argument("--level", type=int, required=True, choices=[1, 2, 3, 4])
+    agent_context_compact.add_argument("--workspace", default="")
 
     sub.add_parser("status")
     sub.add_parser("quality-doctor")

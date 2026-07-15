@@ -7,6 +7,7 @@ import uuid
 from typing import Any, Callable
 
 from agent_evidence_plan_service import EVENT_SCHEMA, build_evidence_plan, finalize_evidence_plan, public_turn_events, verify_evidence_plan
+from agent_session_service import build_session_context, create_agent_session, get_agent_session
 
 
 TURN_SCHEMA = "aibi-agent-turn/v1"
@@ -54,15 +55,29 @@ def run_agent_turn_command(args: argparse.Namespace, *, ask_runner: Callable[[ar
         workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
             raise ValueError(f"Unknown workspace: {workspace_id}")
-        turn_key = f"turn-{uuid.uuid4().hex[:16]}"
         now = now_iso()
+        requested_session_key = str(getattr(args, "session", "") or "").strip()
+        if requested_session_key:
+            session = get_agent_session(connection, workspace_id=workspace_id, session_key=requested_session_key)
+            if not session:
+                raise ValueError(f"Unknown Agent Session in workspace {workspace_id}: {requested_session_key}")
+        else:
+            session = create_agent_session(connection, workspace_id=workspace_id, title=str(args.prompt), now=now)
+        session_key = str(session["sessionKey"])
+        parent_turn_key = str(getattr(args, "parent_turn", "") or session.get("currentTurnKey") or session.get("forkedFromTurnKey") or "").strip() or None
+        if parent_turn_key and not connection.execute("SELECT 1 FROM agent_turns WHERE workspace_id = ? AND turn_key = ?", (workspace_id, parent_turn_key)).fetchone():
+            raise ValueError(f"Unknown parent Agent Turn in workspace {workspace_id}: {parent_turn_key}")
+        session_context = build_session_context(connection, workspace_id=workspace_id, session_key=session_key)
+        if session_context.get("staleRefs") and not bool(getattr(args, "review_stale_context", False)):
+            raise ValueError("Agent Session contains stale object references; inspect agent-session-resume and explicitly review stale context before continuing.")
+        turn_key = f"turn-{uuid.uuid4().hex[:16]}"
         connection.execute(
-            "INSERT INTO agent_turns(turn_key, workspace_id, session_key, parent_turn_key, prompt, status, intent_json, context_json, plan_json, result_json, validation_json, context_fingerprint, created_at, updated_at, finished_at) VALUES(?, ?, NULL, ?, ?, 'running', '{}', '{}', '{}', '{}', '{}', '', ?, ?, NULL)",
-            (turn_key, workspace_id, str(getattr(args, "parent_turn", "") or "") or None, str(args.prompt), now, now),
+            "INSERT INTO agent_turns(turn_key, workspace_id, session_key, parent_turn_key, prompt, status, intent_json, context_json, plan_json, result_json, validation_json, context_fingerprint, created_at, updated_at, finished_at) VALUES(?, ?, ?, ?, ?, 'running', '{}', '{}', '{}', '{}', '{}', '', ?, ?, NULL)",
+            (turn_key, workspace_id, session_key, parent_turn_key, str(args.prompt), now, now),
         )
         append_turn_event(connection, workspace_id=workspace_id, turn_key=turn_key, event_type="accepted", status="running", summary="Agent 回合已接受", now=now)
         connection.commit()
-    ask_args = argparse.Namespace(prompt=str(args.prompt), read_only=bool(getattr(args, "read_only", False)), workspace=workspace_id, parent_run="", branch_label="")
+    ask_args = argparse.Namespace(prompt=str(args.prompt), read_only=bool(getattr(args, "read_only", False)), workspace=workspace_id, parent_run="", branch_label="", session_context=session_context)
     try:
         answer = ask_runner(ask_args)
     except Exception as error:
@@ -83,12 +98,15 @@ def run_agent_turn_command(args: argparse.Namespace, *, ask_runner: Callable[[ar
             "UPDATE agent_turns SET status = ?, intent_json = ?, context_json = ?, plan_json = ?, result_json = ?, validation_json = ?, context_fingerprint = ?, updated_at = ?, finished_at = ? WHERE workspace_id = ? AND turn_key = ?",
             (status, _json(answer.get("intentFrame") or {}), _json(answer.get("semanticContext") or {}), _json(plan), _json(answer), _json(validation), str(answer.get("semanticContext", {}).get("fingerprint") or ""), now, now, workspace_id, turn_key),
         )
+        connection.execute("UPDATE agent_sessions SET current_turn_key = ?, context_fingerprint = ?, updated_at = ? WHERE workspace_id = ? AND session_key = ?", (turn_key, str(answer.get("semanticContext", {}).get("fingerprint") or ""), now, workspace_id, session_key))
         for event in public_turn_events(plan, validation):
             append_turn_event(connection, workspace_id=workspace_id, turn_key=turn_key, event_type=str(event["eventType"]), status=str(event["status"]), summary=str(event["summary"]), now=now_iso(), step_key=event.get("stepKey"), payload={"planFingerprint": plan.get("fingerprint")})
         connection.commit()
         row = connection.execute("SELECT * FROM agent_turns WHERE workspace_id = ? AND turn_key = ?", (workspace_id, turn_key)).fetchone()
         events = list_turn_events(connection, workspace_id=workspace_id, turn_key=turn_key)
-    return {"ok": validation.get("safeToPresent") is True, "schema": "aibi-agent-turn-run/v1", "turn": _turn_payload(row), "evidencePlan": plan, "validation": validation, "events": events, "answer": answer}
+        session = get_agent_session(connection, workspace_id=workspace_id, session_key=session_key)
+        resumed_context = build_session_context(connection, workspace_id=workspace_id, session_key=session_key)
+    return {"ok": validation.get("safeToPresent") is True, "schema": "aibi-agent-turn-run/v1", "session": session, "sessionContext": resumed_context, "turn": _turn_payload(row), "evidencePlan": plan, "validation": validation, "events": events, "answer": answer}
 
 
 def agent_turns_command(args: argparse.Namespace, *, open_db: Callable[[], sqlite3.Connection], active_workspace_id: Callable[[sqlite3.Connection], str]) -> dict[str, Any]:

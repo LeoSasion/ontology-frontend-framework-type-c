@@ -18,6 +18,14 @@
 
 完成前必须生成 `aibi-agent-completion-validation/v1`，检查计划、工作区、Intent/Context schema、上下文新鲜度、指纹和答案。语义歧义是可安全呈现的 `blocked`，合同损坏是 `failed`；二者不能退化为无证据答案。
 
+## Session、Fork 与 Context Snapshot
+
+`aibi-agent-session/v1` 将 Turn 链绑定到单一工作区；连续提问自动引用当前 Turn，重启后可由 SQLite 恢复。Fork 创建新的 Session，并以父 Turn 作为第一回合的显式父引用，父 Session 的当前 Turn、上下文指纹和历史不被修改。
+
+`aibi-agent-context-snapshot/v1` 提供四级压缩合同：保留少量展示主题、仅保留对象引用、生成结构化摘要、Provider overflow 后反应式压缩。任何级别都不删除 Turn，也不丢失 Receipt、Plan、Skill、未决项和阻塞引用；聊天摘要不会自动成为 Context Term、Rule、Confirmed Query 或手工语义。
+
+Resume 会实时核对引用对象。缺失 Turn、Receipt、Analysis Run 或 Action Draft 进入 `staleRefs`，未经显式复核不能继续同一 Session；跨工作区查询始终按未知 Session 处理。
+
 ## Analytical Skill 与 Policy Hook
 
 `aibi-analytical-skill/v1` 是独立于 Domain Pack 的声明式分析方法。内置目录覆盖概览、趋势比较、构成、排名、异常复核、双表核对和数据质量解释；外部 Manifest 必须先 lint、确认安装，再按工作区确认启用。匹配只使用已解析 `taskType`、语义角色和显式 Pack 依赖，不按文件顺序或模型偏好静默决胜。
@@ -63,6 +71,7 @@ Skill 只能引用已登记 Agent Capability，并声明步骤模板、必需证
 npm run verify:semantic-plan
 npm run verify:agent-intent
 npm run verify:agent-turns
+npm run verify:agent-sessions
 npm run verify:analytical-skills
 npm run verify:composite-relationships
 npm run verify:ui-semantic

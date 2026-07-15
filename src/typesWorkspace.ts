@@ -20,6 +20,7 @@ export interface WorkspaceStatus {
     actionDrafts: number;
     sourceIntelligenceRuns?: number;
     connectors?: number;
+    agentSessions?: number;
   };
   sourceRuns: SourceRunSummary[];
   health: {
