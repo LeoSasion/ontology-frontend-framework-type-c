@@ -97,6 +97,37 @@ export async function handleWorkspaceApi({ cli, port, request, response, url }: 
     return true;
   }
 
+  if (url.pathname === "/api/analytical-skills" && request.method === "GET") {
+    const args = ["analytical-skills"];
+    const workspace = url.searchParams.get("workspace");
+    if (workspace) args.push("--workspace", workspace);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/analytical-skills" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["analytical-skill-set", "--skill", String(body.skillId ?? body.skill ?? ""), "--state", String(body.state ?? "")];
+    if (body.workspaceId ?? body.workspace) args.push("--workspace", String(body.workspaceId ?? body.workspace));
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/analytical-skills/match" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["analytical-skill-match", "--task-type", String(body.taskType ?? "overview")];
+    if (body.workspaceId ?? body.workspace) args.push("--workspace", String(body.workspaceId ?? body.workspace));
+    if (body.skillId ?? body.skill) args.push("--skill", String(body.skillId ?? body.skill));
+    if (Array.isArray(body.roles)) body.roles.map(String).forEach((role) => args.push("--role", role));
+    if (Array.isArray(body.domainPacks)) body.domainPacks.map(String).forEach((pack) => args.push("--domain-pack", pack));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/workbench" && request.method === "GET") {
     const limit = url.searchParams.get("limit") ?? "12";
     const result = await cli(["workbench", "--limit", limit]);

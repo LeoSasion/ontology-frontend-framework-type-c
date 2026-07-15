@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "data-quality-explanation",
+  "version": "1.0.0",
+  "displayName": {"zh": "数据质量解释", "en": "Data quality explanation"},
+  "description": {"zh": "解释缺失、重复、类型和关系质量，不修改业务数据。", "en": "Explain missingness, duplication, typing, and relationship quality without changing business data."},
+  "taskTypes": ["diagnosis", "overview"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.context.route", "agent.semantic.plan", "agent.answer.compose"],
+  "stepTemplate": ["load-profile-evidence", "classify-quality-gaps", "bind-field-provenance", "compose-answer"],
+  "requiredEvidence": ["source-intelligence-run", "field-provenance"],
+  "blockingRules": ["stale-source-evidence", "missing-profile-evidence"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 8, "maxRows": 200}
+}

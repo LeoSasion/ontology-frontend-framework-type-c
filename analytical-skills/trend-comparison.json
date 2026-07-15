@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "trend-comparison",
+  "version": "1.0.0",
+  "displayName": {"zh": "趋势与同比环比", "en": "Trend comparison"},
+  "description": {"zh": "按已确认时间粒度比较指标变化。", "en": "Compare measure changes at a verified time grain."},
+  "taskTypes": ["trend", "comparison"],
+  "requiredRoles": ["measure", "time"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-time-grain", "resolve-measures", "plan-comparison", "verify-evidence", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "time-grain", "query-plan-receipt"],
+  "blockingRules": ["unresolved-time", "unresolved-measure", "incomparable-grain"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 10, "maxRows": 500}
+}

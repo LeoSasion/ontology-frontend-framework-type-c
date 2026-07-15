@@ -46,7 +46,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-agent-turn-") as temp:
     list_code, listed = run_cli(env, "agent-turns", "--turn", turn_key, "--after-sequence", "0")
     cancel_code, canceled = run_cli(env, "agent-turn-cancel", turn_key)
 
-    check("schema-v4-bootstrap", status_code == 0 and schema_version == 4, {"status": status_code, "schemaVersion": schema_version})
+    check("schema-v5-bootstrap", status_code == 0 and schema_version == 5, {"status": status_code, "schemaVersion": schema_version})
     check("turn-run-contract", run_code == 0 and run.get("schema") == "aibi-agent-turn-run/v1" and turn_key.startswith("turn-"), run)
     check("evidence-plan-contract", plan.get("schema") == "aibi-agent-evidence-plan/v1" and len(plan.get("fingerprint") or "") == 64, plan)
     check("registered-capabilities-only", all(step.get("capabilityId") in plan.get("registeredCapabilities", []) for step in plan.get("steps") or []), plan)
@@ -54,6 +54,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-agent-turn-") as temp:
     check("strict-event-sequence", sequences == sorted(set(sequences)), events)
     check("event-lifecycle", bool(events) and events[0].get("eventType") == "accepted" and events[-1].get("eventType") in {"turn-completed", "turn-blocked"}, events)
     check("completion-verifier", run.get("validation", {}).get("safeToPresent") is True, run.get("validation"))
+    check("fixed-policy-hooks-pass", run.get("validation", {}).get("policyHooks", {}).get("status") == "passed", run.get("validation"))
+    check("analytical-skill-bound", bool(plan.get("skillRefs")) and len(plan.get("skillRefs", [{}])[0].get("fingerprint") or "") == 64, plan)
     check("turn-reload", list_code == 0 and listed.get("turn", {}).get("turnKey") == turn_key and len(listed.get("events") or []) == len(events), listed)
     check("terminal-cancel-idempotent", cancel_code == 0 and canceled.get("changed") is False and canceled.get("turn", {}).get("turnKey") == turn_key, canceled)
 

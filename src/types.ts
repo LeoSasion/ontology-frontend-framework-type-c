@@ -12,6 +12,8 @@ export type {
   DomainPackManifest,
   DomainPackReference,
   WorkspaceDomainPackRuntime,
+  WorkspaceAnalyticalSkillRuntime,
+  AnalyticalSkillReference,
   EvidenceFocus,
   FieldConfig,
   FolderImportPlan,

@@ -13,7 +13,7 @@ def _fingerprint(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None) -> dict[str, Any]:
+def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None) -> dict[str, Any]:
     field_resolution = semantic_plan.get("fieldResolution", {})
     sources = {
         "table": {
@@ -28,6 +28,7 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
         "confirmedQueries": [{"queryKey": item.get("query_key"), "question": item.get("question"), "score": item.get("matchScore"), "reason": "confirmed-query-recall"} for item in recalled_queries],
         "knowledgeRules": [{"packId": knowledge_match.get("packId"), "version": knowledge_match.get("packVersion"), "ruleId": knowledge_match.get("ruleId"), "title": knowledge_match.get("title"), "grain": knowledge_match.get("grain"), "reason": "enabled-domain-pack-rule"}] if knowledge_match else [],
         "domainPacks": domain_pack_context.get("enabledDomainPacks") or domain_pack_context.get("enabled") or [],
+        "analyticalSkills": [analytical_skill_match.get("selected")] if isinstance(analytical_skill_match, dict) and isinstance(analytical_skill_match.get("selected"), dict) else [],
     }
     missing_slots = [{"kind": item.get("kind"), "mention": item.get("mention"), "reason": item.get("reason")} for item in intent_frame.get("unresolved") or []]
     fingerprint_input = {"workspaceId": workspace_id, "intent": intent_frame, "semanticPlan": semantic_plan, "sources": sources}

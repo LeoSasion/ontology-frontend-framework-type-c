@@ -9,6 +9,7 @@ from bi_cli_core import now_iso, quote_identifier, workspace_slug
 
 
 WORKSPACE_SCOPED_TABLES = [
+    "workspace_analytical_skills",
     "workspace_domain_packs",
     "context_rules",
     "context_terms",

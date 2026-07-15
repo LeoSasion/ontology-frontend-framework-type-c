@@ -134,19 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 C：受限 Analytical Skill
-
-目标：吸收 DB-GPT/Open Interpreter 的 Skills 优点，让业务分析方法可复用，但不打开脚本和任意工具执行。
-
-1. 在 Domain Pack 注册表旁建立独立 Skill Catalog，先读取名称、描述、版本、task type 和所需角色；命中后才加载完整 Manifest。
-2. 提供内置中性 Skill：数据概览、趋势比较、分布/构成、排名、异常核查、两表对账和数据质量说明。
-3. 领域 Skill 必须声明依赖的 Pack；Pack 停用后不再匹配，历史 Plan 保留原版本。
-4. Skill 冲突按显式用户选择、适用证据、手工语义和优先级规则处理，不能按文件加载顺序决胜。
-5. 安装、升级、卸载、启用与停用均 dry-run/confirm，并进入配置导出、迁移和恢复合同。
-6. 增加 Policy Hook：Plan 创建后、Step 执行前、Step 完成后、Turn 完成前运行固定校验器；Hook 只能引用注册校验器 ID。
-
-退出条件：第三方声明式 Skill 能在无代码加载的情况下完成 lint、安装、工作区启用、计划匹配、执行、停用和历史回放；恶意脚本、SQL、外部路径和越权 Capability 全部在安装前阻断。
-
 ### 阶段 D：可恢复 Session、分支与上下文管理
 
 目标：吸收 Open Interpreter 的 resume/fork 和 DB-GPT 的分层 Context Management，同时严格区分“对话历史”和“已确认业务语境”。
@@ -166,7 +153,7 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 4. Receipt、Unit、Plan、确认/拒绝历史、未决项和当前对象不能被压缩掉；大型结果只保留指纹与安全快照引用。
 5. 不自动生成长期业务记忆；只有明确晋级的 Confirmed Query、Context Term/Rule 和手工语义可跨 Session 召回。
 
-迁移：Agent Turn 已在 SQLite v4 持久化；Session 与 Snapshot 合入时必须从 v4 递增，走隔离副本、恢复点和双库复检。
+迁移：Agent Turn 与 Skill 状态已在 SQLite v5 持久化；Session 与 Snapshot 合入时必须从 v5 递增，走隔离副本、恢复点和双库复检。
 
 退出条件：重启后可恢复 Session；Fork 不污染父链；压缩前后关键对象、证据和阻塞结论一致；跨工作区 Session 不可见。
 
@@ -211,7 +198,7 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 ```mermaid
 flowchart TD
   A["已交付：业务意图与上下文"] --> B["已交付：证据计划与事件"]
-  B --> C["C Analytical Skill"]
+  B --> C["已交付：C Analytical Skill"]
   B --> D["D Session 与 Context"]
   A --> E["E Runtime Profile 与评估"]
   C --> F["F 受限工作流图"]
@@ -220,7 +207,7 @@ flowchart TD
   B --> X["P2 复杂跨表"]
 ```
 
-业务意图、上下文、证据计划与事件合同已经交付；C 是当前主链。D、E 可按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
+业务意图、上下文、证据计划、事件、声明式 Skill 与固定 Policy Hook 已经交付；D 是当前主链，E 可按独立改动面推进；F 和复杂跨表不得提前绕过前置合同。
 
 ## 评估与发布指标
 

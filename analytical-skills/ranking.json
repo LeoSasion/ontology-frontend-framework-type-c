@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "ranking",
+  "version": "1.0.0",
+  "displayName": {"zh": "排名分析", "en": "Ranking analysis"},
+  "description": {"zh": "按已确认指标和维度生成有边界的排名。", "en": "Build a bounded ranking from a verified measure and dimension."},
+  "taskTypes": ["ranking"],
+  "requiredRoles": ["measure", "dimension"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-measure", "resolve-dimension", "resolve-limit", "plan-ranking", "verify-evidence", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "query-plan-receipt"],
+  "blockingRules": ["unresolved-measure", "unresolved-dimension", "missing-limit"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 9, "maxRows": 100}
+}

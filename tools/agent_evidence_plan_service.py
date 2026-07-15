@@ -71,7 +71,10 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
         _step(key="step-090-verify", kind="validation", capability_id="agent.completion.verify", depends_on=[execution_dep], input_refs=["turn.plan", "answer"], required_evidence=[], output_schema="aibi-agent-completion-validation/v1", status="planned"),
         _step(key="step-100-answer", kind="answer", capability_id="agent.answer.compose", depends_on=["step-090-verify"], input_refs=["answer.answerCard"], required_evidence=[], output_schema="aibi-agent-answer/v1", status="planned"),
     ])
-    plan_material = {"workspaceId": workspace_id, "turnKey": turn_key, "planVersion": 1, "steps": steps}
+    skill_match = answer.get("analyticalSkillMatch") if isinstance(answer.get("analyticalSkillMatch"), dict) else {}
+    selected_skill = skill_match.get("selected") if isinstance(skill_match.get("selected"), dict) else None
+    skill_refs = [{"skillId": selected_skill.get("skillId"), "version": selected_skill.get("version"), "fingerprint": selected_skill.get("fingerprint"), "status": selected_skill.get("status")}] if selected_skill else []
+    plan_material = {"workspaceId": workspace_id, "turnKey": turn_key, "planVersion": 1, "steps": steps, "skillRefs": skill_refs}
     return {
         "schema": PLAN_SCHEMA,
         "workspaceId": workspace_id,
@@ -79,12 +82,15 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
         "planVersion": 1,
         "status": "blocked" if semantic_blockers else "ready",
         "steps": steps,
+        "skillRefs": skill_refs,
         "registeredCapabilities": sorted(AGENT_CAPABILITIES),
         "fingerprint": _hash(plan_material),
     }
 
 
 def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
+    from agent_policy_hook_service import evaluate_agent_policy_hooks
+
     blockers: list[str] = []
     checks = {
         "planSchema": plan.get("schema") == PLAN_SCHEMA,
@@ -97,13 +103,20 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "answerPresent": isinstance(answer.get("answerCard"), dict),
     }
     blockers.extend(key for key, valid in checks.items() if not valid)
+    policy_hooks = evaluate_agent_policy_hooks(
+        workspace_id=str(plan.get("workspaceId") or ""),
+        plan=plan,
+        skill_match=answer.get("analyticalSkillMatch") if isinstance(answer.get("analyticalSkillMatch"), dict) else None,
+    )
+    if policy_hooks["status"] != "passed":
+        blockers.extend(f"policy:{item}" for item in policy_hooks["blockers"])
     semantic_status = str(answer.get("semanticPlan", {}).get("status") or "not-applicable")
     unresolved = list(answer.get("intentFrame", {}).get("unresolved") or [])
     outcome = "blocked" if semantic_status not in {"ready", "not-applicable"} or unresolved else "completed"
     if outcome == "blocked":
         blockers.extend([f"semantic:{semantic_status}"] if semantic_status not in {"ready", "not-applicable"} else [])
         blockers.extend(f"unresolved:{item.get('mention') or item.get('kind')}" for item in unresolved)
-    status = "failed" if any(not valid for valid in checks.values()) else outcome
+    status = "failed" if any(not valid for valid in checks.values()) else "blocked" if policy_hooks["status"] != "passed" else outcome
     return {
         "schema": "aibi-agent-completion-validation/v1",
         "status": status,
@@ -111,6 +124,7 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "blockers": list(dict.fromkeys(blockers)),
         "evidenceComplete": all(checks.values()),
         "safeToPresent": status in {"completed", "blocked"},
+        "policyHooks": policy_hooks,
         "fingerprint": _hash({"plan": plan.get("fingerprint"), "checks": checks, "blockers": blockers}),
     }
 

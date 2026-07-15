@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `119`
+Command count: `125`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -12,6 +12,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 |---|---:|
 | `agent` | 6 |
 | `analysis` | 4 |
+| `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
 | `context` | 6 |
@@ -40,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 52 |
+| `dry-run-confirm` | 55 |
 | `evidence-receipt` | 8 |
-| `read-only` | 49 |
+| `read-only` | 52 |
 | `runtime-receipt` | 5 |
 
 ## Commands
@@ -62,6 +63,12 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `analysis-unit-build` | `analysis` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--kind`, `--rows-json`, `--title`, `--preferred-chart` |
 | `analysis-unit-verify` | `analysis` | `read-only` | `no` | `no` | `--unit` |
 | `analysis-units` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--receipt`, `--limit` |
+| `analytical-skill-install` | `analytical-skill` | `dry-run-confirm` | `yes` | `no` | `--manifest`, `--yes` |
+| `analytical-skill-lint` | `analytical-skill` | `read-only` | `no` | `no` | `--manifest` |
+| `analytical-skill-match` | `analytical-skill` | `read-only` | `no` | `no` | `--task-type`, `--role`, `--domain-pack`, `--skill`, `--workspace` |
+| `analytical-skill-set` | `analytical-skill` | `dry-run-confirm` | `yes` | `no` | `--skill`, `--state`, `--workspace`, `--yes` |
+| `analytical-skill-uninstall` | `analytical-skill` | `dry-run-confirm` | `yes` | `no` | `--skill`, `--yes` |
+| `analytical-skills` | `analytical-skill` | `read-only` | `no` | `no` | `--workspace` |
 | `apply-config` | `config` | `dry-run-confirm` | `yes` | `no` | `input`, `--yes` |
 | `ask` | `agent` | `action-draft` | `yes` | `no` | `--read-only`, `--parent-run`, `--branch-label`, `--workspace`, `prompt` |
 | `business-dashboard` | `dashboard` | `dry-run-confirm` | `yes` | `yes` | `--op`, `--dashboard`, `--name`, `--table`, `--template`, `--limit`, `--yes` |

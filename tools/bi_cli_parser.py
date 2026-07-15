@@ -246,6 +246,33 @@ def build_parser() -> argparse.ArgumentParser:
     domain_pack_uninstall.add_argument("--pack", required=True)
     domain_pack_uninstall.add_argument("--yes", action="store_true")
 
+    analytical_skills = sub.add_parser("analytical-skills", description="List declaration-only Analytical Skills and workspace activation state.")
+    analytical_skills.add_argument("--workspace", default="")
+
+    analytical_skill_lint = sub.add_parser("analytical-skill-lint", description="Validate one declaration-only Analytical Skill manifest.")
+    analytical_skill_lint.add_argument("--manifest", required=True)
+
+    analytical_skill_install = sub.add_parser("analytical-skill-install", description="Preview or confirm installation or upgrade of one declaration-only Analytical Skill.")
+    analytical_skill_install.add_argument("--manifest", required=True)
+    analytical_skill_install.add_argument("--yes", action="store_true")
+
+    analytical_skill_uninstall = sub.add_parser("analytical-skill-uninstall", description="Preview or confirm removal of an external Analytical Skill.")
+    analytical_skill_uninstall.add_argument("--skill", required=True)
+    analytical_skill_uninstall.add_argument("--yes", action="store_true")
+
+    analytical_skill_set = sub.add_parser("analytical-skill-set", description="Preview or confirm one workspace-scoped Analytical Skill state change.")
+    analytical_skill_set.add_argument("--skill", required=True)
+    analytical_skill_set.add_argument("--state", required=True, choices=["enabled", "disabled"])
+    analytical_skill_set.add_argument("--workspace", default="")
+    analytical_skill_set.add_argument("--yes", action="store_true")
+
+    analytical_skill_match = sub.add_parser("analytical-skill-match", description="Match enabled Analytical Skills against a resolved task type and semantic roles.")
+    analytical_skill_match.add_argument("--task-type", required=True, choices=["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"])
+    analytical_skill_match.add_argument("--role", action="append", choices=["measure", "dimension", "time", "identity", "attribute"], default=[])
+    analytical_skill_match.add_argument("--domain-pack", action="append", default=[])
+    analytical_skill_match.add_argument("--skill", default="")
+    analytical_skill_match.add_argument("--workspace", default="")
+
     source_run = sub.add_parser("source-run")
     source_run.add_argument("source_run_id")
 

@@ -114,3 +114,21 @@ export interface WorkspaceDomainPackRuntime {
   enabledDomainPacks: DomainPackReference[];
   availableDomainPacks: DomainPackManifest[];
 }
+
+export interface AnalyticalSkillReference {
+  skillId: string;
+  version: string;
+  fingerprint: string;
+  taskTypes: string[];
+  requiredRoles: string[];
+  requiredDomainPacks: string[];
+  allowedCapabilities: string[];
+}
+
+export interface WorkspaceAnalyticalSkillRuntime {
+  schema: "aibi-analytical-skill-runtime/v1" | string;
+  workspaceId: string;
+  enabledAnalyticalSkills: AnalyticalSkillReference[];
+  availableAnalyticalSkills: Array<AnalyticalSkillReference & { enabled: boolean; sourceType: string }>;
+  fingerprint: string;
+}

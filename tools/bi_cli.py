@@ -67,6 +67,7 @@ from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
 from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
 from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
+from analytical_skill_service import analytical_roles_from_intent_frame, analytical_skill_runtime_context, match_analytical_skills
 from platform_analytics_knowledge import (
     execute_platform_knowledge,
     match_platform_knowledge,
@@ -162,6 +163,12 @@ from bi_cli_io_services import (
     validate_metadata_config,
 )
 from bi_cli_system_commands import (
+    analytical_skill_install_command,
+    analytical_skill_lint_command,
+    analytical_skill_match_command,
+    analytical_skill_set_command,
+    analytical_skill_uninstall_command,
+    analytical_skills_command,
     cli_contract_command,
     domain_pack_install_command,
     domain_pack_lint_command,
@@ -1980,6 +1987,13 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             table_columns=table_columns,
         )
         intent_frame = build_business_intent_frame(prompt, semantic_plan=semantic_plan)
+        analytical_skill_runtime = analytical_skill_runtime_context(connection, workspace_id)
+        analytical_skill_match = match_analytical_skills(
+            analytical_skill_runtime,
+            task_type=str(intent_frame.get("taskType") or "overview"),
+            roles=analytical_roles_from_intent_frame(intent_frame),
+            enabled_domain_packs=[str(item.get("packId") or "") for item in active_domain_pack_context.get("enabledDomainPacks") or []],
+        )
         semantic_context = build_semantic_context_bundle(
             workspace_id=workspace_id,
             intent_frame=intent_frame,
@@ -1990,6 +2004,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             recalled_queries=recalled_queries,
             domain_pack_context=active_domain_pack_context,
             knowledge_match=platform_match,
+            analytical_skill_match=analytical_skill_match,
         )
         clarification = build_agent_clarification(intent_frame, semantic_context)
         semantic_execution = None
@@ -2385,6 +2400,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         "analysisRun": analysis_run,
         "intentFrame": intent_frame,
         "semanticContext": semantic_context,
+        "analyticalSkillMatch": analytical_skill_match,
+        "analyticalSkills": analytical_skill_runtime,
         "clarification": clarification,
         "context": {
             "matchedTermCount": len(context_matches["terms"]),
@@ -2706,6 +2723,18 @@ def main() -> int:
             result = domain_pack_install_command(args)
         elif args.command == "domain-pack-uninstall":
             result = domain_pack_uninstall_command(args)
+        elif args.command == "analytical-skills":
+            result = analytical_skills_command(args)
+        elif args.command == "analytical-skill-lint":
+            result = analytical_skill_lint_command(args)
+        elif args.command == "analytical-skill-install":
+            result = analytical_skill_install_command(args)
+        elif args.command == "analytical-skill-uninstall":
+            result = analytical_skill_uninstall_command(args)
+        elif args.command == "analytical-skill-set":
+            result = analytical_skill_set_command(args)
+        elif args.command == "analytical-skill-match":
+            result = analytical_skill_match_command(args)
         elif args.command == "source-run":
             result = source_run_command(args)
         elif args.command == "list-tables":

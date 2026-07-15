@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "two-table-reconciliation",
+  "version": "1.0.0",
+  "displayName": {"zh": "双表核对", "en": "Two-table reconciliation"},
+  "description": {"zh": "只在已保存关系与粒度均可验证时核对两张表。", "en": "Reconcile two tables only through a verified saved relationship and grain."},
+  "taskTypes": ["reconciliation"],
+  "requiredRoles": ["identity", "measure"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-sources", "resolve-join-key", "verify-cardinality", "plan-reconciliation", "verify-evidence", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "relationship-receipt", "query-plan-receipt"],
+  "blockingRules": ["missing-relationship", "unverified-cardinality", "mixed-grain"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 12, "maxRows": 500}
+}

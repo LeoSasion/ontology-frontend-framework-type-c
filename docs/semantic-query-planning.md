@@ -6,7 +6,7 @@
 
 `aibi-agent-intent-frame/v1` 将问题规范化为任务类型、指标、维度、时间、筛选、比较、输出、粒度和未决项。字段概念必须保留 `tableKey`、字段、角色、来源与置信度；Provider 不是必需依赖，也不能静默消歧。
 
-`aibi-semantic-context-bundle/v1` 在当前工作区统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack 与知识规则。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定意图、语义计划和来源。
+`aibi-semantic-context-bundle/v1` 在当前工作区统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack、Analytical Skill 与知识规则。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定意图、语义计划和来源。
 
 `aibi-agent-clarification/v1` 把全部未决字段合并为一次澄清，每个候选都必须声明表级来源。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。
 
@@ -17,6 +17,12 @@
 `aibi-agent-turn/v1` 与 `aibi-agent-turn-event/v1` 持久化在当前工作区。事件序号严格递增，支持从 `after-sequence` 续读；公开事件不包含私有推理、密钥或原始行。`POST /api/agent/turns` 创建回合，`GET /api/agent/turns/:id/events` 以 SSE 回放事件；现有 `/api/agent/ask` 和 `/api/agent/explain` 复用同一 Turn 服务。
 
 完成前必须生成 `aibi-agent-completion-validation/v1`，检查计划、工作区、Intent/Context schema、上下文新鲜度、指纹和答案。语义歧义是可安全呈现的 `blocked`，合同损坏是 `failed`；二者不能退化为无证据答案。
+
+## Analytical Skill 与 Policy Hook
+
+`aibi-analytical-skill/v1` 是独立于 Domain Pack 的声明式分析方法。内置目录覆盖概览、趋势比较、构成、排名、异常复核、双表核对和数据质量解释；外部 Manifest 必须先 lint、确认安装，再按工作区确认启用。匹配只使用已解析 `taskType`、语义角色和显式 Pack 依赖，不按文件顺序或模型偏好静默决胜。
+
+Skill 只能引用已登记 Agent Capability，并声明步骤模板、必需证据、阻塞规则、输出 schema、确认模式和固定资源上限。Python、JavaScript、Shell、SQL、HTML、URL、任意工具键和跨 AIBI 仓库路径在安装前阻断。`aibi-agent-policy-hooks/v1` 使用固定校验器复核工作区、能力、声明纯度、资源和证据引用；Hook 本身不是脚本扩展点。
 
 ## 规划流程
 
@@ -57,6 +63,7 @@
 npm run verify:semantic-plan
 npm run verify:agent-intent
 npm run verify:agent-turns
+npm run verify:analytical-skills
 npm run verify:composite-relationships
 npm run verify:ui-semantic
 ```

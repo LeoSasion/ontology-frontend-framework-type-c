@@ -11,6 +11,8 @@ export type {
   CoreSemanticRuntime,
   DomainPackManifest,
   DomainPackReference,
+  AnalyticalSkillReference,
+  WorkspaceAnalyticalSkillRuntime,
   WorkspaceDomainPackRuntime,
   SourcePipelineContract,
   SourcePipelineStageContract,

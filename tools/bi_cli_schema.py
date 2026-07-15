@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 4
+CURRENT_SQLITE_SCHEMA_VERSION = 5
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -665,6 +665,26 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_workspace_domain_packs_enabled
           ON workspace_domain_packs(workspace_id, enabled, pack_id);
+        CREATE TABLE IF NOT EXISTS analytical_skills (
+          skill_id TEXT PRIMARY KEY,
+          version TEXT NOT NULL,
+          manifest_json TEXT NOT NULL,
+          fingerprint TEXT NOT NULL,
+          source_type TEXT NOT NULL,
+          installed_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS workspace_analytical_skills (
+          workspace_id TEXT NOT NULL,
+          skill_id TEXT NOT NULL,
+          version TEXT NOT NULL,
+          enabled INTEGER NOT NULL DEFAULT 0,
+          enabled_at TEXT,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, skill_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_workspace_analytical_skills_enabled
+          ON workspace_analytical_skills(workspace_id, enabled, skill_id);
         CREATE TABLE IF NOT EXISTS context_terms (
           term_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,

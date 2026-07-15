@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "composition",
+  "version": "1.0.0",
+  "displayName": {"zh": "构成分析", "en": "Composition analysis"},
+  "description": {"zh": "解释指标在一个已确认维度上的构成。", "en": "Explain a measure composition over one verified dimension."},
+  "taskTypes": ["composition"],
+  "requiredRoles": ["measure", "dimension"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-measure", "resolve-dimension", "plan-composition", "verify-total", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "query-plan-receipt"],
+  "blockingRules": ["unresolved-measure", "unresolved-dimension", "mixed-grain"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 9, "maxRows": 200}
+}

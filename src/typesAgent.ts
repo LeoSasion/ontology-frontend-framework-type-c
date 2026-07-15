@@ -66,6 +66,7 @@ export interface AgentEvidencePlan {
   planVersion: number;
   status: string;
   steps: AgentEvidencePlanStep[];
+  skillRefs?: Array<{ skillId: string; version: string; fingerprint: string; status: string }>;
   registeredCapabilities: string[];
   fingerprint: string;
 }
@@ -177,6 +178,11 @@ export interface AgentAskResult {
   intentFrame?: BusinessIntentFrame;
   semanticContext?: SemanticContextBundle;
   clarification?: AgentClarification;
+  analyticalSkillMatch?: {
+    schema: string;
+    status: string;
+    selected?: { skillId: string; version: string; fingerprint: string; status: string; missingRoles: string[]; missingDomainPacks: string[] } | null;
+  };
   agentTurn?: AgentTurn;
   evidencePlan?: AgentEvidencePlan;
   turnEvents?: AgentTurnEvent[];

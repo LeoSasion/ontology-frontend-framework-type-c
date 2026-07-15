@@ -79,6 +79,7 @@ function actionForApiPath(url: URL) {
   if (url.pathname.includes("jobs")) return "job";
   if (url.pathname.includes("context")) return "context";
   if (url.pathname.includes("domain-packs")) return "domain-pack";
+  if (url.pathname.includes("analytical-skills")) return "analytical-skill";
   if (url.pathname.includes("preferences") || url.pathname.includes("theme") || url.pathname.includes("config")) return "settings";
   if (url.pathname.includes("workspace")) return "workspace";
   return "api";

@@ -16,14 +16,14 @@
 | 语义与关系 | 稳定受控 | 组合字段消歧、复合键、版本失效、筛选、预聚合和放大阻断进入 Receipt |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
-| Agent 与证据 | 稳定高级 | Intent/Context 统一业务语义；复杂问答生成受限 Evidence Plan、严格序号 Turn Event 和 Completion Validation；API/CLI 同源，前端可见紧凑进度与阻塞 |
+| Agent 与证据 | 稳定高级 | Intent/Context 统一业务语义；复杂问答生成受限 Evidence Plan、严格序号 Turn Event、固定 Policy Hook 和 Completion Validation；匹配的 Analytical Skill 版本与指纹进入计划，API/CLI 同源 |
 | Durable Job 与 Workflow | 稳定初版 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
 | 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |
-| 通用领域扩展 | 稳定受控 | 声明式 Domain Pack 支持签名、lint、安装、升级、卸载、冲突和工作区启停；默认停用 |
+| 通用扩展 | 稳定受控 | Domain Pack 管业务语义，Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具 |
 | Provider | 稳定可选 | deterministic 默认；DeepSeek 只接收有界脱敏上下文，失败自动降级 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v4、DuckDB schema v1；Agent Turn/事件持久化已版本化；兼容检查、隔离迁移、恢复点和双库回滚可用 |
+| 本地运维 | 稳定 | SQLite schema v5、DuckDB schema v1；Agent Turn、事件和 Skill 状态已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
@@ -38,6 +38,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - HTTP Adapter 仅支持 allowlist origin、GET、UTF-8 JSON、可选点路径和有界分页；无任意 Header、请求体、Webhook 或 OAuth。
 - 数据库 Adapter 当前只支持 allowlist 本地 SQLite 文件和显式非系统表；不接受 SQL、远程数据库或驱动插件。
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
+- 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。
 
 ## 架构归属
@@ -47,6 +48,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 | `src/` | 页面、可见工作流、派生状态、类型化客户端和对象路由 |
 | `server/` | 本地 HTTP、安全边界和 CLI 编排 |
 | `domain-packs/` | AIBI-C 自有可选领域 Manifest；不得承载 Core 默认行为 |
+| `analytical-skills/` | AIBI-C 内置中性分析方法 Manifest；只组合登记能力，不承载业务口径或执行代码 |
 | `knowledge/` | 版本化只读知识资产；只有已启用 Pack 才能引用 |
 | `tools/` | 确定性 BI、语义、关系、证据、Job、导出、扩展运行时和公共 CLI |
 | `scripts/` | 构建、迁移、浏览器、发布、安全与回归门禁 |
@@ -59,6 +61,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 npm run verify:docs
 npm run build
 npm run verify
+npm run verify:analytical-skills
 npm run verify:domain-packs
 npm run verify:domain-regressions
 npm run verify:connector-adapters

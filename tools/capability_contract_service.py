@@ -12,7 +12,7 @@ FILESYSTEM_READ_COMMANDS = {
     "preview-import", "import-commit", "preview-import-folder", "import-folder",
     "source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run",
     "validate-config", "apply-config",
-    "discover-connector", "preview-connector", "plan-connector-sync", "domain-pack-lint",
+    "discover-connector", "preview-connector", "plan-connector-sync", "domain-pack-lint", "analytical-skill-lint", "analytical-skill-install",
 }
 FILESYSTEM_WRITE_COMMANDS = {
     "source-intelligence", "source-intelligence-job-run", "export-evidence", "export-analysis", "export-config", "cli-contract",

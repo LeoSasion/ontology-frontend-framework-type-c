@@ -20,6 +20,15 @@ from domain_pack_service import (
     domain_pack_uninstall_command as domain_pack_uninstall_command_service,
     domain_packs_command as domain_packs_command_service,
 )
+from analytical_skill_service import (
+    analytical_skill_install_command as analytical_skill_install_command_service,
+    analytical_skill_lint_command as analytical_skill_lint_command_service,
+    analytical_skill_match_command as analytical_skill_match_command_service,
+    analytical_skill_set_command as analytical_skill_set_command_service,
+    analytical_skill_uninstall_command as analytical_skill_uninstall_command_service,
+    analytical_skills_command as analytical_skills_command_service,
+    analytical_skill_runtime_context,
+)
 from workspace_command_service import (
     workspace_create_command as workspace_create_command_service,
     workspace_delete_command as workspace_delete_command_service,
@@ -124,6 +133,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
         workspace["isActive"] = True
         domain_packs = domain_pack_runtime_context(connection, active_id)
         workspace["enabledDomainPacks"] = domain_packs["enabledDomainPacks"]
+        analytical_skills = analytical_skill_runtime_context(connection, active_id)
         source_runs = rows_to_dicts(
             connection.execute(
                 """
@@ -147,6 +157,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
             "counts": counts,
             "sourceRuns": source_runs,
             "domainPacks": domain_packs,
+            "analyticalSkills": analytical_skills,
             "health": {
                 "ok": True,
                 "notes": [
@@ -363,5 +374,32 @@ def domain_pack_install_command(args: argparse.Namespace) -> dict[str, Any]:
 
 def domain_pack_uninstall_command(args: argparse.Namespace) -> dict[str, Any]:
     return domain_pack_uninstall_command_service(args, open_db=open_db)
+
+
+def analytical_skills_command(args: argparse.Namespace) -> dict[str, Any]:
+    return analytical_skills_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
+
+
+def analytical_skill_lint_command(args: argparse.Namespace) -> dict[str, Any]:
+    return analytical_skill_lint_command_service(args)
+
+
+def analytical_skill_install_command(args: argparse.Namespace) -> dict[str, Any]:
+    from bi_cli_core import now_iso
+    return analytical_skill_install_command_service(args, open_db=open_db, now_iso=now_iso)
+
+
+def analytical_skill_uninstall_command(args: argparse.Namespace) -> dict[str, Any]:
+    from bi_cli_core import now_iso
+    return analytical_skill_uninstall_command_service(args, open_db=open_db, now_iso=now_iso)
+
+
+def analytical_skill_set_command(args: argparse.Namespace) -> dict[str, Any]:
+    from bi_cli_core import now_iso
+    return analytical_skill_set_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+
+
+def analytical_skill_match_command(args: argparse.Namespace) -> dict[str, Any]:
+    return analytical_skill_match_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
 
 

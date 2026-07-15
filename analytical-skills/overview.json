@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "overview",
+  "version": "1.0.0",
+  "displayName": {"zh": "业务概览", "en": "Business overview"},
+  "description": {"zh": "用可验证的指标与维度形成概览。", "en": "Build an overview from verified measures and dimensions."},
+  "taskTypes": ["overview"],
+  "requiredRoles": ["measure"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-measures", "plan-query", "verify-evidence", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "query-plan-receipt"],
+  "blockingRules": ["unresolved-measure", "stale-context"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 8, "maxRows": 200}
+}

@@ -20,6 +20,12 @@ export function AgentEvidencePlan({ plan }: { plan: AgentEvidencePlanContract })
         <span>{biText("证据计划", "Evidence plan")}</span>
         <strong>{completed}/{plan.steps.length} · {statusText(plan.status)}</strong>
       </summary>
+      {plan.skillRefs?.length ? (
+        <div className="agentEvidencePlanSkills">
+          <small>{biText("分析 Skill", "Analytical Skill")}</small>
+          {plan.skillRefs.map((skill) => <span key={`${skill.skillId}@${skill.version}`}>{skill.skillId} · v{skill.version}</span>)}
+        </div>
+      ) : null}
       <ol>
         {plan.steps.map((step) => (
           <li className={step.status} key={step.stepKey}>

@@ -1,0 +1,17 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "anomaly-review",
+  "version": "1.0.0",
+  "displayName": {"zh": "异常复核", "en": "Anomaly review"},
+  "description": {"zh": "以基线、粒度和证据为前提复核异常。", "en": "Review anomalies against a verified baseline, grain, and evidence."},
+  "taskTypes": ["anomaly", "diagnosis"],
+  "requiredRoles": ["measure"],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.semantic.plan", "agent.query.execute", "agent.answer.compose"],
+  "stepTemplate": ["resolve-measure", "resolve-baseline", "plan-comparison", "inspect-segments", "verify-evidence", "compose-answer"],
+  "requiredEvidence": ["field-provenance", "baseline-definition", "query-plan-receipt"],
+  "blockingRules": ["unresolved-measure", "missing-baseline", "incomparable-grain"],
+  "outputSchema": "aibi-agent-answer/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 12, "maxRows": 500}
+}
