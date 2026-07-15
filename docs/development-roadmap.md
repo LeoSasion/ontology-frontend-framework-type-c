@@ -134,18 +134,6 @@ Profile 类似 Open Interpreter 的 Provider/Harness 分离，但只适配通信
 
 ## 当前队列
 
-### 阶段 F：受限工作流图与只读专家
-
-目标：在已有阶段稳定后，再吸收 AWEL 的 Branch/Join 和多角色协作，而不是立即构建自由多 Agent。
-
-1. 只开放固定 Operator：context、resolve、clarify、query、validate、unit、chart、explain、export、branch、join。
-2. 只读且互不依赖的 Step 可以并行；写入、关系变更和依赖相同数据版本的 Step 串行。
-3. Planner、Semantic Reviewer、Evidence Reviewer 和 Narrator 是同一 Turn 内的角色视图；只有 Orchestrator 能提交 Capability 请求。
-4. Reviewer 只能返回结构化通过/阻断/修订建议，不能直接执行工具。
-5. Join 必须验证所有父 Step 的 workspace、plan version、data/Pack fingerprint 和证据完整性。
-
-退出条件：并行不会改变确定性结果或事件顺序语义；任一专家失败可降级为单 Orchestrator；无工具权限泄漏或循环重规划。
-
 ### P2. 更复杂的跨表执行
 
 目标：在 Intent Frame 和 Evidence Plan 已能说明统计粒度、关系依赖与证据缺口后，扩展当前一跳与线性正向两跳能力。
@@ -165,13 +153,13 @@ flowchart TD
   B --> C["已交付：C Analytical Skill"]
   B --> D["已交付：D Session 与 Context"]
   A --> E["已交付：E Runtime Profile 与评估"]
-  C --> F["F 受限工作流图"]
+  C --> F["已交付：F 受限工作流图"]
   D --> F
   E --> F
   B --> X["P2 复杂跨表"]
 ```
 
-业务意图、上下文、证据计划、事件、声明式 Skill、固定 Policy Hook、可恢复 Session、Fork、证据感知快照、受控 Provider Registry、出站门禁与评估回执已经交付；F 是当前主链，复杂跨表不得提前绕过前置合同。
+A-F 主链已经交付：业务意图、上下文、证据计划、事件、声明式 Skill、固定 Policy Hook、可恢复 Session、Fork、证据感知快照、受控 Provider Registry、出站门禁、评估回执、固定工作流图、只读专家视图和 Join 完整性校验均已落地。当前队列只保留 P2 复杂跨表；它不得绕过既有语义、证据和工作流合同。
 
 ## 评估与发布指标
 

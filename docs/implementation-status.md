@@ -16,8 +16,8 @@
 | 语义与关系 | 稳定受控 | 组合字段消歧、复合键、版本失效、筛选、预聚合和放大阻断进入 Receipt |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
-| Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；工作区 Session 可重启恢复和 Fork，四级 Context Snapshot 保留 Receipt/Plan/Skill 引用且不自动晋级业务事实 |
-| Durable Job 与 Workflow | 稳定初版 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环 |
+| Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；工作区 Session 可重启恢复和 Fork，四级 Context Snapshot 保留 Receipt/Plan/Skill 引用且不自动晋级业务事实；工作流图随 Turn 持久化并可回读 |
+| Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表 |
 | 分析导出 | 稳定初版 | 已验证 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具 |
@@ -31,6 +31,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 ## 已知限制
 
 - 不支持认证、角色、协作、远程托管、云同步、原生移动客户端或远程灾备。
+- 不支持自由多 Agent、专家直接调用工具、任意 Operator 或循环重规划；专家失败只降级到单 Orchestrator 的固定复核。
 - 跨表执行开放一跳和严格线性正向两跳；三跳、反向路径、跨跳筛选和跨跳预聚合保持阻断。
 - 重启中断 Job 不自动续跑；当前后台白名单只包含 Source Intelligence。
 - Analysis Unit 与导出最多冻结 500 行；旧 Receipt 缺少结果绑定时必须重新执行。
@@ -66,6 +67,7 @@ npm run verify
 npm run verify:analytical-skills
 npm run verify:agent-sessions
 npm run verify:runtime-profiles
+npm run verify:restricted-workflow
 npm run verify:domain-packs
 npm run verify:domain-regressions
 npm run verify:connector-adapters

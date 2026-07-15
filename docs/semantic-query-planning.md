@@ -18,6 +18,14 @@
 
 完成前必须生成 `aibi-agent-completion-validation/v1`，检查计划、工作区、Intent/Context schema、上下文新鲜度、指纹和答案。语义歧义是可安全呈现的 `blocked`，合同损坏是 `failed`；二者不能退化为无证据答案。
 
+## 受限工作流图与专家视图
+
+`aibi-agent-workflow-graph/v1` 只允许 `context`、`resolve`、`clarify`、`query`、`validate`、`unit`、`chart`、`explain`、`export`、`branch`、`join` 十一个声明式 Operator。节点不得携带代码、脚本、SQL、URL、任意工具或处理器；只有 Orchestrator 可以提交已登记 Capability，请求写入或产生运行回执的节点必须串行。
+
+Planner、Semantic Reviewer、Evidence Reviewer 和 Narrator 是同一 Turn 的只读结构化角色视图，不是拥有独立权限的 Agent。它们只能返回 `pass`、`block` 或 `revise` 以及证据引用，工具权限固定为零。互不依赖的只读节点可以并行计算，但公开事件按图的确定性顺序发布；任一专家异常或越权输出会被固定 Orchestrator 复核替代。
+
+`aibi-agent-workflow-join/v1` 在合并前逐项核对父节点齐全、工作区、plan version、数据指纹、Domain Pack 指纹和证据完整性。图包含循环、未知 Operator、专家 Capability、并行写入或指纹漂移时必须阻断，不能以可执行结果代替合同通过。
+
 ## Session、Fork 与 Context Snapshot
 
 `aibi-agent-session/v1` 将 Turn 链绑定到单一工作区；连续提问自动引用当前 Turn，重启后可由 SQLite 恢复。Fork 创建新的 Session，并以父 Turn 作为第一回合的显式父引用，父 Session 的当前 Turn、上下文指纹和历史不被修改。
@@ -82,6 +90,7 @@ npm run verify:agent-turns
 npm run verify:agent-sessions
 npm run verify:analytical-skills
 npm run verify:runtime-profiles
+npm run verify:restricted-workflow
 npm run verify:composite-relationships
 npm run verify:ui-semantic
 ```

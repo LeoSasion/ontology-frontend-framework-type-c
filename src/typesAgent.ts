@@ -69,6 +69,38 @@ export interface AgentEvidencePlan {
   skillRefs?: Array<{ skillId: string; version: string; fingerprint: string; status: string }>;
   registeredCapabilities: string[];
   fingerprint: string;
+  workflowGraph?: AgentWorkflowGraph;
+  workflowExecution?: AgentWorkflowExecution;
+}
+
+export interface AgentWorkflowGraph {
+  schema: "aibi-agent-workflow-graph/v1" | string;
+  workspaceId: string;
+  planVersion: number;
+  dataFingerprint: string;
+  domainPackFingerprint: string;
+  nodes: Array<{
+    nodeKey: string;
+    operator: string;
+    role: string;
+    dependsOn: string[];
+    capabilityId?: string | null;
+    mutationMode: string;
+    canSubmitCapability: boolean;
+    toolPermissions: string;
+  }>;
+  fingerprint: string;
+}
+
+export interface AgentWorkflowExecution {
+  schema: "aibi-agent-workflow-execution/v1" | string;
+  status: string;
+  mode: string;
+  parallelReadOnlyGroups: string[][];
+  roleViews: Array<{ role: string; decision: "pass" | "block" | "revise" | string; blockers: string[]; revisions: string[]; canSubmitCapability: false; toolCalls: [] }>;
+  reviewerCapabilitySubmissionCount: 0;
+  reviewerToolCallCount: 0;
+  fingerprint: string;
 }
 
 export interface AgentTurnEvent {

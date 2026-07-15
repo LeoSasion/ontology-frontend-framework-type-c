@@ -207,6 +207,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   ] : [];
   const llmAudit = result.llm.audit;
   const providerUsed = result.llm.mode === "provider";
+  const expertRoleCount = result.evidencePlan?.workflowExecution?.roleViews?.length ?? 0;
   const llmAuditItems = [
     {
       key: "provider",
@@ -462,7 +463,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         </div>
         <div className="statusPill">
           <span className="dot ok" />
-          <span>{result.agentSession ? `${biText("会话", "Session")} ${result.sessionContext?.turnCount ?? 1} · ` : ""}{llmModeText(providerUsed)}</span>
+          <span>{result.agentSession ? `${biText("会话", "Session")} ${result.sessionContext?.turnCount ?? 1} · ` : ""}{expertRoleCount ? `${expertRoleCount} ${biText("个只读角色", "read-only roles")} · ` : ""}{llmModeText(providerUsed)}</span>
         </div>
       </div>
 

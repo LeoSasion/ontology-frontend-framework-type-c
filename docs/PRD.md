@@ -71,6 +71,8 @@
 - 本地确定性运行时负责字段、查询、结果和证据；可选 Provider 只能解释或提出必要澄清。
 - Runtime Profile 选择按工作区预演并确认；切换 Provider 不得改变 Intent、字段、Capability、Receipt、草案或确认边界。
 - Provider 上下文使用固定出站白名单且不包含原始行；输出未通过 JSON、数字和 evidence grounding 时必须静默降级为确定性本地答案并留下脱敏评估回执。
+- Agent 计划只使用固定声明式 Operator；只有 Orchestrator 能提交已登记 Capability，Planner、Semantic Reviewer、Evidence Reviewer 和 Narrator 不得调用工具或形成独立执行链。
+- 互不依赖的只读节点可以并行，但公开事件顺序必须确定；写入和运行回执节点保持串行。Join 必须核对工作区、计划版本、数据/Pack 指纹和证据完整性，任一专家异常时降级为单 Orchestrator 固定复核。
 - 只读回答不创建动作草案；写入意图只生成待确认草案。
 
 完整扩展、Provider、ERP 单元和迁移合同见 [通用扩展框架](extensible-domain-framework.md)。

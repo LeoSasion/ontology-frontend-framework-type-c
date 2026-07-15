@@ -75,7 +75,7 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
     selected_skill = skill_match.get("selected") if isinstance(skill_match.get("selected"), dict) else None
     skill_refs = [{"skillId": selected_skill.get("skillId"), "version": selected_skill.get("version"), "fingerprint": selected_skill.get("fingerprint"), "status": selected_skill.get("status")}] if selected_skill else []
     plan_material = {"workspaceId": workspace_id, "turnKey": turn_key, "planVersion": 1, "steps": steps, "skillRefs": skill_refs}
-    return {
+    base_plan = {
         "schema": PLAN_SCHEMA,
         "workspaceId": workspace_id,
         "turnKey": turn_key,
@@ -86,12 +86,18 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
         "registeredCapabilities": sorted(AGENT_CAPABILITIES),
         "fingerprint": _hash(plan_material),
     }
+    from restricted_workflow_graph_service import bind_restricted_workflow
+    return bind_restricted_workflow(plan=base_plan, answer=answer)
 
 
 def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
     from agent_policy_hook_service import evaluate_agent_policy_hooks
+    from restricted_workflow_graph_service import GRAPH_SCHEMA, EXECUTION_SCHEMA, validate_restricted_workflow_graph
 
     blockers: list[str] = []
+    workflow_graph = plan.get("workflowGraph") if isinstance(plan.get("workflowGraph"), dict) else {}
+    workflow_execution = plan.get("workflowExecution") if isinstance(plan.get("workflowExecution"), dict) else {}
+    workflow_validation = validate_restricted_workflow_graph(workflow_graph) if workflow_graph else {"status": "blocked", "blockers": ["missing-workflow-graph"]}
     checks = {
         "planSchema": plan.get("schema") == PLAN_SCHEMA,
         "workspaceBound": bool(plan.get("workspaceId")),
@@ -101,6 +107,12 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "contextCurrent": answer.get("semanticContext", {}).get("stale") is False,
         "contextFingerprint": len(str(answer.get("semanticContext", {}).get("fingerprint") or "")) == 64,
         "answerPresent": isinstance(answer.get("answerCard"), dict),
+        "workflowGraphSchema": workflow_graph.get("schema") == GRAPH_SCHEMA,
+        "workflowGraphValid": workflow_validation.get("status") == "passed",
+        "workflowExecutionSchema": workflow_execution.get("schema") == EXECUTION_SCHEMA,
+        "workflowJoinValid": workflow_execution.get("join", {}).get("status") == "passed",
+        "reviewerAuthorityContained": workflow_execution.get("reviewerCapabilitySubmissionCount") == 0 and workflow_execution.get("reviewerToolCallCount") == 0,
+        "parallelReadOnlyReview": bool(workflow_execution.get("parallelReadOnlyGroups")),
     }
     blockers.extend(key for key, valid in checks.items() if not valid)
     policy_hooks = evaluate_agent_policy_hooks(
@@ -125,6 +137,8 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "evidenceComplete": all(checks.values()),
         "safeToPresent": status in {"completed", "blocked"},
         "policyHooks": policy_hooks,
+        "workflowValidation": workflow_validation,
+        "workflowExecution": workflow_execution,
         "fingerprint": _hash({"plan": plan.get("fingerprint"), "checks": checks, "blockers": blockers}),
     }
 
@@ -140,7 +154,7 @@ def finalize_evidence_plan(plan: dict[str, Any], validation: dict[str, Any]) -> 
             step["status"] = "completed" if validation.get("safeToPresent") else "blocked"
             step["blockers"] = [] if validation.get("safeToPresent") else ["completion-validation-failed"]
     finalized["status"] = validation.get("status")
-    finalized["fingerprint"] = _hash({"workspaceId": finalized.get("workspaceId"), "turnKey": finalized.get("turnKey"), "planVersion": finalized.get("planVersion"), "steps": finalized.get("steps")})
+    finalized["fingerprint"] = _hash({"workspaceId": finalized.get("workspaceId"), "turnKey": finalized.get("turnKey"), "planVersion": finalized.get("planVersion"), "steps": finalized.get("steps"), "workflowGraph": finalized.get("workflowGraph"), "workflowExecution": finalized.get("workflowExecution")})
     return finalized
 
 
@@ -154,6 +168,8 @@ def public_turn_events(plan: dict[str, Any], validation: dict[str, Any]) -> list
         if step.get("stepKey") in {"step-001-intent", "step-002-context", "step-090-verify", "step-100-answer"}:
             continue
         events.append({"eventType": "step-completed" if step.get("status") == "completed" else "step-blocked" if step.get("status") == "blocked" else "approval-required", "stepKey": step.get("stepKey"), "status": step.get("status"), "summary": f"{step.get('kind')} · {step.get('status')}"})
+    for event in plan.get("workflowExecution", {}).get("events") or []:
+        events.append({"eventType": event.get("eventType"), "stepKey": event.get("nodeKey"), "status": event.get("status"), "summary": f"{event.get('role')} · {event.get('status')}"})
     events.extend([
         {"eventType": "validation-completed", "stepKey": "step-090-verify", "status": validation.get("status"), "summary": "完成条件已复核"},
         {"eventType": "answer-ready", "stepKey": "step-100-answer", "status": "completed" if validation.get("safeToPresent") else "blocked", "summary": "业务答案已准备"},

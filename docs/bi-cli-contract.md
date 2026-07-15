@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `134`
+Command count: `137`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -33,7 +33,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `system` | 6 |
 | `view` | 4 |
 | `workbench` | 1 |
-| `workflow` | 1 |
+| `workflow` | 4 |
 | `workspace` | 4 |
 
 | Mutation mode | Commands |
@@ -43,7 +43,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 56 |
 | `evidence-receipt` | 8 |
-| `read-only` | 56 |
+| `read-only` | 59 |
 | `runtime-receipt` | 9 |
 
 ## Commands
@@ -68,6 +68,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `agent-turn-cancel` | `agent` | `runtime-receipt` | `no` | `no` | `turn`, `--workspace` |
 | `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--session`, `--review-stale-context`, `--read-only` |
 | `agent-turns` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--turn`, `--after-sequence`, `--limit` |
+| `agent-workflow-graph` | `workflow` | `read-only` | `no` | `no` | `--turn`, `--workspace` |
 | `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
 | `analysis-unit-build` | `analysis` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--kind`, `--rows-json`, `--title`, `--preferred-chart` |
 | `analysis-unit-verify` | `analysis` | `read-only` | `no` | `no` | `--unit` |
@@ -159,6 +160,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `remove-stale-filters` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--yes` |
 | `remove-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--widget`, `--yes` |
 | `rename-source` | `source` | `dry-run-confirm` | `yes` | `no` | `source`, `--name`, `--yes` |
+| `restricted-workflow-operators` | `workflow` | `read-only` | `no` | `no` | - |
+| `restricted-workflow-validate` | `workflow` | `read-only` | `no` | `no` | `--graph-json`, `--workspace` |
 | `save-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--name`, `--type`, `--provider`, `--status`, `--endpoint`, `--resource`, `--page-param`, `...` |
 | `save-dashboard-modules` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--name`, `--default-table`, `--canvas-width-mode`, `--widgets-json`, `--layout-json`, `--filters-json`, `--yes` |
 | `save-formula` | `formula` | `dry-run-confirm` | `yes` | `no` | `--id`, `--name`, `--table`, `--expression`, `--mode`, `--dimension`, `--time-field`, `--value-format`, `...` |

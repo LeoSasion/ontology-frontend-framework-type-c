@@ -78,6 +78,16 @@ def build_parser() -> argparse.ArgumentParser:
     context_budget.add_argument("--segments-json", required=True)
     context_budget.add_argument("--max-chars", type=int, default=12_000)
 
+    sub.add_parser("restricted-workflow-operators", description="List the fixed Operator and read-only expert role registry.")
+
+    restricted_workflow_validate = sub.add_parser("restricted-workflow-validate", description="Validate one declaration-only restricted workflow graph without executing it.")
+    restricted_workflow_validate.add_argument("--graph-json", required=True)
+    restricted_workflow_validate.add_argument("--workspace", default="")
+
+    agent_workflow_graph = sub.add_parser("agent-workflow-graph", description="Inspect the persisted restricted workflow graph for one Agent Turn.")
+    agent_workflow_graph.add_argument("--turn", required=True)
+    agent_workflow_graph.add_argument("--workspace", default="")
+
     agent_turn_run = sub.add_parser("agent-turn-run", description="Run one evidence-planned Agent turn and persist its public event stream.")
     agent_turn_run.add_argument("prompt")
     agent_turn_run.add_argument("--workspace", default="")

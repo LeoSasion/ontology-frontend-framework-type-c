@@ -103,6 +103,7 @@ from workflow_command_service import capability_contracts_command, context_budge
 from agent_turn_service import agent_turns_command, cancel_agent_turn_command, run_agent_turn_command
 from agent_session_service import agent_context_compact_command, agent_session_create_command, agent_session_fork_command, agent_session_resume_command, agent_sessions_command
 from agent_runtime_profile_service import agent_provider_evaluation_record_command, agent_provider_evaluations_command, agent_runtime_profile_set_command, agent_runtime_profiles_command
+from restricted_workflow_graph_service import agent_workflow_graph_command, restricted_workflow_operators_command, restricted_workflow_validate_command
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -2644,6 +2645,12 @@ def main() -> int:
             result = workflow_plan_command(args, parser)
         elif args.command == "context-budget":
             result = context_budget_command(args)
+        elif args.command == "restricted-workflow-operators":
+            result = restricted_workflow_operators_command(args)
+        elif args.command == "restricted-workflow-validate":
+            result = restricted_workflow_validate_command(args)
+        elif args.command == "agent-workflow-graph":
+            result = agent_workflow_graph_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "agent-turn-run":
             result = run_agent_turn_command(args, ask_runner=ask_command, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "agent-turns":

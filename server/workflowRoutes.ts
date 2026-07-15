@@ -13,6 +13,39 @@ function nonEmpty(value: unknown) {
 }
 
 export async function handleWorkflowApi({ cli, request, response, url }: WorkflowRoutesOptions) {
+  if (url.pathname === "/api/workflow/operators" && request.method === "GET") {
+    const result = await cli(["restricted-workflow-operators"]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/workflow/validate" && request.method === "POST") {
+    const body = await readBody(request);
+    if (!body.graph || typeof body.graph !== "object" || Array.isArray(body.graph)) {
+      sendJson(response, 400, { ok: false, action: "restricted-workflow-validate", error: "graph must be one object" });
+      return true;
+    }
+    const args = ["restricted-workflow-validate", "--graph-json", JSON.stringify(body.graph)];
+    if (body.workspaceId) args.push("--workspace", String(body.workspaceId));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/workflow/agent-graph" && request.method === "GET") {
+    const turn = nonEmpty(url.searchParams.get("turn"));
+    if (!turn) {
+      sendJson(response, 400, { ok: false, action: "agent-workflow-graph", error: "turn is required" });
+      return true;
+    }
+    const args = ["agent-workflow-graph", "--turn", turn];
+    const workspace = nonEmpty(url.searchParams.get("workspaceId"));
+    if (workspace) args.push("--workspace", workspace);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 404 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/capabilities" && request.method === "GET") {
     const args = ["capability-contracts"];
     const command = nonEmpty(url.searchParams.get("command"));
