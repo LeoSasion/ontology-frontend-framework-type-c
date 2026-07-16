@@ -1,0 +1,24 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "forecast-readiness",
+  "version": "1.0.0",
+  "displayName": {"zh": "预测准备度", "en": "Forecast readiness"},
+  "description": {"zh": "只评估当前时间序列能否进入有界预测评测，不生成未来数值。", "en": "Assess whether a current time series can enter bounded forecast evaluation without generating future values."},
+  "skillKind": "analysis",
+  "taskTypes": ["overview", "trend", "anomaly"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["resolve-target-series", "bind-forecast-horizon", "verify-current-analysis-unit", "assess-history-and-cadence", "assess-stability", "enforce-leakage-policy", "declare-assumptions", "verify-explainability"],
+  "requiredEvidence": ["field-provenance", "grain-definition", "query-plan-receipt", "analysis-unit"],
+  "blockingRules": ["missing-forecast-target", "missing-time-field", "missing-forecast-horizon", "missing-forecast-cutoff", "stale-analysis-unit", "forecast-generation-forbidden"],
+  "triggerSignals": ["forecast-readiness-request"],
+  "slotRules": [
+    {"whenAny": ["forecast-readiness-request"], "requireAll": ["measure", "time-field", "grain", "forecast-horizon", "forecast-cutoff"]}
+  ],
+  "semanticGuards": ["current-context", "field-provenance", "grain-explicit", "facts-before-hypotheses", "receipt-before-claim", "result-invariants", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 12, "maxRows": 500}
+}

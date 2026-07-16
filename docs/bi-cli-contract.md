@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `159`
+Command count: `160`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,7 +11,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 13 |
+| `analysis` | 14 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -43,7 +43,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 65 |
 | `evidence-receipt` | 8 |
-| `read-only` | 71 |
+| `read-only` | 72 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -121,6 +121,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `export-config` | `config` | `runtime-receipt` | `no` | `no` | `output` |
 | `export-evidence` | `evidence` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--output` |
 | `field-update` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--field`, `--role`, `--usage`, `--confidence`, `--yes` |
+| `forecast-readiness` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--horizon` |
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |
 | `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--yes` |
 | `import-folder` | `import` | `dry-run-confirm` | `yes` | `no` | `path`, `--limit`, `--no-recursive`, `--yes` |

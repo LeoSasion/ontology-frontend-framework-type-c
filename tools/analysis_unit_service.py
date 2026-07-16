@@ -691,9 +691,27 @@ def attach_analysis_unit(
             preferred_chart=preferred,
             now_iso=now_iso,
         )
+        business_understanding = result.get("businessUnderstanding") if isinstance(result.get("businessUnderstanding"), dict) else {}
+        method_plan = business_understanding.get("methodPlan") if isinstance(business_understanding.get("methodPlan"), dict) else {}
+        readiness = None
+        if method_plan.get("skillId") == "forecast-readiness":
+            slots = business_understanding.get("slots") if isinstance(business_understanding.get("slots"), dict) else {}
+            horizon_slot = slots.get("forecast-horizon") if isinstance(slots.get("forecast-horizon"), dict) else {}
+            cutoff_slot = slots.get("forecast-cutoff") if isinstance(slots.get("forecast-cutoff"), dict) else {}
+            horizon_match = re.search(r"\d+", str(horizon_slot.get("value") or ""))
+            if horizon_match:
+                from forecast_readiness_service import assess_forecast_readiness
+                readiness = assess_forecast_readiness(
+                    unit,
+                    freshness=analysis_unit_consumer_state(connection, workspace_id, unit),
+                    horizon=int(horizon_match.group(0)),
+                    declared_cutoff=cutoff_slot.get("value"),
+                )
         connection.commit()
     result["analysisUnit"] = unit
     result["chartAdapter"] = unit["chartAdapter"]
+    if readiness:
+        result["forecastReadiness"] = readiness
     if isinstance(answer, dict):
         answer["analysisUnitRef"] = {
             "unitKey": unit["unitKey"],
@@ -702,4 +720,10 @@ def attach_analysis_unit(
             "resultFingerprint": unit["resultFingerprint"],
         }
         answer["chartAdapter"] = unit["chartAdapter"]
+        if readiness:
+            answer["forecastReadinessRef"] = {
+                "status": readiness["status"],
+                "fingerprint": readiness["fingerprint"],
+                "canGenerateForecast": False,
+            }
     return result

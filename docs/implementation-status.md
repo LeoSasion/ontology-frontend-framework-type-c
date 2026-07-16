@@ -18,7 +18,7 @@
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
 | Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；Analysis Unit 在计划持久化前补全；blocker 保持可读字符串；工作区 Session 可重启恢复和 Fork，失效持久 key 只恢复重试一次，浏览器禁用存储时安全退化；Analysis Run 比较分支与 Turn 父链独立；工作流图随 Turn 持久化并可回读 |
-| 业务理解与分析 Skills | 稳定初版 | 五层上下文、`aibi-business-understanding-frame/v1`、类型化单问题澄清、六个业务理解 Skill，以及漏斗、队列留存、异常分诊、分群贡献、驱动调查和决策看板六个方法 Skill 已接入 CLI/API/UI；专用信号不会抢占普通分析，`aibi-analysis-method-plan/v1` 把步骤、槽位、证据、Guard、资源和 Capability 交集带入 Evidence Plan |
+| 业务理解与分析 Skills | 稳定初版 | 五层上下文、`aibi-business-understanding-frame/v1`、类型化单问题澄清、六个业务理解 Skill，以及漏斗、队列留存、异常分诊、分群贡献、驱动调查、决策看板和 Forecast Readiness 七个方法 Skill 已接入 CLI/API/UI；专用信号不会抢占普通分析，`aibi-analysis-method-plan/v1` 把步骤、槽位、证据、Guard、资源和 Capability 交集带入 Evidence Plan |
 | 计划质量评测 | 稳定初版 | 15 个固定中立 Business Expression Case 在内存夹具中确定性重放；评分卡覆盖槽位、字段、澄清、证据、重放及零容忍隔离指标，不读取用户业务行或调用 Provider；设置页可运行并查看当前/失效回执，Case Set、Policy 或运行时漂移后旧回执不用于发布 |
 | 语义补丁与审核收件箱 | 稳定初版 | JSON/Markdown/结构化纠正经声明式 Adapter 形成不可变提案；设置页展示来源和 Before/After，接受/拒绝均需预演与确认；schema/目标漂移阻断接受，reviewed 语义受自动覆盖保护，来源与审核状态可随配置迁移 |
 | Confirmed Plan Memory 与混合召回 | 稳定初版 | 成功动作先生成候选，显式提升后才形成证据绑定计划记忆；lexical、字符 n-gram、结构化计划和 freshness 联合排序并生成 Recall Receipt；召回仅提供候选，不改变 Semantic Plan，漂移后同步 stale |
@@ -26,6 +26,7 @@
 | 有限 Research Run 与统一追踪 | 稳定初版 | current Anchor 可经预演和确认建立固定预算的研究账本；计划修订只追加不可变版本，Observation 仅采纳同线程 current Anchor，且旧修订证据不计入当前覆盖；结论区分 supported、challenged、mixed、inconclusive，统一 Trace 可重放且不复制业务结果行 |
 | Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；全部读取与适配入口复核多源、关系、版本和 Pack 当前性 |
+| Forecast Readiness | 稳定初版 | current 趋势或异常 Unit 可按明确 horizon 执行来源、样本、节奏、稳定性、泄漏、假设和可解释性七门禁；CLI/API/Agent/UI 同源，blocked 仍是成功诊断，响应固定不生成预测、不调用 Provider、不返回业务行 |
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
@@ -48,6 +49,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
 - 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
 - 业务理解合同、六个理解 Skill、六个第二批方法 Skill 与有限 Research Run 已进入稳定初版；方法计划仍不是已执行结论，Research Run 也只组织当前线程内的已验证锚点，不自动生成分析分支或扩大执行权限。
+- Forecast Readiness 只判断是否可进入受限评测；至少需要 24 个 current Unit 时间点，且不提供 backtest、模型训练、预测值、预测图或可靠性承诺。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。

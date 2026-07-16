@@ -42,6 +42,7 @@ COMMAND_DOMAINS: dict[str, str] = {
     "analysis-unit-build": "analysis",
     "analysis-units": "analysis",
     "analysis-unit-verify": "analysis",
+    "forecast-readiness": "analysis",
     "chart-adapt": "analysis",
     "jobs": "job",
     "job-cancel": "job",

@@ -71,8 +71,8 @@ def legacy_fingerprint(manifest: dict) -> str:
 
 
 builtins = builtin_analytical_skills()
-check("nineteen-neutral-builtins", len(builtins) == 19 and len({item["skillId"] for item in builtins}) == 19, [item["skillId"] for item in builtins])
-check("analysis-and-understanding-skills-are-declarative", sum(item["skillKind"] == "analysis" for item in builtins) == 13 and sum(item["skillKind"] == "understanding" for item in builtins) == 6, [(item["skillId"], item["skillKind"]) for item in builtins])
+check("twenty-neutral-builtins", len(builtins) == 20 and len({item["skillId"] for item in builtins}) == 20, [item["skillId"] for item in builtins])
+check("analysis-and-understanding-skills-are-declarative", sum(item["skillKind"] == "analysis" for item in builtins) == 14 and sum(item["skillKind"] == "understanding" for item in builtins) == 6, [(item["skillId"], item["skillKind"]) for item in builtins])
 check("builtins-use-registered-capabilities", all(capability.startswith("agent.") for item in builtins for capability in item["allowedCapabilities"]), builtins)
 
 overview_raw = json.loads((ROOT / "analytical-skills" / "overview.json").read_text(encoding="utf-8"))
@@ -218,7 +218,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-analytical-skill-") as temp:
         and len((funnel_gap.get("clarification") or {}).get("items") or []) == 1,
         funnel_gap,
     )
-    check("builtin-runtime-defaults", catalog_code == 0 and len(catalog.get("enabledAnalyticalSkills") or []) == 19, catalog)
+    check("builtin-runtime-defaults", catalog_code == 0 and len(catalog.get("enabledAnalyticalSkills") or []) == 20, catalog)
     check("lint-contract", lint_code == 0 and linted.get("valid") is True and len((linted.get("manifest") or {}).get("fingerprint") or "") == 64, linted)
     check("install-requires-confirmation", preview_code == 0 and preview.get("requiresConfirmation") is True and preview.get("dryRun") is True, preview)
     check("confirmed-install-disabled-by-default", install_code == 0 and installed.get("confirmed") is True and disabled_catalog_code == 0 and not any(item.get("skillId") == "external-demo" for item in disabled_catalog.get("enabledAnalyticalSkills") or []), disabled_catalog)

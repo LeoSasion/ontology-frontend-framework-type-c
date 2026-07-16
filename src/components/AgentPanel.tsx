@@ -527,6 +527,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
             onExportAnalysis={() => void exportVerifiedAnalysis()}
             analysisExportStatus={analysisExport.status}
             analysisExportMessage={analysisExport.message}
+            forecastReadiness={result.forecastReadiness}
             queryRuntimeRef={queryRuntimeRef}
             runtimeEngine={runtimeEngine}
           />

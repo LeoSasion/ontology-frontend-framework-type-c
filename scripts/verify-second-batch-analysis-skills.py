@@ -40,7 +40,7 @@ method_cases = (
 )
 method_ids = {item[0] for item in method_cases}
 catalog_methods = {item["skillId"] for item in builtins if item.get("outputSchema") == "aibi-analysis-method-plan/v1"}
-check("six-method-skills-are-versioned-builtins", catalog_methods == method_ids, sorted(catalog_methods))
+check("six-second-batch-method-skills-remain-versioned-builtins", method_ids.issubset(catalog_methods), sorted(catalog_methods))
 check(
     "method-skills-are-declarative-and-bounded",
     all(

@@ -35,12 +35,14 @@ METHOD_SIGNAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("segment-contribution-request", re.compile(r"(?:分群贡献|分组贡献|结构贡献|分段贡献|segment\s+contribution|contribution\s+by)", re.IGNORECASE)),
     ("driver-investigation-request", re.compile(r"(?:驱动(?:调查|因素|分析)|影响因素|原因调查|driver\s+investigation|root\s+cause)", re.IGNORECASE)),
     ("dashboard-decision-request", re.compile(r"(?:决策看板|决策仪表盘|监控看板设计|监控仪表盘设计|decision\s+dashboard|dashboard\s+design)", re.IGNORECASE)),
+    ("forecast-readiness-request", re.compile(r"(?:预测(?:准备度|可行性|条件|未来)|未来(?:预测|趋势)|forecast\s+readiness|ready\s+to\s+forecast|forecast\s+(?:the\s+)?future)", re.IGNORECASE)),
 )
 
 SLOT_PRIORITY = (
     "funnel-stages", "stage-order", "cohort-entry-event", "retention-event", "entity-key",
     "time-scope", "time-field", "cohort-period", "comparison-baseline", "anomaly-threshold",
     "contribution-total", "driver-candidates", "dashboard-audience", "review-cadence",
+    "forecast-horizon", "forecast-cutoff",
     "numerator", "denominator", "relationship-path", "grain",
     "field-binding", "business-rule", "term-definition", "time-scope", "comparison-baseline",
     "time-field", "measure", "dimension", "decision-goal", "source-profile",
@@ -80,6 +82,8 @@ SLOT_QUESTIONS: dict[str, tuple[str, str]] = {
     "driver-candidates": ("应优先核查哪些有证据来源的候选驱动维度？", "Which evidence-backed candidate driver dimensions should be investigated first?"),
     "dashboard-audience": ("这个决策看板主要供谁使用？", "Who is the primary audience for this decision dashboard?"),
     "review-cadence": ("这个看板按什么节奏复核和刷新？", "At what cadence should this dashboard be reviewed and refreshed?"),
+    "forecast-horizon": ("准备度评估应覆盖多少个未来周期？", "How many future periods should the readiness assessment cover?"),
+    "forecast-cutoff": ("历史数据应以哪个时间点作为评估截止点？", "Which timestamp should be the evaluation cutoff for historical data?"),
 }
 
 
@@ -447,6 +451,14 @@ def _slot_state(
             slots["dashboard-audience"] = _resolved(audience, "explicit-business-definition")
         if cadence:
             slots["review-cadence"] = _resolved(cadence, "explicit-business-definition")
+
+    if "forecast-readiness-request" in signals:
+        horizon = _explicit_labeled_value(prompt, ("预测跨度", "预测周期", "未来周期", "forecast horizon", "horizon"))
+        cutoff = _explicit_labeled_value(prompt, ("预测截止", "评估截止", "历史截止", "训练截止", "forecast cutoff", "cutoff"))
+        if horizon:
+            slots["forecast-horizon"] = _resolved(horizon, "explicit-business-definition")
+        if cutoff:
+            slots["forecast-cutoff"] = _resolved(cutoff, "explicit-business-definition")
 
     if terms:
         first = terms[0]

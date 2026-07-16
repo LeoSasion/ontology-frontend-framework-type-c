@@ -31,6 +31,7 @@ ALLOWED_BUSINESS_SIGNALS = {
     "missing-measure",
     "funnel-request", "cohort-retention-request", "anomaly-triage-request",
     "segment-contribution-request", "driver-investigation-request", "dashboard-decision-request",
+    "forecast-readiness-request",
 }
 ALLOWED_INTENT_SLOTS = {
     "decision-goal", "metric-concept", "measure", "dimension", "time-scope", "time-field",
@@ -39,7 +40,7 @@ ALLOWED_INTENT_SLOTS = {
     "output-purpose", "filter-semantics", "status-meaning", "unit", "null-policy",
     "funnel-stages", "stage-order", "cohort-entry-event", "retention-event", "cohort-period",
     "anomaly-threshold", "contribution-total", "driver-candidates", "dashboard-audience",
-    "review-cadence",
+    "review-cadence", "forecast-horizon", "forecast-cutoff",
 }
 ALLOWED_SEMANTIC_GUARDS = {
     "no-silent-proxy", "no-implicit-denominator", "current-context", "field-provenance",

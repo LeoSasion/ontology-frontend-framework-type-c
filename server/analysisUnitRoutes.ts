@@ -26,6 +26,18 @@ export async function handleAnalysisUnitApi({ cli, request, response, url }: Ana
     return true;
   }
 
+  if (url.pathname === "/api/forecast-readiness" && request.method === "GET") {
+    const unit = nonEmpty(url.searchParams.get("unit"));
+    const horizon = nonEmpty(url.searchParams.get("horizon")) || "1";
+    if (!unit) {
+      sendJson(response, 400, { ok: false, action: "forecast-readiness", error: "unit is required" });
+      return true;
+    }
+    const result = await cli(["forecast-readiness", "--unit", unit, "--horizon", horizon]);
+    sendJson(response, result.forecastReadiness ? 200 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-units/build" && request.method === "POST") {
     const body = await readBody(request);
     const receipt = nonEmpty(body.receipt ?? body.queryReceiptKey);

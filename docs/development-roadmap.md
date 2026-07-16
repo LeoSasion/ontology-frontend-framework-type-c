@@ -8,7 +8,9 @@
 
 ## 当前队列
 
-1. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
+1. P2-B：以 current Receipt/Unit 建立可确认、不可变、无 stale fallback 的物化快照。
+2. P2-C：Metric Monitor 只比较兼容快照并输出本地状态，不发送通知或自动写业务系统。
+3. P2-D：只读联邦证明只验证多 Adapter 计划可行性，首版不跨源执行结果查询。
 
 每项只有在实现、专项验证、全量回归、文档和真实运行回执同时成立后才移入 [实现状态](implementation-status.md)；设计文档、Manifest 存在或单一单元测试不单独构成交付。
 
@@ -19,7 +21,7 @@
 3. 预测类能力必须先有样本量、稳定性、泄漏、假设和可解释性门禁；否则只报告准备度。
 4. 任一新项进入队列前必须写明用户结果、运行边界、失败行为、验收门槛和退出条件。
 
-业务理解专题的详细后续项只在 [业务理解与分析 Skills](business-understanding-skills.md#后续能力队列) 维护，避免在本文件复制清单。
+业务理解与分析方法的已交付合同只在 [业务理解与分析 Skills](business-understanding-skills.md) 维护；P2 的运行边界统一见 [本地可信分析后续能力](local-trusted-analytics.md)，避免复制清单。
 
 ## 暂不开发
 

@@ -52,6 +52,7 @@
 - 比率、转化率和占比没有已验证分子/分母计划时必须澄清，不得退化为计数。
 - 已确认分析只能先形成复用候选；再次显式提升后才生成 Confirmed Plan Memory。混合召回只排序候选并生成 Recall Receipt，不得替当前计划选字段、关系或执行动作。
 - 有限 Research Run 只能从 current Exploration Anchor 建立；计划、修订、反例、敏感性和结论均受固定预算、同线程证据、不可变版本与 freshness 约束，详见 [有限 Research Run](finite-research-runs.md)。
+- 预测类请求必须先通过 current Analysis Unit 的确定性 Forecast Readiness 门禁；它只报告样本量、节奏、稳定性、泄漏策略、假设与可解释性，不生成预测值或未来结果。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
 
 工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；历史计划复用由 [确认计划记忆](confirmed-plan-memory.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
@@ -112,6 +113,7 @@
 | 业务表达与计划质量评测 | [计划质量评测](plan-quality-evaluation.md) |
 | 探索线程、分析锚点与结果板 | [探索线程与可恢复分析上下文](exploration-threads.md) |
 | 有限研究、不可变计划修订与统一 Trace | [有限 Research Run](finite-research-runs.md) |
+| 预测准备度、物化快照、Metric Monitor 与只读联邦证明 | [本地可信分析后续能力](local-trusted-analytics.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

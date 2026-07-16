@@ -26,6 +26,7 @@
 | [计划质量评测](plan-quality-evaluation.md) | Business Expression Case、确定性 Scorecard、发布门槛、重放与隔离边界 |
 | [探索线程与可恢复分析上下文](exploration-threads.md) | 分析锚点、父子血缘、结果板、新鲜度与恢复边界 |
 | [有限 Research Run](finite-research-runs.md) | 有限研究预算、不可变计划修订、反例/敏感性证据与统一追踪 |
+| [本地可信分析后续能力](local-trusted-analytics.md) | Forecast Readiness、物化快照、Metric Monitor 与只读联邦证明的边界和退出条件 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |
@@ -46,6 +47,7 @@
 | 已确认计划如何安全召回和失效 | `docs/confirmed-plan-memory.md` |
 | 业务表达与计划质量如何评测 | `docs/plan-quality-evaluation.md` |
 | 已验证结果如何形成可恢复分支与结果板 | `docs/exploration-threads.md` |
+| 本地预测准备度、快照、监控和联邦证明如何受限 | `docs/local-trusted-analytics.md` |
 | 某次验证是否通过 | `artifacts/` 中对应日期回执 |
 | CLI 当前命令与参数 | `docs/bi-cli-contract.md` 的实时生成结果 |
 

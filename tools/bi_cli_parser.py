@@ -390,6 +390,10 @@ def build_parser() -> argparse.ArgumentParser:
     analysis_unit_verify = sub.add_parser("analysis-unit-verify", description="Recalculate an Analysis Unit from its frozen snapshot and compare fingerprints.")
     analysis_unit_verify.add_argument("--unit", required=True)
 
+    forecast_readiness = sub.add_parser("forecast-readiness", description="Assess whether one current temporal Analysis Unit can enter bounded forecast evaluation without producing a forecast.")
+    forecast_readiness.add_argument("--unit", required=True)
+    forecast_readiness.add_argument("--horizon", type=int, default=1)
+
     chart_adapt = sub.add_parser("chart-adapt", description="Choose a whitelisted chart from a validated Analysis Unit shape.")
     chart_adapt.add_argument("--unit", required=True)
     chart_adapt.add_argument("--preferred-chart", default="", choices=["", "metric", "bar", "line", "pie", "table"])

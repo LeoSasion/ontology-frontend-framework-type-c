@@ -122,6 +122,7 @@ from analysis_unit_service import (
     attach_analysis_unit,
     chart_adapt_command,
 )
+from forecast_readiness_service import forecast_readiness_command
 from job_command_service import job_cancel_command, job_recover_command, jobs_command
 from source_intelligence_job_service import (
     job_process_exit_command,
@@ -2943,6 +2944,8 @@ def main() -> int:
             result = analysis_units_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "analysis-unit-verify":
             result = analysis_unit_verify_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "forecast-readiness":
+            result = forecast_readiness_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "chart-adapt":
             result = chart_adapt_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "jobs":

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import type { AgentAskResult } from "../types";
 import { confidenceText, evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
 import { formatBusinessValue } from "../businessPresentation";
@@ -7,6 +7,7 @@ import { Bilingual, biText } from "./Bilingual";
 const AgentProviderNarrative = lazy(() => import("./AgentProviderNarrative").then((module) => ({ default: module.AgentProviderNarrative })));
 const AgentSemanticPlan = lazy(() => import("./AgentSemanticPlan").then((module) => ({ default: module.AgentSemanticPlan })));
 const AgentEvidencePlan = lazy(() => import("./AgentEvidencePlan").then((module) => ({ default: module.AgentEvidencePlan })));
+const ForecastReadinessPanel = lazy(() => import("./ForecastReadinessPanel").then((module) => ({ default: module.ForecastReadinessPanel })));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
@@ -29,6 +30,7 @@ type AgentAnswerCardProps = {
   onExportAnalysis?: () => void;
   analysisExportStatus?: "idle" | "exporting" | "ready" | "error";
   analysisExportMessage?: string;
+  forecastReadiness?: AgentAskResult["forecastReadiness"];
 };
 
 function widgetTypeText(widgetType?: string) {
@@ -116,6 +118,7 @@ function businessSignalText(signal: string) {
     "segment-contribution-request": biText("分群贡献", "Segment contribution"),
     "driver-investigation-request": biText("驱动调查", "Driver investigation"),
     "dashboard-decision-request": biText("决策看板设计", "Decision dashboard design"),
+    "forecast-readiness-request": biText("预测准备度", "Forecast readiness"),
   };
   return labels[signal] ?? signal;
 }
@@ -154,6 +157,8 @@ function businessSlotText(slotKey: string, fallback?: unknown) {
     "driver-candidates": biText("候选驱动", "Driver candidates"),
     "dashboard-audience": biText("看板受众", "Dashboard audience"),
     "review-cadence": biText("复核节奏", "Review cadence"),
+    "forecast-horizon": biText("预测跨度", "Forecast horizon"),
+    "forecast-cutoff": biText("评估截止点", "Evaluation cutoff"),
   };
   return labels[slotKey] ?? understandingText(fallback, slotKey);
 }
@@ -237,7 +242,15 @@ function IntentFrameChips({ frame }: { frame: NonNullable<AgentAskResult["intent
   );
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, businessUnderstanding, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, onSelectSemanticPath, onSelectSemanticRoot, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "" }: AgentAnswerCardProps) {
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, businessUnderstanding, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, onSelectSemanticPath, onSelectSemanticRoot, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "", forecastReadiness }: AgentAnswerCardProps) {
+  const forecastReadinessFingerprint = forecastReadiness?.fingerprint ?? "";
+  const analysisUnitKey = answerCard.analysisUnitRef?.unitKey ?? "";
+  const hasInitialForecastReadiness = Boolean(forecastReadiness);
+  const [forecastOpen, setForecastOpen] = useState(hasInitialForecastReadiness);
+
+  useEffect(() => {
+    setForecastOpen(hasInitialForecastReadiness);
+  }, [analysisUnitKey, forecastReadinessFingerprint, hasInitialForecastReadiness]);
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
@@ -519,7 +532,17 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
                   : biText("导出 Excel + 报告", "Export Excel + report")}
               </button>
               {analysisExportMessage ? <small className={analysisExportStatus}>{analysisExportMessage}</small> : null}
+              {["trend", "anomaly"].includes(answerCard.analysisUnitRef.kind) ? (
+                <button className="miniButton" data-testid="forecast-readiness-open" onClick={() => setForecastOpen((current) => !current)} type="button">
+                  {forecastOpen ? biText("收起预测准备度", "Hide forecast readiness") : biText("检查预测准备度", "Check forecast readiness")}
+                </button>
+              ) : null}
             </div>
+          ) : null}
+          {forecastOpen && ["trend", "anomaly"].includes(answerCard.analysisUnitRef.kind) ? (
+            <Suspense fallback={null}>
+              <ForecastReadinessPanel initialReadiness={forecastReadiness} unitKey={answerCard.analysisUnitRef.unitKey} />
+            </Suspense>
           ) : null}
         </div>
       ) : null}

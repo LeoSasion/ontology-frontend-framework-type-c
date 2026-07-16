@@ -369,6 +369,7 @@ export interface AgentAskResult {
   evidencePlan?: AgentEvidencePlan;
   turnEvents?: AgentTurnEvent[];
   analysisUnit?: AnalysisUnit;
+  forecastReadiness?: ForecastReadiness;
   chartAdapter?: ChartAdapter;
   context?: {
     matchedTermCount: number;
@@ -409,6 +410,7 @@ export interface AgentAskResult {
     queryPlanReceipt?: QueryPlanReceipt;
     analysisUnitRef?: Pick<AnalysisUnit, "unitKey" | "kind" | "status" | "resultFingerprint">;
     chartAdapter?: ChartAdapter;
+    forecastReadinessRef?: Pick<ForecastReadiness, "status" | "fingerprint" | "canGenerateForecast">;
   };
   recommendedCommands: string[];
   requiresConfirmation: boolean;
@@ -460,6 +462,34 @@ export interface AnalysisUnit {
   chartAdapter: ChartAdapter;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ForecastReadinessGate {
+  key: "source" | "sample" | "cadence" | "stability" | "leakage" | "assumptions" | "explainability" | string;
+  status: "passed" | "blocked" | string;
+  summary: string;
+  metrics: Record<string, unknown>;
+  blockers: string[];
+}
+
+export interface ForecastReadiness {
+  schema: "aibi-forecast-readiness/v1" | string;
+  policyVersion: string;
+  workspaceId: string;
+  unitKey: string;
+  queryReceiptKey: string;
+  definitionFingerprint: string;
+  resultFingerprint: string;
+  horizon: number;
+  status: "ready-for-evaluation" | "blocked" | string;
+  gates: ForecastReadinessGate[];
+  blockers: string[];
+  canGenerateForecast: false;
+  forecastGenerated: false;
+  providerUsed: false;
+  rawBusinessRowsExposed: 0;
+  nextAction: string;
+  fingerprint: string;
 }
 
 export interface RelationshipTraversalMapping {

@@ -1,0 +1,66 @@
+.forecastReadinessPanel {
+  display: grid;
+  gap: 0.8rem;
+  grid-column: 1 / -1;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent) 18%);
+  border-radius: 0.85rem;
+  background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
+}
+
+.forecastReadinessLead,
+.forecastReadinessStatus {
+  display: flex;
+  gap: 0.75rem;
+  align-items: end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.forecastReadinessLead > div,
+.forecastReadinessLead label,
+.forecastReadinessStatus {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.forecastReadinessLead > div { flex: 1 1 22rem; }
+.forecastReadinessLead label { width: 8rem; }
+.forecastReadinessLead input { width: 100%; }
+
+.forecastReadinessStatus {
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 0.7rem;
+  background: var(--bi-surface);
+}
+
+.forecastReadinessStatus.ready { border-left: 3px solid var(--success); }
+.forecastReadinessStatus.blocked { border-left: 3px solid var(--warning); }
+
+.forecastReadinessGates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 0.55rem;
+}
+
+.forecastReadinessGates article {
+  display: grid;
+  gap: 0.18rem;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.65rem;
+}
+
+.forecastReadinessGates article.passed { border-top: 3px solid var(--success); }
+.forecastReadinessGates article.blocked { border-top: 3px solid var(--warning); }
+.forecastReadinessGates em { overflow-wrap: anywhere; font-style: normal; color: var(--warning-strong); }
+.forecastReadinessBoundary,
+.forecastReadinessMessage { margin: 0; }
+
+@media (max-width: 720px) {
+  .forecastReadinessLead { align-items: stretch; }
+  .forecastReadinessLead label { width: 100%; }
+  .forecastReadinessLead button { width: 100%; }
+}
