@@ -98,7 +98,8 @@ const checks = [
   {
     label: "settings-runtime-catalog-is-a-summary-with-progressive-boundaries",
     ok: settings.includes('data-testid="settings-runtime-catalog"')
-      && settings.includes("getRuntimeCatalog()")
+      && settings.includes("getRuntimeCatalog(controller.signal)")
+      && settings.includes("requestRef.current?.controller.abort()")
       && [
         "runtimeCatalog.tables.length",
         "runtimeCatalog.metrics.length",

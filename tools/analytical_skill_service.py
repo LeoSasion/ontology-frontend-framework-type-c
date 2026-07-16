@@ -28,6 +28,7 @@ ALLOWED_BUSINESS_SIGNALS = {
     "time-comparison", "diagnosis-request", "comparison-request", "cross-table-request",
     "unresolved-field", "relationship-ambiguity", "executable-plan", "data-quality-risk",
     "artifact-request",
+    "missing-measure",
 }
 ALLOWED_INTENT_SLOTS = {
     "decision-goal", "metric-concept", "measure", "dimension", "time-scope", "time-field",

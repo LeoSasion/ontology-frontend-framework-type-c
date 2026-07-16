@@ -113,6 +113,24 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/agent/plan-quality/cases" && request.method === "GET") {
+    const result = await cli(["business-expression-cases"]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/plan-quality/evaluate" && request.method === "POST") {
+    const result = await cli(["plan-quality-evaluate"]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/plan-quality/scorecards" && request.method === "GET") {
+    const result = await cli(["plan-quality-scorecards", "--limit", url.searchParams.get("limit") ?? "20"]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-runs" && request.method === "GET") {
     const args = ["analysis-runs", "--limit", url.searchParams.get("limit") ?? "30"];
     const run = url.searchParams.get("run");

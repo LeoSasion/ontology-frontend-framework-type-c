@@ -130,6 +130,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
             "connectors": connection.execute("SELECT COUNT(*) FROM data_connectors WHERE workspace_id = ?", (active_id,)).fetchone()[0],
             "agentSessions": connection.execute("SELECT COUNT(*) FROM agent_sessions WHERE workspace_id = ?", (active_id,)).fetchone()[0],
             "providerEvaluations": connection.execute("SELECT COUNT(*) FROM agent_provider_evaluations WHERE workspace_id = ?", (active_id,)).fetchone()[0],
+            "planQualityScorecards": connection.execute("SELECT COUNT(*) FROM plan_quality_scorecards WHERE workspace_id = ?", (active_id,)).fetchone()[0],
         }
         workspace = dict(connection.execute("SELECT * FROM workspaces WHERE id = ?", (active_id,)).fetchone())
         workspace["isActive"] = True

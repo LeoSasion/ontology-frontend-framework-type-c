@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `147`
+Command count: `150`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -10,7 +10,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 
 | Domain | Commands |
 |---|---:|
-| `agent` | 15 |
+| `agent` | 18 |
 | `analysis` | 4 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
@@ -43,8 +43,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 58 |
 | `evidence-receipt` | 8 |
-| `read-only` | 67 |
-| `runtime-receipt` | 9 |
+| `read-only` | 69 |
+| `runtime-receipt` | 10 |
 
 ## Commands
 
@@ -82,6 +82,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `apply-config` | `config` | `dry-run-confirm` | `yes` | `no` | `input`, `--yes` |
 | `ask` | `agent` | `action-draft` | `yes` | `no` | `--read-only`, `--parent-run`, `--branch-label`, `--workspace`, `prompt` |
 | `business-dashboard` | `dashboard` | `dry-run-confirm` | `yes` | `yes` | `--op`, `--dashboard`, `--name`, `--table`, `--template`, `--limit`, `--yes` |
+| `business-expression-cases` | `agent` | `read-only` | `no` | `no` | - |
 | `business-field-profiles` | `semantic` | `read-only` | `no` | `no` | `--workspace`, `--table`, `--field` |
 | `capability-contracts` | `system` | `read-only` | `no` | `no` | `--command`, `--domain` |
 | `chart-adapt` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--preferred-chart` |
@@ -142,6 +143,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `list-views` | `view` | `read-only` | `no` | `no` | `--table` |
 | `navigation-op` | `navigation` | `dry-run-confirm` | `yes` | `no` | `--module`, `--op`, `--name`, `--sort`, `--yes` |
 | `plan-connector-sync` | `connector` | `read-only` | `no` | `no` | `--connector` |
+| `plan-quality-evaluate` | `agent` | `runtime-receipt` | `no` | `no` | `--workspace` |
+| `plan-quality-scorecards` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--limit` |
 | `preferences` | `settings` | `dry-run-confirm` | `yes` | `no` | `--theme-key`, `--require-delete-name-confirmation`, `--auto-save-dashboard-on-switch`, `--agent-can-manage-generated-assets`, `--agent-can-manage-manual-assets`, `--yes` |
 | `preview-connector` | `connector` | `read-only` | `no` | `no` | `--connector`, `--limit` |
 | `preview-import` | `import` | `evidence-receipt` | `no` | `yes` | `file`, `--table`, `--unique-fields`, `--conflict-rule` |

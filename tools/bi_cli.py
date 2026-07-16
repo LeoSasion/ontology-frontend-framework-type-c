@@ -119,6 +119,7 @@ from workflow_command_service import capability_contracts_command, context_budge
 from agent_turn_service import agent_turns_command, cancel_agent_turn_command, run_agent_turn_command
 from agent_session_service import agent_context_compact_command, agent_session_create_command, agent_session_fork_command, agent_session_resume_command, agent_sessions_command
 from agent_runtime_profile_service import agent_provider_evaluation_record_command, agent_provider_evaluations_command, agent_runtime_profile_set_command, agent_runtime_profiles_command
+from plan_quality_service import business_expression_cases_command, plan_quality_evaluate_command, plan_quality_scorecards_command
 from restricted_workflow_graph_service import agent_workflow_graph_command, restricted_workflow_operators_command, restricted_workflow_validate_command
 from workspace_manifest_service import business_field_profiles_command, runtime_catalog_command, workspace_manifest_command, workspace_planning_binding
 from bi_cli_schema import (
@@ -2843,6 +2844,12 @@ def main() -> int:
             result = agent_provider_evaluations_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "agent-provider-evaluation-record":
             result = agent_provider_evaluation_record_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "business-expression-cases":
+            result = business_expression_cases_command(args)
+        elif args.command == "plan-quality-evaluate":
+            result = plan_quality_evaluate_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "plan-quality-scorecards":
+            result = plan_quality_scorecards_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "status":
             result = status_command(args)
         elif args.command == "workspace-manifest":

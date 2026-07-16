@@ -144,6 +144,15 @@ def build_parser() -> argparse.ArgumentParser:
     agent_provider_evaluations.add_argument("--workspace", default="")
     agent_provider_evaluations.add_argument("--limit", type=int, default=30)
 
+    business_expression_cases = sub.add_parser("business-expression-cases", description="List the immutable deterministic Business Expression Case catalog.")
+
+    plan_quality_evaluate = sub.add_parser("plan-quality-evaluate", description="Run the local deterministic planning benchmark and persist one redacted Scorecard.")
+    plan_quality_evaluate.add_argument("--workspace", default="")
+
+    plan_quality_scorecards = sub.add_parser("plan-quality-scorecards", description="List bounded workspace Plan Quality Scorecards with live freshness.")
+    plan_quality_scorecards.add_argument("--workspace", default="")
+    plan_quality_scorecards.add_argument("--limit", type=int, default=20)
+
     agent_provider_evaluation_record = sub.add_parser("agent-provider-evaluation-record", description="Record one redacted terminal Provider evaluation receipt.")
     agent_provider_evaluation_record.add_argument("--workspace", default="")
     agent_provider_evaluation_record.add_argument("--profile", required=True, choices=["deterministic", "deepseek", "local-openai"])

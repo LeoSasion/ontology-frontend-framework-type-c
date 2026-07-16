@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 9 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 10 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -111,6 +111,12 @@ try {
     "v9-plan-memory-tables-and-indexes-are-created",
     inspectedPayload.planMemoryTables?.join(":") === "confirmed_plan_memories:recall_receipts"
       && inspectedPayload.planMemoryIndexes?.join(":") === "idx_confirmed_plan_workspace_query:idx_confirmed_plan_workspace_status:idx_recall_receipts_workspace_created",
+    inspectedPayload,
+  );
+  add(
+    "v10-plan-quality-table-and-index-are-created",
+    inspectedPayload.planQualityTables?.join(":") === "plan_quality_scorecards"
+      && inspectedPayload.planQualityIndexes?.join(":") === "idx_plan_quality_scorecards_workspace_created",
     inspectedPayload,
   );
 

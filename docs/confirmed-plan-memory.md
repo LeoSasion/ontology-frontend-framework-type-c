@@ -54,4 +54,4 @@ CLI 参数与副作用以 [CLI 合同](bi-cli-contract.md) 为准；产品验收
 - 不同计划得分接近时保留多个候选并标记歧义，不静默决胜。
 - 任一来源、Pack、关系或语义漂移都使 Query 与 Plan Memory 同步 stale。
 - 工作区删除同步删除 Query、Plan Memory 与 Recall Receipt；跨工作区候选数必须为零。
-- migration 必须以 SQLite schema v9 进入，支持隔离预演、恢复点、应用失败和最终校验失败回滚。
+- Confirmed Plan Memory 在 SQLite schema v9 引入；当前 schema v10 继续通过隔离预演、恢复点、应用失败和最终校验失败回滚保证兼容升级。

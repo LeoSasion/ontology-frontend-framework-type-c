@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 9
+CURRENT_SQLITE_SCHEMA_VERSION = 10
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -1000,6 +1000,20 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_agent_provider_evaluations_workspace_created
           ON agent_provider_evaluations(workspace_id, created_at);
+        CREATE TABLE IF NOT EXISTS plan_quality_scorecards (
+          scorecard_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          status TEXT NOT NULL,
+          case_set_id TEXT NOT NULL,
+          case_set_fingerprint TEXT NOT NULL,
+          policy_fingerprint TEXT NOT NULL,
+          runtime_fingerprint TEXT NOT NULL,
+          scorecard_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, scorecard_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_plan_quality_scorecards_workspace_created
+          ON plan_quality_scorecards(workspace_id, created_at);
         """
     )
     connection.execute(

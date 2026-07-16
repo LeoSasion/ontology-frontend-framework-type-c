@@ -135,13 +135,14 @@ flowchart LR
 
 发布门槛：核心槽位正确率不低于 95%，已绑定字段 precision 不低于 98%，一次澄清后安全继续比例不低于 90%，完成回合证据覆盖和计划重放一致性为 100%，静默消歧、越权和跨工作区泄漏为 0。
 
+固定 Business Expression Case、确定性评分算法、freshness 和设置页回执已按 [计划质量评测](plan-quality-evaluation.md) 交付；它们属于本地发布门禁，不再列入未来队列。
+
 ## 后续能力队列
 
 本节只维护业务理解专题的后续顺序；跨产品优先级入口见 [未来开发队列](development-roadmap.md)。
 
-1. 建立业务表达基准集与 Plan Quality Scorecard，覆盖同义词、同名指标、比率、去重实体、状态、时间、跨表和 Pack 冲突，并按 Domain Pack 隔离。
-2. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`segment-contribution`、`driver-investigation`、`dashboard-decision-design`。
-3. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
+1. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`segment-contribution`、`driver-investigation`、`dashboard-decision-design`。
+2. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
 
 ## 公开研究快照
 

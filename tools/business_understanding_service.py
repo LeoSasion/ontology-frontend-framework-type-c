@@ -19,6 +19,10 @@ DISTINCT_PATTERN = re.compile(
     r"(?:去重|不重复|独立(?:用户|客户|订单|商品|实体)|unique\s+(?:count|users?|customers?|orders?)|distinct\s+(?:count|users?|customers?|orders?))",
     re.IGNORECASE,
 )
+MISSING_MEASURE_CUE_PATTERN = re.compile(
+    r"(?:指标|度量|kpi|metric|measure)",
+    re.IGNORECASE,
+)
 CROSS_TABLE_PATTERN = re.compile(
     r"(?:跨表|关联后|连接后|两张表|多张表|join\s+grain|after\s+join(?:ing)?)",
     re.IGNORECASE,
@@ -236,6 +240,16 @@ def _signals(
         result.append("ratio-request")
     if distinct_request:
         result.append("distinct-count-request")
+    if (
+        not has_measure
+        and selected
+        and not unresolved
+        and not neutral_overview
+        and not ratio_request
+        and not distinct_request
+        and MISSING_MEASURE_CUE_PATTERN.search(prompt)
+    ):
+        result.append("missing-measure")
     if _list(context_matches.get("terms")):
         result.append("business-term-match")
     if any(item in {"year-over-year", "period-over-period"} for item in comparisons):

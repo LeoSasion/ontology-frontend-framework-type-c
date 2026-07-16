@@ -77,10 +77,11 @@
 - Provider 上下文使用固定出站白名单且不包含原始行；输出未通过 JSON、数字和 evidence grounding 时必须静默降级为确定性本地答案并留下脱敏评估回执。
 - Agent 计划只使用固定声明式 Operator；只有 Orchestrator 能提交已登记 Capability，Planner、Semantic Reviewer、Evidence Reviewer 和 Narrator 不得调用工具或形成独立执行链。
 - Analytical Skill 必须版本化并通过运行时合同、触发槽位、语义 Guard 和 Capability Registry 校验；Skill 只能收缩权限，不能添加 SQL、代码、URL、MCP 或 Registry 外工具。
+- 业务理解发布必须通过固定 Business Expression Case 与确定性 Plan Quality Scorecard；评测不读取用户业务行、不调用 Provider，旧 Case Set 或规划合同的 Scorecard 不得冒充当前结果。
 - 互不依赖的只读节点可以并行，但公开事件顺序必须确定；写入和运行回执节点保持串行。Join 必须核对工作区、计划版本、数据/Pack 指纹和证据完整性，任一专家异常时降级为单 Orchestrator 固定复核。
 - 只读回答不创建动作草案；写入意图只生成待确认草案。
 
-业务理解合同、首批 Skills 与专题验收见 [业务理解与分析 Skills](business-understanding-skills.md)；完整扩展、Provider、ERP 单元和迁移合同见 [通用扩展框架](extensible-domain-framework.md)。
+业务理解合同、首批 Skills 与专题验收见 [业务理解与分析 Skills](business-understanding-skills.md)，质量门见 [计划质量评测](plan-quality-evaluation.md)；完整扩展、Provider、ERP 单元和迁移合同见 [通用扩展框架](extensible-domain-framework.md)。
 
 ### Job、安全与本地运行
 
@@ -103,6 +104,7 @@
 | 工作区上下文与字段画像合同 | [工作区上下文目录](workspace-context-catalog.md) |
 | 知识源、语义提案与人工审核合同 | [语义补丁与审核收件箱](semantic-review-inbox.md) |
 | 计划记忆与召回合同 | [确认计划记忆](confirmed-plan-memory.md) |
+| 业务表达与计划质量评测 | [计划质量评测](plan-quality-evaluation.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

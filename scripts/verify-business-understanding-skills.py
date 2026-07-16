@@ -145,6 +145,23 @@ check(
     vague_overview,
 )
 
+region = field("sites", "region", "dimension")
+unknown_measure = build_business_understanding_frame(
+    "请按 region 计算风险成本指标",
+    intent(dimensions=[region]),
+    semantic([region]),
+    {"terms": [], "rules": []},
+    runtime,
+)
+check(
+    "explicit-unknown-measure-never-falls-back-to-count",
+    unknown_measure["status"] == "needs-clarification"
+    and "missing-measure" in unknown_measure["signals"]
+    and "measure" in unknown_measure["missingSlots"]
+    and unknown_measure["activeClarification"]["slot"] == "measure",
+    unknown_measure,
+)
+
 ratio_intent = intent()
 ratio_plan = semantic(status="needs-clarification")
 ratio = build_business_understanding_frame(

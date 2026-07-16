@@ -220,14 +220,16 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           implementationStatusSource.includes("| Connector Adapter | 稳定受控 |") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
-          developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&
+          !developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&
           !developmentRoadmapDocSource.includes("P0-C：证据绑定的混合语义召回") &&
-          developmentRoadmapDocSource.includes("P1：Exploration Thread") &&
+          developmentRoadmapDocSource.includes("P1-A：Exploration Thread") &&
+          developmentRoadmapDocSource.includes("P1-B：第二批通用分析 Skills") &&
           developmentRoadmapDocSource.includes("P1-C：有限 Research Run") &&
           developmentRoadmapDocSource.includes("P2：只在本地可信边界内增加 forecast readiness") &&
           !developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
           !developmentRoadmapDocSource.includes("| P1 | 业务理解与首批 Skills |") &&
           implementationStatusSource.includes("| 业务理解与首批 Skills | 稳定初版 |") &&
+          implementationStatusSource.includes("| 计划质量评测 | 稳定初版 |") &&
           developmentRoadmapDocSource.includes("## 暂不开发") &&
           !developmentRoadmapDocSource.includes("npm run preflight"),
       },

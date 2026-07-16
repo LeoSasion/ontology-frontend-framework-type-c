@@ -60,6 +60,9 @@ COMMAND_DOMAINS: dict[str, str] = {
     "agent-runtime-profile-set": "agent",
     "agent-provider-evaluations": "agent",
     "agent-provider-evaluation-record": "agent",
+    "business-expression-cases": "agent",
+    "plan-quality-evaluate": "agent",
+    "plan-quality-scorecards": "agent",
     "workspace-create": "workspace",
     "workspace-select": "workspace",
     "workspace-rename": "workspace",
@@ -185,6 +188,7 @@ IMMEDIATE_RUNTIME_WRITES = {
     "agent-context-compact",
     "agent-runtime-profile-set",
     "agent-provider-evaluation-record",
+    "plan-quality-evaluate",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
 

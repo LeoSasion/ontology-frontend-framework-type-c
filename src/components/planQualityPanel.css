@@ -1,0 +1,127 @@
+.planQualitySection {
+  margin-top: 16px;
+  padding: 16px 0;
+  border-block: 1px solid var(--line);
+}
+
+.planQualityHeading,
+.planQualityActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.planQualityHeading > div:first-child { min-width: 0; }
+
+.planQualityHeading p {
+  max-width: 70ch;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  text-wrap: pretty;
+}
+
+.settingsStatusPill {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.settingsStatusPill.success {
+  border-color: color-mix(in srgb, var(--green) 45%, var(--line));
+  color: var(--green);
+}
+
+.planQualityMetrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 14px 0 0;
+  border-block: 1px solid var(--line);
+}
+
+.planQualityMetrics > div {
+  min-width: 0;
+  padding: 10px 12px;
+  border-inline-end: 1px solid var(--line);
+}
+
+.planQualityMetrics > div:last-child { border-inline-end: 0; }
+.planQualityMetrics dt { color: var(--muted); font-size: 10px; }
+
+.planQualityMetrics dd {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.planQualityBoundary {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.planQualityDetails { margin-top: 10px; }
+
+.planQualityDetails summary {
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planQualityCaseList {
+  display: grid;
+  margin-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.planQualityCaseList > div {
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) minmax(190px, 1fr) minmax(130px, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.planQualityCaseList span,
+.planQualityCaseList small,
+.planQualityEmpty span {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.planQualityEmpty {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px;
+}
+
+@container settings-panel (max-width: 680px) {
+  .planQualityHeading,
+  .planQualityActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .planQualityActions .secondaryButton { width: 100%; }
+  .planQualityMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .planQualityMetrics > div { border-bottom: 1px solid var(--line); }
+  .planQualityMetrics > div:nth-child(2n) { border-inline-end: 0; }
+  .planQualityMetrics > div:last-child { border-bottom: 0; }
+  .planQualityCaseList > div { grid-template-columns: minmax(0, 1fr); gap: 3px; }
+}

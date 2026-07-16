@@ -14,6 +14,8 @@ Bundle 同时引用 `aibi-workspace-planning-binding/v1` 的 schema、fingerprin
 
 `aibi-agent-clarification/v1` 为未决项标记 metric definition、population、grain、time、baseline、status、relationship path 等类型和 materiality，一次只询问一个最能缩小计划空间的高价值问题；每个候选都必须声明表级来源和选择影响。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。回答若改变语义，旧 Intent、Evidence Plan 和未执行 Receipt 必须失效并重新规划。
 
+显式要求“指标/metric/measure”但当前只绑定到维度或属性时，运行时标记 `missing-measure` 并澄清指标定义，不能退化为行数。完整的固定表达 Case、发布阈值和 stale 规则见 [计划质量评测](plan-quality-evaluation.md)。
+
 ## Evidence Plan 与 Agent Turn
 
 `aibi-agent-evidence-plan/v1` 将意图、上下文、语义规划、白名单查询、草案、完成复核和答案组织为类型化 Step。Step 必须引用固定 Agent Capability，声明依赖、输入/输出指纹、mutation mode、所需证据、阻塞项和完成检查；不存在任意 Operator 或模型工具调用。
@@ -107,6 +109,7 @@ npm run verify:agent-intent
 npm run verify:agent-turns
 npm run verify:agent-sessions
 npm run verify:analytical-skills
+npm run verify:plan-quality
 npm run verify:runtime-profiles
 npm run verify:restricted-workflow
 npm run verify:composite-relationships

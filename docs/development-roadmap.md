@@ -8,8 +8,8 @@
 
 ## 当前队列
 
-1. P0-D：确定性 Plan Quality Scorecard、Business Expression Case 和端到端评测集。
-2. P1：Exploration Thread、锚点/分支、语义图表、结果看板和第二批分析 Skills。
+1. P1-A：Exploration Thread、分析锚点/分支、可恢复上下文、语义图表和结果看板。
+2. P1-B：第二批通用分析 Skills，并让每种方法复用既有语义、关系、证据和权限门禁。
 3. P1-C：有限 Research Run、不可变计划修订、反例/敏感性检查和统一追踪。
 4. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
 
