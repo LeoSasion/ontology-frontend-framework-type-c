@@ -16,7 +16,7 @@
 1. 创建或选择本地工作区。
 2. 从统一入口检查文件、文件夹或已登记 Connector，预览目标、合并、键和风险后再确认导入。
 3. 生成字段、质量、关系和缺口证据。
-4. 描述问题或图表；系统直接回答、形成一个草案，或集中澄清一次。
+4. 描述问题或图表；系统检索当前工作区业务上下文后直接回答、形成一个草案，或一次只澄清一个会改变结果的关键歧义。
 5. 只读结果直接展示；写入只在唯一确认面批准或拒绝。
 6. 完成后打开真实对象；后续分析从已确认结果创建有血缘分支。
 
@@ -43,7 +43,7 @@
 ### 语义、关系与查询
 
 - 字段语义记录结构角色、用途、置信度和手工覆盖，自动能力排除内部 `__*` 字段。
-- 同名或近义字段跨表竞争时，显式表名优先；证据不足时集中澄清一次。
+- 同名或近义字段跨表竞争时，显式表名优先；证据不足时一次只询问一个最高价值的类型化问题。
 - 多维问题完整记录指标、维度、筛选、参与表和统计粒度。
 - 关系推荐结合值重叠、基数、复合键、版本和行膨胀；推荐不等于执行许可。
 - 跨表执行仅使用当前工作区已保存且验证有效的关系；路径或版本失效时阻断。
@@ -65,6 +65,7 @@
 ### 通用扩展与 Agent
 
 - 新工作区不启用任何 Domain Pack；Core 只推断结构事实，不静默注入行业语义。
+- Agent 必须区分 Structural、Semantic、Business、Operational 与 Behavioral 五层上下文，并生成带来源、版本、新鲜度和未决项的 Business Understanding Frame；个人表达偏好不能改变共享业务事实。
 - Domain Pack、Knowledge Pack、Connector Adapter、Provider 和看板单元职责独立，并读取同一工作区运行上下文。
 - Pack 启停和版本变化不重解释历史结果；依赖对象进入复核状态。
 - 多 Pack 冲突不能按加载顺序决胜；显式选择和手工语义优先，仍有歧义时澄清。
@@ -72,10 +73,11 @@
 - Runtime Profile 选择按工作区预演并确认；切换 Provider 不得改变 Intent、字段、Capability、Receipt、草案或确认边界。
 - Provider 上下文使用固定出站白名单且不包含原始行；输出未通过 JSON、数字和 evidence grounding 时必须静默降级为确定性本地答案并留下脱敏评估回执。
 - Agent 计划只使用固定声明式 Operator；只有 Orchestrator 能提交已登记 Capability，Planner、Semantic Reviewer、Evidence Reviewer 和 Narrator 不得调用工具或形成独立执行链。
+- Analytical Skill 必须版本化并通过运行时合同、触发槽位、语义 Guard 和 Capability Registry 校验；Skill 只能收缩权限，不能添加 SQL、代码、URL、MCP 或 Registry 外工具。
 - 互不依赖的只读节点可以并行，但公开事件顺序必须确定；写入和运行回执节点保持串行。Join 必须核对工作区、计划版本、数据/Pack 指纹和证据完整性，任一专家异常时降级为单 Orchestrator 固定复核。
 - 只读回答不创建动作草案；写入意图只生成待确认草案。
 
-完整扩展、Provider、ERP 单元和迁移合同见 [通用扩展框架](extensible-domain-framework.md)。
+业务理解合同、首批 Skills 与专题验收见 [业务理解与分析 Skills](business-understanding-skills.md)；完整扩展、Provider、ERP 单元和迁移合同见 [通用扩展框架](extensible-domain-framework.md)。
 
 ### Job、安全与本地运行
 
@@ -94,6 +96,7 @@
 | 可观察验收行为 | [产品验收矩阵](product-acceptance-matrix.md) |
 | 当前实现与限制 | [实现状态](implementation-status.md) |
 | 未交付事项 | [未来开发队列](development-roadmap.md) |
+| 业务理解合同与 Skills | [业务理解与分析 Skills](business-understanding-skills.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

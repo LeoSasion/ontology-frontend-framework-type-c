@@ -9,7 +9,7 @@ TASK_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("reconciliation", ("对账", "核对", "一致", "reconcile", "reconciliation")),
     ("diagnosis", ("为什么", "原因", "诊断", "驱动", "why", "diagnose", "driver")),
     ("anomaly", ("异常", "离群", "突增", "突降", "anomaly", "outlier", "spike", "drop")),
-    ("ranking", ("排名", "排行", "前", "最高", "最低", "top ", "bottom ", "rank")),
+    ("ranking", ("排名", "排行", "最高", "最低", "top ", "bottom ", "rank")),
     ("composition", ("构成", "占比", "份额", "结构", "composition", "share", "mix")),
     ("trend", ("趋势", "走势", "同比", "环比", "按月", "按周", "按日", "trend", "over time", "mom", "yoy")),
     ("comparison", ("比较", "对比", "差异", "相比", "versus", " vs ", "compare", "difference")),
@@ -33,8 +33,15 @@ def _selected_fields(semantic_plan: dict[str, Any], roles: set[str]) -> list[dic
 
 
 def _task_type(prompt: str) -> tuple[str, float, str]:
-    normalized = f" {_compact(prompt).casefold()} "
+    compact = _compact(prompt).casefold()
+    normalized = f" {compact} "
     for task_type, patterns in TASK_PATTERNS:
+        if task_type == "ranking" and re.search(
+            r"前\s*(?:\d+|[一二三四五六七八九十百]+|几|n)\s*(?:名|个|条|位|组)?",
+            compact,
+            re.IGNORECASE,
+        ):
+            return task_type, 0.96, "lexical:ranked-prefix"
         matched = next((pattern for pattern in patterns if pattern.casefold() in normalized), None)
         if matched:
             return task_type, 0.96, f"lexical:{matched.strip()}"

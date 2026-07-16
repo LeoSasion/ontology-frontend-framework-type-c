@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "change-driver-diagnosis",
+  "version": "1.0.0",
+  "displayName": {"zh": "变化归因定界", "en": "Change driver diagnosis"},
+  "description": {"zh": "先锁定变化指标、对比基线和拆解维度，再区分事实驱动与待验证假设。", "en": "Resolve the changed measure, comparison baseline, and diagnostic dimension before separating observed drivers from hypotheses."},
+  "skillKind": "understanding",
+  "taskTypes": ["diagnosis", "comparison", "trend", "anomaly"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.completion.verify"],
+  "stepTemplate": ["resolve-changed-measure", "resolve-comparison-baseline", "resolve-driver-dimension", "separate-facts-and-hypotheses"],
+  "requiredEvidence": ["comparison-baseline", "driver-breakdown", "query-plan-receipt"],
+  "blockingRules": ["missing-baseline", "missing-driver-dimension", "unsupported-causal-claim"],
+  "triggerSignals": ["diagnosis-request", "time-comparison"],
+  "slotRules": [
+    {"whenAny": ["diagnosis-request"], "requireAll": ["measure", "comparison-baseline", "dimension"]},
+    {"whenAny": ["time-comparison"], "requireAll": ["measure", "time-scope", "time-field", "comparison-baseline"]}
+  ],
+  "semanticGuards": ["time-window-complete", "facts-before-hypotheses", "receipt-before-claim", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-query-plan-receipt/v1"],
+  "outputSchema": "aibi-business-understanding-frame/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 12, "maxRows": 500}
+}

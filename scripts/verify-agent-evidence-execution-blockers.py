@@ -27,10 +27,32 @@ def check(label: str, ok: bool, detail: object = None) -> None:
 
 
 def base_answer() -> dict[str, object]:
+    field_provenance = {
+        "type": "fieldProvenance",
+        "tableKey": "orders",
+        "field": "amount",
+        "role": "measure",
+        "source": "fixture-semantic",
+    }
     return {
         "workspaceId": "default",
-        "intentFrame": {"schema": "aibi-agent-intent-frame/v1", "unresolved": []},
-        "semanticPlan": {"status": "ready"},
+        "intentFrame": {
+            "schema": "aibi-agent-intent-frame/v1",
+            "decisionGoal": "按关系路径汇总 amount",
+            "unresolved": [],
+            "evidenceRefs": [field_provenance],
+        },
+        "semanticPlan": {
+            "status": "ready",
+            "fieldResolution": {
+                "selected": [{
+                    "tableKey": "orders",
+                    "field": "amount",
+                    "role": "measure",
+                    "source": "fixture-semantic",
+                }],
+            },
+        },
         "semanticContext": {
             "schema": "aibi-semantic-context-bundle/v1",
             "stale": False,
@@ -85,6 +107,7 @@ blocked_execution = {
 }
 blocked_answer["executionPlan"] = blocked_execution
 blocked_answer["queryPlanReceipt"] = {
+    "schema": "aibi-query-plan-receipt/v1",
     "receiptKey": "receipt-blocked",
     "status": "blocked",
     "source": {"dataFingerprint": "d" * 64},
@@ -138,6 +161,7 @@ ready_answer = base_answer()
 ready_execution = {"status": "ready", "rootTable": "orders", "relationships": relationships, "blockers": []}
 ready_answer["executionPlan"] = ready_execution
 ready_answer["queryPlanReceipt"] = {
+    "schema": "aibi-query-plan-receipt/v1",
     "receiptKey": "receipt-ready",
     "status": "executed",
     "source": {"dataFingerprint": "e" * 64},
@@ -194,6 +218,7 @@ for variant_name, variant_proofs, expected_blocker in strict_proof_variants:
     variant_answer = base_answer()
     variant_answer["executionPlan"] = ready_execution
     variant_answer["queryPlanReceipt"] = {
+        "schema": "aibi-query-plan-receipt/v1",
         "receiptKey": f"receipt-{variant_name}",
         "status": "executed",
         "source": {"dataFingerprint": "9" * 64, "tableKeys": ["orders", "items", "products"]},
@@ -230,6 +255,7 @@ for variant_name, variant_proofs, expected_blocker in strict_proof_variants:
 missing_proof_answer = base_answer()
 missing_proof_answer["executionPlan"] = ready_execution
 missing_proof_answer["queryPlanReceipt"] = {
+    "schema": "aibi-query-plan-receipt/v1",
     "receiptKey": "receipt-missing-proof",
     "status": "executed",
     "source": {"dataFingerprint": "f" * 64, "tableKeys": ["orders", "items", "products"]},

@@ -19,7 +19,7 @@ def requires_verified_analysis_plan(prompt: str) -> bool:
         "after joining",
     ]
     ratio_risk = bool(
-        re.search(r"[\u4e00-\u9fff](率|占比|比例|比率|百分比)", prompt)
+        re.search(r"(?:[\u4e00-\u9fff]率|占比|比例|比率|百分比|百分之|[%％])", prompt)
         or re.search(r"\b(rate|ratio|percentage|percent)\b", folded)
     )
     return ratio_risk or any(term.casefold() in folded for term in structural_risk_terms)

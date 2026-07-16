@@ -17,10 +17,11 @@
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
 | Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；Analysis Unit 在计划持久化前补全；blocker 保持可读字符串；工作区 Session 可重启恢复和 Fork，失效持久 key 只恢复重试一次，浏览器禁用存储时安全退化；Analysis Run 比较分支与 Turn 父链独立；工作流图随 Turn 持久化并可回读 |
+| 业务理解与首批 Skills | 稳定初版 | 五层上下文、`aibi-business-understanding-frame/v1`、类型化单问题澄清和六个业务理解 Skill 已接入 CLI/API/UI；执行前由语义、证据、权限、新鲜度和工作区隔离门禁共同约束 |
 | Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；全部读取与适配入口复核多源、关系、版本和 Pack 当前性 |
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
-| 通用扩展 | 稳定受控 | Domain Pack 管业务语义，Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具 |
+| 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
 | 本地运维 | 稳定 | SQLite schema v7、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile 选择与 Provider 评估已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
@@ -40,6 +41,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 数据库 Adapter 当前只支持 allowlist 本地 SQLite 文件和显式非系统表；不接受 SQL、远程数据库或驱动插件。
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
 - 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
+- 业务理解合同和六个首批 Skill 已进入稳定初版；后续扩展仍必须同时具备实现、专项验证、运行回执和产品验收，不能用设计文档替代运行证据。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。

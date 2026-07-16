@@ -22,10 +22,35 @@ STEP_PATTERN = re.compile(r"^[a-z][a-z0-9-]{1,63}$")
 ALLOWED_TASK_TYPES = {"overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"}
 ALLOWED_ROLES = {"measure", "dimension", "time", "identity", "attribute"}
 ALLOWED_CONFIRMATION_MODES = {"read-only", "draft-confirmation"}
+ALLOWED_SKILL_KINDS = {"analysis", "understanding"}
+ALLOWED_BUSINESS_SIGNALS = {
+    "underspecified-question", "ratio-request", "distinct-count-request", "business-term-match",
+    "time-comparison", "diagnosis-request", "comparison-request", "cross-table-request",
+    "unresolved-field", "relationship-ambiguity", "executable-plan", "data-quality-risk",
+    "artifact-request",
+}
+ALLOWED_INTENT_SLOTS = {
+    "decision-goal", "metric-concept", "measure", "dimension", "time-scope", "time-field",
+    "comparison-baseline", "numerator", "denominator", "entity-key", "population", "grain",
+    "field-binding", "term-definition", "business-rule", "relationship-path", "source-profile",
+    "output-purpose", "filter-semantics", "status-meaning", "unit", "null-policy",
+}
+ALLOWED_SEMANTIC_GUARDS = {
+    "no-silent-proxy", "no-implicit-denominator", "current-context", "field-provenance",
+    "verified-relationship-path", "relationship-proof-when-needed", "grain-explicit",
+    "time-window-complete", "receipt-before-claim", "result-invariants", "facts-before-hypotheses",
+    "no-permission-escalation",
+}
+CURRENT_SKILL_CONTRACTS = {
+    "aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1",
+    "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1",
+    "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1",
+}
 ALLOWED_KEYS = {
     "schema", "skillId", "version", "displayName", "description", "taskTypes", "requiredRoles",
     "requiredDomainPacks", "allowedCapabilities", "stepTemplate", "requiredEvidence", "blockingRules",
-    "outputSchema", "confirmationMode", "resourceLimits",
+    "outputSchema", "confirmationMode", "resourceLimits", "skillKind", "triggerSignals", "slotRules",
+    "semanticGuards", "compatibleContracts",
 }
 FORBIDDEN_KEYS = {"code", "command", "commands", "script", "sql", "url", "uri", "endpoint", "executable", "interpreter", "tool", "tools"}
 FORBIDDEN_TEXT = re.compile(
@@ -78,6 +103,23 @@ def _reject_executable_content(value: Any, path: str = "manifest") -> None:
         raise ValueError(f"Analytical Skill contains forbidden executable or external content: {path}")
 
 
+def _slot_rules(value: Any) -> list[dict[str, list[str]]]:
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 16:
+        raise ValueError("Analytical Skill slotRules must be a bounded list.")
+    result: list[dict[str, list[str]]] = []
+    for index, rule in enumerate(value):
+        if not isinstance(rule, dict) or set(rule) != {"whenAny", "requireAll"}:
+            raise ValueError(f"Analytical Skill slotRules[{index}] must contain only whenAny and requireAll.")
+        when_any = _bounded_strings(rule.get("whenAny"), f"slotRules[{index}].whenAny", allowed=ALLOWED_BUSINESS_SIGNALS, maximum=12)
+        require_all = _bounded_strings(rule.get("requireAll"), f"slotRules[{index}].requireAll", allowed=ALLOWED_INTENT_SLOTS, maximum=16)
+        if not when_any or not require_all:
+            raise ValueError(f"Analytical Skill slotRules[{index}] must declare at least one signal and slot.")
+        result.append({"whenAny": when_any, "requireAll": require_all})
+    return result
+
+
 def validate_analytical_skill_manifest(raw: Any, *, source_type: str = "external") -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ValueError("Analytical Skill manifest must be an object.")
@@ -95,7 +137,12 @@ def validate_analytical_skill_manifest(raw: Any, *, source_type: str = "external
         raise ValueError("Analytical Skill skillId must be a lowercase kebab-case identifier.")
     if not VERSION_PATTERN.fullmatch(version):
         raise ValueError("Analytical Skill version must use x.y.z.")
+    skill_kind = str(raw.get("skillKind") or "analysis").strip()
+    if skill_kind not in ALLOWED_SKILL_KINDS:
+        raise ValueError("Analytical Skill skillKind is unsupported.")
     tasks = _bounded_strings(raw.get("taskTypes"), "taskTypes", allowed=ALLOWED_TASK_TYPES, maximum=8)
+    if not tasks:
+        raise ValueError("Analytical Skill must declare at least one task type.")
     roles = _bounded_strings(raw.get("requiredRoles"), "requiredRoles", allowed=ALLOWED_ROLES, maximum=5)
     packs = _bounded_strings(raw.get("requiredDomainPacks"), "requiredDomainPacks", maximum=16)
     if any(not SKILL_ID_PATTERN.fullmatch(item) for item in packs):
@@ -108,6 +155,27 @@ def validate_analytical_skill_manifest(raw: Any, *, source_type: str = "external
         raise ValueError("Analytical Skill stepTemplate must contain declarative kebab-case step ids.")
     required_evidence = _bounded_strings(raw.get("requiredEvidence"), "requiredEvidence", maximum=24)
     blockers = _bounded_strings(raw.get("blockingRules"), "blockingRules", maximum=24)
+    trigger_signals = _bounded_strings(
+        raw.get("triggerSignals") or [],
+        "triggerSignals",
+        allowed=ALLOWED_BUSINESS_SIGNALS,
+        maximum=16,
+    )
+    slot_rules = _slot_rules(raw.get("slotRules"))
+    semantic_guards = _bounded_strings(
+        raw.get("semanticGuards") or [],
+        "semanticGuards",
+        allowed=ALLOWED_SEMANTIC_GUARDS,
+        maximum=16,
+    )
+    compatible_contracts = _bounded_strings(
+        raw.get("compatibleContracts") or sorted(CURRENT_SKILL_CONTRACTS),
+        "compatibleContracts",
+        allowed=CURRENT_SKILL_CONTRACTS,
+        maximum=len(CURRENT_SKILL_CONTRACTS),
+    )
+    if skill_kind == "understanding" and not trigger_signals:
+        raise ValueError("An understanding skill must declare at least one trigger signal.")
     output_schema = str(raw.get("outputSchema") or "").strip()
     if not output_schema.startswith("aibi-") or not output_schema.endswith("/v1"):
         raise ValueError("Analytical Skill outputSchema must reference a versioned AIBI-C schema.")
@@ -126,6 +194,7 @@ def validate_analytical_skill_manifest(raw: Any, *, source_type: str = "external
         "version": version,
         "displayName": _localized(raw.get("displayName"), "displayName"),
         "description": _localized(raw.get("description"), "description"),
+        "skillKind": skill_kind,
         "taskTypes": tasks,
         "requiredRoles": roles,
         "requiredDomainPacks": packs,
@@ -133,12 +202,37 @@ def validate_analytical_skill_manifest(raw: Any, *, source_type: str = "external
         "stepTemplate": steps,
         "requiredEvidence": required_evidence,
         "blockingRules": blockers,
+        "triggerSignals": trigger_signals,
+        "slotRules": slot_rules,
+        "semanticGuards": semantic_guards,
+        "compatibleContracts": compatible_contracts,
         "outputSchema": output_schema,
         "confirmationMode": confirmation_mode,
         "resourceLimits": {"maxSteps": max_steps, "maxRows": max_rows},
         "sourceType": source_type,
     }
-    manifest["fingerprint"] = _fingerprint(manifest)
+    # Preserve the material identity of legacy v1 manifests. Installation stores
+    # the normalized manifest, so merely seeing the optional keys is insufficient:
+    # their default values must round-trip without changing an existing
+    # skillId@version fingerprint. Only non-default extension semantics opt into
+    # the extended identity material.
+    uses_skill_extensions = (
+        skill_kind != "analysis"
+        or bool(trigger_signals)
+        or bool(slot_rules)
+        or bool(semantic_guards)
+        or compatible_contracts != sorted(CURRENT_SKILL_CONTRACTS)
+    )
+    fingerprint_material = manifest if uses_skill_extensions else {
+        key: manifest[key]
+        for key in (
+            "schema", "skillId", "version", "displayName", "description", "taskTypes",
+            "requiredRoles", "requiredDomainPacks", "allowedCapabilities", "stepTemplate",
+            "requiredEvidence", "blockingRules", "outputSchema", "confirmationMode",
+            "resourceLimits", "sourceType",
+        )
+    }
+    manifest["fingerprint"] = _fingerprint(fingerprint_material)
     return manifest
 
 
@@ -169,8 +263,16 @@ def builtin_analytical_skills() -> list[dict[str, Any]]:
 
 
 def _external_skills(connection: sqlite3.Connection) -> list[dict[str, Any]]:
-    rows = connection.execute("SELECT manifest_json FROM analytical_skills ORDER BY skill_id").fetchall()
-    return [validate_analytical_skill_manifest(json.loads(str(row["manifest_json"])), source_type="external") for row in rows]
+    rows = connection.execute("SELECT skill_id, version, manifest_json, fingerprint FROM analytical_skills ORDER BY skill_id").fetchall()
+    manifests: list[dict[str, Any]] = []
+    for row in rows:
+        manifest = validate_analytical_skill_manifest(json.loads(str(row["manifest_json"])), source_type="external")
+        if str(row["skill_id"]) != manifest["skillId"] or str(row["version"]) != manifest["version"]:
+            raise ValueError(f"Persisted Analytical Skill identity does not match its manifest: {row['skill_id']}")
+        if str(row["fingerprint"]) != manifest["fingerprint"]:
+            raise RuntimeError(f"Persisted Analytical Skill fingerprint drifted: {row['skill_id']}@{row['version']}")
+        manifests.append(manifest)
+    return manifests
 
 
 def analytical_skill_runtime_context(connection: sqlite3.Connection, workspace_id: str) -> dict[str, Any]:
@@ -193,28 +295,75 @@ def analytical_skill_runtime_context(connection: sqlite3.Connection, workspace_i
         item = {**manifest, "enabled": is_enabled, "configuredVersion": row["version"] if row else None, "enabledAt": row["enabled_at"] if row else None, "updatedAt": row["updated_at"] if row else None}
         available.append(item)
         if is_enabled:
-            enabled.append({key: item[key] for key in ("skillId", "version", "fingerprint", "taskTypes", "requiredRoles", "requiredDomainPacks", "allowedCapabilities", "stepTemplate", "requiredEvidence", "blockingRules", "outputSchema", "confirmationMode", "resourceLimits", "sourceType")})
+            enabled.append({key: item[key] for key in (
+                "skillId", "version", "fingerprint", "skillKind", "taskTypes", "requiredRoles",
+                "requiredDomainPacks", "allowedCapabilities", "stepTemplate", "requiredEvidence",
+                "blockingRules", "triggerSignals", "slotRules", "semanticGuards", "compatibleContracts",
+                "outputSchema", "confirmationMode", "resourceLimits", "sourceType",
+            )})
     material = [{"skillId": item["skillId"], "version": item["version"], "fingerprint": item["fingerprint"]} for item in enabled]
     return {"schema": RUNTIME_SCHEMA, "workspaceId": workspace_id, "enabledAnalyticalSkills": enabled, "availableAnalyticalSkills": available, "fingerprint": _fingerprint(material)}
 
 
-def match_analytical_skills(runtime: dict[str, Any], *, task_type: str, roles: list[str], enabled_domain_packs: list[str], requested_skill_id: str = "") -> dict[str, Any]:
+def match_analytical_skills(
+    runtime: dict[str, Any],
+    *,
+    task_type: str,
+    roles: list[str],
+    enabled_domain_packs: list[str],
+    requested_skill_id: str = "",
+    business_signals: list[str] | None = None,
+    intent_slots: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     role_set, pack_set = set(roles), set(enabled_domain_packs)
+    signal_set = set(business_signals or [])
+    slot_state = intent_slots or {}
     candidates: list[dict[str, Any]] = []
+    supporting: list[dict[str, Any]] = []
     for skill in runtime.get("enabledAnalyticalSkills") or []:
-        if requested_skill_id and skill["skillId"] != requested_skill_id:
-            continue
         if task_type not in skill["taskTypes"]:
             continue
         missing_roles = sorted(set(skill["requiredRoles"]) - role_set)
         missing_packs = sorted(set(skill["requiredDomainPacks"]) - pack_set)
+        if skill.get("skillKind", "analysis") == "understanding":
+            active_signals = sorted(set(skill.get("triggerSignals") or []) & signal_set)
+            if not active_signals:
+                continue
+            active_rules = [
+                rule for rule in skill.get("slotRules") or []
+                if set(rule.get("whenAny") or []) & signal_set
+            ]
+            required_slots = sorted({slot for rule in active_rules for slot in rule.get("requireAll") or []})
+            missing_slots = [
+                slot for slot in required_slots
+                if not isinstance(slot_state.get(slot), dict) or slot_state[slot].get("status") != "resolved"
+            ]
+            status = "ready" if not missing_roles and not missing_packs and not missing_slots else "blocked"
+            supporting.append({
+                "skillId": skill["skillId"], "version": skill["version"], "fingerprint": skill["fingerprint"],
+                "skillKind": "understanding", "status": status, "activeSignals": active_signals,
+                "requiredSlots": required_slots, "missingSlots": missing_slots,
+                "missingRoles": missing_roles, "missingDomainPacks": missing_packs,
+                "allowedCapabilities": skill["allowedCapabilities"], "stepTemplate": skill["stepTemplate"],
+                "requiredEvidence": skill["requiredEvidence"], "blockingRules": skill["blockingRules"],
+                "semanticGuards": skill.get("semanticGuards") or [],
+                "compatibleContracts": skill.get("compatibleContracts") or [],
+                "outputSchema": skill["outputSchema"], "confirmationMode": skill["confirmationMode"],
+                "resourceLimits": skill["resourceLimits"],
+            })
+            continue
+        if requested_skill_id and skill["skillId"] != requested_skill_id:
+            continue
         status = "ready" if not missing_roles and not missing_packs else "blocked"
         candidates.append({
             "skillId": skill["skillId"], "version": skill["version"], "fingerprint": skill["fingerprint"],
+            "skillKind": "analysis",
             "status": status, "missingRoles": missing_roles, "missingDomainPacks": missing_packs,
             "selectionEvidence": {"taskSpecificity": 1 / len(skill["taskTypes"]), "requiredRoleCount": len(skill["requiredRoles"]), "matchedRoleCount": len(set(skill["requiredRoles"]) & role_set)},
             "allowedCapabilities": skill["allowedCapabilities"], "stepTemplate": skill["stepTemplate"],
             "requiredEvidence": skill["requiredEvidence"], "blockingRules": skill["blockingRules"],
+            "semanticGuards": skill.get("semanticGuards") or [],
+            "compatibleContracts": skill.get("compatibleContracts") or [],
             "outputSchema": skill["outputSchema"], "confirmationMode": skill["confirmationMode"], "resourceLimits": skill["resourceLimits"],
         })
     def selection_key(item: dict[str, Any]) -> tuple[Any, ...]:
@@ -226,13 +375,21 @@ def match_analytical_skills(runtime: dict[str, Any], *, task_type: str, roles: l
     tied = [item for item in candidates if best and selection_key(item) == selection_key(best)]
     selected = best if requested_skill_id or len(tied) <= 1 else None
     match_status = selected["status"] if selected else "needs-selection" if tied else "not-matched"
+    supporting.sort(key=lambda item: (item["status"] != "ready", item["skillId"]))
+    supporting_ready = [item for item in supporting if item["status"] == "ready"]
+    supporting_blocked = [item for item in supporting if item["status"] == "blocked"]
     return {
         "schema": "aibi-analytical-skill-match/v1", "taskType": task_type, "roles": sorted(role_set),
         "enabledDomainPacks": sorted(pack_set), "requestedSkillId": requested_skill_id or None,
         "status": match_status, "selected": selected, "candidates": candidates,
+        "businessSignals": sorted(signal_set), "intentSlots": slot_state,
+        "supporting": supporting, "supportingReady": supporting_ready, "supportingBlocked": supporting_blocked,
         "selectionRequired": match_status == "needs-selection",
         "runtimeFingerprint": runtime.get("fingerprint"),
-        "fingerprint": _fingerprint({"taskType": task_type, "roles": sorted(role_set), "packs": sorted(pack_set), "candidates": candidates}),
+        "fingerprint": _fingerprint({
+            "taskType": task_type, "roles": sorted(role_set), "packs": sorted(pack_set),
+            "signals": sorted(signal_set), "slots": slot_state, "candidates": candidates, "supporting": supporting,
+        }),
     }
 
 

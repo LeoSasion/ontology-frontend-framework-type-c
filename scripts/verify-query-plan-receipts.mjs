@@ -31,8 +31,39 @@ try {
   checks.push({
     label: "unverified-ratio-never-falls-through-to-count",
     ok: unsafeRatio.parsed?.queryPlanReceipt?.status === "blocked"
+      && unsafeRatio.parsed?.businessUnderstanding?.status === "needs-clarification"
       && unsafeRatio.parsed?.answerCard?.clarification?.kind === "compound-analysis-definition"
-      && unsafeRatio.parsed?.queryPlanReceipt?.validation?.executed === false,
+      && unsafeRatio.parsed?.queryPlanReceipt?.validation?.executed === false
+      && !unsafeRatio.parsed?.queryPlanReceipt?.runtime?.compiledSql,
+  });
+  for (const [label, prompt] of [
+    ["standalone-share", "占比是多少"],
+    ["standalone-ratio", "请按渠道统计，比例是多少"],
+    ["standalone-percentage", "请给出，百分比"],
+    ["percent-symbol", "退款订单占总订单多少%"],
+    ["fullwidth-percent-symbol", "退款订单占总订单多少％"],
+    ["percent-phrase", "退货订单占全部订单的百分之几"],
+  ]) {
+    const result = run(label, ["ask", prompt]);
+    checks.push(result);
+    checks.push({
+      label: `${label}-requires-verified-ratio-definition`,
+      ok: result.parsed?.queryPlanReceipt?.status === "blocked"
+        && result.parsed?.queryPlanReceipt?.validation?.executed === false
+        && !result.parsed?.queryPlanReceipt?.runtime?.compiledSql
+        && result.parsed?.businessUnderstanding?.status === "needs-clarification"
+        && result.parsed?.answerCard?.clarification?.kind === "compound-analysis-definition",
+    });
+  }
+  const unsafeYearOverYear = run("unverified-year-over-year", ["ask", "按 order_date 看 net_sales 同比"]);
+  checks.push(unsafeYearOverYear);
+  checks.push({
+    label: "year-over-year-without-comparison-period-never-runs-plain-grouping",
+    ok: unsafeYearOverYear.parsed?.businessUnderstanding?.status === "needs-clarification"
+      && unsafeYearOverYear.parsed?.queryPlanReceipt?.status === "blocked"
+      && unsafeYearOverYear.parsed?.queryPlanReceipt?.validation?.executed === false
+      && !unsafeYearOverYear.parsed?.queryPlanReceipt?.runtime?.compiledSql
+      && unsafeYearOverYear.parsed?.actionDraft?.status === "read-only",
   });
   const enabledPack = run("enable-pack", ["domain-pack-set", "--pack", "platform-commerce", "--state", "enabled", "--yes"]);
   checks.push(enabledPack);

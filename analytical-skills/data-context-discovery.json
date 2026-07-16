@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "data-context-discovery",
+  "version": "1.0.0",
+  "displayName": {"zh": "数据语境发现", "en": "Data context discovery"},
+  "description": {"zh": "用字段画像与来源证据消解同名字段、状态值和数据质量风险。", "en": "Use field profiles and source evidence to resolve ambiguous fields, status values, and data quality risks."},
+  "skillKind": "understanding",
+  "taskTypes": ["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.context.route", "agent.semantic.plan"],
+  "stepTemplate": ["inspect-field-candidates", "compare-source-profiles", "bind-provenance"],
+  "requiredEvidence": ["field-profile", "field-provenance", "source-fingerprint"],
+  "blockingRules": ["ambiguous-field-binding", "missing-source-profile", "stale-source-context"],
+  "triggerSignals": ["unresolved-field", "data-quality-risk"],
+  "slotRules": [
+    {"whenAny": ["unresolved-field"], "requireAll": ["field-binding"]},
+    {"whenAny": ["data-quality-risk"], "requireAll": ["source-profile"]}
+  ],
+  "semanticGuards": ["current-context", "field-provenance", "no-silent-proxy", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1"],
+  "outputSchema": "aibi-business-understanding-frame/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 8, "maxRows": 200}
+}

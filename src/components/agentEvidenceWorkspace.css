@@ -276,6 +276,21 @@
   grid-column: span 2;
 }
 
+@container main-panel (max-width: 520px) {
+  .agentMainPanel > .panelHeader {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+    gap: 10px;
+  }
+
+  .agentMainPanel > .panelHeader .statusPill {
+    justify-self: start;
+    max-width: 100%;
+    white-space: normal;
+  }
+}
+
 .agentProviderNarrative {
   display: grid;
   gap: 8px;
@@ -636,30 +651,14 @@
   padding: 0 var(--space-4) var(--space-3) 2.4rem;
 }
 
-.agentEvidencePlanSkills {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0.7rem 0 0;
-}
-
-.agentEvidencePlanSkills span {
-  border: 1px solid var(--border-subtle);
-  border-radius: 999px;
-  padding: 0.18rem 0.5rem;
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-}
-
-.agentEvidencePlan li {
+.agentEvidencePlan > ol > li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-1) var(--space-3);
   color: var(--text-secondary);
 }
 
-.agentEvidencePlan li small {
+.agentEvidencePlan > ol > li > small {
   grid-column: 1 / -1;
   color: var(--warning-text);
 }

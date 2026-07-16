@@ -13,8 +13,21 @@ def _fingerprint(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None, business_understanding: dict[str, Any] | None = None) -> dict[str, Any]:
     field_resolution = semantic_plan.get("fieldResolution", {})
+    skill_sources: list[dict[str, Any]] = []
+    if isinstance(analytical_skill_match, dict):
+        selected_skill = analytical_skill_match.get("selected")
+        if isinstance(selected_skill, dict):
+            skill_sources.append(selected_skill)
+        for key in ("supporting", "supportingSkills"):
+            for skill in analytical_skill_match.get(key) or []:
+                if isinstance(skill, dict) and skill not in skill_sources:
+                    skill_sources.append(skill)
+    if isinstance(business_understanding, dict):
+        for skill in business_understanding.get("supportingSkills") or []:
+            if isinstance(skill, dict) and skill not in skill_sources:
+                skill_sources.append(skill)
     sources = {
         "table": {
             "tableKey": selected_table.get("table_key") if selected_table else None,
@@ -28,7 +41,7 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
         "confirmedQueries": [{"queryKey": item.get("query_key"), "question": item.get("question"), "score": item.get("matchScore"), "reason": "confirmed-query-recall"} for item in recalled_queries],
         "knowledgeRules": [{"packId": knowledge_match.get("packId"), "version": knowledge_match.get("packVersion"), "ruleId": knowledge_match.get("ruleId"), "title": knowledge_match.get("title"), "grain": knowledge_match.get("grain"), "reason": "enabled-domain-pack-rule"}] if knowledge_match else [],
         "domainPacks": domain_pack_context.get("enabledDomainPacks") or domain_pack_context.get("enabled") or [],
-        "analyticalSkills": [analytical_skill_match.get("selected")] if isinstance(analytical_skill_match, dict) and isinstance(analytical_skill_match.get("selected"), dict) else [],
+        "analyticalSkills": skill_sources,
         "session": {
             "sessionKey": session_context.get("sessionKey"),
             "currentTurnKey": session_context.get("currentTurnKey"),
@@ -42,12 +55,14 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
         } if isinstance(session_context, dict) else None,
     }
     missing_slots = [{"kind": item.get("kind"), "mention": item.get("mention"), "reason": item.get("reason")} for item in intent_frame.get("unresolved") or []]
-    fingerprint_input = {"workspaceId": workspace_id, "intent": intent_frame, "semanticPlan": semantic_plan, "sources": sources}
+    understanding = business_understanding if isinstance(business_understanding, dict) else None
+    fingerprint_input = {"workspaceId": workspace_id, "intent": intent_frame, "semanticPlan": semantic_plan, "sources": sources, "businessUnderstanding": understanding}
     return {
         "schema": CONTEXT_SCHEMA,
         "workspaceId": workspace_id,
         "retrievalPolicy": {"strategy": "deterministic-first", "reranker": "disabled", "ambiguityGatePreserved": True},
         "sources": sources,
+        "businessUnderstanding": understanding,
         "missingSlots": missing_slots,
         "stale": False,
         "fingerprint": _fingerprint(fingerprint_input),

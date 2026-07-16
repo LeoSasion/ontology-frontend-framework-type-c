@@ -15,9 +15,61 @@ def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+def _metric_definition(intent: dict[str, Any]) -> dict[str, str] | None:
+    raw = intent.get("metricDefinition")
+    if raw is None:
+        return None
+    required = {"kind", "metric", "numerator", "denominator", "grain"}
+    if not isinstance(raw, dict) or set(raw) != required:
+        raise ValueError(f"Invalid platform knowledge metric definition: {intent.get('id')}")
+    result = {key: str(raw.get(key) or "").strip() for key in required}
+    if result["kind"] != "ratio" or not all(result.values()):
+        raise ValueError(f"Incomplete platform knowledge metric definition: {intent.get('id')}")
+    return result
+
+
+def _business_definition(
+    intent: dict[str, Any],
+    roles: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
+    requirements = [item for item in intent.get("tables", []) if isinstance(item, dict)]
+    fields_by_role = {
+        str(item.get("role") or ""): {str(field) for field in item.get("requiredFields", []) if str(field).strip()}
+        for item in requirements
+    }
+    entity_key = intent.get("entityKey")
+    if entity_key is not None:
+        if not isinstance(entity_key, dict) or set(entity_key) != {"role", "field"}:
+            raise ValueError(f"Invalid platform knowledge entity key: {intent.get('id')}")
+        entity_role = str(entity_key.get("role") or "").strip()
+        entity_field = str(entity_key.get("field") or "").strip()
+        if not entity_role or entity_field not in fields_by_role.get(entity_role, set()):
+            raise ValueError(f"Unbound platform knowledge entity key: {intent.get('id')}")
+    if roles is None:
+        return None
+
+    bindings: list[str] = []
+    for requirement in requirements:
+        role = str(requirement.get("role") or "")
+        table = roles.get(role)
+        if not table:
+            raise ValueError(f"Missing platform knowledge role binding: {intent.get('id')}:{role}")
+        table_key = str(table.get("table_key") or "").strip()
+        bindings.extend(f"{table_key}.{field}" for field in requirement.get("requiredFields", []) if table_key and str(field).strip())
+    result: dict[str, Any] = {"fieldBindings": bindings}
+    if isinstance(entity_key, dict):
+        role = str(entity_key["role"])
+        result["entityKey"] = f"{roles[role]['table_key']}.{entity_key['field']}"
+    return result
+
+
 @lru_cache(maxsize=1)
 def platform_knowledge_pack() -> dict[str, Any]:
-    return json.loads(KNOWLEDGE_PATH.read_text(encoding="utf-8"))
+    pack = json.loads(KNOWLEDGE_PATH.read_text(encoding="utf-8"))
+    for intent in pack.get("intents", []):
+        _metric_definition(intent)
+        _business_definition(intent)
+    return pack
 
 
 def _table_catalog(connection: sqlite3.Connection, workspace_id: str) -> list[dict[str, Any]]:
@@ -123,6 +175,8 @@ def match_platform_knowledge(
             "roles": roles,
             "entity": entity_match.group(0) if entity_match else None,
             "threshold": float(percent_match.group(1)) / 100 if percent_match else None,
+            "metricDefinition": _metric_definition(intent),
+            "businessDefinition": _business_definition(intent, roles),
             "sql": _compiled_sql(intent, roles),
             "source": pack.get("source", {}),
         }

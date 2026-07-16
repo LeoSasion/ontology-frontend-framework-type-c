@@ -45,7 +45,7 @@ python tools/bi_cli.py --json domain-pack-uninstall --pack <pack-id> --yes
 
 - 新工作区和迁移后的旧工作区都保持 `enabledDomainPacks=[]`。
 - 启停只影响后续计划；历史 Receipt、Unit 和结果保留创建时的 Pack 版本。
-- 显式字段选择优先于手工语义，手工语义优先于 Pack 建议；仍冲突时集中澄清一次。
+- 显式字段选择优先于手工语义，手工语义优先于 Pack 建议；仍有实质冲突时按 [业务理解合同](business-understanding-skills.md) 一次只澄清一个最高价值问题。
 - 停用后不再展示该 Pack 的建议；依赖对象进入复核状态，不自动删除。
 - `workspace_domain_packs` 属于 SQLite 版本化 schema 和配置导出合同；表结构变化必须提升 `user_version`，备份/恢复必须保留启用状态。
 

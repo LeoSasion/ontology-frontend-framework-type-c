@@ -46,6 +46,38 @@ def _manifest_fingerprint(manifest: dict[str, Any]) -> str:
     return hashlib.sha256(_canonical_json(manifest).encode("utf-8")).hexdigest()
 
 
+def _artifact_content_fingerprints(
+    artifacts: dict[str, str],
+    manifest_path: Path,
+    package_root: Path,
+) -> dict[str, dict[str, Any]]:
+    """Hash validated static artifacts without exposing absolute package paths."""
+    root = package_root.resolve()
+    result: dict[str, dict[str, Any]] = {}
+    for key, relative_path in sorted(artifacts.items()):
+        resolved = (root / relative_path).resolve()
+        try:
+            resolved.relative_to(root)
+        except ValueError as error:
+            raise ValueError(
+                f"Domain Pack artifact escapes its package root in {manifest_path.name}: {relative_path}"
+            ) from error
+        if not resolved.is_file():
+            raise ValueError(f"Domain Pack artifact does not exist in {manifest_path.name}: {relative_path}")
+        digest = hashlib.sha256()
+        byte_count = 0
+        with resolved.open("rb") as artifact_file:
+            for chunk in iter(lambda: artifact_file.read(1024 * 1024), b""):
+                digest.update(chunk)
+                byte_count += len(chunk)
+        result[key] = {
+            "path": Path(relative_path).as_posix(),
+            "sha256": digest.hexdigest(),
+            "bytes": byte_count,
+        }
+    return result
+
+
 def _localized_text(value: Any, field: str) -> dict[str, str]:
     if not isinstance(value, dict):
         raise ValueError(f"Domain Pack {field} must contain zh and en text.")
@@ -215,6 +247,8 @@ def validate_domain_pack_manifest(
     conflicts = sorted({str(item).strip() for item in raw.get("conflicts") or [] if str(item).strip()})
     if any(not PACK_ID_PATTERN.fullmatch(item) or item == pack_id for item in conflicts):
         raise ValueError(f"Invalid Domain Pack conflicts in {manifest_path.name}")
+    artifacts = _artifact_paths(raw.get("artifacts"), manifest_path, package_root, external=external)
+    artifact_content = _artifact_content_fingerprints(artifacts, manifest_path, package_root)
     manifest = {
         "schema": DOMAIN_PACK_SCHEMA,
         "packId": pack_id,
@@ -223,7 +257,7 @@ def validate_domain_pack_manifest(
         "description": _localized_text(raw.get("description"), "description"),
         "coreCompatibility": {"min": minimum, "max": maximum},
         "capabilities": capabilities,
-        "artifacts": _artifact_paths(raw.get("artifacts"), manifest_path, package_root, external=external),
+        "artifacts": artifacts,
         "contributions": _contributions(raw.get("contributions"), manifest_path),
         "uiContributions": _ui_contributions(raw.get("uiContributions"), manifest_path),
         "conflicts": conflicts,
@@ -233,7 +267,10 @@ def validate_domain_pack_manifest(
         "manifestPath": manifest_path.name if external else manifest_path.relative_to(ROOT).as_posix(),
     }
     manifest["compatible"] = minimum <= CORE_DOMAIN_API_VERSION <= maximum
-    manifest["fingerprint"] = _manifest_fingerprint({key: value for key, value in manifest.items() if key != "fingerprint"})
+    fingerprint_material = {key: value for key, value in manifest.items() if key != "fingerprint"}
+    if artifact_content:
+        fingerprint_material["artifactContent"] = artifact_content
+    manifest["fingerprint"] = _manifest_fingerprint(fingerprint_material)
     return manifest
 
 

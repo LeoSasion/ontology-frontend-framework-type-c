@@ -4,11 +4,13 @@
 
 ## 业务意图与上下文合同
 
+`aibi-business-understanding-frame/v1` 在 Intent 之前绑定问题与 Structural、Semantic、Business、Operational、Behavioral 五层上下文，记录业务槽位、候选来源、实质歧义和下一条最高价值问题。它不保存 SQL，也不允许 Behavioral 偏好覆盖共享口径。完整定义与首批 Skill 见 [业务理解与分析 Skills](business-understanding-skills.md)。
+
 `aibi-agent-intent-frame/v1` 将问题规范化为任务类型、指标、维度、时间、筛选、比较、输出、粒度和未决项。字段概念必须保留 `tableKey`、字段、角色、来源与置信度；Provider 不是必需依赖，也不能静默消歧。
 
-`aibi-semantic-context-bundle/v1` 在当前工作区统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack、Analytical Skill 与知识规则。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定意图、语义计划和来源。
+`aibi-semantic-context-bundle/v1` 在当前工作区按五层上下文统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack、Analytical Skill、运行证据与展示偏好。每项保留来源、作用域、版本、新鲜度和指纹。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定业务理解、意图、语义计划和来源。
 
-`aibi-agent-clarification/v1` 把全部未决字段合并为一次澄清，每个候选都必须声明表级来源。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。
+`aibi-agent-clarification/v1` 为未决项标记 metric definition、population、grain、time、baseline、status、relationship path 等类型和 materiality，一次只询问一个最能缩小计划空间的高价值问题；每个候选都必须声明表级来源和选择影响。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。回答若改变语义，旧 Intent、Evidence Plan 和未执行 Receipt 必须失效并重新规划。
 
 ## Evidence Plan 与 Agent Turn
 
@@ -40,6 +42,8 @@ Resume 会实时核对引用对象。缺失 Turn、Receipt、Analysis Run 或 Ac
 
 Skill 只能引用已登记 Agent Capability，并声明步骤模板、必需证据、阻塞规则、输出 schema、确认模式和固定资源上限。Python、JavaScript、Shell、SQL、HTML、URL、任意工具键和跨 AIBI 仓库路径在安装前阻断。`aibi-agent-policy-hooks/v1` 使用固定校验器复核工作区、能力、声明纯度、资源和证据引用；Hook 本身不是脚本扩展点。
 
+业务理解 Skill 向后兼容增加 `skillKind`、`triggerSignals`、`slotRules`、`semanticGuards` 和 `compatibleContracts`；`aibi-analytical-skill-match/v1` 记录版本、触发证据、缺失槽位、运行时 fingerprint 与 Capability 交集。六个首批 Skill 的职责和验收只在 [业务理解与分析 Skills](business-understanding-skills.md) 维护。
+
 ## Agent Runtime Profile 与 Provider 评估
 
 `aibi-agent-runtime-profile/v1` 将 Provider、模型、wire API、结构化输出、context window、输出预算、超时和重试从业务语义中分离。工作区默认选择 `deterministic`；可选 `deepseek` 或显式 loopback `local-openai`。Profile 切换先预演再确认，只改变解释层，不能改变 Intent、字段、Capability、SQL/Receipt、草案或确认边界。
@@ -51,7 +55,7 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 ## 规划流程
 
 1. 从当前工作区注册表、字段语义和指标构建候选，排除内部 `__*` 字段。
-2. 记录命中的字段、指标和别名；跨表竞争时返回 `needs-clarification`。
+2. 记录命中的字段、指标和别名；跨表竞争时返回 `needs-clarification`，并只提出当前最高价值问题。
 3. 为每个字段声明表、角色和统计粒度，保留全部指标、维度与筛选。
 4. 只在当前工作区已保存关系图中寻找路径，并记录版本、方向和行膨胀。
 5. 缺路径返回 `needs-relationship`；低置信、版本过期或放大风险返回 `needs-validation`。
@@ -61,7 +65,7 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 
 - 同名字段不能按导入顺序、列顺序或模型偏好决胜；别名只能召回候选。
 - 用户明确表名后可在目标表内选择，依据必须进入 Receipt。
-- 多个未决字段合并为一个候选面；一次澄清后仍不安全时明确阻断。
+- 多个未决字段进入同一类型化队列，但每轮只询问一个高价值问题；回答后重新规划，仍不安全时继续澄清或明确阻断。
 - 复合业务键必须整体保存和验证，不能退化为第一列。
 - 比率、转化率和占比必须有已验证分子、分母、筛选与粒度，否则澄清。
 - 筛选只接受字段、白名单操作符和值；右表预聚合覆盖完整连接键。

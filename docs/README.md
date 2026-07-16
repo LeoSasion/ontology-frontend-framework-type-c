@@ -19,6 +19,7 @@
 
 | 文档 | 唯一职责 |
 | --- | --- |
+| [业务理解与分析 Skills](business-understanding-skills.md) | 五层业务上下文、业务理解合同、首批 Skills、专题验收与后续顺序 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |
@@ -33,6 +34,7 @@
 | 当前已经做到什么 | `docs/implementation-status.md` |
 | 接下来做什么 | `docs/development-roadmap.md` |
 | 用户如何验收 | `docs/product-acceptance-matrix.md` |
+| 助手如何理解业务、选择 Skill | `docs/business-understanding-skills.md` |
 | 某次验证是否通过 | `artifacts/` 中对应日期回执 |
 | CLI 当前命令与参数 | `docs/bi-cli-contract.md` 的实时生成结果 |
 

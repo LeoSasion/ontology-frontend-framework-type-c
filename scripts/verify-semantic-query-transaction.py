@@ -104,12 +104,49 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             "query": {},
         }
 
+    verified_path = {
+        "tables": ["root", "facts"],
+        "safeForPlanning": True,
+        "risks": [],
+        "fingerprint": "p" * 64,
+        "hops": [{
+            "relationKey": "root-facts",
+            "fromTable": "root",
+            "toTable": "facts",
+            "direction": "forward",
+            "joinType": "inner",
+            "fieldMappings": [{"leftField": "id", "rightField": "root_id"}],
+            "risk": {"safeForPlanning": True, "risks": [], "confidence": 1.0},
+        }],
+    }
     ready_semantic_plan = {
         "schema": "aibi-semantic-query-plan/v1",
         "status": "ready",
-        "fieldResolution": {"status": "resolved", "selected": [], "bindings": [], "unresolved": []},
-        "grain": {"dimensions": [], "measures": [], "otherFields": [], "tables": ["root", "facts"]},
-        "joinPlan": {"rootTable": "root", "requiredTables": ["root", "facts"], "targets": [{"targetTable": "facts"}]},
+        "fieldResolution": {
+            "status": "resolved",
+            "selected": [
+                {"id": "root.id", "tableKey": "root", "field": "id", "role": "dimension", "confidence": 1.0, "source": "transaction-fixture", "matchedAlias": "root.id"},
+                {"id": "facts.value", "tableKey": "facts", "field": "value", "role": "measure", "confidence": 1.0, "source": "transaction-fixture", "matchedAlias": "facts.value"},
+            ],
+            "bindings": [],
+            "unresolved": [],
+        },
+        "grain": {
+            "dimensions": [{"tableKey": "root", "field": "id", "role": "dimension"}],
+            "measures": [{"tableKey": "facts", "field": "value", "role": "measure"}],
+            "otherFields": [],
+            "tables": ["root", "facts"],
+        },
+        "joinPlan": {
+            "rootTable": "root",
+            "requiredTables": ["root", "facts"],
+            "targets": [{
+                "targetTable": "facts",
+                "paths": [verified_path],
+                "selectedPath": verified_path,
+                "requiresPathClarification": False,
+            }],
+        },
     }
     original_execute = bi_cli.execute_workspace_semantic_query
     original_plan = bi_cli.build_workspace_semantic_plan
@@ -119,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
     bi_cli.attach_analysis_unit = lambda result, **_: result
     output = io.StringIO()
     try:
-        sys.argv = ["bi_cli.py", "--json", "ask", "transaction probe", "--read-only"]
+        sys.argv = ["bi_cli.py", "--json", "ask", "按 root.id 汇总 facts.value", "--read-only"]
         with contextlib.redirect_stdout(output):
             ask_status = bi_cli.main()
     finally:

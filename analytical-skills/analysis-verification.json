@@ -1,0 +1,22 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "analysis-verification",
+  "version": "1.0.0",
+  "displayName": {"zh": "分析结果核验", "en": "Analysis verification"},
+  "description": {"zh": "在呈现结论前检查上下文、关系证据、结果约束与执行回执。", "en": "Check context, relationship evidence, result invariants, and execution receipts before presenting a conclusion."},
+  "skillKind": "understanding",
+  "taskTypes": ["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["check-current-context", "check-required-evidence", "check-result-invariants", "bind-execution-receipt"],
+  "requiredEvidence": ["query-plan-receipt"],
+  "blockingRules": ["missing-execution-receipt", "failed-result-invariant", "stale-context"],
+  "triggerSignals": ["executable-plan"],
+  "slotRules": [],
+  "semanticGuards": ["current-context", "relationship-proof-when-needed", "receipt-before-claim", "result-invariants", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-business-understanding-frame/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1"],
+  "outputSchema": "aibi-business-understanding-frame/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 8, "maxRows": 2000}
+}

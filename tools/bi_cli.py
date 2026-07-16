@@ -46,6 +46,11 @@ from agent_prompt_resolution import (
     should_create_agent_draft,
 )
 from agent_intent_service import build_business_intent_frame
+from business_understanding_service import (
+    apply_business_understanding_to_intent,
+    build_business_understanding_frame,
+    build_business_understanding_gap,
+)
 from semantic_context_router import build_semantic_context_bundle
 from agent_clarification_service import build_agent_clarification
 from agent_recommended_commands import build_agent_recommended_commands
@@ -68,7 +73,7 @@ from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
 from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
 from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
-from analytical_skill_service import analytical_roles_from_intent_frame, analytical_skill_runtime_context, match_analytical_skills
+from analytical_skill_service import analytical_skill_runtime_context
 from platform_analytics_knowledge import (
     execute_platform_knowledge,
     match_platform_knowledge,
@@ -2012,11 +2017,23 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         )
         intent_frame = build_business_intent_frame(business_prompt, semantic_plan=semantic_plan)
         analytical_skill_runtime = analytical_skill_runtime_context(connection, workspace_id)
-        analytical_skill_match = match_analytical_skills(
+        business_understanding = build_business_understanding_frame(
+            business_prompt,
+            intent_frame,
+            semantic_plan,
+            context_matches,
             analytical_skill_runtime,
-            task_type=str(intent_frame.get("taskType") or "overview"),
-            roles=analytical_roles_from_intent_frame(intent_frame),
-            enabled_domain_packs=[str(item.get("packId") or "") for item in active_domain_pack_context.get("enabledDomainPacks") or []],
+            knowledge_match=platform_match,
+            enabled_domain_packs=[
+                str(item.get("packId") or "")
+                for item in active_domain_pack_context.get("enabledDomainPacks") or []
+            ],
+        )
+        intent_frame = apply_business_understanding_to_intent(intent_frame, business_understanding)
+        analytical_skill_match = (
+            business_understanding.get("skillMatch")
+            if isinstance(business_understanding.get("skillMatch"), dict)
+            else {}
         )
         semantic_context = build_semantic_context_bundle(
             workspace_id=workspace_id,
@@ -2030,11 +2047,16 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             knowledge_match=platform_match,
             analytical_skill_match=analytical_skill_match,
             session_context=getattr(args, "session_context", None),
+            business_understanding=business_understanding,
         )
-        clarification = build_agent_clarification(intent_frame, semantic_context)
+        clarification = build_agent_clarification(intent_frame, semantic_context, business_understanding)
+        business_understanding_blocked = (
+            str(business_understanding.get("status") or "ready") == "needs-clarification"
+            or bool(business_understanding.get("blockers"))
+        )
         semantic_execution = None
         semantic_targets = semantic_plan.get("joinPlan", {}).get("targets") or []
-        if platform_match is None and semantic_plan["status"] == "ready" and semantic_targets:
+        if platform_match is None and not business_understanding_blocked and semantic_plan["status"] == "ready" and semantic_targets:
             semantic_execution = execute_workspace_semantic_query(
                 connection,
                 workspace_id,
@@ -2049,7 +2071,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             )
         semantic_execution_blocked = bool(semantic_execution and not semantic_execution.get("executed"))
         semantic_blocked = (
-            semantic_plan["status"] in BLOCKING_STATUSES or semantic_execution_blocked
+            semantic_plan["status"] in BLOCKING_STATUSES
+            or semantic_execution_blocked
         ) and platform_match is None
         single_chart_dashboard_create = intents.wants_widget and selected_dashboard is None
         dashboard_action = None
@@ -2114,7 +2137,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         )
         if verified_analysis_gap:
             should_create_draft = False
-        if semantic_blocked:
+        if semantic_blocked or business_understanding_blocked:
             should_create_draft = False
         action_payload = build_agent_action_payload(
             prompt=business_prompt,
@@ -2181,12 +2204,24 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 created_at=now_iso(),
             )
         answer_card = (
-            execute_platform_knowledge(connection, platform_match)
-            if platform_match
+            build_agent_answer_card(connection, resolution_prompt, None, None, workspace_id)
+            if selected_table is None
             else (
-                build_verified_analysis_gap(business_prompt, selected_table["table_key"] if selected_table else None)
-                if verified_analysis_gap
-                else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action, workspace_id)
+                build_business_understanding_gap(
+                    business_prompt,
+                    business_understanding,
+                    selected_table["table_key"],
+                )
+                if business_understanding_blocked
+                else (
+                    execute_platform_knowledge(connection, platform_match)
+                    if platform_match
+                    else (
+                        build_verified_analysis_gap(business_prompt, selected_table["table_key"])
+                        if verified_analysis_gap
+                        else build_agent_answer_card(connection, resolution_prompt, selected_table, actionable_widget_action, workspace_id)
+                    )
+                )
             )
         )
         if semantic_execution and semantic_execution.get("executed"):
@@ -2241,7 +2276,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 ],
                 "nextActions": [localized_value("打开证据核对字段、粒度和关系版本", "Open evidence to review fields, grain, and relationship versions")],
             }
-        if semantic_blocked:
+        if semantic_blocked and not business_understanding_blocked:
             semantic_unresolved = semantic_plan["fieldResolution"].get("unresolved") or []
             execution_blockers = semantic_execution.get("executionPlan", {}).get("blockers") if semantic_execution else []
             status_summary = {
@@ -2270,7 +2305,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     {"zh": "选择明确的数据表与字段，或先预览并保存可靠关系。", "en": "Choose an explicit table and field, or preview and save a reliable relationship first."}
                 ],
             }
-        elif widget_clarification and isinstance(widget_action, dict):
+        elif widget_clarification and not business_understanding_blocked and isinstance(widget_action, dict):
             answer_card = build_widget_clarification_answer_card(widget_action)
         context_refs = [
             {"type": "contextTerm", "termKey": item["term_key"], "name": item["canonical_name"]}
@@ -2306,18 +2341,45 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     evidence_keys.add(key)
             answer_card["evidenceRefs"] = evidence_refs
         answer_query = answer_card.get("query") if isinstance(answer_card.get("query"), dict) else None
-        receipt_unresolved = (
-            semantic_plan["fieldResolution"].get("unresolved")
-            or [
-                {
-                    "type": "semantic-plan",
-                    "status": semantic_plan["status"],
-                    "joinPlan": semantic_plan["joinPlan"],
-                }
-            ]
-            if semantic_blocked
-            else ([] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")])
-        )
+        if business_understanding_blocked:
+            receipt_unresolved = []
+            answer_clarification = answer_card.get("clarification")
+            if (
+                isinstance(answer_clarification, dict)
+                and answer_clarification.get("kind") == "compound-analysis-definition"
+            ):
+                # Preserve the established receipt-level compound-metric blocker
+                # while the richer Business Understanding slots explain exactly
+                # which parts of the definition are still missing.
+                receipt_unresolved.append({
+                    "kind": "compound-analysis-definition",
+                    "mention": str(answer_clarification.get("originalQuestion") or prompt),
+                    "reason": "missing-verified-business-definition",
+                    "required": list(answer_clarification.get("required") or []),
+                })
+            receipt_unresolved.extend(list(business_understanding.get("unresolved") or []))
+            if not receipt_unresolved:
+                receipt_unresolved = (
+                    list(business_understanding.get("blockers") or [])
+                    or (
+                        [clarification["items"][0]]
+                        if clarification.get("items")
+                        else [answer_card.get("summary")]
+                    )
+                )
+        else:
+            receipt_unresolved = (
+                semantic_plan["fieldResolution"].get("unresolved")
+                or [
+                    {
+                        "type": "semantic-plan",
+                        "status": semantic_plan["status"],
+                        "joinPlan": semantic_plan["joinPlan"],
+                    }
+                ]
+                if semantic_blocked
+                else ([] if answer_query else [answer_card.get("clarification") or answer_card.get("summary")])
+            )
         if semantic_execution_blocked:
             receipt_unresolved = merge_receipt_unresolved_with_execution_blockers(
                 receipt_unresolved,
@@ -2338,7 +2400,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 if semantic_execution
                 else None
             ),
-            status="executed" if not semantic_blocked and answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
+            status="executed" if not business_understanding_blocked and not semantic_blocked and answer_query and isinstance(answer_query.get("runtime"), dict) else "blocked",
             group=str(answer_query.get("group")) if answer_query and answer_query.get("group") else None,
             groups=list(answer_query.get("groupRefs") or []) if answer_query else [],
             measure=str(answer_query.get("measure")) if answer_query and answer_query.get("measure") else None,
@@ -2457,6 +2519,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         "analysisRun": analysis_run,
         "intentFrame": intent_frame,
         "semanticContext": semantic_context,
+        "businessUnderstanding": business_understanding,
         "analyticalSkillMatch": analytical_skill_match,
         "analyticalSkills": analytical_skill_runtime,
         "clarification": clarification,

@@ -67,6 +67,19 @@ def write_external_pack(path: Path, version: str, secret: str, *, migration: boo
     (path / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
+def resign_external_pack(path: Path, secret: str) -> None:
+    manifest_path = path / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    unsigned = {key: value for key, value in manifest.items() if key != "signature"}
+    canonical = json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    manifest["signature"] = {
+        "algorithm": "hmac-sha256",
+        "keyId": "verify-key",
+        "value": hmac.new(secret.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest(),
+    }
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 with tempfile.TemporaryDirectory(prefix="aibi-c-domain-packs-") as temp_dir:
     env = os.environ.copy()
     env["AIBI_HYBRID_DB_PATH"] = str(Path(temp_dir) / "metadata.sqlite")
@@ -139,9 +152,43 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-domain-packs-") as temp_dir:
 
     package_v1 = Path(temp_dir) / "package-v1"
     package_v2 = Path(temp_dir) / "package-v2"
+    package_missing = Path(temp_dir) / "package-missing"
+    package_escape = Path(temp_dir) / "package-escape"
     write_external_pack(package_v1, "1.0.0", trust_secret)
     write_external_pack(package_v2, "1.1.0", trust_secret, migration=True)
     linted = run(["domain-pack-lint", "--package", str(package_v1)], env)
+    fingerprint_before_artifact_change = linted.get("manifest", {}).get("fingerprint")
+    (package_v1 / "guide.md").write_text("# External pack 1.0.0\n\nChanged static knowledge.\n", encoding="utf-8")
+    relinted = run(["domain-pack-lint", "--package", str(package_v1)], env)
+    check(
+        "external-static-artifact-content-changes-pack-fingerprint",
+        linted.get("ok") is True
+        and relinted.get("ok") is True
+        and fingerprint_before_artifact_change
+        and relinted.get("manifest", {}).get("fingerprint") != fingerprint_before_artifact_change,
+        {"before": linted, "after": relinted},
+    )
+    write_external_pack(package_missing, "1.0.0", trust_secret)
+    (package_missing / "guide.md").unlink()
+    missing_artifact = run(["domain-pack-lint", "--package", str(package_missing)], env)
+    check(
+        "external-pack-missing-artifact-is-rejected",
+        missing_artifact.get("ok") is False and "artifact does not exist" in str(missing_artifact.get("error") or ""),
+        missing_artifact,
+    )
+    write_external_pack(package_escape, "1.0.0", trust_secret)
+    (Path(temp_dir) / "outside.md").write_text("outside package root", encoding="utf-8")
+    escape_manifest_path = package_escape / "manifest.json"
+    escape_manifest = json.loads(escape_manifest_path.read_text(encoding="utf-8"))
+    escape_manifest["artifacts"] = {"guide": "../outside.md"}
+    escape_manifest_path.write_text(json.dumps(escape_manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    resign_external_pack(package_escape, trust_secret)
+    escaped_artifact = run(["domain-pack-lint", "--package", str(package_escape)], env)
+    check(
+        "external-pack-artifact-cannot-escape-package-root",
+        escaped_artifact.get("ok") is False and "Unsafe Domain Pack artifact path" in str(escaped_artifact.get("error") or ""),
+        escaped_artifact,
+    )
     install_preview = run(["domain-pack-install", "--package", str(package_v1)], env)
     installed = run(["domain-pack-install", "--package", str(package_v1), "--yes"], env)
     check(

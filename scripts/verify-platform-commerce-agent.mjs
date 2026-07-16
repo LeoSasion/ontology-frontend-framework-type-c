@@ -160,6 +160,13 @@ const cases = [
     expected: { 同步失败: 1, 待处理: 1 },
   },
   {
+    id: "non-metric-knowledge-rule-cannot-authorize-rate",
+    prompt: "虚拟商品未发货率",
+    expectedBlocked: true,
+    expectedKnowledgeMatch: true,
+    expected: {},
+  },
+  {
     id: "unsupported-refund-rate-is-blocked",
     prompt: "按月份计算跨平台净退款率，分母使用已结算商品件数，并把售后与结算宽表关联。",
     expectedBlocked: true,
@@ -252,17 +259,22 @@ try {
       .map(([label, expected]) => ({ label, expected, actual: actual[label] }));
     const matchedRuleId = result.parsed?.agentKnowledge?.matchedRuleId ?? null;
     const receipt = result.parsed?.queryPlanReceipt;
+    const businessUnderstandingStatus = result.parsed?.businessUnderstanding?.status ?? null;
+    const businessUnderstandingBlockers = result.parsed?.businessUnderstanding?.blockers ?? [];
     const evidenceTypes = (result.parsed?.answerCard?.evidenceRefs ?? []).map((item) => item?.type).filter(Boolean);
     const knowledgeRuleEvidenceCount = evidenceTypes.filter((type) => type === "knowledgeRule").length;
     const ok = testCase.expectedBlocked
       ? result.ok
-        && matchedRuleId === null
+        && (testCase.expectedKnowledgeMatch ? matchedRuleId !== null : matchedRuleId === null)
         && result.parsed?.answerCard?.kind === "clarification"
         && receipt?.status === "blocked"
+        && businessUnderstandingStatus === "needs-clarification"
         && !receipt?.runtime?.compiledSql
       : result.ok
         && matchedRuleId === testCase.id
         && mismatches.length === 0
+        && businessUnderstandingStatus === "ready"
+        && businessUnderstandingBlockers.length === 0
         && receipt?.status === "executed"
         && receipt?.runtime?.compiledSql
         && knowledgeRuleEvidenceCount === 1;
@@ -275,6 +287,8 @@ try {
       mismatches,
       matchedRuleId,
       queryStatus: receipt?.status ?? null,
+      businessUnderstandingStatus,
+      businessUnderstandingBlockers,
       compiledSql: receipt?.runtime?.compiledSql ?? null,
       evidenceTypes,
       error: result.parsed?.error ?? result.stderr?.trim() ?? "",

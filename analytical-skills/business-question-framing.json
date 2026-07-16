@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "business-question-framing",
+  "version": "1.0.0",
+  "displayName": {"zh": "业务问题定界", "en": "Business question framing"},
+  "description": {"zh": "在分析前明确决策目标、核心度量与交付用途。", "en": "Resolve the decision goal, core measure, and delivery purpose before analysis."},
+  "skillKind": "understanding",
+  "taskTypes": ["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route"],
+  "stepTemplate": ["identify-decision-goal", "resolve-core-measure", "resolve-output-purpose"],
+  "requiredEvidence": ["prompt-intent", "resolved-business-slots"],
+  "blockingRules": ["missing-decision-goal", "missing-core-measure"],
+  "triggerSignals": ["underspecified-question", "artifact-request"],
+  "slotRules": [
+    {"whenAny": ["underspecified-question"], "requireAll": ["decision-goal", "measure"]},
+    {"whenAny": ["artifact-request"], "requireAll": ["output-purpose"]}
+  ],
+  "semanticGuards": ["no-silent-proxy", "current-context", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1"],
+  "outputSchema": "aibi-business-understanding-frame/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 6, "maxRows": 1}
+}

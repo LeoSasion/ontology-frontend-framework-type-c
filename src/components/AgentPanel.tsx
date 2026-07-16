@@ -1,4 +1,5 @@
 import "./agentEvidenceWorkspace.css";
+import "./AgentBusinessUnderstanding.css";
 import { Suspense, useEffect, useState } from "react";
 import type { ActionDraft, AgentAskResult, WorkbenchPayload } from "../types";
 import {
@@ -163,11 +164,19 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   const topView = workbench.savedViews[0];
   const topRelationship = workbench.relationships[0];
   const answerEvidenceRefs = result.answerCard?.evidenceRefs ?? [];
+  const currentQueryReceipt = result.queryPlanReceipt ?? result.answerCard?.queryPlanReceipt;
+  const currentQueryExecuted = currentQueryReceipt?.status === "executed";
+  const businessUnderstandingBlocked = Boolean(
+    result.businessUnderstanding
+    && (result.businessUnderstanding.status !== "ready" || result.businessUnderstanding.blockers?.length),
+  );
   const queryRuntimeRef = answerEvidenceRefs.find((ref) => String(ref.type ?? "") === "queryRuntime");
   const sourceRunRef = answerEvidenceRefs.find((ref) => String(ref.type ?? "") === "sourceRun") ?? answerEvidenceRefs.find((ref) => String(ref.type ?? "") === "table");
   const metricDefinitionRef = answerEvidenceRefs.find((ref) => String(ref.type ?? "") === "metricDefinition");
   const answerQuery = objectRecord(result.answerCard?.query);
-  const runtimeEngine = String(queryRuntimeRef?.engine ?? workbench.queryRuntime?.engine ?? "");
+  const runtimeEngine = currentQueryExecuted
+    ? String(queryRuntimeRef?.engine ?? workbench.queryRuntime?.engine ?? "")
+    : "";
   const answerEvidenceSteps: AnswerEvidenceStep[] = result.answerCard ? [
     {
       key: "source",
@@ -181,9 +190,13 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     {
       key: "metric",
       label: biText("指标口径", "Metric logic"),
-      detail: String(metricDefinitionRef?.label ?? metricDefinitionRef?.metric_key ?? (answerQuery?.measure ? `${String(answerQuery.aggregation ?? "sum")}(${String(answerQuery.measure)})${answerQuery.group ? ` · ${String(answerQuery.group)}` : ""}` : topMetric ? `${topMetric.aggregation}(${topMetric.measure})` : biText("缺少可用指标", "No usable metric"))),
-      badge: metricDefinitionRef ? biText("已匹配", "Matched") : biText("查询推导", "Query-derived"),
-      tone: metricDefinitionRef || answerQuery?.measure || topMetric ? "ok" : "warn",
+      detail: businessUnderstandingBlocked
+        ? biText("业务口径待确认，本次没有采用默认指标", "Business definition is unresolved; no default metric was used")
+        : String(metricDefinitionRef?.label ?? metricDefinitionRef?.metric_key ?? (answerQuery?.measure ? `${String(answerQuery.aggregation ?? "sum")}(${String(answerQuery.measure)})${answerQuery.group ? ` · ${String(answerQuery.group)}` : ""}` : topMetric ? `${topMetric.aggregation}(${topMetric.measure})` : biText("缺少可用指标", "No usable metric"))),
+      badge: businessUnderstandingBlocked
+        ? biText("待确认", "Unresolved")
+        : metricDefinitionRef ? biText("已匹配", "Matched") : biText("查询推导", "Query-derived"),
+      tone: businessUnderstandingBlocked ? "warn" : metricDefinitionRef || answerQuery?.measure || topMetric ? "ok" : "warn",
     },
     {
       key: "runtime",
@@ -411,7 +424,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
 
   if (!hasData) {
     return (
-      <section className="mainPanel" aria-labelledby="agent-title">
+      <section className="mainPanel agentMainPanel" aria-labelledby="agent-title">
         <div className="panelHeader">
           <div>
             <p className="kicker">{biText("分析", "Analyze")}</p>
@@ -454,7 +467,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   }
 
   return (
-    <section className="mainPanel" aria-labelledby="agent-title">
+    <section className="mainPanel agentMainPanel" aria-labelledby="agent-title">
       <div className="panelHeader">
         <div>
           <p className="kicker">{biText("分析", "Analyze")}</p>
@@ -484,6 +497,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
             answerQuery={answerQuery}
             providerResponse={result.llm.response}
             intentFrame={result.intentFrame}
+            businessUnderstanding={result.businessUnderstanding}
             clarificationBundle={result.clarification}
             evidencePlan={result.evidencePlan}
             semanticPlan={result.semanticPlan}

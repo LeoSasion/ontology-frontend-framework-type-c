@@ -1,0 +1,24 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "cross-table-analysis-design",
+  "version": "1.0.0",
+  "displayName": {"zh": "跨表分析设计", "en": "Cross-table analysis design"},
+  "description": {"zh": "在跨表分析前明确业务粒度、基数和有证据的关系路径。", "en": "Resolve business grain, cardinality, and an evidenced relationship path before cross-table analysis."},
+  "skillKind": "understanding",
+  "taskTypes": ["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.context.route", "agent.semantic.plan", "agent.completion.verify"],
+  "stepTemplate": ["resolve-analysis-grain", "select-relationship-path", "validate-cardinality", "bind-path-proof"],
+  "requiredEvidence": ["grain-definition", "relationship-path-proof", "cardinality-profile"],
+  "blockingRules": ["ambiguous-relationship-path", "unverified-cardinality", "fanout-risk"],
+  "triggerSignals": ["cross-table-request", "relationship-ambiguity"],
+  "slotRules": [
+    {"whenAny": ["cross-table-request", "relationship-ambiguity"], "requireAll": ["grain", "relationship-path"]}
+  ],
+  "semanticGuards": ["verified-relationship-path", "relationship-proof-when-needed", "grain-explicit", "receipt-before-claim", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1"],
+  "outputSchema": "aibi-business-understanding-frame/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 10, "maxRows": 200}
+}

@@ -21,6 +21,7 @@ import {
   waitForApi,
   withTemporaryWorkspace,
 } from "./ui-verify-workspace.mjs";
+import { forbiddenProjectPathPattern } from "./repository-boundary-policy.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const defaultValidationInput = resolve("validation-inputs/orders.csv");
@@ -36,7 +37,6 @@ const datasetDomain = process.env.AIBI_REAL_IMPORT_DOMAIN ?? (resolve(importTarg
 const minimumFolderGroups = Math.max(1, Number(process.env.AIBI_REAL_IMPORT_MIN_GROUPS ?? 1));
 const knownFinancialBaseline = false;
 const nonProductionPathPattern = /[\\/](fixtures|testdata|validation-inputs)[\\/]/i;
-const forbiddenProjectPathPattern = /[\\/](AIBI-B|AIBI项目杂交|AIBI|财务报表(?:_bak)?)(?:[\\/]|$)/i;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-import-"));
 const viewport = { key: "desktop", label: "desktop", width: 1280, height: 900 };
 const evidenceViewports = [

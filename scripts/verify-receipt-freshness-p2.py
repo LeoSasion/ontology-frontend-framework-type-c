@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 import analysis_unit_service as analysis_unit_service_module  # noqa: E402
 import confirmed_query_service as confirmed_query_service_module  # noqa: E402
+import domain_pack_service as domain_pack_service_module  # noqa: E402
 from analysis_unit_service import analysis_unit_build_command  # noqa: E402
 from confirmed_query_service import (  # noqa: E402
     confirm_query_command,
@@ -23,6 +24,7 @@ from confirmed_query_service import (  # noqa: E402
     recall_confirmed_queries,
 )
 from query_plan_receipt_service import (  # noqa: E402
+    create_query_plan_receipt,
     current_query_receipt_source_state,
     get_query_receipt,
 )
@@ -90,6 +92,32 @@ def receipt_state(database: Path, receipt_key: str) -> dict[str, Any]:
         return current_query_receipt_source_state(connection, "default", receipt)
     finally:
         connection.close()
+
+
+def knowledge_artifact_drift_states(
+    database: Path,
+    receipt_key: str,
+    temp_root: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    mirror_root = temp_root / "domain-pack-artifact-drift"
+    mirror_manifest = mirror_root / "domain-packs" / "platform-commerce.v1.json"
+    mirror_knowledge = mirror_root / "knowledge" / "platform-commerce.v1.json"
+    mirror_manifest.parent.mkdir(parents=True, exist_ok=True)
+    mirror_knowledge.parent.mkdir(parents=True, exist_ok=True)
+    mirror_manifest.write_bytes((ROOT / "domain-packs" / "platform-commerce.v1.json").read_bytes())
+    mirror_knowledge.write_bytes((ROOT / "knowledge" / "platform-commerce.v1.json").read_bytes())
+    original_root = domain_pack_service_module.ROOT
+    original_pack_root = domain_pack_service_module.PACK_ROOT
+    try:
+        domain_pack_service_module.ROOT = mirror_root
+        domain_pack_service_module.PACK_ROOT = mirror_manifest.parent
+        baseline = receipt_state(database, receipt_key)
+        mirror_knowledge.write_bytes(mirror_knowledge.read_bytes() + b"\n")
+        drifted = receipt_state(database, receipt_key)
+        return baseline, drifted
+    finally:
+        domain_pack_service_module.ROOT = original_root
+        domain_pack_service_module.PACK_ROOT = original_pack_root
 
 
 def recalled(database: Path, prompt: str) -> list[dict[str, Any]]:
@@ -236,6 +264,103 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-receipt-freshness-p2-") as tempo
 
     status, pack_enabled = cli(env, "domain-pack-set", "--pack", "platform-commerce", "--state", "enabled", "--yes")
     check("enable-domain-pack", status == 0 and pack_enabled.get("ok") is True, pack_enabled)
+
+    connection = connection_for(database)
+    try:
+        knowledge_receipt = create_query_plan_receipt(
+            connection,
+            workspace_id="default",
+            request_text="fixed domain rule over two sources",
+            source_table_key="regions",
+            source_table_keys=["regions", "facts"],
+            status="executed",
+            joins=[{"role": "facts", "table_key": "facts"}],
+            knowledge_rule={"packId": "platform-commerce", "packVersion": "1.0.0", "ruleId": "fixture-rule"},
+            runtime={"engine": "sqlite", "database": "metadata-store", "compiledSql": "fixed-rule-fixture"},
+            evidence_refs=[{"type": "knowledgeRule", "packId": "platform-commerce", "ruleId": "fixture-rule"}],
+            domain_packs=pack_enabled.get("enabledDomainPacks") or [],
+            result_rows=[{"label": "value", "value": 30}],
+            now_iso=lambda: "2026-07-16T12:35:00Z",
+        )
+        manual_missing_proof_receipt = create_query_plan_receipt(
+            connection,
+            workspace_id="default",
+            request_text="manual cross source without saved proof",
+            source_table_key="regions",
+            source_table_keys=["regions", "facts"],
+            status="executed",
+            joins=[{"leftTableKey": "regions", "rightTableKey": "facts", "leftField": "region_id", "rightField": "region_id"}],
+            runtime={"engine": "sqlite", "database": "metadata-store", "compiledSql": "manual-fixture"},
+            domain_packs=pack_enabled.get("enabledDomainPacks") or [],
+            result_rows=[{"label": "value", "value": 30}],
+            now_iso=lambda: "2026-07-16T12:36:00Z",
+        )
+        versionless_knowledge_receipt = create_query_plan_receipt(
+            connection,
+            workspace_id="default",
+            request_text="unversioned knowledge rule cannot authorize a cross-source query",
+            source_table_key="regions",
+            source_table_keys=["regions", "facts"],
+            status="executed",
+            joins=[{"role": "facts", "table_key": "facts"}],
+            knowledge_rule={"packId": "platform-commerce", "ruleId": "fixture-rule"},
+            runtime={"engine": "sqlite", "database": "metadata-store", "compiledSql": "invalid-rule-fixture"},
+            domain_packs=pack_enabled.get("enabledDomainPacks") or [],
+            result_rows=[{"label": "value", "value": 30}],
+            now_iso=lambda: "2026-07-16T12:37:00Z",
+        )
+        connection.commit()
+    finally:
+        connection.close()
+    knowledge_state = receipt_state(database, knowledge_receipt["receiptKey"])
+    manual_missing_proof_state = receipt_state(database, manual_missing_proof_receipt["receiptKey"])
+    versionless_knowledge_state = receipt_state(database, versionless_knowledge_receipt["receiptKey"])
+    check(
+        "fixed-knowledge-rule-uses-domain-pack-authority-without-fake-relationship-proof",
+        knowledge_receipt.get("validation", {}).get("relationshipAuthority") == "domain-pack-knowledge-rule"
+        and knowledge_receipt.get("validation", {}).get("relationshipPathRequired") is False
+        and knowledge_receipt.get("selection", {}).get("relationshipPathProof") == []
+        and knowledge_state.get("matchesReceipt") is True
+        and knowledge_state.get("relationshipPath", {}).get("knowledgeRuleBound") is True,
+        {"receipt": knowledge_receipt, "state": knowledge_state},
+    )
+    status, knowledge_unit = cli(
+        env,
+        "analysis-unit-build",
+        "--receipt", knowledge_receipt["receiptKey"],
+        "--kind", "metric",
+        "--rows-json", json.dumps([{"label": "value", "value": 30}], ensure_ascii=False),
+    )
+    check("knowledge-rule-receipt-remains-usable-by-analysis-unit", status == 0 and knowledge_unit.get("analysisUnit", {}).get("status") == "ready", knowledge_unit)
+    artifact_baseline_state, artifact_drifted_state = knowledge_artifact_drift_states(
+        database,
+        knowledge_receipt["receiptKey"],
+        temp_root,
+    )
+    check(
+        "knowledge-artifact-content-change-invalidates-old-receipt",
+        artifact_baseline_state.get("matchesReceipt") is True
+        and artifact_drifted_state.get("matchesReceipt") is False
+        and artifact_drifted_state.get("domainPackMatchesReceipt") is False
+        and "query-receipt-domain-pack-drifted" in artifact_drifted_state.get("blockers", []),
+        {"baseline": artifact_baseline_state, "drifted": artifact_drifted_state},
+    )
+    check(
+        "manual-cross-table-query-still-requires-saved-relationship-proof",
+        manual_missing_proof_receipt.get("validation", {}).get("relationshipPathRequired") is True
+        and manual_missing_proof_state.get("matchesReceipt") is False
+        and manual_missing_proof_state.get("relationshipPath", {}).get("matchesReceipt") is False
+        and "query-receipt-relationship-path-drifted" in manual_missing_proof_state.get("blockers", []),
+        {"receipt": manual_missing_proof_receipt, "state": manual_missing_proof_state},
+    )
+    check(
+        "versionless-knowledge-rule-cannot-bypass-relationship-proof",
+        versionless_knowledge_receipt.get("validation", {}).get("knowledgeRuleBound") is False
+        and versionless_knowledge_receipt.get("validation", {}).get("relationshipPathRequired") is True
+        and versionless_knowledge_state.get("matchesReceipt") is False
+        and "query-receipt-relationship-path-drifted" in versionless_knowledge_state.get("blockers", []),
+        {"receipt": versionless_knowledge_receipt, "state": versionless_knowledge_state},
+    )
     domain_state = receipt_state(database, second_receipt_key)
     check(
         "domain-pack-toggle-invalidates-receipt",

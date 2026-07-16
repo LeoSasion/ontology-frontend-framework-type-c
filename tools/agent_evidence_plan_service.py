@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any
 
 from query_plan_receipt_service import validate_relationship_path_proof
@@ -57,6 +58,354 @@ def _normalize_blockers(values: Any) -> list[str]:
 
 def _record(value: Any) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
+
+
+def _unique_strings(*values: Any) -> list[str]:
+    result: list[str] = []
+    for value in values:
+        items = value if isinstance(value, (list, tuple)) else ([] if value is None else [value])
+        for item in items:
+            text = str(item or "").strip()
+            if text and text not in result:
+                result.append(text)
+    return result
+
+
+def _nonempty(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
+
+
+def _valid_fingerprint(value: Any) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{64}", str(value or "").strip().casefold()))
+
+
+def _resolved_slot(slots: dict[str, Any], name: str) -> dict[str, Any]:
+    slot = _record(slots.get(name))
+    return slot if slot.get("status") == "resolved" and _nonempty(slot.get("value")) else {}
+
+
+def _canonical_evidence_name(value: Any) -> str:
+    text = re.sub(r"[^0-9a-z]+", "-", str(value or "").strip().casefold()).strip("-")
+    aliases = {
+        "businessunderstanding": "business-understanding",
+        "cardinalityprofile": "cardinality-profile",
+        "comparisonbaseline": "comparison-baseline",
+        "driverbreakdown": "driver-breakdown",
+        "fieldprofile": "field-profile",
+        "fieldprovenance": "field-provenance",
+        "graindefinition": "grain-definition",
+        "metricdefinition": "metric-definition",
+        "promptintent": "prompt-intent",
+        "queryplanreceipt": "query-plan-receipt",
+        "relationshippathproof": "relationship-path-proof",
+        "resolvedbusinessslots": "resolved-business-slots",
+        "sourcefingerprint": "source-fingerprint",
+        "sourceintelligencerun": "source-intelligence-run",
+    }
+    return aliases.get(text.replace("-", ""), text)
+
+
+def _field_provenance_refs(answer: dict[str, Any]) -> list[dict[str, Any]]:
+    intent_frame = _record(answer.get("intentFrame"))
+    business_understanding = _record(answer.get("businessUnderstanding"))
+    candidates: list[Any] = [
+        *list(intent_frame.get("evidenceRefs") or []),
+        *list(business_understanding.get("evidenceRefs") or []),
+    ]
+    for slot in _record(business_understanding.get("slots")).values():
+        if isinstance(slot, dict):
+            candidates.extend(list(slot.get("evidenceRefs") or []))
+    selected = _record(answer.get("semanticPlan")).get("fieldResolution")
+    for field in list(_record(selected).get("selected") or []):
+        if isinstance(field, dict):
+            candidates.append({"type": "fieldProvenance", **field})
+    refs: list[dict[str, Any]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for item in candidates:
+        if not isinstance(item, dict) or _canonical_evidence_name(item.get("type")) != "field-provenance":
+            continue
+        table_key = str(item.get("tableKey") or "").strip()
+        field = str(item.get("field") or "").strip()
+        source = str(item.get("source") or "").strip()
+        if not table_key or not field or not source:
+            continue
+        identity = (table_key, field, source)
+        if identity not in seen:
+            seen.add(identity)
+            refs.append(item)
+    return refs
+
+
+def _answer_claims_results(answer: dict[str, Any]) -> bool:
+    answer_card = _record(answer.get("answerCard"))
+    analysis_unit = _record(answer.get("analysisUnit"))
+    return bool(answer_card.get("metrics") or answer_card.get("rows") or analysis_unit.get("status") == "ready")
+
+
+def _cross_table_context(answer: dict[str, Any], receipt: dict[str, Any], execution_plan: dict[str, Any]) -> bool:
+    if _is_cross_table_query(receipt, execution_plan):
+        return True
+    required_tables = _record(_record(answer.get("semanticPlan")).get("joinPlan")).get("requiredTables")
+    return isinstance(required_tables, list) and len(required_tables) > 1
+
+
+def _collect_evidence(answer: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """Build evidence only from validated answer structures, never plan declarations."""
+    inventory: dict[str, list[dict[str, Any]]] = {}
+
+    def add(name: str, ref: dict[str, Any]) -> None:
+        canonical = _canonical_evidence_name(name)
+        inventory.setdefault(canonical, []).append(ref)
+
+    intent_frame = _record(answer.get("intentFrame"))
+    business_understanding = _record(answer.get("businessUnderstanding"))
+    semantic_context = _record(answer.get("semanticContext"))
+    semantic_plan = _record(answer.get("semanticPlan"))
+    slots = _record(business_understanding.get("slots"))
+    receipt = _record(answer.get("queryPlanReceipt"))
+    execution_plan = _execution_plan(answer, receipt)
+
+    if intent_frame.get("schema") == "aibi-agent-intent-frame/v1" and _nonempty(intent_frame.get("decisionGoal")):
+        add("prompt-intent", {"schema": intent_frame.get("schema"), "decisionGoal": intent_frame.get("decisionGoal")})
+    resolved_slots = sorted(name for name, value in slots.items() if _resolved_slot(slots, name))
+    if (
+        business_understanding.get("schema") == "aibi-business-understanding-frame/v1"
+        and business_understanding.get("status") == "ready"
+        and not business_understanding.get("missingSlots")
+        and resolved_slots
+    ):
+        add("resolved-business-slots", {"slots": resolved_slots, "fingerprint": business_understanding.get("fingerprint")})
+
+    for ref in _field_provenance_refs(answer):
+        add("field-provenance", ref)
+
+    grain = _resolved_slot(slots, "grain")
+    if grain:
+        add("grain-definition", {"slot": "grain", "value": grain.get("value"), "source": grain.get("source")})
+
+    signals = set(str(item) for item in business_understanding.get("signals") or [])
+    metric_slots = ["metric-concept", "numerator", "denominator", "grain"] if "ratio-request" in signals else ["metric-concept", "entity-key", "grain"] if "distinct-count-request" in signals else []
+    if metric_slots and all(_resolved_slot(slots, name) for name in metric_slots):
+        add("metric-definition", {
+            "kind": "ratio" if "ratio-request" in signals else "distinct-count",
+            "slots": {name: _resolved_slot(slots, name).get("value") for name in metric_slots},
+        })
+
+    source_profile = _resolved_slot(slots, "source-profile")
+    if source_profile and list(source_profile.get("evidenceRefs") or []):
+        add("field-profile", {"value": source_profile.get("value"), "evidenceRefs": source_profile.get("evidenceRefs")})
+
+    source = _record(receipt.get("source"))
+    source_fingerprint = source.get("sourceFingerprint") or source.get("dataFingerprint") or semantic_context.get("dataFingerprint")
+    if _valid_fingerprint(source_fingerprint):
+        add("source-fingerprint", {"fingerprint": source_fingerprint})
+
+    if receipt.get("schema") == "aibi-query-plan-receipt/v1" and receipt.get("status") == "executed" and _nonempty(receipt.get("receiptKey")):
+        add("query-plan-receipt", {"receiptKey": receipt.get("receiptKey"), "status": "executed"})
+
+    proofs = _relationship_path_proofs(receipt)
+    cross_table = _cross_table_context(answer, receipt, execution_plan)
+    relationship_validation = validate_relationship_path_proof(
+        proofs,
+        cross_table=cross_table,
+        expected_relationships=_expected_relationships(receipt, execution_plan),
+    )
+    if cross_table and relationship_validation.get("proven") is True:
+        for index, proof in enumerate(proofs):
+            fingerprint = str(proof.get("proofFingerprint") or "")
+            hop_index = int(proof.get("hopIndex") if isinstance(proof.get("hopIndex"), int) else index)
+            ref = {"hopIndex": hop_index, "proofFingerprint": fingerprint, "relationKey": proof.get("relationKey")}
+            add("relationship-path-proof", ref)
+            if fingerprint:
+                add(f"relationship-path-proof:{hop_index}:{fingerprint[:20]}", ref)
+        if proofs and all(isinstance(proof.get("cardinalityProof"), dict) and bool(proof.get("cardinalityProof")) for proof in proofs):
+            add("cardinality-profile", {"hopCount": len(proofs), "proofFingerprints": [proof.get("proofFingerprint") for proof in proofs]})
+
+    comparison_plan = _record(semantic_plan.get("comparisonPlan"))
+    if comparison_plan.get("status") == "ready" and _nonempty(comparison_plan.get("currentWindow")) and _nonempty(comparison_plan.get("baselineWindow")):
+        add("comparison-baseline", {
+            "currentWindow": comparison_plan.get("currentWindow"),
+            "baselineWindow": comparison_plan.get("baselineWindow"),
+            "timeField": comparison_plan.get("timeField"),
+        })
+
+    driver_breakdown = _record(answer.get("driverBreakdown"))
+    if driver_breakdown.get("status") == "ready" and driver_breakdown.get("evidenceRefs"):
+        add("driver-breakdown", {"fingerprint": driver_breakdown.get("fingerprint"), "evidenceRefs": driver_breakdown.get("evidenceRefs")})
+
+    source_intelligence = _record(answer.get("sourceIntelligenceRun"))
+    if source_intelligence.get("usableForPlanning") is True and _valid_fingerprint(source_intelligence.get("fingerprint")):
+        add("source-intelligence-run", {"fingerprint": source_intelligence.get("fingerprint")})
+    return inventory
+
+
+def _business_step_evidence_refs(answer: dict[str, Any], business_understanding: dict[str, Any]) -> list[dict[str, Any]]:
+    refs: list[dict[str, Any]] = []
+    if business_understanding.get("fingerprint"):
+        refs.append({"type": "businessUnderstanding", "fingerprint": business_understanding.get("fingerprint")})
+    refs.extend(item for item in business_understanding.get("evidenceRefs") or [] if isinstance(item, dict))
+    for name, values in _collect_evidence(answer).items():
+        if name.startswith("relationship-path-proof:"):
+            continue
+        for value in values:
+            refs.append({"type": name, **value})
+    unique: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for ref in refs:
+        identity = _hash(ref)
+        if identity not in seen:
+            seen.add(identity)
+            unique.append(ref)
+    return unique
+
+
+def _validate_required_evidence(plan: dict[str, Any], answer: dict[str, Any]) -> dict[str, Any]:
+    inventory = _collect_evidence(answer)
+    results: list[dict[str, Any]] = []
+    blockers: list[str] = []
+    plan_executable = plan.get("status") != "blocked"
+    for step in plan.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        required = _unique_strings(step.get("requiredEvidence"))
+        # A blocked plan is intentionally allowed to omit evidence it is
+        # asking the user or runtime to supply. Completed claims are not.
+        enforce = plan_executable and step.get("status") == "completed"
+        for requirement in required:
+            canonical = _canonical_evidence_name(requirement)
+            satisfied = bool(inventory.get(canonical)) if enforce else None
+            results.append({
+                "stepKey": step.get("stepKey"),
+                "requirement": requirement,
+                "canonicalRequirement": canonical,
+                "status": "passed" if satisfied is True else "missing" if satisfied is False else "skipped-blocked-step",
+                "evidenceCount": len(inventory.get(canonical) or []),
+            })
+            if satisfied is False:
+                blockers.append(f"evidence:{step.get('stepKey')}:missing:{requirement}")
+    return {
+        "status": "passed" if not blockers else "failed",
+        "results": results,
+        "availableEvidence": sorted(inventory),
+        "blockers": blockers,
+    }
+
+
+def _validate_semantic_guards(
+    plan: dict[str, Any],
+    answer: dict[str, Any],
+    *,
+    policy_hooks: dict[str, Any],
+) -> dict[str, Any]:
+    inventory = _collect_evidence(answer)
+    business_understanding = _record(answer.get("businessUnderstanding"))
+    intent_frame = _record(answer.get("intentFrame"))
+    semantic_context = _record(answer.get("semanticContext"))
+    receipt = _record(answer.get("queryPlanReceipt"))
+    execution_plan = _execution_plan(answer, receipt)
+    slots = _record(business_understanding.get("slots"))
+    cross_table = _cross_table_context(answer, receipt, execution_plan)
+    relationship_validation = validate_relationship_path_proof(
+        _relationship_path_proofs(receipt),
+        cross_table=cross_table,
+        expected_relationships=_expected_relationships(receipt, execution_plan),
+    )
+    claims_results = _answer_claims_results(answer)
+    result_binding = _record(receipt.get("resultBinding"))
+    analysis_unit = _record(answer.get("analysisUnit"))
+    unit_validation = _record(analysis_unit.get("validation"))
+    receipt_invariants = (
+        receipt.get("status") == "executed"
+        and _valid_fingerprint(result_binding.get("resultFingerprint"))
+        and isinstance(result_binding.get("rowCount"), int)
+    )
+    unit_invariants = not analysis_unit or (
+        analysis_unit.get("status") == "ready"
+        and unit_validation.get("status") in {"ready", "passed"}
+        and not unit_validation.get("blockers")
+        and all(bool(value) for value in _record(unit_validation.get("checks")).values())
+        and analysis_unit.get("queryReceiptKey") == receipt.get("receiptKey")
+        and analysis_unit.get("resultFingerprint") == result_binding.get("resultFingerprint")
+    )
+    resolution = _record(intent_frame.get("resolution"))
+    proxy_sources = {
+        str(slot.get("source") or "").strip().casefold()
+        for slot in slots.values()
+        if isinstance(slot, dict)
+        and any(token in str(slot.get("source") or "").strip().casefold() for token in ("proxy", "fallback", "implicit"))
+    }
+    guard_values = {
+        "current-context": semantic_context.get("stale") is False and _valid_fingerprint(semantic_context.get("fingerprint")),
+        "no-silent-proxy": (
+            business_understanding.get("status") in {None, "ready"}
+            and not business_understanding.get("blockers")
+            and not business_understanding.get("missingSlots")
+            and resolution.get("silentDisambiguation") is not True
+            and not proxy_sources
+        ),
+        "no-implicit-denominator": (
+            "ratio-request" not in set(str(item) for item in business_understanding.get("signals") or [])
+            or bool(_resolved_slot(slots, "numerator") and _resolved_slot(slots, "denominator"))
+        ),
+        "field-provenance": bool(inventory.get("field-provenance")),
+        "verified-relationship-path": not cross_table or relationship_validation.get("proven") is True,
+        "relationship-proof-when-needed": not cross_table or relationship_validation.get("proven") is True,
+        "grain-explicit": bool(inventory.get("grain-definition")),
+        "time-window-complete": bool(inventory.get("comparison-baseline")),
+        "facts-before-hypotheses": bool(inventory.get("driver-breakdown") and inventory.get("query-plan-receipt")),
+        "receipt-before-claim": not claims_results or bool(inventory.get("query-plan-receipt")),
+        "result-invariants": not claims_results or bool(receipt_invariants and unit_invariants),
+        "no-permission-escalation": (
+            policy_hooks.get("status") == "passed"
+            and _record(plan.get("workflowExecution")).get("providerCanWrite") is False
+            and _record(plan.get("workflowExecution")).get("reviewerCapabilitySubmissionCount") == 0
+            and _record(plan.get("workflowExecution")).get("reviewerToolCallCount") == 0
+        ),
+    }
+    results: list[dict[str, Any]] = []
+    blockers: list[str] = []
+    plan_executable = plan.get("status") != "blocked"
+    for step in plan.get("steps") or []:
+        if not isinstance(step, dict):
+            continue
+        guards = _unique_strings(step.get("guards"))
+        enforce = plan_executable and step.get("status") == "completed"
+        for guard in guards:
+            canonical = _canonical_evidence_name(guard)
+            satisfied = guard_values.get(canonical, False) if enforce else None
+            results.append({
+                "stepKey": step.get("stepKey"),
+                "guard": guard,
+                "status": "passed" if satisfied is True else "failed" if satisfied is False else "skipped-blocked-step",
+                "supported": canonical in guard_values,
+            })
+            if satisfied is False:
+                reason = "unsupported" if canonical not in guard_values else "failed"
+                blockers.append(f"guard:{step.get('stepKey')}:{reason}:{guard}")
+    return {"status": "passed" if not blockers else "failed", "results": results, "blockers": blockers}
+
+
+def _matched_skills(skill_match: dict[str, Any]) -> list[dict[str, Any]]:
+    skills: list[dict[str, Any]] = []
+    primary = skill_match.get("selected")
+    if isinstance(primary, dict):
+        skills.append({**primary, "skillKind": str(primary.get("skillKind") or "analysis")})
+    supporting_values = [skill_match.get("supporting"), skill_match.get("supportingSkills")]
+    for values in supporting_values:
+        for item in values or [] if isinstance(values, list) else []:
+            if not isinstance(item, dict):
+                continue
+            normalized = {**item, "skillKind": str(item.get("skillKind") or "understanding")}
+            identity = (normalized.get("skillId"), normalized.get("version"))
+            if not any((existing.get("skillId"), existing.get("version")) == identity for existing in skills):
+                skills.append(normalized)
+    return skills
 
 
 def _execution_plan(answer: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
@@ -146,7 +495,7 @@ def _relationship_proof_evidence(proofs: list[dict[str, Any]]) -> tuple[list[str
     return required, refs
 
 
-def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], input_refs: list[str], required_evidence: list[str], output_schema: str, status: str = "completed", blockers: list[Any] | None = None, artifact_refs: list[Any] | None = None, evidence_refs: list[Any] | None = None) -> dict[str, Any]:
+def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], input_refs: list[str], required_evidence: list[str], output_schema: str, status: str = "completed", blockers: list[Any] | None = None, artifact_refs: list[Any] | None = None, evidence_refs: list[Any] | None = None, guards: list[Any] | None = None, declared_blocking_rules: list[Any] | None = None) -> dict[str, Any]:
     mutation_mode = AGENT_CAPABILITIES[capability_id]
     input_payload = {"inputRefs": input_refs, "dependsOn": depends_on}
     output_payload = {"artifacts": artifact_refs or [], "evidence": evidence_refs or [], "status": status}
@@ -163,7 +512,9 @@ def _step(*, key: str, kind: str, capability_id: str, depends_on: list[str], inp
         "status": status,
         "blockers": _normalize_blockers(blockers),
         "retryPolicy": {"mode": "none", "maxAttempts": 1},
-        "completionChecks": ["workspace-bound", "schema-valid", "evidence-complete"],
+        "completionChecks": _unique_strings("workspace-bound", "schema-valid", "evidence-complete", guards),
+        "guards": _unique_strings(guards),
+        "declaredBlockingRules": _unique_strings(declared_blocking_rules),
         "artifactRefs": list(artifact_refs or []),
         "evidenceRefs": list(evidence_refs or []),
         "outputFingerprint": _hash(output_payload),
@@ -176,16 +527,57 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
     action = answer.get("actionDraft") if isinstance(answer.get("actionDraft"), dict) else {}
     semantic_status = str(semantic_plan.get("status") or "not-applicable")
     semantic_blockers = [] if semantic_status in {"ready", "not-applicable"} else [semantic_status]
+    business_understanding = _record(answer.get("businessUnderstanding"))
+    skill_match = _record(business_understanding.get("skillMatch")) or _record(answer.get("analyticalSkillMatch"))
+    matched_skills = _matched_skills(skill_match)
+    supporting_skills = [skill for skill in matched_skills if skill.get("skillKind") == "understanding"]
+    business_status = str(business_understanding.get("status") or "ready")
+    business_blockers = _normalize_blockers(business_understanding.get("blockers"))
+    if business_status == "needs-clarification" and not business_blockers:
+        business_blockers = ["business-understanding-needs-clarification"]
+    business_required_evidence = _unique_strings(
+        business_understanding.get("requiredEvidence"),
+        *(skill.get("requiredEvidence") for skill in supporting_skills),
+    )
+    business_guards = _unique_strings(
+        business_understanding.get("guards"),
+        *(skill.get("semanticGuards") for skill in supporting_skills),
+    )
+    business_rules = _unique_strings(*(skill.get("blockingRules") for skill in supporting_skills))
     receipt_record = receipt or {}
     execution_plan = _execution_plan(answer, receipt_record)
     relationship_path_proofs = _relationship_path_proofs(receipt_record)
     query_blockers = _query_blockers(receipt_record, execution_plan, relationship_path_proofs)
     relationship_required, relationship_evidence_refs = _relationship_proof_evidence(relationship_path_proofs)
-    plan_blockers = [*semantic_blockers, *query_blockers]
+    plan_blockers = [*business_blockers, *semantic_blockers, *query_blockers]
     steps = [
         _step(key="step-001-intent", kind="intent", capability_id="agent.intent.resolve", depends_on=[], input_refs=["turn.prompt"], required_evidence=[], output_schema="aibi-agent-intent-frame/v1"),
-        _step(key="step-002-context", kind="context", capability_id="agent.context.route", depends_on=["step-001-intent"], input_refs=["turn.intentFrame"], required_evidence=[], output_schema="aibi-semantic-context-bundle/v1"),
-        _step(key="step-003-semantic", kind="semantic", capability_id="agent.semantic.plan", depends_on=["step-002-context"], input_refs=["turn.semanticContext"], required_evidence=["field-provenance"], output_schema="aibi-semantic-query-plan/v1", status="blocked" if semantic_blockers else "completed", blockers=semantic_blockers),
+        _step(
+            key="step-002-business-understanding",
+            kind="business-understanding",
+            capability_id="agent.context.route",
+            depends_on=["step-001-intent"],
+            input_refs=["turn.prompt", "turn.intentFrame", "answer.businessUnderstanding"],
+            required_evidence=business_required_evidence,
+            output_schema="aibi-business-understanding-frame/v1",
+            status="blocked" if business_blockers else "completed",
+            blockers=business_blockers,
+            guards=business_guards,
+            declared_blocking_rules=business_rules,
+            evidence_refs=_business_step_evidence_refs(answer, business_understanding),
+        ),
+        _step(key="step-002-context", kind="context", capability_id="agent.context.route", depends_on=["step-002-business-understanding"], input_refs=["turn.intentFrame", "answer.businessUnderstanding"], required_evidence=[], output_schema="aibi-semantic-context-bundle/v1"),
+        _step(
+            key="step-003-semantic",
+            kind="semantic",
+            capability_id="agent.semantic.plan",
+            depends_on=["step-002-context"],
+            input_refs=["turn.semanticContext"],
+            required_evidence=["field-provenance"] if semantic_status == "ready" else [],
+            output_schema="aibi-semantic-query-plan/v1",
+            status="blocked" if business_blockers or semantic_blockers else "completed",
+            blockers=[*business_blockers, *semantic_blockers],
+        ),
     ]
     execution_dep = "step-003-semantic"
     if receipt or execution_plan:
@@ -216,9 +608,29 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
         _step(key="step-090-verify", kind="validation", capability_id="agent.completion.verify", depends_on=[execution_dep], input_refs=["turn.plan", "answer"], required_evidence=[], output_schema="aibi-agent-completion-validation/v1", status="planned"),
         _step(key="step-100-answer", kind="answer", capability_id="agent.answer.compose", depends_on=["step-090-verify"], input_refs=["answer.answerCard"], required_evidence=[], output_schema="aibi-agent-answer/v1", status="planned"),
     ])
-    skill_match = answer.get("analyticalSkillMatch") if isinstance(answer.get("analyticalSkillMatch"), dict) else {}
-    selected_skill = skill_match.get("selected") if isinstance(skill_match.get("selected"), dict) else None
-    skill_refs = [{"skillId": selected_skill.get("skillId"), "version": selected_skill.get("version"), "fingerprint": selected_skill.get("fingerprint"), "status": selected_skill.get("status")}] if selected_skill else []
+    skill_refs: list[dict[str, Any]] = []
+    for skill in matched_skills:
+        reference = {
+            "skillId": skill.get("skillId"),
+            "version": skill.get("version"),
+            "fingerprint": skill.get("fingerprint"),
+            "status": skill.get("status"),
+            "skillKind": skill.get("skillKind"),
+        }
+        for key in (
+            "activeSignals",
+            "requiredSlots",
+            "missingSlots",
+            "allowedCapabilities",
+            "semanticGuards",
+            "compatibleContracts",
+            "missingRoles",
+            "missingDomainPacks",
+            "selectionEvidence",
+        ):
+            if key in skill:
+                reference[key] = skill.get(key)
+        skill_refs.append(reference)
     plan_material = {"workspaceId": workspace_id, "turnKey": turn_key, "planVersion": 1, "steps": steps, "skillRefs": skill_refs}
     base_plan = {
         "schema": PLAN_SCHEMA,
@@ -251,6 +663,10 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "contextSchema": answer.get("semanticContext", {}).get("schema") == "aibi-semantic-context-bundle/v1",
         "contextCurrent": answer.get("semanticContext", {}).get("stale") is False,
         "contextFingerprint": len(str(answer.get("semanticContext", {}).get("fingerprint") or "")) == 64,
+        "businessUnderstandingSchema": not answer.get("businessUnderstanding") or (
+            isinstance(answer.get("businessUnderstanding"), dict)
+            and answer.get("businessUnderstanding", {}).get("schema") == "aibi-business-understanding-frame/v1"
+        ),
         "answerPresent": isinstance(answer.get("answerCard"), dict),
         "workflowGraphSchema": workflow_graph.get("schema") == GRAPH_SCHEMA,
         "workflowGraphValid": workflow_validation.get("status") == "passed",
@@ -263,17 +679,32 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
     policy_hooks = evaluate_agent_policy_hooks(
         workspace_id=str(plan.get("workspaceId") or ""),
         plan=plan,
-        skill_match=answer.get("analyticalSkillMatch") if isinstance(answer.get("analyticalSkillMatch"), dict) else None,
+        skill_match=(
+            answer.get("businessUnderstanding", {}).get("skillMatch")
+            if isinstance(answer.get("businessUnderstanding"), dict) and isinstance(answer.get("businessUnderstanding", {}).get("skillMatch"), dict)
+            else answer.get("analyticalSkillMatch") if isinstance(answer.get("analyticalSkillMatch"), dict) else None
+        ),
     )
     if policy_hooks["status"] != "passed":
         blockers.extend(f"policy:{item}" for item in policy_hooks["blockers"])
+    evidence_validation = _validate_required_evidence(plan, answer)
+    semantic_guard_validation = _validate_semantic_guards(plan, answer, policy_hooks=policy_hooks)
+    checks["requiredEvidenceSatisfied"] = evidence_validation["status"] == "passed"
+    checks["semanticGuardsSatisfied"] = semantic_guard_validation["status"] == "passed"
+    blockers.extend(evidence_validation["blockers"])
+    blockers.extend(semantic_guard_validation["blockers"])
     semantic_status = str(answer.get("semanticPlan", {}).get("status") or "not-applicable")
     unresolved = list(answer.get("intentFrame", {}).get("unresolved") or [])
     receipt = _record(answer.get("queryPlanReceipt"))
     execution_plan = _execution_plan(answer, receipt)
     query_blockers = _query_blockers(receipt, execution_plan, _relationship_path_proofs(receipt))
-    outcome = "blocked" if semantic_status not in {"ready", "not-applicable"} or unresolved or query_blockers else "completed"
+    business_understanding = _record(answer.get("businessUnderstanding"))
+    business_status = str(business_understanding.get("status") or "ready")
+    business_blockers = _normalize_blockers(business_understanding.get("blockers"))
+    outcome = "blocked" if business_status == "needs-clarification" or business_blockers or semantic_status not in {"ready", "not-applicable"} or unresolved or query_blockers else "completed"
     if outcome == "blocked":
+        blockers.extend([f"business:{business_status}"] if business_status == "needs-clarification" else [])
+        blockers.extend(f"business:{item}" for item in business_blockers)
         blockers.extend([f"semantic:{semantic_status}"] if semantic_status not in {"ready", "not-applicable"} else [])
         blockers.extend(f"unresolved:{item.get('mention') or item.get('kind')}" for item in unresolved)
         blockers.extend(f"query:{item}" for item in query_blockers)
@@ -288,7 +719,15 @@ def verify_evidence_plan(plan: dict[str, Any], answer: dict[str, Any]) -> dict[s
         "policyHooks": policy_hooks,
         "workflowValidation": workflow_validation,
         "workflowExecution": workflow_execution,
-        "fingerprint": _hash({"plan": plan.get("fingerprint"), "checks": checks, "blockers": blockers}),
+        "evidenceValidation": evidence_validation,
+        "semanticGuardValidation": semantic_guard_validation,
+        "fingerprint": _hash({
+            "plan": plan.get("fingerprint"),
+            "checks": checks,
+            "blockers": blockers,
+            "evidenceValidation": evidence_validation,
+            "semanticGuardValidation": semantic_guard_validation,
+        }),
     }
 
 
@@ -311,11 +750,12 @@ def finalize_evidence_plan(plan: dict[str, Any], validation: dict[str, Any]) -> 
 def public_turn_events(plan: dict[str, Any], validation: dict[str, Any]) -> list[dict[str, Any]]:
     events = [
         {"eventType": "intent-resolved", "stepKey": "step-001-intent", "status": "completed", "summary": "业务意图已解析"},
+        {"eventType": "business-understanding-ready", "stepKey": "step-002-business-understanding", "status": next((str(step.get("status")) for step in plan.get("steps") or [] if step.get("stepKey") == "step-002-business-understanding"), "completed"), "summary": "业务口径已检查"},
         {"eventType": "context-ready", "stepKey": "step-002-context", "status": "completed", "summary": "语义上下文已绑定"},
         {"eventType": "plan-ready", "stepKey": None, "status": str(plan.get("status") or "ready"), "summary": "证据计划已生成"},
     ]
     for step in plan.get("steps") or []:
-        if step.get("stepKey") in {"step-001-intent", "step-002-context", "step-090-verify", "step-100-answer"}:
+        if step.get("stepKey") in {"step-001-intent", "step-002-business-understanding", "step-002-context", "step-090-verify", "step-100-answer"}:
             continue
         events.append({"eventType": "step-completed" if step.get("status") == "completed" else "step-blocked" if step.get("status") == "blocked" else "approval-required", "stepKey": step.get("stepKey"), "status": step.get("status"), "summary": f"{step.get('kind')} · {step.get('status')}"})
     for event in plan.get("workflowExecution", {}).get("events") or []:

@@ -224,6 +224,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("### P1.") &&
           !developmentRoadmapDocSource.includes("### P2.") &&
           developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
+          !developmentRoadmapDocSource.includes("| P1 | 业务理解与首批 Skills |") &&
+          implementationStatusSource.includes("| 业务理解与首批 Skills | 稳定初版 |") &&
           developmentRoadmapDocSource.includes("## 暂不开发") &&
           !developmentRoadmapDocSource.includes("npm run preflight"),
       },

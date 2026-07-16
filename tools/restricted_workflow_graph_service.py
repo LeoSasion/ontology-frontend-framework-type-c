@@ -176,7 +176,8 @@ def build_restricted_agent_workflow_graph(*, plan: dict[str, Any], answer: dict[
     nodes = [
         _node("node-010-resolve", operator="resolve", role="Orchestrator", depends_on=[], input_refs=["turn.prompt"], capability_id="agent.intent.resolve"),
         _node("node-020-planner", operator="branch", role="Planner", depends_on=["node-010-resolve"], input_refs=["intentFrame"]),
-        _node("node-030-context", operator="context", role="Orchestrator", depends_on=["node-010-resolve"], input_refs=["intentFrame"], capability_id="agent.context.route"),
+        _node("node-025-business", operator="context", role="Orchestrator", depends_on=["node-010-resolve"], input_refs=["intentFrame", "businessUnderstanding"], capability_id="agent.context.route"),
+        _node("node-030-context", operator="context", role="Orchestrator", depends_on=["node-025-business"], input_refs=["intentFrame", "businessUnderstanding"], capability_id="agent.context.route"),
         _node("node-040-semantic", operator="resolve", role="Orchestrator", depends_on=["node-020-planner", "node-030-context"], input_refs=["semanticContext"], capability_id=semantic_capability),
     ]
     last_orchestrator = "node-040-semantic"

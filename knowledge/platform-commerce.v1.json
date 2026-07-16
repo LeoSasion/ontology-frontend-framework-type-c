@@ -45,6 +45,7 @@
         {"role": "aftersales", "requiredFields": ["售后单号", "售后状态", "商家编码", "退商品金额"]}
       ],
       "sql": "WITH paid AS (SELECT CAST(\"商家编码\" AS TEXT) AS merchant, COUNT(*) AS paid_items FROM {{orders}} WHERE \"支付时间\" IS NOT NULL AND TRIM(CAST(\"支付时间\" AS TEXT)) <> '' AND CAST(\"订单状态\" AS TEXT) <> '已关闭' GROUP BY CAST(\"商家编码\" AS TEXT)), refunded AS (SELECT CAST(\"商家编码\" AS TEXT) AS merchant, SUM(CAST(\"退商品金额\" AS REAL)) AS refund_amount, COUNT(*) AS refund_items FROM {{aftersales}} WHERE CAST(\"售后状态\" AS TEXT) LIKE '%退款成功%' AND CAST(\"退商品金额\" AS REAL) > 0 GROUP BY CAST(\"商家编码\" AS TEXT)), ranked AS (SELECT refunded.merchant, refunded.refund_amount, refunded.refund_items, COALESCE(paid.paid_items, 0) AS paid_items FROM refunded LEFT JOIN paid ON paid.merchant = refunded.merchant ORDER BY refunded.refund_amount DESC LIMIT 10) SELECT merchant || '退款金额' AS label, refund_amount AS value FROM ranked UNION ALL SELECT merchant || '已支付商品单数', paid_items FROM ranked UNION ALL SELECT merchant || '退款率', CASE WHEN paid_items > 0 THEN refund_items * 1.0 / paid_items ELSE NULL END FROM ranked",
+      "metricDefinition": {"kind": "ratio", "metric": "退款率", "numerator": "退款成功且退商品金额大于 0 的商品记录数", "denominator": "已支付且未关闭的商品单数", "grain": "商家编码"},
       "grain": "商家编码粒度；退款率分子为成功退款商品记录数，分母为已支付且未关闭商品单数"
     },
     {
@@ -69,6 +70,7 @@
       "allTerms": ["主单", "金额"],
       "anyTerms": ["去重", "重复", "直接求和", "有效主单"],
       "tables": [{"role": "orders", "requiredFields": ["主订单编号", "订单状态", "主单应付金额"]}],
+      "entityKey": {"role": "orders", "field": "主订单编号"},
       "sql": "WITH main_orders AS (SELECT CAST(\"主订单编号\" AS TEXT) AS order_id, MAX(CAST(\"订单状态\" AS TEXT)) AS status, MAX(CAST(\"主单应付金额\" AS REAL)) AS amount FROM {{orders}} GROUP BY CAST(\"主订单编号\" AS TEXT)), eligible AS (SELECT * FROM main_orders WHERE status <> '已关闭') SELECT '有效主单金额' AS label, COALESCE(SUM(amount), 0) AS value FROM eligible UNION ALL SELECT '有效主单数', COUNT(*) FROM eligible",
       "grain": "一行一个主订单；排除已关闭主单后汇总"
     },
@@ -165,6 +167,7 @@
       "percentPattern": "([0-9]+(?:\\.[0-9]+)?)\\s*%",
       "tables": [{"role": "outbounds", "requiredFields": ["io_id", "o_id", "warehouse_name", "l_id"]}],
       "sql": "WITH per_order AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages FROM {{outbounds}} GROUP BY CAST(\"o_id\" AS TEXT)), metric AS (SELECT COALESCE(SUM(CASE WHEN packages > 1 THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0), 0) AS rate FROM per_order) SELECT '一单多包裹率' AS label, rate AS value FROM metric UNION ALL SELECT '阈值', :threshold UNION ALL SELECT '是否超过阈值', CASE WHEN rate > :threshold THEN 1 ELSE 0 END FROM metric",
+      "metricDefinition": {"kind": "ratio", "metric": "一单多包裹率", "numerator": "一单多包裹订单数", "denominator": "有销售出库记录的订单数", "grain": "销售出库订单 o_id"},
       "grain": "销售出库订单粒度；百分号输入先除以 100，再与一单多包裹订单数/有出库订单数比较"
     },
     {
@@ -174,6 +177,7 @@
       "anyTerms": ["包裹数", "订单数", "一单多包裹率"],
       "tables": [{"role": "outbounds", "requiredFields": ["io_id", "o_id", "warehouse_name", "lc_name", "l_id"]}],
       "sql": "WITH grouped AS (SELECT CAST(\"warehouse_name\" AS TEXT) AS warehouse, CAST(\"lc_name\" AS TEXT) AS carrier, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages, COUNT(DISTINCT CAST(\"o_id\" AS TEXT)) AS orders FROM {{outbounds}} GROUP BY CAST(\"warehouse_name\" AS TEXT), CAST(\"lc_name\" AS TEXT)), per_order AS (SELECT CAST(\"o_id\" AS TEXT) AS order_id, COUNT(DISTINCT CAST(\"io_id\" AS TEXT)) AS packages FROM {{outbounds}} GROUP BY CAST(\"o_id\" AS TEXT)) SELECT warehouse || '/' || carrier || '包裹数' AS label, packages AS value FROM grouped UNION ALL SELECT warehouse || '/' || carrier || '订单数', orders FROM grouped UNION ALL SELECT '一单多包裹率', COALESCE(SUM(CASE WHEN packages > 1 THEN 1 ELSE 0 END) * 1.0 / NULLIF(COUNT(*), 0), 0) FROM per_order",
+      "metricDefinition": {"kind": "ratio", "metric": "一单多包裹率", "numerator": "一单多包裹订单数", "denominator": "有销售出库记录的订单数", "grain": "销售出库订单 o_id；展示维度为仓库和物流公司"},
       "grain": "销售出库单为包裹粒度；订单按 o_id 去重；一单多包裹率分母为有出库的订单"
     },
     {

@@ -328,6 +328,24 @@ def _json_list(value: Any) -> list[Any]:
     return parsed if isinstance(parsed, list) else []
 
 
+def _knowledge_rule_authority(knowledge_rule: Any, domain_packs: Any) -> bool:
+    """Bind fixed cross-table knowledge SQL to its enabled Domain Pack, not a fake saved join."""
+    rule = knowledge_rule if isinstance(knowledge_rule, dict) else {}
+    pack_id = str(rule.get("packId") or "").strip()
+    rule_id = str(rule.get("ruleId") or "").strip()
+    pack_version = str(rule.get("packVersion") or rule.get("version") or "").strip()
+    if not pack_id or not rule_id or not pack_version:
+        return False
+    for pack in domain_packs if isinstance(domain_packs, list) else []:
+        if not isinstance(pack, dict) or str(pack.get("packId") or "").strip() != pack_id:
+            continue
+        enabled_version = str(pack.get("version") or "").strip()
+        enabled_fingerprint = str(pack.get("fingerprint") or "").strip()
+        if enabled_version and enabled_fingerprint and pack_version == enabled_version:
+            return True
+    return False
+
+
 def _current_relationship_entry(
     connection: sqlite3.Connection,
     workspace_id: str,
@@ -463,6 +481,8 @@ def current_query_receipt_source_state(
         data_fingerprint = workspace_data_fingerprint(connection, workspace_id, None)
     selection = receipt.get("selection") if isinstance(receipt.get("selection"), dict) else {}
     relationship_proofs = _normalize_relationship_path_proof(selection.get("relationshipPathProof"))
+    knowledge_rule = selection.get("knowledgeRule") if isinstance(selection.get("knowledgeRule"), dict) else None
+    knowledge_rule_authority = _knowledge_rule_authority(knowledge_rule, receipt.get("domainPacks"))
     execution_plan = selection.get("executionPlan") if isinstance(selection.get("executionPlan"), dict) else {}
     execution_relationships = (
         execution_plan.get("relationships")
@@ -472,11 +492,12 @@ def current_query_receipt_source_state(
     if not execution_relationships and isinstance(execution_plan.get("relationship"), dict):
         execution_relationships = [execution_plan["relationship"]]
     joins = selection.get("joins") if isinstance(selection.get("joins"), list) else []
-    expected_relationships = execution_relationships or joins
-    cross_table = len(table_keys) > 1 or bool(expected_relationships) or bool(relationship_proofs)
+    cross_table = len(table_keys) > 1 or bool(execution_relationships) or bool(joins) or bool(relationship_proofs)
+    relationship_path_required = cross_table and (not knowledge_rule_authority or bool(relationship_proofs))
+    expected_relationships = (execution_relationships or joins) if relationship_path_required else []
     stored_proof_validation = validate_relationship_path_proof(
         relationship_proofs,
-        cross_table=cross_table,
+        cross_table=relationship_path_required,
         expected_relationships=expected_relationships,
     )
     relationship_entries = [
@@ -484,6 +505,8 @@ def current_query_receipt_source_state(
         for proof in relationship_proofs
     ]
     relationship_blockers = list(stored_proof_validation.get("blockers") or [])
+    if knowledge_rule and not knowledge_rule_authority:
+        relationship_blockers.append("knowledge-rule-authority-invalid")
     current_relationship_path_fingerprint = _fingerprint(relationship_proofs) if relationship_proofs else None
     if current_relationship_path_fingerprint != source.get("relationshipPathFingerprint"):
         relationship_blockers.append("relationship-path-proof-fingerprint-mismatch")
@@ -537,7 +560,9 @@ def current_query_receipt_source_state(
         "workspaceMatchesReceipt": workspace_matches,
         "sourceTablesMatch": source_tables_match,
         "relationshipPath": {
-            "required": cross_table,
+            "required": relationship_path_required,
+            "authority": "domain-pack-knowledge-rule" if knowledge_rule_authority and not relationship_proofs else "saved-relationship-path" if cross_table else "single-source",
+            "knowledgeRuleBound": knowledge_rule_authority,
             "matchesReceipt": relationship_path_matches,
             "fingerprint": current_relationship_path_fingerprint,
             "validation": stored_proof_validation,
@@ -594,8 +619,9 @@ def create_query_plan_receipt(
     filters = list(filters or [])
     groups = list(groups or [])
     joins = list(joins or [])
+    knowledge_rule_authority = _knowledge_rule_authority(knowledge_rule, domain_packs)
     normalized_relationship_path_proof = _normalize_relationship_path_proof(relationship_path_proof)
-    if not normalized_relationship_path_proof:
+    if not normalized_relationship_path_proof and not knowledge_rule_authority:
         normalized_relationship_path_proof = _derived_relationship_path_proof(semantic_plan, execution_plan, joins)
     normalized_source_table_keys = _source_table_keys(
         source_table_key=source_table_key,
@@ -652,10 +678,13 @@ def create_query_plan_receipt(
         if isinstance(execution_plan, dict) and isinstance(execution_plan.get("relationship"), dict)
         else None
     )
-    expected_relationships = execution_relationships or ([single_execution_relationship] if single_execution_relationship else joins)
+    relationship_path_required = cross_table_query and (not knowledge_rule_authority or bool(normalized_relationship_path_proof))
+    expected_relationships = (
+        execution_relationships or ([single_execution_relationship] if single_execution_relationship else joins)
+    ) if relationship_path_required else []
     relationship_proof_validation = validate_relationship_path_proof(
         normalized_relationship_path_proof,
-        cross_table=cross_table_query,
+        cross_table=relationship_path_required,
         expected_relationships=expected_relationships,
     )
     semantic_root = (
@@ -723,6 +752,9 @@ def create_query_plan_receipt(
             "blocked": status == "blocked",
             "sourceTablesRegistered": all(entry["registered"] for entry in source_entries),
             "relationshipPathProven": relationship_proof_validation["proven"],
+            "relationshipPathRequired": relationship_path_required,
+            "relationshipAuthority": "domain-pack-knowledge-rule" if knowledge_rule_authority and not normalized_relationship_path_proof else "saved-relationship-path" if cross_table_query else "single-source",
+            "knowledgeRuleBound": knowledge_rule_authority,
         },
         "resultBinding": result_binding,
         "contextRefs": context_refs,

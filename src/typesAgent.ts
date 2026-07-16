@@ -30,6 +30,89 @@ export interface AgentClarification {
   message?: string | null;
 }
 
+export type BusinessUnderstandingText = string | { zh?: string; en?: string };
+
+export interface BusinessUnderstandingSignal {
+  signalKey?: string;
+  kind: string;
+  mention?: string;
+  value?: string | number | boolean | null;
+  label?: BusinessUnderstandingText;
+  source?: string;
+  confidence?: number;
+}
+
+export interface BusinessUnderstandingSlot {
+  slotKey?: string;
+  label?: BusinessUnderstandingText;
+  role?: string;
+  status: "resolved" | "missing" | "ambiguous" | "blocked" | string;
+  value?: unknown;
+  displayValue?: BusinessUnderstandingText;
+  source?: string;
+  required?: boolean;
+  reason?: string | null;
+  evidenceRefs?: Array<Record<string, unknown>>;
+}
+
+export interface BusinessUnderstandingClarification {
+  clarificationKey?: string;
+  kind?: string;
+  mention?: string;
+  question?: BusinessUnderstandingText;
+  questionLocalized?: BusinessUnderstandingText;
+  reason?: BusinessUnderstandingText;
+  priority?: number | string;
+  slotKeys?: string[];
+  slot?: string;
+  skillId?: string;
+  candidates?: Array<Record<string, unknown>>;
+  active?: boolean;
+}
+
+export interface AgentSkillReference {
+  skillId: string;
+  version: string;
+  fingerprint: string;
+  status: string;
+  skillKind?: "analytical" | "analysis" | "understanding" | "business-understanding" | string;
+  activeSignals?: string[];
+  requiredSlots?: string[];
+  missingSlots?: string[];
+  allowedCapabilities?: string[];
+  semanticGuards?: string[];
+  compatibleContracts?: string[];
+  missingRoles?: string[];
+  missingDomainPacks?: string[];
+  selectionEvidence?: Record<string, number>;
+}
+
+export interface AgentBusinessUnderstanding {
+  schema: "aibi-business-understanding-frame/v1" | string;
+  status: "ready" | "partial" | "needs-clarification" | "blocked" | string;
+  signals: Array<BusinessUnderstandingSignal | string>;
+  slots: Record<string, BusinessUnderstandingSlot>;
+  supportingSkills: AgentSkillReference[];
+  activeClarification: BusinessUnderstandingClarification | null;
+  unresolved: BusinessUnderstandingClarification[];
+  blockers: Array<string | Record<string, unknown>>;
+  requiredEvidence: string[];
+  guards: string[];
+  clarification: {
+    active: BusinessUnderstandingClarification | null;
+    items: BusinessUnderstandingClarification[];
+    askAtMostOne: boolean;
+  };
+  fingerprint: string;
+  /* Transitional aliases keep older local receipts readable while v1 rolls out. */
+  clarifications?: BusinessUnderstandingClarification[];
+  guardRules?: string[];
+  evidenceRefs?: Array<Record<string, unknown>>;
+  skillMatch?: Record<string, unknown> | null;
+  resolvedSlots?: string[];
+  missingSlots?: string[];
+}
+
 export interface SemanticContextBundle {
   schema: "aibi-semantic-context-bundle/v1" | string;
   workspaceId: string;
@@ -66,7 +149,7 @@ export interface AgentEvidencePlan {
   planVersion: number;
   status: string;
   steps: AgentEvidencePlanStep[];
-  skillRefs?: Array<{ skillId: string; version: string; fingerprint: string; status: string }>;
+  skillRefs?: AgentSkillReference[];
   registeredCapabilities: string[];
   fingerprint: string;
   workflowGraph?: AgentWorkflowGraph;
@@ -228,6 +311,7 @@ export interface AgentAskResult {
   executionPlan?: SemanticQueryExecutionPlan | null;
   analysisRun?: AnalysisRun;
   intentFrame?: BusinessIntentFrame;
+  businessUnderstanding?: AgentBusinessUnderstanding;
   semanticContext?: SemanticContextBundle;
   clarification?: AgentClarification;
   analyticalSkillMatch?: {

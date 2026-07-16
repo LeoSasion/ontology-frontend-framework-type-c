@@ -119,6 +119,11 @@ export interface AnalyticalSkillReference {
   skillId: string;
   version: string;
   fingerprint: string;
+  skillKind?: "analytical" | "analysis" | "understanding" | "business-understanding" | string;
+  triggerSignals?: Array<string | Record<string, unknown>>;
+  slotRules?: Record<string, Record<string, unknown>> | Array<Record<string, unknown>>;
+  semanticGuards?: string[];
+  compatibleContracts?: string[];
   taskTypes: string[];
   requiredRoles: string[];
   requiredDomainPacks: string[];
