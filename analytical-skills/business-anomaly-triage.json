@@ -1,0 +1,24 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "business-anomaly-triage",
+  "version": "1.0.0",
+  "displayName": {"zh": "业务异常分诊", "en": "Business anomaly triage"},
+  "description": {"zh": "先验证指标、可比基线和质量风险，再定位异常切片并分级证据。", "en": "Validate the measure, comparable baseline, and data-quality risk before locating anomalous segments and grading evidence."},
+  "skillKind": "analysis",
+  "taskTypes": ["anomaly", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["verify-anomaly-measure", "establish-comparable-baseline", "separate-data-quality-risk", "locate-anomalous-segments", "grade-impact-and-evidence", "propose-bounded-next-check"],
+  "requiredEvidence": ["field-provenance", "comparison-baseline", "grain-definition", "query-plan-receipt"],
+  "blockingRules": ["missing-comparable-baseline", "undefined-anomaly-threshold", "incomplete-time-window", "quality-risk-not-separated", "unsupported-business-cause"],
+  "triggerSignals": ["anomaly-triage-request"],
+  "slotRules": [
+    {"whenAny": ["anomaly-triage-request"], "requireAll": ["measure", "time-scope", "time-field", "comparison-baseline", "grain", "anomaly-threshold"]}
+  ],
+  "semanticGuards": ["comparable-baseline", "time-window-complete", "grain-explicit", "facts-before-hypotheses", "no-causal-overclaim", "receipt-before-claim", "result-invariants", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 18, "maxRows": 500}
+}

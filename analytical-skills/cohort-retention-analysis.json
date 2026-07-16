@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "cohort-retention-analysis",
+  "version": "1.0.0",
+  "displayName": {"zh": "队列留存分析", "en": "Cohort retention analysis"},
+  "description": {"zh": "按已确认的入组事件、留存事件和观察周期构建互斥队列并检查窗口完整性。", "en": "Build exclusive cohorts from confirmed entry and retention events while checking observation-window completeness."},
+  "skillKind": "analysis",
+  "taskTypes": ["overview", "trend", "comparison"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["resolve-cohort-entry", "resolve-retention-event", "bind-entity-key", "lock-observation-window", "build-exclusive-cohorts", "measure-period-retention", "check-censoring-and-completeness"],
+  "requiredEvidence": ["field-provenance", "grain-definition", "query-plan-receipt"],
+  "blockingRules": ["missing-cohort-entry", "missing-retention-event", "unresolved-entity", "incomplete-observation-window", "row-count-used-as-entity"],
+  "triggerSignals": ["cohort-retention-request"],
+  "slotRules": [
+    {"whenAny": ["cohort-retention-request"], "requireAll": ["entity-key", "cohort-entry-event", "retention-event", "cohort-period", "time-scope", "time-field", "grain"]},
+    {"whenAny": ["cross-table-request"], "requireAll": ["relationship-path"]}
+  ],
+  "semanticGuards": ["same-entity-population", "cohort-window-complete", "right-censoring-explicit", "grain-explicit", "relationship-proof-when-needed", "result-invariants", "receipt-before-claim", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 18, "maxRows": 500}
+}

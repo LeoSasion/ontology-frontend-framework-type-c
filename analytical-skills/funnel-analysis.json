@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "funnel-analysis",
+  "version": "1.0.0",
+  "displayName": {"zh": "漏斗分析", "en": "Funnel analysis"},
+  "description": {"zh": "在同一实体、总体和时间窗口内验证阶段顺序、逐步转化与流失。", "en": "Verify ordered stage conversion and drop-off for one entity population and time window."},
+  "skillKind": "analysis",
+  "taskTypes": ["overview", "composition", "comparison", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["resolve-funnel-stages", "verify-stage-order", "bind-entity-and-population", "lock-time-window", "verify-grain-and-relationships", "measure-stage-conversion", "verify-funnel-invariants"],
+  "requiredEvidence": ["field-provenance", "grain-definition", "query-plan-receipt"],
+  "blockingRules": ["missing-stage-definition", "unordered-stages", "unresolved-entity", "population-drift", "unsafe-relationship-path"],
+  "triggerSignals": ["funnel-request"],
+  "slotRules": [
+    {"whenAny": ["funnel-request"], "requireAll": ["funnel-stages", "stage-order", "entity-key", "population", "time-scope", "time-field", "grain"]},
+    {"whenAny": ["cross-table-request"], "requireAll": ["relationship-path"]}
+  ],
+  "semanticGuards": ["ordered-stages", "same-entity-population", "grain-explicit", "relationship-proof-when-needed", "result-invariants", "receipt-before-claim", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 18, "maxRows": 500}
+}

@@ -71,8 +71,8 @@ def legacy_fingerprint(manifest: dict) -> str:
 
 
 builtins = builtin_analytical_skills()
-check("thirteen-neutral-builtins", len(builtins) == 13 and len({item["skillId"] for item in builtins}) == 13, [item["skillId"] for item in builtins])
-check("analysis-and-understanding-skills-are-declarative", sum(item["skillKind"] == "analysis" for item in builtins) == 7 and sum(item["skillKind"] == "understanding" for item in builtins) == 6, [(item["skillId"], item["skillKind"]) for item in builtins])
+check("nineteen-neutral-builtins", len(builtins) == 19 and len({item["skillId"] for item in builtins}) == 19, [item["skillId"] for item in builtins])
+check("analysis-and-understanding-skills-are-declarative", sum(item["skillKind"] == "analysis" for item in builtins) == 13 and sum(item["skillKind"] == "understanding" for item in builtins) == 6, [(item["skillId"], item["skillKind"]) for item in builtins])
 check("builtins-use-registered-capabilities", all(capability.startswith("agent.") for item in builtins for capability in item["allowedCapabilities"]), builtins)
 
 overview_raw = json.loads((ROOT / "analytical-skills" / "overview.json").read_text(encoding="utf-8"))
@@ -144,6 +144,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-analytical-skill-") as temp:
     )
     business_gap_code, business_gap = run_cli(env, "ask", "看看数据")
     ratio_gap_code, ratio_gap = run_cli(env, "ask", "请计算退款率")
+    funnel_gap_code, funnel_gap = run_cli(env, "ask", "请做漏斗分析")
     catalog_code, catalog = run_cli(env, "analytical-skills")
     lint_code, linted = run_cli(env, "analytical-skill-lint", "--manifest", str(manifest_path))
     preview_code, preview = run_cli(env, "analytical-skill-install", "--manifest", str(manifest_path))
@@ -205,7 +206,19 @@ with tempfile.TemporaryDirectory(prefix="aibi-analytical-skill-") as temp:
         and (ratio_gap.get("answerCard") or {}).get("rows") == [],
         ratio_gap,
     )
-    check("builtin-runtime-defaults", catalog_code == 0 and len(catalog.get("enabledAnalyticalSkills") or []) == 13, catalog)
+    check(
+        "incomplete-method-request-never-falls-through-to-generic-query",
+        funnel_gap_code == 0
+        and (funnel_gap.get("businessUnderstanding") or {}).get("status") == "needs-clarification"
+        and ((funnel_gap.get("businessUnderstanding") or {}).get("methodPlan") or {}).get("skillId") == "funnel-analysis"
+        and ((funnel_gap.get("businessUnderstanding") or {}).get("methodPlan") or {}).get("status") == "blocked"
+        and (funnel_gap.get("queryPlanReceipt") or {}).get("status") == "blocked"
+        and not (funnel_gap.get("answerCard") or {}).get("query")
+        and (funnel_gap.get("answerCard") or {}).get("rows") == []
+        and len((funnel_gap.get("clarification") or {}).get("items") or []) == 1,
+        funnel_gap,
+    )
+    check("builtin-runtime-defaults", catalog_code == 0 and len(catalog.get("enabledAnalyticalSkills") or []) == 19, catalog)
     check("lint-contract", lint_code == 0 and linted.get("valid") is True and len((linted.get("manifest") or {}).get("fingerprint") or "") == 64, linted)
     check("install-requires-confirmation", preview_code == 0 and preview.get("requiresConfirmation") is True and preview.get("dryRun") is True, preview)
     check("confirmed-install-disabled-by-default", install_code == 0 and installed.get("confirmed") is True and disabled_catalog_code == 0 and not any(item.get("skillId") == "external-demo" for item in disabled_catalog.get("enabledAnalyticalSkills") or []), disabled_catalog)

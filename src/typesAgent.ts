@@ -99,6 +99,7 @@ export interface AgentBusinessUnderstanding {
   blockers: Array<string | Record<string, unknown>>;
   requiredEvidence: string[];
   guards: string[];
+  methodPlan?: AgentAnalysisMethodPlan | null;
   clarification: {
     active: BusinessUnderstandingClarification | null;
     items: BusinessUnderstandingClarification[];
@@ -112,6 +113,24 @@ export interface AgentBusinessUnderstanding {
   skillMatch?: Record<string, unknown> | null;
   resolvedSlots?: string[];
   missingSlots?: string[];
+}
+
+export interface AgentAnalysisMethodPlan {
+  schema: "aibi-analysis-method-plan/v1" | string;
+  skillId: string;
+  skillVersion: string;
+  skillFingerprint: string;
+  status: "ready" | "blocked" | string;
+  activeSignals: string[];
+  steps: string[];
+  requiredSlots: string[];
+  resolvedSlots: Record<string, BusinessUnderstandingSlot>;
+  missingSlots: string[];
+  requiredEvidence: string[];
+  semanticGuards: string[];
+  allowedCapabilities: string[];
+  resourceLimits: { maxSteps?: number; maxRows?: number; [key: string]: unknown };
+  fingerprint: string;
 }
 
 export interface SemanticContextBundle {

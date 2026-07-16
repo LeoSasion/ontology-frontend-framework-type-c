@@ -10,7 +10,7 @@ TASK_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("diagnosis", ("为什么", "原因", "诊断", "驱动", "why", "diagnose", "driver")),
     ("anomaly", ("异常", "离群", "突增", "突降", "anomaly", "outlier", "spike", "drop")),
     ("ranking", ("排名", "排行", "最高", "最低", "top ", "bottom ", "rank")),
-    ("composition", ("构成", "占比", "份额", "结构", "composition", "share", "mix")),
+    ("composition", ("构成", "占比", "份额", "结构", "分群贡献", "分组贡献", "composition", "segment contribution", "share", "mix")),
     ("trend", ("趋势", "走势", "同比", "环比", "按月", "按周", "按日", "trend", "over time", "mom", "yoy")),
     ("comparison", ("比较", "对比", "差异", "相比", "versus", " vs ", "compare", "difference")),
 )

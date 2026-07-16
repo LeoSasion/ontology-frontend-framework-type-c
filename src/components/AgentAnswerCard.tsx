@@ -110,6 +110,12 @@ function businessSignalText(signal: string) {
     "time-comparison": biText("时间对比", "Time comparison"),
     "comparison-request": biText("对比分析", "Comparison"),
     "data-quality-risk": biText("数据质量风险", "Data-quality risk"),
+    "funnel-request": biText("漏斗分析", "Funnel analysis"),
+    "cohort-retention-request": biText("队列留存", "Cohort retention"),
+    "anomaly-triage-request": biText("异常分诊", "Anomaly triage"),
+    "segment-contribution-request": biText("分群贡献", "Segment contribution"),
+    "driver-investigation-request": biText("驱动调查", "Driver investigation"),
+    "dashboard-decision-request": biText("决策看板设计", "Decision dashboard design"),
   };
   return labels[signal] ?? signal;
 }
@@ -138,6 +144,16 @@ function businessSlotText(slotKey: string, fallback?: unknown) {
     denominator: biText("分母", "Denominator"),
     "relationship-path": biText("关联路径", "Relationship path"),
     "source-profile": biText("数据画像", "Source profile"),
+    "funnel-stages": biText("漏斗阶段", "Funnel stages"),
+    "stage-order": biText("阶段顺序", "Stage order"),
+    "cohort-entry-event": biText("入组事件", "Cohort entry event"),
+    "retention-event": biText("留存事件", "Retention event"),
+    "cohort-period": biText("队列周期", "Cohort period"),
+    "anomaly-threshold": biText("异常阈值", "Anomaly threshold"),
+    "contribution-total": biText("贡献总体", "Contribution total"),
+    "driver-candidates": biText("候选驱动", "Driver candidates"),
+    "dashboard-audience": biText("看板受众", "Dashboard audience"),
+    "review-cadence": biText("复核节奏", "Review cadence"),
   };
   return labels[slotKey] ?? understandingText(fallback, slotKey);
 }
@@ -272,6 +288,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
   const activeQuestion = businessClarificationQuestion(activeUnderstandingClarification)
     || (clarificationBundle?.required ? understandingText(clarificationBundle.message) : "");
   const understandingBlockers = (businessUnderstanding?.blockers ?? []).map(businessBlockerText).filter(Boolean);
+  const methodPlan = businessUnderstanding?.methodPlan ?? null;
   const understandingNeedsAttention = Boolean(
     activeQuestion
     || unresolvedSlots.length
@@ -340,6 +357,18 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
                     <strong>{resolvedSlots.length} {biText("已解析", "resolved")} · {unresolvedSlots.length} {biText("待确认", "open")}</strong>
                   </div>
                 </div>
+                {methodPlan ? (
+                  <section className={`agentUnderstandingMethod ${methodPlan.status === "blocked" ? "blocked" : "ready"}`} data-testid="agent-understanding-method-plan">
+                    <div>
+                      <span>{biText("分析方法", "Analysis method")}</span>
+                      <strong>{methodPlan.skillId} · v{methodPlan.skillVersion}</strong>
+                      <small>{methodPlan.activeSignals.map(businessSignalText).join(" · ")}</small>
+                    </div>
+                    <ol aria-label={biText("方法步骤", "Method steps")}>
+                      {methodPlan.steps.map((step, index) => <li key={`${step}-${index}`}>{step}</li>)}
+                    </ol>
+                  </section>
+                ) : null}
                 {understandingSlots.length ? (
                   <div className="agentUnderstandingSlots">
                     {resolvedSlots.length ? (

@@ -28,9 +28,20 @@ CROSS_TABLE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 ARTIFACT_OUTPUTS = {"export", "dashboard-draft", "chart-draft"}
+METHOD_SIGNAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("funnel-request", re.compile(r"(?:漏斗|转化路径|阶段转化|流失路径|\bfunnel\b|drop[ -]?off)", re.IGNORECASE)),
+    ("cohort-retention-request", re.compile(r"(?:队列留存|分群留存|留存分析|\bcohort\s+retention\b|\bretention\s+cohort\b)", re.IGNORECASE)),
+    ("anomaly-triage-request", re.compile(r"(?:异常(?:分诊|排查|定位|影响范围)|(?:分诊|排查|定位)异常|anomaly\s+triage|triage\s+anomal)", re.IGNORECASE)),
+    ("segment-contribution-request", re.compile(r"(?:分群贡献|分组贡献|结构贡献|分段贡献|segment\s+contribution|contribution\s+by)", re.IGNORECASE)),
+    ("driver-investigation-request", re.compile(r"(?:驱动(?:调查|因素|分析)|影响因素|原因调查|driver\s+investigation|root\s+cause)", re.IGNORECASE)),
+    ("dashboard-decision-request", re.compile(r"(?:决策看板|决策仪表盘|监控看板设计|监控仪表盘设计|decision\s+dashboard|dashboard\s+design)", re.IGNORECASE)),
+)
 
 SLOT_PRIORITY = (
-    "numerator", "denominator", "entity-key", "relationship-path", "grain",
+    "funnel-stages", "stage-order", "cohort-entry-event", "retention-event", "entity-key",
+    "time-scope", "time-field", "cohort-period", "comparison-baseline", "anomaly-threshold",
+    "contribution-total", "driver-candidates", "dashboard-audience", "review-cadence",
+    "numerator", "denominator", "relationship-path", "grain",
     "field-binding", "business-rule", "term-definition", "time-scope", "comparison-baseline",
     "time-field", "measure", "dimension", "decision-goal", "source-profile",
     "output-purpose", "population", "filter-semantics", "status-meaning", "unit", "null-policy",
@@ -59,6 +70,16 @@ SLOT_QUESTIONS: dict[str, tuple[str, str]] = {
     "status-meaning": ("这些状态值分别代表什么业务阶段？", "What business stage does each status value represent?"),
     "unit": ("这个指标使用什么单位？", "Which unit should this metric use?"),
     "null-policy": ("空值应排除、归零还是作为独立状态？", "Should nulls be excluded, treated as zero, or kept as a separate state?"),
+    "funnel-stages": ("这个漏斗包含哪些已确认的业务阶段？", "Which confirmed business stages belong in this funnel?"),
+    "stage-order": ("这些漏斗阶段应按什么先后顺序计算？", "In which order should the funnel stages be evaluated?"),
+    "cohort-entry-event": ("哪个业务事件定义实体进入队列？", "Which business event defines cohort entry?"),
+    "retention-event": ("哪个后续事件代表实体在观察期内留存？", "Which subsequent event represents retention in the observation window?"),
+    "cohort-period": ("队列应按日、周还是月划分？", "Should cohorts be grouped by day, week, or month?"),
+    "anomaly-threshold": ("什么阈值或规则才算业务异常？", "Which threshold or rule defines a business anomaly?"),
+    "contribution-total": ("各分群贡献需要对账到哪个总体变化？", "Which total change should segment contributions reconcile to?"),
+    "driver-candidates": ("应优先核查哪些有证据来源的候选驱动维度？", "Which evidence-backed candidate driver dimensions should be investigated first?"),
+    "dashboard-audience": ("这个决策看板主要供谁使用？", "Who is the primary audience for this decision dashboard?"),
+    "review-cadence": ("这个看板按什么节奏复核和刷新？", "At what cadence should this dashboard be reviewed and refreshed?"),
 }
 
 
@@ -94,6 +115,13 @@ def _explicit_labeled_value(prompt: str, labels: tuple[str, ...]) -> str:
 
 def _unique_strings(values: list[Any]) -> list[str]:
     return list(dict.fromkeys(text for item in values if (text := _text(item))))
+
+
+def _ordered_values(value: str) -> list[str]:
+    if not value:
+        return []
+    parts = re.split(r"\s*(?:→|->|=>|>|＞|然后|再到|到)\s*", value)
+    return _unique_strings(parts) if len(parts) >= 2 else []
 
 
 def _evidence_ref(kind: str, **values: Any) -> dict[str, Any]:
@@ -273,6 +301,9 @@ def _signals(
         result.append("data-quality-risk")
     if requested_output in ARTIFACT_OUTPUTS:
         result.append("artifact-request")
+    for signal, pattern in METHOD_SIGNAL_PATTERNS:
+        if pattern.search(prompt):
+            result.append(signal)
     if _text(semantic_plan.get("status")) == "ready" and not unresolved and selected:
         result.append("executable-plan")
     return _unique_strings(result)
@@ -311,11 +342,20 @@ def _slot_state(
         slots["measure"] = _resolved(_text(knowledge.get("title") or knowledge.get("ruleId")), "domain-pack-rule", knowledge_refs)
     if dimensions:
         slots["dimension"] = _resolved([_qualified_field(item) for item in dimensions], "semantic-fields", _field_refs(dimensions))
+    explicit_measure = _explicit_labeled_value(prompt, ("指标", "度量", "metric", "measure"))
+    explicit_dimension = _explicit_labeled_value(prompt, ("维度", "拆解维度", "dimension"))
+    if explicit_measure and "measure" not in slots:
+        slots["measure"] = _resolved(explicit_measure, "explicit-business-definition")
+    if explicit_dimension and "dimension" not in slots:
+        slots["dimension"] = _resolved(explicit_dimension, "explicit-business-definition")
     time_scope = intent_frame.get("timeScope")
     if isinstance(time_scope, dict) and _text(time_scope.get("expression")):
         slots["time-scope"] = _resolved(time_scope, "explicit-time-expression")
     if len(time_fields) == 1:
         slots["time-field"] = _resolved(_qualified_field(time_fields[0]), "semantic-field", _field_refs(time_fields))
+    explicit_time_field = _explicit_labeled_value(prompt, ("时间字段", "统计时间", "time field"))
+    if explicit_time_field and "time-field" not in slots:
+        slots["time-field"] = _resolved(explicit_time_field, "explicit-business-definition")
     comparison_plan = _record(semantic_plan.get("comparisonPlan"))
     current_window = comparison_plan.get("currentWindow")
     baseline_window = comparison_plan.get("baselineWindow")
@@ -324,18 +364,27 @@ def _slot_state(
         slots["comparison-baseline"] = _resolved(baseline_window, "verified-comparison-plan")
         if _text(comparison_plan.get("timeField")):
             slots["time-field"] = _resolved(_text(comparison_plan.get("timeField")), "verified-comparison-plan")
+    explicit_baseline = _explicit_labeled_value(prompt, ("对比基线", "比较基线", "基线", "baseline"))
+    if explicit_baseline and "comparison-baseline" not in slots:
+        slots["comparison-baseline"] = _resolved(explicit_baseline, "explicit-business-definition")
     requested_output = _text(intent_frame.get("requestedOutput") or "answer")
     if requested_output:
         slots["output-purpose"] = _resolved(requested_output, "explicit-output-intent")
     filters = _list(intent_frame.get("filters"))
     if filters:
         slots["population"] = _resolved(filters, "explicit-filters")
+    explicit_population = _explicit_labeled_value(prompt, ("统计范围", "总体", "population"))
+    if explicit_population and "population" not in slots:
+        slots["population"] = _resolved(explicit_population, "explicit-business-definition")
 
     grain_fields = _list(_record(intent_frame.get("grainExpectation")).get("fields"))
     if grain_fields:
         slots["grain"] = _resolved(grain_fields, "intent-grain", field_evidence)
     elif knowledge and _text(knowledge.get("grain")):
         slots["grain"] = _resolved(_text(knowledge.get("grain")), "domain-pack-rule", knowledge_refs)
+    explicit_grain = _explicit_labeled_value(prompt, ("统计粒度", "粒度", "grain"))
+    if explicit_grain and "grain" not in slots:
+        slots["grain"] = _resolved(explicit_grain, "explicit-business-definition")
 
     if len(identities) == 1:
         slots["entity-key"] = _resolved(_qualified_field(identities[0]), "semantic-field", _field_refs(identities))
@@ -348,6 +397,56 @@ def _slot_state(
                 "distinct-entity-grain",
                 [*_field_refs(dimensions), *_field_refs(identities)],
             )
+    explicit_entity = _explicit_labeled_value(prompt, ("实体键", "去重键", "用户键", "entity key"))
+    if explicit_entity and "entity-key" not in slots:
+        slots["entity-key"] = _resolved(explicit_entity, "explicit-business-definition")
+
+    if "funnel-request" in signals:
+        raw_stages = _explicit_labeled_value(prompt, ("漏斗阶段", "阶段", "步骤", "stages"))
+        ordered_stages = _ordered_values(raw_stages)
+        if raw_stages:
+            stages = ordered_stages or _unique_strings(re.split(r"\s*(?:、|/|\|)\s*", raw_stages))
+            if len(stages) >= 2:
+                slots["funnel-stages"] = _resolved(stages, "explicit-business-definition")
+        if ordered_stages:
+            slots["stage-order"] = _resolved(ordered_stages, "explicit-business-definition")
+
+    if "cohort-retention-request" in signals:
+        entry_event = _explicit_labeled_value(prompt, ("入组事件", "进入事件", "首次事件", "cohort entry"))
+        retention_event = _explicit_labeled_value(prompt, ("留存事件", "回访事件", "后续事件", "retention event"))
+        cohort_period = _explicit_labeled_value(prompt, ("队列周期", "分群周期", "cohort period"))
+        if entry_event:
+            slots["cohort-entry-event"] = _resolved(entry_event, "explicit-business-definition")
+        if retention_event:
+            slots["retention-event"] = _resolved(retention_event, "explicit-business-definition")
+        if cohort_period:
+            slots["cohort-period"] = _resolved(cohort_period, "explicit-business-definition")
+
+    if "anomaly-triage-request" in signals:
+        threshold = _explicit_labeled_value(prompt, ("异常阈值", "异常标准", "阈值", "threshold"))
+        if threshold:
+            slots["anomaly-threshold"] = _resolved(threshold, "explicit-business-definition")
+
+    if "segment-contribution-request" in signals:
+        contribution_total = _explicit_labeled_value(prompt, ("贡献总体", "总体变化", "对账总体", "contribution total"))
+        if contribution_total:
+            slots["contribution-total"] = _resolved(contribution_total, "explicit-business-definition")
+
+    if "driver-investigation-request" in signals:
+        candidates = _explicit_labeled_value(prompt, ("候选驱动", "驱动维度", "候选维度", "driver candidates"))
+        candidate_values = _unique_strings(re.split(r"\s*(?:、|/|\||，|,)\s*", candidates)) if candidates else []
+        if not candidate_values and dimensions:
+            candidate_values = [_qualified_field(item) for item in dimensions]
+        if candidate_values:
+            slots["driver-candidates"] = _resolved(candidate_values, "explicit-business-definition" if candidates else "semantic-fields", _field_refs(dimensions))
+
+    if "dashboard-decision-request" in signals:
+        audience = _explicit_labeled_value(prompt, ("使用者", "受众", "决策者", "audience"))
+        cadence = _explicit_labeled_value(prompt, ("复核节奏", "刷新节奏", "更新频率", "cadence"))
+        if audience:
+            slots["dashboard-audience"] = _resolved(audience, "explicit-business-definition")
+        if cadence:
+            slots["review-cadence"] = _resolved(cadence, "explicit-business-definition")
 
     if terms:
         first = terms[0]
@@ -473,6 +572,32 @@ def _clarification_for_slot(slot: str, skill_id: str, semantic_plan: dict[str, A
     }
 
 
+def _analysis_method_plan(skill_match: dict[str, Any], slots: dict[str, dict[str, Any]]) -> dict[str, Any] | None:
+    selected = _record(skill_match.get("selected"))
+    if selected.get("skillKind") != "analysis" or selected.get("outputSchema") != "aibi-analysis-method-plan/v1":
+        return None
+    required_slots = _unique_strings(_list(selected.get("requiredSlots")))
+    missing_slots = _unique_strings(_list(selected.get("missingSlots")))
+    resolved_slots = {slot: copy.deepcopy(slots[slot]) for slot in required_slots if slot in slots}
+    material = {
+        "schema": "aibi-analysis-method-plan/v1",
+        "skillId": selected.get("skillId"),
+        "skillVersion": selected.get("version"),
+        "skillFingerprint": selected.get("fingerprint"),
+        "status": "blocked" if missing_slots or selected.get("status") == "blocked" else "ready",
+        "activeSignals": _unique_strings(_list(selected.get("activeSignals"))),
+        "steps": _unique_strings(_list(selected.get("stepTemplate"))),
+        "requiredSlots": required_slots,
+        "resolvedSlots": resolved_slots,
+        "missingSlots": missing_slots,
+        "requiredEvidence": _unique_strings(_list(selected.get("requiredEvidence"))),
+        "semanticGuards": _unique_strings(_list(selected.get("semanticGuards"))),
+        "allowedCapabilities": _unique_strings(_list(selected.get("allowedCapabilities"))),
+        "resourceLimits": copy.deepcopy(_record(selected.get("resourceLimits"))),
+    }
+    return {**material, "fingerprint": _fingerprint(material)}
+
+
 def build_business_understanding_frame(
     prompt: str,
     intent_frame: dict[str, Any],
@@ -512,9 +637,12 @@ def build_business_understanding_frame(
         intent_slots=slots,
     )
     supporting = [item for item in _list(skill_match.get("supporting")) if isinstance(item, dict)]
+    selected_skill = _record(skill_match.get("selected"))
+    method_plan = _analysis_method_plan(skill_match, slots)
     missing_by_slot: dict[str, str] = {}
     blockers: list[dict[str, Any]] = []
-    for skill in supporting:
+    governed_skills = [*([selected_skill] if method_plan else []), *supporting]
+    for skill in governed_skills:
         for slot in _list(skill.get("missingSlots")):
             slot_name = _text(slot)
             if not slot_name:
@@ -545,8 +673,8 @@ def build_business_understanding_frame(
     ordered_missing = sorted(missing_by_slot, key=lambda slot: (priority.get(slot, len(priority)), slot))
     unresolved = [_clarification_for_slot(slot, missing_by_slot[slot], semantic_plan) for slot in ordered_missing]
     active = unresolved[0] if unresolved else None
-    guards = _unique_strings([guard for skill in supporting for guard in _list(skill.get("semanticGuards"))])
-    required_evidence = _unique_strings([item for skill in supporting for item in _list(skill.get("requiredEvidence"))])
+    guards = _unique_strings([guard for skill in governed_skills for guard in _list(skill.get("semanticGuards"))])
+    required_evidence = _unique_strings([item for skill in governed_skills for item in _list(skill.get("requiredEvidence"))])
     status = "needs-clarification" if blockers else "ready"
     material = {
         "schema": FRAME_SCHEMA,
@@ -560,6 +688,7 @@ def build_business_understanding_frame(
         "blockers": blockers,
         "activeClarification": active,
         "evidenceRefs": evidence_refs,
+        "methodPlan": method_plan,
         "skillMatchFingerprint": skill_match.get("fingerprint"),
     }
     return {

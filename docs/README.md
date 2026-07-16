@@ -19,7 +19,7 @@
 
 | 文档 | 唯一职责 |
 | --- | --- |
-| [业务理解与分析 Skills](business-understanding-skills.md) | 五层业务上下文、业务理解合同、首批 Skills、专题验收与后续顺序 |
+| [业务理解与分析 Skills](business-understanding-skills.md) | 五层业务上下文、业务理解合同、理解与方法 Skills、专题验收与后续顺序 |
 | [工作区上下文目录](workspace-context-catalog.md) | Workspace Manifest、Runtime Catalog、字段画像、PII 边界、新鲜度与规划绑定 |
 | [语义补丁与审核收件箱](semantic-review-inbox.md) | 知识源适配、不可变语义提案、人工审核、漂移阻断与配置可移植 |
 | [确认计划记忆](confirmed-plan-memory.md) | 证据绑定的混合召回、Recall Receipt、显式提升和 stale 边界 |

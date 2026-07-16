@@ -605,6 +605,10 @@
   gap: 14px;
 }
 
+.progressiveDetailsBody.single > * {
+  min-width: 0;
+}
+
 .dashboardProgressiveGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

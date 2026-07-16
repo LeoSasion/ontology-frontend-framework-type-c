@@ -100,6 +100,72 @@
   min-width: 0;
 }
 
+.agentUnderstandingMethod {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.42fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+}
+
+.agentUnderstandingMethod.blocked {
+  border-color: color-mix(in srgb, var(--amber) 42%, var(--line));
+  background: color-mix(in srgb, var(--amber) 7%, var(--surface));
+}
+
+.agentUnderstandingMethod > div {
+  display: grid;
+  align-content: start;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
+.agentUnderstandingMethod span,
+.agentUnderstandingMethod small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+.agentUnderstandingMethod strong {
+  overflow-wrap: anywhere;
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.agentUnderstandingMethod ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: method-step;
+}
+
+.agentUnderstandingMethod li {
+  position: relative;
+  min-width: 0;
+  padding: 0.5rem 0.58rem 0.5rem 2rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  counter-increment: method-step;
+}
+
+.agentUnderstandingMethod li::before {
+  position: absolute;
+  left: 0.58rem;
+  color: var(--text-muted);
+  content: counter(method-step, decimal-leading-zero);
+}
+
 .agentUnderstandingSlots > section {
   min-width: 0;
   padding: var(--space-3);
@@ -269,6 +335,7 @@
 
 @media (max-width: 960px) {
   .agentUnderstandingOverview,
+  .agentUnderstandingMethod,
   .agentEvidencePlanSkills {
     grid-template-columns: minmax(0, 1fr);
   }

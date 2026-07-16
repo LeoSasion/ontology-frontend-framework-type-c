@@ -27,6 +27,7 @@ KNOWN_SKILL_CONTRACTS = {
     "aibi-agent-evidence-plan/v1",
     "aibi-query-plan-receipt/v1",
     "aibi-agent-answer/v1",
+    "aibi-analysis-method-plan/v1",
 }
 
 
@@ -109,13 +110,18 @@ def evaluate_agent_policy_hooks(*, workspace_id: str, plan: dict[str, Any], skil
         and step.get("mutationMode") == AGENT_CAPABILITIES[step.get("capabilityId")]
         for step in plan.get("steps") or []
     )
+    method_capability_intersection = (
+        not selected
+        or selected.get("outputSchema") != "aibi-analysis-method-plan/v1"
+        or set(plan_capabilities).issubset(set(str(item) for item in selected.get("allowedCapabilities") or []))
+    )
     results = {
         "workspace-bound": bool(workspace_id) and plan.get("workspaceId") == workspace_id,
         "registered-capabilities-only": all(item in AGENT_CAPABILITIES for item in [*plan_capabilities, *skill_capabilities]),
         "declaration-only-skill": not forbidden,
         "skill-declarations-valid": all(item["declarationValid"] for item in skill_checks),
         "skill-compatible-contracts": all(item["compatibleContractsValid"] for item in skill_checks),
-        "skill-no-permission-escalation": mutation_modes_match and all(item["capabilitiesValid"] for item in skill_checks),
+        "skill-no-permission-escalation": mutation_modes_match and method_capability_intersection and all(item["capabilitiesValid"] for item in skill_checks),
         "skill-resource-limits": len(plan.get("steps") or []) <= max_steps and all(item["resourcesValid"] for item in skill_checks),
         "evidence-reference-bound": all(item and len(item) <= 128 for item in evidence_refs),
     }
@@ -126,6 +132,6 @@ def evaluate_agent_policy_hooks(*, workspace_id: str, plan: dict[str, Any], skil
         "fixedHooks": list(POLICY_HOOKS),
         "results": results,
         "blockers": blockers,
-        "details": {"forbiddenPaths": forbidden, "planCapabilityCount": len(plan_capabilities), "skillCapabilityCount": len(skill_capabilities), "skillCount": len(skills), "maxSteps": max_steps, "skillChecks": skill_checks},
+        "details": {"forbiddenPaths": forbidden, "planCapabilityCount": len(plan_capabilities), "skillCapabilityCount": len(skill_capabilities), "methodCapabilityIntersection": method_capability_intersection, "skillCount": len(skills), "maxSteps": max_steps, "skillChecks": skill_checks},
         "fingerprint": _hash({"workspaceId": workspace_id, "plan": plan.get("fingerprint"), "skills": skills, "results": results}),
     }

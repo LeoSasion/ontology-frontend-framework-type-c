@@ -19,7 +19,7 @@
     "verify:agent-turns": "python scripts/verify-agent-turns.py && node --import tsx --test scripts/verify-agent-analysis-branch-route.test.ts && python scripts/verify-agent-evidence-plan-blockers.py && python scripts/verify-agent-evidence-execution-blockers.py && python scripts/verify-agent-evidence-requirements.py && node --import tsx --test scripts/verify-agent-evidence-plan-render.test.ts",
     "verify:agent-sessions": "python scripts/verify-agent-sessions.py && node --import tsx --test scripts/verify-agent-session-continuity.test.ts",
     "verify:exploration-threads": "python scripts/verify-exploration-threads.py && node scripts/verify-exploration-thread-ui.mjs",
-    "verify:analytical-skills": "python scripts/verify-analytical-skills.py",
+    "verify:analytical-skills": "python scripts/verify-analytical-skills.py && python scripts/verify-second-batch-analysis-skills.py",
     "verify:business-understanding": "python scripts/verify-business-understanding-skills.py",
     "verify:plan-quality": "python scripts/verify-plan-quality-scorecard.py && node scripts/verify-plan-quality-ui.mjs",
     "verify:workspace-context-catalog": "python scripts/verify-workspace-context-catalog.py",

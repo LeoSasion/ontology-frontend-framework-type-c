@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -165,4 +166,58 @@ test("My understanding renders signals, slot resolution, one active clarificatio
   assert.doesNotMatch(html, /This lower-value question must stay queued/);
   assert.match(html, /data-testid="agent-understanding-blockers"/);
   assert.match(html, /missing-denominator-evidence/);
+});
+
+
+test("My understanding renders a bounded analysis method plan without executable content", () => {
+  const understanding = businessUnderstandingFixture();
+  understanding.methodPlan = {
+    schema: "aibi-analysis-method-plan/v1",
+    skillId: "funnel-analysis",
+    skillVersion: "1.0.0",
+    skillFingerprint: "m".repeat(64),
+    status: "blocked",
+    activeSignals: ["funnel-request"],
+    steps: ["resolve-funnel-stages", "verify-stage-order", "verify-funnel-invariants"],
+    requiredSlots: ["funnel-stages", "stage-order"],
+    resolvedSlots: {},
+    missingSlots: ["funnel-stages", "stage-order"],
+    requiredEvidence: ["field-provenance"],
+    semanticGuards: ["ordered-stages"],
+    allowedCapabilities: ["agent.semantic.plan"],
+    resourceLimits: { maxSteps: 18, maxRows: 500 },
+    fingerprint: "f".repeat(64),
+  };
+  const html = renderToStaticMarkup(createElement(AgentAnswerCard, {
+    answerCard: {
+      kind: "clarification",
+      title: { zh: "漏斗定义待确认", en: "Funnel definition pending" },
+      summary: { zh: "先确认阶段。", en: "Confirm stages first." },
+      confidence: "needs-clarification",
+      metrics: [],
+      rows: [],
+      evidenceRefs: [],
+      nextActions: [],
+    },
+    answerEvidenceSteps: [],
+    answerQuery: null,
+    businessUnderstanding: understanding,
+    runtimeEngine: "",
+  }));
+  assert.match(html, /data-testid="agent-understanding-method-plan"/);
+  assert.match(html, /funnel-analysis · v1.0.0/);
+  assert.match(html, /漏斗分析|Funnel analysis/);
+  assert.match(html, /resolve-funnel-stages/);
+  assert.match(html, /verify-stage-order/);
+  assert.doesNotMatch(html, /SELECT\s|https?:\/\/|python\s/i);
+});
+
+
+test("progressive Agent evidence panels may shrink inside a mobile viewport", () => {
+  const sharedCss = readFileSync(new URL("../src/components/workspaceShared.css", import.meta.url), "utf8");
+  const evidenceCss = readFileSync(new URL("../src/components/agentEvidenceDrafts.css", import.meta.url), "utf8");
+  assert.match(sharedCss, /\.progressiveDetailsBody\.single\s*>\s*\*\s*\{[^}]*min-width:\s*0/s);
+  assert.match(evidenceCss, /\.agentCheckedPanel\s*\{[^}]*min-width:\s*0[^}]*width:\s*100%/s);
+  assert.match(evidenceCss, /\.agentCheckedGrid\s*\{[^}]*min-width:\s*0/s);
+  assert.match(evidenceCss, /\.agentLlmAuditPanel\s*\{[^}]*repeat\(auto-fit,\s*minmax\(min\(100%,\s*320px\),\s*1fr\)\)[^}]*min-width:\s*0/s);
 });

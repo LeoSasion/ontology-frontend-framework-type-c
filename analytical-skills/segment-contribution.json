@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "segment-contribution",
+  "version": "1.0.0",
+  "displayName": {"zh": "分群贡献分析", "en": "Segment contribution analysis"},
+  "description": {"zh": "把总体变化按互斥且可加的分群拆解，并对账贡献与残差。", "en": "Decompose a total change across exclusive additive segments and reconcile contributions and residuals."},
+  "skillKind": "analysis",
+  "taskTypes": ["composition", "comparison", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["lock-total-change", "verify-exclusive-segments", "measure-segment-change", "calculate-segment-contribution", "reconcile-to-total", "label-residual-and-limits"],
+  "requiredEvidence": ["field-provenance", "comparison-baseline", "grain-definition", "query-plan-receipt"],
+  "blockingRules": ["overlapping-segments", "non-additive-measure", "missing-contribution-total", "mixed-grain", "unreconciled-residual"],
+  "triggerSignals": ["segment-contribution-request"],
+  "slotRules": [
+    {"whenAny": ["segment-contribution-request"], "requireAll": ["measure", "dimension", "comparison-baseline", "contribution-total", "grain"]},
+    {"whenAny": ["cross-table-request"], "requireAll": ["relationship-path"]}
+  ],
+  "semanticGuards": ["comparable-baseline", "additive-contribution", "grain-explicit", "relationship-proof-when-needed", "no-causal-overclaim", "receipt-before-claim", "result-invariants", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 18, "maxRows": 500}
+}

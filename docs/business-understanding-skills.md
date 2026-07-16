@@ -98,6 +98,23 @@ Workspace Manifest、Runtime Catalog 与 Business Field Profile 已形成首版�
 
 Skill 之间可以串联，但只有 Orchestrator 能提交已登记 Capability。`analysis-verification` 是只读复核，不得修写计划或绕过阻断；需要修改时返回 `revise` 并重新进入规划。
 
+## 第二批通用方法 Skills
+
+P1-B 已把六种常见分析方法实现为中立、声明式、可阻断的 Skill，而不是行业模板或可执行脚本。每个方法同时给出专用 `triggerSignals`、`slotRules`、`stepTemplate`、`requiredEvidence`、`semanticGuards`、资源上限和固定 Capability 交集。专用信号只从用户原问题和已验证 Intent 派生；没有专用信号时，方法 Skill 不参与普通任务的候选排序。
+
+`aibi-analysis-method-plan/v1` 是被选中方法的只读计划投影，至少记录 Skill 身份与指纹、触发依据、状态、声明步骤、已解析与缺失槽位、证据、Guard、Capability 交集、资源上限和自身 fingerprint。它不包含 SQL、代码、外部地址、结果行或 Provider 推理，也不等同于已执行结果。方法计划随 Business Understanding Frame 进入 Evidence Plan；任何关键槽位缺失时，查询步骤保持阻断并只提出一个最高价值问题。
+
+| Skill ID | 专用触发与必需槽位 | 固定方法步骤 | 失败行为 |
+| --- | --- | --- | --- |
+| `funnel-analysis` | 漏斗/转化路径；阶段集合、阶段顺序、实体键、时间范围与时间字段、总体 | 解析阶段 → 校验顺序与同一实体 → 锁定窗口 → 验证关系/粒度 → 计算逐阶段总体与流失 → 复核不变量 | 阶段含义或顺序不明、跨表路径未证明、分母总体漂移时阻断；不得把单一比率当完整漏斗 |
+| `cohort-retention-analysis` | 留存/队列；实体键、入组事件、回访事件、队列周期、观察窗口与时间字段 | 定义入组 → 定义回访 → 固定观察窗口 → 构建互斥队列 → 计算分期留存 → 检查右删失与完整性 | 入组或回访事件不明、时间覆盖不足、实体不可去重时阻断；不得用行数代替留存实体 |
+| `business-anomaly-triage` | 异常排查/分诊；指标、时间窗口、可比基线、粒度、分诊阈值 | 验证指标 → 建立可比基线 → 检查数据质量 → 定位异常切片 → 评估影响与证据强度 → 输出下一步 | 缺少可比基线、时间窗不完整或质量风险未分离时只报告不可判定，不生成业务原因 |
+| `segment-contribution` | 分群/结构贡献；指标、分群维度、比较基线、贡献总体、粒度 | 锁定总变化 → 验证互斥/可加分群 → 计算分群变化与贡献 → 对账总体 → 标记残差 | 分群重叠、总体不可对账、粒度混合时阻断；贡献不得被表述为因果 |
+| `driver-investigation` | 驱动调查/原因调查；指标、比较基线、候选驱动维度、时间窗口、粒度 | 量化变化 → 枚举已验证候选 → 独立拆解 → 控制总体与粒度 → 排序证据 → 区分事实、关联与假设 | 候选维度无来源、样本或比较不可比时阻断；不得从相关性宣称因果 |
+| `dashboard-decision-design` | 决策看板/监控设计；决策目标、受众、复核节奏、核心指标、维度、时间范围与输出用途 | 定义决策 → 排列核心指标与 Guardrail → 绑定筛选/切片 → 选择兼容图形 → 复核来源与刷新边界 → 仅生成草案 | 目标、受众或指标未确认时不生成多组件看板；不得用占位指标、假数字或领域默认布局 |
+
+匹配优先级固定为：显式请求的 Skill → 专用信号命中的方法 Skill → 通用 taskType Skill。专用候选以信号覆盖、缺失槽位、任务特异度、已匹配角色排序；实质同分仍要求显式选择，禁止按文件名或加载顺序决胜。显式请求只能选择已启用、合同兼容且能力受限的 Skill，不能绕过缺失槽位或 Policy Hook。
+
 ## 执行闭环
 
 ```mermaid
@@ -141,8 +158,7 @@ flowchart LR
 
 本节只维护业务理解专题的后续顺序；跨产品优先级入口见 [未来开发队列](development-roadmap.md)。
 
-1. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`segment-contribution`、`driver-investigation`、`dashboard-decision-design`。
-2. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
+1. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
 
 ## 公开研究快照
 

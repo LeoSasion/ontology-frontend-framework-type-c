@@ -29,23 +29,32 @@ ALLOWED_BUSINESS_SIGNALS = {
     "unresolved-field", "relationship-ambiguity", "executable-plan", "data-quality-risk",
     "artifact-request",
     "missing-measure",
+    "funnel-request", "cohort-retention-request", "anomaly-triage-request",
+    "segment-contribution-request", "driver-investigation-request", "dashboard-decision-request",
 }
 ALLOWED_INTENT_SLOTS = {
     "decision-goal", "metric-concept", "measure", "dimension", "time-scope", "time-field",
     "comparison-baseline", "numerator", "denominator", "entity-key", "population", "grain",
     "field-binding", "term-definition", "business-rule", "relationship-path", "source-profile",
     "output-purpose", "filter-semantics", "status-meaning", "unit", "null-policy",
+    "funnel-stages", "stage-order", "cohort-entry-event", "retention-event", "cohort-period",
+    "anomaly-threshold", "contribution-total", "driver-candidates", "dashboard-audience",
+    "review-cadence",
 }
 ALLOWED_SEMANTIC_GUARDS = {
     "no-silent-proxy", "no-implicit-denominator", "current-context", "field-provenance",
     "verified-relationship-path", "relationship-proof-when-needed", "grain-explicit",
     "time-window-complete", "receipt-before-claim", "result-invariants", "facts-before-hypotheses",
     "no-permission-escalation",
+    "ordered-stages", "same-entity-population", "cohort-window-complete",
+    "right-censoring-explicit", "comparable-baseline", "additive-contribution",
+    "no-causal-overclaim", "dashboard-evidence-only",
 }
 CURRENT_SKILL_CONTRACTS = {
     "aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1",
     "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1",
     "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1",
+    "aibi-analysis-method-plan/v1",
 }
 ALLOWED_KEYS = {
     "schema", "skillId", "version", "displayName", "description", "taskTypes", "requiredRoles",
@@ -324,21 +333,25 @@ def match_analytical_skills(
     for skill in runtime.get("enabledAnalyticalSkills") or []:
         if task_type not in skill["taskTypes"]:
             continue
+        trigger_signals = set(skill.get("triggerSignals") or [])
+        active_signals = sorted(trigger_signals & signal_set)
+        explicitly_requested = bool(requested_skill_id and skill["skillId"] == requested_skill_id)
+        if skill.get("skillKind", "analysis") == "analysis" and trigger_signals and not active_signals and not explicitly_requested:
+            continue
         missing_roles = sorted(set(skill["requiredRoles"]) - role_set)
         missing_packs = sorted(set(skill["requiredDomainPacks"]) - pack_set)
+        active_rules = [
+            rule for rule in skill.get("slotRules") or []
+            if set(rule.get("whenAny") or []) & signal_set or explicitly_requested
+        ]
+        required_slots = sorted({slot for rule in active_rules for slot in rule.get("requireAll") or []})
+        missing_slots = [
+            slot for slot in required_slots
+            if not isinstance(slot_state.get(slot), dict) or slot_state[slot].get("status") != "resolved"
+        ]
         if skill.get("skillKind", "analysis") == "understanding":
-            active_signals = sorted(set(skill.get("triggerSignals") or []) & signal_set)
             if not active_signals:
                 continue
-            active_rules = [
-                rule for rule in skill.get("slotRules") or []
-                if set(rule.get("whenAny") or []) & signal_set
-            ]
-            required_slots = sorted({slot for rule in active_rules for slot in rule.get("requireAll") or []})
-            missing_slots = [
-                slot for slot in required_slots
-                if not isinstance(slot_state.get(slot), dict) or slot_state[slot].get("status") != "resolved"
-            ]
             status = "ready" if not missing_roles and not missing_packs and not missing_slots else "blocked"
             supporting.append({
                 "skillId": skill["skillId"], "version": skill["version"], "fingerprint": skill["fingerprint"],
@@ -355,12 +368,20 @@ def match_analytical_skills(
             continue
         if requested_skill_id and skill["skillId"] != requested_skill_id:
             continue
-        status = "ready" if not missing_roles and not missing_packs else "blocked"
+        status = "ready" if not missing_roles and not missing_packs and not missing_slots else "blocked"
         candidates.append({
             "skillId": skill["skillId"], "version": skill["version"], "fingerprint": skill["fingerprint"],
             "skillKind": "analysis",
-            "status": status, "missingRoles": missing_roles, "missingDomainPacks": missing_packs,
-            "selectionEvidence": {"taskSpecificity": 1 / len(skill["taskTypes"]), "requiredRoleCount": len(skill["requiredRoles"]), "matchedRoleCount": len(set(skill["requiredRoles"]) & role_set)},
+            "status": status, "activeSignals": active_signals, "requiredSlots": required_slots,
+            "missingSlots": missing_slots, "missingRoles": missing_roles, "missingDomainPacks": missing_packs,
+            "selectionEvidence": {
+                "signalSpecificity": (len(active_signals) / len(trigger_signals)) if trigger_signals else 0,
+                "matchedSignalCount": len(active_signals),
+                "taskSpecificity": 1 / len(skill["taskTypes"]),
+                "requiredRoleCount": len(skill["requiredRoles"]),
+                "matchedRoleCount": len(set(skill["requiredRoles"]) & role_set),
+                "requiredSlotCount": len(required_slots),
+            },
             "allowedCapabilities": skill["allowedCapabilities"], "stepTemplate": skill["stepTemplate"],
             "requiredEvidence": skill["requiredEvidence"], "blockingRules": skill["blockingRules"],
             "semanticGuards": skill.get("semanticGuards") or [],
@@ -369,7 +390,16 @@ def match_analytical_skills(
         })
     def selection_key(item: dict[str, Any]) -> tuple[Any, ...]:
         evidence = item["selectionEvidence"]
-        return (item["status"] != "ready", len(item["missingRoles"]) + len(item["missingDomainPacks"]), -float(evidence["taskSpecificity"]), -int(evidence["matchedRoleCount"]), -int(evidence["requiredRoleCount"]))
+        return (
+            not bool(item.get("activeSignals")),
+            -float(evidence.get("signalSpecificity") or 0),
+            -int(evidence.get("matchedSignalCount") or 0),
+            item["status"] != "ready",
+            len(item["missingRoles"]) + len(item["missingDomainPacks"]) + len(item.get("missingSlots") or []),
+            -float(evidence["taskSpecificity"]),
+            -int(evidence["matchedRoleCount"]),
+            -int(evidence["requiredRoleCount"]),
+        )
 
     candidates.sort(key=lambda item: (*selection_key(item), item["skillId"]))
     best = candidates[0] if candidates else None

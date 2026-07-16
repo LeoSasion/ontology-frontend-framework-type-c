@@ -1,0 +1,24 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "dashboard-decision-design",
+  "version": "1.0.0",
+  "displayName": {"zh": "决策看板设计", "en": "Decision dashboard design"},
+  "description": {"zh": "从决策目标、受众和复核节奏出发设计证据化看板草案。", "en": "Design an evidence-backed dashboard draft from the decision goal, audience, and review cadence."},
+  "skillKind": "analysis",
+  "taskTypes": ["overview", "comparison", "trend", "composition", "ranking", "anomaly", "reconciliation", "diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.action.draft", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["define-dashboard-decision", "resolve-audience-and-cadence", "prioritize-core-measures-and-guardrails", "bind-filters-and-segments", "choose-shape-compatible-visuals", "verify-source-and-refresh-boundary", "draft-dashboard-for-confirmation"],
+  "requiredEvidence": ["field-provenance", "grain-definition"],
+  "blockingRules": ["missing-decision-goal", "missing-dashboard-audience", "missing-review-cadence", "unverified-core-measure", "placeholder-widget", "stale-source"],
+  "triggerSignals": ["dashboard-decision-request"],
+  "slotRules": [
+    {"whenAny": ["dashboard-decision-request"], "requireAll": ["decision-goal", "dashboard-audience", "review-cadence", "measure", "dimension", "time-scope", "grain", "output-purpose"]}
+  ],
+  "semanticGuards": ["current-context", "field-provenance", "grain-explicit", "dashboard-evidence-only", "receipt-before-claim", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "draft-confirmation",
+  "resourceLimits": {"maxSteps": 20, "maxRows": 500}
+}

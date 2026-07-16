@@ -18,7 +18,7 @@
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
 | 看板 | 稳定核心 / Beta 领域 | 空看板不注入组件；高级编辑可用；整套领域方案保持 Beta |
 | Agent 与证据 | 稳定高级 | Intent/Context、Evidence Plan、Turn Event、Policy Hook 与 Completion Validation 同源；Analysis Unit 在计划持久化前补全；blocker 保持可读字符串；工作区 Session 可重启恢复和 Fork，失效持久 key 只恢复重试一次，浏览器禁用存储时安全退化；Analysis Run 比较分支与 Turn 父链独立；工作流图随 Turn 持久化并可回读 |
-| 业务理解与首批 Skills | 稳定初版 | 五层上下文、`aibi-business-understanding-frame/v1`、类型化单问题澄清和六个业务理解 Skill 已接入 CLI/API/UI；执行前由语义、证据、权限、新鲜度和工作区隔离门禁共同约束 |
+| 业务理解与分析 Skills | 稳定初版 | 五层上下文、`aibi-business-understanding-frame/v1`、类型化单问题澄清、六个业务理解 Skill，以及漏斗、队列留存、异常分诊、分群贡献、驱动调查和决策看板六个方法 Skill 已接入 CLI/API/UI；专用信号不会抢占普通分析，`aibi-analysis-method-plan/v1` 把步骤、槽位、证据、Guard、资源和 Capability 交集带入 Evidence Plan |
 | 计划质量评测 | 稳定初版 | 15 个固定中立 Business Expression Case 在内存夹具中确定性重放；评分卡覆盖槽位、字段、澄清、证据、重放及零容忍隔离指标，不读取用户业务行或调用 Provider；设置页可运行并查看当前/失效回执，Case Set、Policy 或运行时漂移后旧回执不用于发布 |
 | 语义补丁与审核收件箱 | 稳定初版 | JSON/Markdown/结构化纠正经声明式 Adapter 形成不可变提案；设置页展示来源和 Before/After，接受/拒绝均需预演与确认；schema/目标漂移阻断接受，reviewed 语义受自动覆盖保护，来源与审核状态可随配置迁移 |
 | Confirmed Plan Memory 与混合召回 | 稳定初版 | 成功动作先生成候选，显式提升后才形成证据绑定计划记忆；lexical、字符 n-gram、结构化计划和 freshness 联合排序并生成 Recall Receipt；召回仅提供候选，不改变 Semantic Plan，漂移后同步 stale |
@@ -46,7 +46,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 数据库 Adapter 当前只支持 allowlist 本地 SQLite 文件和显式非系统表；不接受 SQL、远程数据库或驱动插件。
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
 - 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
-- 业务理解合同和六个首批 Skill 已进入稳定初版；后续扩展仍必须同时具备实现、专项验证、运行回执和产品验收，不能用设计文档替代运行证据。
+- 业务理解合同、六个理解 Skill 和六个第二批方法 Skill 已进入稳定初版；多步骤方法的持续研究、计划修订、反例与敏感性执行仍由后续有限 Research Run 承担，不能把方法计划本身当成已执行结论。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。

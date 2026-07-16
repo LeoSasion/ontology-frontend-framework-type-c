@@ -1,0 +1,25 @@
+{
+  "schema": "aibi-analytical-skill/v1",
+  "skillId": "driver-investigation",
+  "version": "1.0.0",
+  "displayName": {"zh": "驱动调查", "en": "Driver investigation"},
+  "description": {"zh": "在可比窗口和固定粒度下调查有来源的候选驱动，并区分事实、关联与假设。", "en": "Investigate sourced candidate drivers at a fixed grain and comparable window while separating facts, associations, and hypotheses."},
+  "skillKind": "analysis",
+  "taskTypes": ["diagnosis"],
+  "requiredRoles": [],
+  "requiredDomainPacks": [],
+  "allowedCapabilities": ["agent.intent.resolve", "agent.context.route", "agent.semantic.plan", "agent.query.execute", "agent.completion.verify", "agent.answer.compose"],
+  "stepTemplate": ["quantify-observed-change", "enumerate-sourced-driver-candidates", "test-independent-breakdowns", "control-population-and-grain", "rank-evidence-strength", "separate-fact-association-and-hypothesis"],
+  "requiredEvidence": ["field-provenance", "comparison-baseline", "grain-definition", "query-plan-receipt"],
+  "blockingRules": ["unsourced-driver-candidate", "missing-comparable-baseline", "mixed-population", "mixed-grain", "causal-overclaim"],
+  "triggerSignals": ["driver-investigation-request"],
+  "slotRules": [
+    {"whenAny": ["driver-investigation-request"], "requireAll": ["measure", "comparison-baseline", "driver-candidates", "time-scope", "grain"]},
+    {"whenAny": ["cross-table-request"], "requireAll": ["relationship-path"]}
+  ],
+  "semanticGuards": ["comparable-baseline", "grain-explicit", "facts-before-hypotheses", "no-causal-overclaim", "relationship-proof-when-needed", "receipt-before-claim", "result-invariants", "no-permission-escalation"],
+  "compatibleContracts": ["aibi-agent-intent-frame/v1", "aibi-business-understanding-frame/v1", "aibi-semantic-context-bundle/v1", "aibi-semantic-query-plan/v1", "aibi-agent-evidence-plan/v1", "aibi-query-plan-receipt/v1", "aibi-analysis-method-plan/v1"],
+  "outputSchema": "aibi-analysis-method-plan/v1",
+  "confirmationMode": "read-only",
+  "resourceLimits": {"maxSteps": 18, "maxRows": 500}
+}

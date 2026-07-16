@@ -68,6 +68,8 @@
 .agentCheckedPanel {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  width: 100%;
   margin-top: 14px;
   border: 1px solid var(--bi-border);
   border-radius: 8px;
@@ -102,8 +104,9 @@
 
 .agentLlmAuditPanel {
   display: grid;
-  grid-template-columns: minmax(320px, 0.75fr) minmax(520px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 12px;
+  min-width: 0;
   align-items: stretch;
   margin-top: 12px;
   border: 1px solid var(--bi-border);
@@ -564,6 +567,10 @@
   display: grid;
   gap: 10px;
   margin-top: 12px;
+}
+
+.agentCheckedGrid {
+  min-width: 0;
 }
 
 .agentDraftQueue > summary {

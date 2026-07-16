@@ -234,6 +234,11 @@ def _collect_evidence(answer: dict[str, Any]) -> dict[str, list[dict[str, Any]]]
             "baselineWindow": comparison_plan.get("baselineWindow"),
             "timeField": comparison_plan.get("timeField"),
         })
+    elif (comparison_slot := _resolved_slot(slots, "comparison-baseline")):
+        add("comparison-baseline", {
+            "value": comparison_slot.get("value"),
+            "source": comparison_slot.get("source"),
+        })
 
     driver_breakdown = _record(answer.get("driverBreakdown"))
     if driver_breakdown.get("status") == "ready" and driver_breakdown.get("evidenceRefs"):
@@ -340,6 +345,14 @@ def _validate_semantic_guards(
         if isinstance(slot, dict)
         and any(token in str(slot.get("source") or "").strip().casefold() for token in ("proxy", "fallback", "implicit"))
     }
+    signals = {str(item) for item in business_understanding.get("signals") or []}
+    method_plan = _record(business_understanding.get("methodPlan"))
+    answer_text = json.dumps(_record(answer.get("answerCard")), ensure_ascii=False, sort_keys=True).casefold()
+    causal_overclaim = bool(re.search(
+        r"(?:证明.{0,24}(?:导致|引起)|(?:导致|引起).{0,24}的原因|\b(?:proves?|caused by|causes?)\b)",
+        answer_text,
+        re.IGNORECASE,
+    ))
     guard_values = {
         "current-context": semantic_context.get("stale") is False and _valid_fingerprint(semantic_context.get("fingerprint")),
         "no-silent-proxy": (
@@ -366,6 +379,32 @@ def _validate_semantic_guards(
             and _record(plan.get("workflowExecution")).get("providerCanWrite") is False
             and _record(plan.get("workflowExecution")).get("reviewerCapabilitySubmissionCount") == 0
             and _record(plan.get("workflowExecution")).get("reviewerToolCallCount") == 0
+        ),
+        "ordered-stages": bool(
+            _resolved_slot(slots, "funnel-stages")
+            and _resolved_slot(slots, "stage-order")
+        ),
+        "same-entity-population": bool(
+            _resolved_slot(slots, "entity-key")
+            and ("funnel-request" not in signals or _resolved_slot(slots, "population"))
+        ),
+        "cohort-window-complete": all(_resolved_slot(slots, name) for name in (
+            "cohort-entry-event", "retention-event", "cohort-period", "time-scope", "time-field",
+        )),
+        "right-censoring-explicit": bool(
+            _resolved_slot(slots, "cohort-period") and _resolved_slot(slots, "time-scope")
+        ),
+        "comparable-baseline": bool(_resolved_slot(slots, "comparison-baseline")),
+        "additive-contribution": all(_resolved_slot(slots, name) for name in (
+            "contribution-total", "dimension", "grain",
+        )),
+        "no-causal-overclaim": not causal_overclaim,
+        "dashboard-evidence-only": bool(
+            method_plan.get("skillId") == "dashboard-decision-design"
+            and method_plan.get("status") == "ready"
+            and _resolved_slot(slots, "measure")
+            and _resolved_slot(slots, "dimension")
+            and _resolved_slot(slots, "time-scope")
         ),
     }
     results: list[dict[str, Any]] = []
@@ -528,6 +567,7 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
     semantic_status = str(semantic_plan.get("status") or "not-applicable")
     semantic_blockers = [] if semantic_status in {"ready", "not-applicable"} else [semantic_status]
     business_understanding = _record(answer.get("businessUnderstanding"))
+    method_plan = _record(business_understanding.get("methodPlan"))
     skill_match = _record(business_understanding.get("skillMatch")) or _record(answer.get("analyticalSkillMatch"))
     matched_skills = _matched_skills(skill_match)
     supporting_skills = [skill for skill in matched_skills if skill.get("skillKind") == "understanding"]
@@ -567,18 +607,36 @@ def build_evidence_plan(*, workspace_id: str, turn_key: str, answer: dict[str, A
             evidence_refs=_business_step_evidence_refs(answer, business_understanding),
         ),
         _step(key="step-002-context", kind="context", capability_id="agent.context.route", depends_on=["step-002-business-understanding"], input_refs=["turn.intentFrame", "answer.businessUnderstanding"], required_evidence=[], output_schema="aibi-semantic-context-bundle/v1"),
-        _step(
+    ]
+    semantic_dep = "step-002-context"
+    if method_plan:
+        method_missing = _unique_strings(method_plan.get("missingSlots"))
+        method_blockers = [f"method-slot · {item} · required-by-method-skill" for item in method_missing]
+        steps.append(_step(
+            key="step-002-method",
+            kind="analysis-method",
+            capability_id="agent.semantic.plan",
+            depends_on=[semantic_dep],
+            input_refs=["answer.businessUnderstanding.methodPlan", "turn.semanticContext"],
+            required_evidence=_unique_strings(method_plan.get("requiredEvidence")),
+            output_schema="aibi-analysis-method-plan/v1",
+            status="blocked" if method_plan.get("status") == "blocked" or method_blockers else "completed",
+            blockers=method_blockers,
+            guards=_unique_strings(method_plan.get("semanticGuards")),
+            evidence_refs=_business_step_evidence_refs(answer, business_understanding),
+        ))
+        semantic_dep = "step-002-method"
+    steps.append(_step(
             key="step-003-semantic",
             kind="semantic",
             capability_id="agent.semantic.plan",
-            depends_on=["step-002-context"],
+            depends_on=[semantic_dep],
             input_refs=["turn.semanticContext"],
             required_evidence=["field-provenance"] if semantic_status == "ready" else [],
             output_schema="aibi-semantic-query-plan/v1",
             status="blocked" if business_blockers or semantic_blockers else "completed",
             blockers=[*business_blockers, *semantic_blockers],
-        ),
-    ]
+        ))
     execution_dep = "step-003-semantic"
     if receipt or execution_plan:
         receipt_status = str(receipt_record.get("status") or "missing")
