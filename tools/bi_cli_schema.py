@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 10
+CURRENT_SQLITE_SCHEMA_VERSION = 11
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -1014,6 +1014,56 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_plan_quality_scorecards_workspace_created
           ON plan_quality_scorecards(workspace_id, created_at);
+        CREATE TABLE IF NOT EXISTS exploration_threads (
+          thread_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          title TEXT NOT NULL,
+          status TEXT NOT NULL,
+          root_anchor_key TEXT NOT NULL,
+          current_anchor_key TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, thread_key)
+        );
+        CREATE TABLE IF NOT EXISTS exploration_anchors (
+          anchor_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          thread_key TEXT NOT NULL,
+          parent_anchor_key TEXT,
+          label TEXT NOT NULL,
+          analysis_run_key TEXT NOT NULL,
+          query_receipt_key TEXT NOT NULL,
+          analysis_unit_key TEXT NOT NULL,
+          session_key TEXT,
+          turn_key TEXT,
+          run_fingerprint TEXT NOT NULL,
+          receipt_fingerprint TEXT NOT NULL,
+          unit_fingerprint TEXT NOT NULL,
+          result_fingerprint TEXT NOT NULL,
+          chart_input_fingerprint TEXT NOT NULL,
+          turn_context_fingerprint TEXT NOT NULL,
+          binding_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, anchor_key),
+          UNIQUE(workspace_id, thread_key, analysis_run_key)
+        );
+        CREATE TABLE IF NOT EXISTS exploration_board_items (
+          board_item_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          thread_key TEXT NOT NULL,
+          anchor_key TEXT NOT NULL,
+          position INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, board_item_key),
+          UNIQUE(workspace_id, thread_key, anchor_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_exploration_threads_workspace_updated
+          ON exploration_threads(workspace_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_exploration_anchors_thread_created
+          ON exploration_anchors(workspace_id, thread_key, created_at);
+        CREATE INDEX IF NOT EXISTS idx_exploration_board_thread_position
+          ON exploration_board_items(workspace_id, thread_key, position, created_at);
         """
     )
     connection.execute(

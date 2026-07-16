@@ -222,7 +222,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&
           !developmentRoadmapDocSource.includes("P0-C：证据绑定的混合语义召回") &&
-          developmentRoadmapDocSource.includes("P1-A：Exploration Thread") &&
+          !developmentRoadmapDocSource.includes("P1-A：") &&
+          implementationStatusSource.includes("| 探索线程与结果板 | 稳定初版 |") &&
           developmentRoadmapDocSource.includes("P1-B：第二批通用分析 Skills") &&
           developmentRoadmapDocSource.includes("P1-C：有限 Research Run") &&
           developmentRoadmapDocSource.includes("P2：只在本地可信边界内增加 forecast readiness") &&

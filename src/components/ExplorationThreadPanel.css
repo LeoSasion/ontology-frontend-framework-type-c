@@ -1,0 +1,180 @@
+.explorationThreadPanel {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.explorationThreadLead,
+.explorationCardTopline,
+.explorationConfirm,
+.explorationConfirmActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.explorationThreadLead > div,
+.explorationConfirm > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.explorationThreadLead strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.explorationThreadLead small,
+.explorationConfirm span,
+.explorationCard p,
+.explorationEmpty {
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.explorationStatus,
+.explorationCardTopline span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.explorationStatus.current,
+.explorationCard.current .explorationCardTopline span:last-child {
+  border-color: color-mix(in srgb, var(--success-text) 28%, var(--border-soft));
+  color: var(--success-text);
+}
+
+.explorationStatus.stale,
+.explorationCard.stale .explorationCardTopline span:last-child,
+.explorationCard.missing .explorationCardTopline span:last-child {
+  border-color: color-mix(in srgb, var(--warning-text) 34%, var(--border-soft));
+  color: var(--warning-text);
+}
+
+.explorationConfirm {
+  align-items: flex-start;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border-soft));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface-raised));
+}
+
+.explorationConfirm code {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.explorationBoard {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  gap: 10px;
+}
+
+.explorationCard {
+  display: grid;
+  min-width: 0;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.explorationCard.stale,
+.explorationCard.missing {
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--warning-text) 8%);
+}
+
+.explorationCard p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  font-size: 12px;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.explorationCard dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+
+.explorationCard dl > div {
+  display: grid;
+  grid-template-columns: minmax(54px, auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.explorationCard dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.explorationCard dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.explorationBlocker {
+  color: var(--warning-text);
+  overflow-wrap: anywhere;
+}
+
+.explorationHistory > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.explorationBranchForm label {
+  display: grid;
+  gap: 5px;
+}
+
+.explorationBranchForm label > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.explorationMessage {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 640px) {
+  .explorationThreadLead,
+  .explorationConfirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .explorationStatus {
+    align-self: flex-start;
+  }
+
+  .explorationConfirmActions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .explorationBoard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

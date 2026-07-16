@@ -102,6 +102,12 @@ from confirmed_query_service import (
     recall_receipts_command,
 )
 from analysis_run_service import analysis_runs_command, create_analysis_run, validate_branch_parent
+from exploration_thread_service import (
+    exploration_anchor_add_command,
+    exploration_board_set_command,
+    exploration_thread_create_command,
+    exploration_threads_command,
+)
 from analysis_unit_service import (
     analysis_unit_build_command,
     analysis_unit_verify_command,
@@ -2906,6 +2912,14 @@ def main() -> int:
             result = confirm_query_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-runs":
             result = analysis_runs_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "exploration-threads":
+            result = exploration_threads_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "exploration-thread-create":
+            result = exploration_thread_create_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "exploration-anchor-add":
+            result = exploration_anchor_add_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "exploration-board-set":
+            result = exploration_board_set_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-unit-build":
             result = analysis_unit_build_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-units":
@@ -3176,7 +3190,12 @@ def main() -> int:
             result = delete_formula_command(args)
         elif args.command == "ask":
             args.prompt = " ".join(args.prompt)
-            result = ask_command(args)
+            result = attach_analysis_unit(
+                ask_command(args),
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+                now_iso=now_iso,
+            )
         elif args.command == "confirm-action":
             result = confirm_action_command(args)
             if not result.get("workspaceId"):

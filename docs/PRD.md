@@ -63,7 +63,10 @@
 - 已执行查询形成绑定 Receipt 的 Analysis Unit；冻结结果、指纹、形状和验证，不重新猜测口径。
 - Chart Adapter 只选择与 Unit 形状兼容的白名单图表；不兼容时解释性阻断。
 - 导出只消费已验证 Receipt/Unit，不重新查询或写业务库。
-- 分析分支必须保留父结果、查询、动作和拒绝历史。
+- 分析分支必须保留父结果、查询、动作和拒绝历史；已验证结果可以经预演和确认形成工作区级 Exploration Thread、不可变 Anchor 与结果板。
+- 线程恢复必须实时复核 Run、Receipt、Unit、Session/Turn 和来源绑定；失效历史仍可查看但不得继续推导，也不得回退到任意“最新”结果。
+
+探索线程、结果板与恢复边界由 [探索线程与可恢复分析上下文](exploration-threads.md) 维护。
 
 ### 通用扩展与 Agent
 
@@ -105,6 +108,7 @@
 | 知识源、语义提案与人工审核合同 | [语义补丁与审核收件箱](semantic-review-inbox.md) |
 | 计划记忆与召回合同 | [确认计划记忆](confirmed-plan-memory.md) |
 | 业务表达与计划质量评测 | [计划质量评测](plan-quality-evaluation.md) |
+| 探索线程、分析锚点与结果板 | [探索线程与可恢复分析上下文](exploration-threads.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

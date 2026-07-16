@@ -181,7 +181,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-analytical-skill-") as temp:
     enabled_external = [item for item in (configured.get("runtime") or {}).get("enabledAnalyticalSkills", []) if item.get("skillId") == "external-demo"]
     isolated_external = [item for item in (isolated.get("enabledAnalyticalSkills") or []) if item.get("skillId") == "external-demo"]
 
-    check("schema-v10-bootstrap", status_code == 0 and schema_version == 10, schema_version)
+    check("schema-v11-bootstrap", status_code == 0 and schema_version == 11, schema_version)
     check("business-gap-fixture-imported", fixture_code == 0 and fixture.get("ok") is True, fixture)
     check(
         "underspecified-question-blocks-execution-and-draft",

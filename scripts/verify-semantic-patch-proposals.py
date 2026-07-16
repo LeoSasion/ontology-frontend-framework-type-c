@@ -70,7 +70,7 @@ def main() -> None:
                 "INSERT INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at) VALUES('sales', 'default', 'Sales', 'sales_physical', 'fixture.csv', 2, 3, '2026-01-01T00:00:00+00:00', 1, '2026-01-01T00:00:00+00:00')"
             )
             connection.commit()
-        check("schema-v10-bootstrap", status.get("ok") is True and schema_version == 10, schema_version)
+        check("schema-v11-bootstrap", status.get("ok") is True and schema_version == 11, schema_version)
 
         adapters_one = cli(["knowledge-source-adapters"])
         adapters_two = cli(["knowledge-source-adapters"])

@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 10 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 11 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -117,6 +117,12 @@ try {
     "v10-plan-quality-table-and-index-are-created",
     inspectedPayload.planQualityTables?.join(":") === "plan_quality_scorecards"
       && inspectedPayload.planQualityIndexes?.join(":") === "idx_plan_quality_scorecards_workspace_created",
+    inspectedPayload,
+  );
+  add(
+    "v11-exploration-thread-tables-and-indexes-are-created",
+    inspectedPayload.explorationTables?.join(":") === "exploration_anchors:exploration_board_items:exploration_threads"
+      && inspectedPayload.explorationIndexes?.join(":") === "idx_exploration_anchors_thread_created:idx_exploration_board_thread_position:idx_exploration_threads_workspace_updated",
     inspectedPayload,
   );
 

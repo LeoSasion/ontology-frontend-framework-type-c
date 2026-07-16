@@ -53,7 +53,7 @@ const deterministicResult = {
 let server: ReturnType<typeof createServer> | null = null;
 try {
   const initial = cli(["agent-runtime-profiles"]);
-  check("schema-v10-profile-catalog-boots", initial.result.status === 0 && initial.payload.selectedProfileId === "deterministic");
+  check("schema-v11-profile-catalog-boots", initial.result.status === 0 && initial.payload.selectedProfileId === "deterministic");
   check("registry-exposes-three-reviewed-profiles", Array.isArray(initial.payload.profiles) && initial.payload.profiles.length === 3);
 
   const preview = cli(["agent-runtime-profile-set", "--profile", "deepseek"]);

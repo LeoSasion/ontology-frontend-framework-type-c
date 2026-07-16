@@ -26,9 +26,39 @@ def validate_branch_parent(connection: sqlite3.Connection, workspace_id: str, pa
     if not row:
         raise ValueError(f"Unknown analysis run in active workspace: {parent_run_key}")
     parent = _payload(row)
-    if parent["status"] != "confirmed":
-        raise ValueError("Analysis branches are available only after the parent chart is confirmed")
+    if parent["status"] not in {"confirmed", "executed"}:
+        raise ValueError("Analysis branches are available only after the parent result is executed or confirmed")
+    from analysis_unit_service import analysis_unit_consumer_state, get_analysis_unit
+    from query_plan_receipt_service import current_query_receipt_source_state, get_query_receipt
+
+    receipt = get_query_receipt(connection, workspace_id, str(parent.get("query_receipt_key") or ""))
+    if not receipt or str(receipt.get("status") or "") != "executed":
+        raise ValueError("Analysis branches require the parent Query Receipt to be executed and current")
+    source_state = current_query_receipt_source_state(connection, workspace_id, receipt)
+    if not source_state.get("matchesReceipt"):
+        blockers = ", ".join(str(item) for item in source_state.get("blockers") or ["query-receipt-drifted"])
+        raise ValueError(f"Analysis branches cannot continue from a stale parent Receipt: {blockers}")
+    unit_rows = connection.execute(
+        "SELECT unit_key FROM analysis_units WHERE workspace_id = ? AND query_receipt_key = ? ORDER BY updated_at DESC",
+        (workspace_id, parent["query_receipt_key"]),
+    ).fetchall()
+    usable_unit = False
+    for unit_row in unit_rows:
+        unit = get_analysis_unit(connection, workspace_id, str(unit_row["unit_key"]))
+        if unit and str(unit.get("status") or "") == "ready" and analysis_unit_consumer_state(connection, workspace_id, unit).get("usable"):
+            usable_unit = True
+            break
+    if not usable_unit:
+        raise ValueError("Analysis branches require a current ready parent Analysis Unit")
     return parent
+
+
+def get_analysis_run(connection: sqlite3.Connection, workspace_id: str, run_key: str) -> dict[str, Any] | None:
+    row = connection.execute(
+        "SELECT * FROM analysis_runs WHERE workspace_id = ? AND run_key = ?",
+        (workspace_id, run_key),
+    ).fetchone()
+    return _payload(row) if row else None
 
 
 def create_analysis_run(

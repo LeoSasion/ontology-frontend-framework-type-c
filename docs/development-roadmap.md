@@ -8,10 +8,9 @@
 
 ## 当前队列
 
-1. P1-A：Exploration Thread、分析锚点/分支、可恢复上下文、语义图表和结果看板。
-2. P1-B：第二批通用分析 Skills，并让每种方法复用既有语义、关系、证据和权限门禁。
-3. P1-C：有限 Research Run、不可变计划修订、反例/敏感性检查和统一追踪。
-4. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
+1. P1-B：第二批通用分析 Skills，并让每种方法复用既有语义、关系、证据和权限门禁。
+2. P1-C：有限 Research Run、不可变计划修订、反例/敏感性检查和统一追踪。
+3. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
 
 每项只有在实现、专项验证、全量回归、文档和真实运行回执同时成立后才移入 [实现状态](implementation-status.md)；设计文档、Manifest 存在或单一单元测试不单独构成交付。
 

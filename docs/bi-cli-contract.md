@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `150`
+Command count: `154`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,7 +11,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 4 |
+| `analysis` | 8 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -41,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 58 |
+| `dry-run-confirm` | 61 |
 | `evidence-receipt` | 8 |
-| `read-only` | 69 |
+| `read-only` | 70 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -113,6 +113,10 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `domain-pack-uninstall` | `domain-pack` | `dry-run-confirm` | `yes` | `no` | `--pack`, `--yes` |
 | `domain-packs` | `domain-pack` | `read-only` | `no` | `no` | `--workspace` |
 | `erp-unit-library` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--limit`, `--select`, `--summary` |
+| `exploration-anchor-add` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--thread`, `--parent-anchor`, `--run`, `--unit`, `--session`, `--turn`, `--label`, `--expected-plan`, `...` |
+| `exploration-board-set` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--thread`, `--anchor`, `--state`, `--position`, `--expected-plan`, `--yes` |
+| `exploration-thread-create` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--run`, `--unit`, `--session`, `--turn`, `--title`, `--label`, `--expected-plan`, `--yes` |
+| `exploration-threads` | `analysis` | `read-only` | `no` | `no` | `--thread`, `--limit` |
 | `export-analysis` | `evidence` | `artifact-export` | `no` | `no` | `--receipt`, `--unit`, `--output` |
 | `export-config` | `config` | `runtime-receipt` | `no` | `no` | `output` |
 | `export-evidence` | `evidence` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--output` |

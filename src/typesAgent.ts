@@ -702,6 +702,108 @@ export interface AnalysisRun {
   updated_at: string;
 }
 
+export interface ExplorationAnchorFreshness {
+  schema: "aibi-exploration-anchor-freshness/v1" | string;
+  status: "current" | "stale" | "missing" | string;
+  usableForContinuation: boolean;
+  missingRefs: string[];
+  blockers: string[];
+  staleFallbackUsed: false;
+  unitFreshness?: Record<string, unknown> | null;
+}
+
+export interface ExplorationAnchor {
+  schema: "aibi-exploration-anchor/v1" | string;
+  anchorKey: string;
+  workspaceId: string;
+  threadKey: string;
+  parentAnchorKey?: string | null;
+  label: string;
+  analysisRunKey: string;
+  queryReceiptKey: string;
+  analysisUnitKey: string;
+  sessionKey?: string | null;
+  turnKey?: string | null;
+  bindingFingerprint: string;
+  createdAt: string;
+  freshness: ExplorationAnchorFreshness;
+  summary: {
+    question: string;
+    runStatus: string;
+    unitKind: string;
+    unitTitle: string;
+    dimensionColumns: string[];
+    measureColumn?: string | null;
+    sourceTableKeys: string[];
+    chartType?: string | null;
+    allowedChartTypes: string[];
+    rowCount?: number | null;
+    rowsIncluded: false;
+  };
+}
+
+export interface ExplorationThread {
+  schema: "aibi-exploration-thread/v1" | string;
+  threadKey: string;
+  workspaceId: string;
+  title: string;
+  storedStatus: string;
+  status: "current" | "stale" | "missing" | string;
+  rootAnchorKey: string;
+  currentAnchorKey: string;
+  currentAnchorUsable: boolean;
+  missingRefs: string[];
+  anchors: ExplorationAnchor[];
+  anchorCount: number;
+  resultBoard: {
+    schema: "aibi-exploration-result-board/v1" | string;
+    items: Array<{
+      boardItemKey: string;
+      anchorKey: string;
+      position: number;
+      anchor?: ExplorationAnchor | null;
+      createdAt: string;
+      updatedAt: string;
+    }>;
+    itemCount: number;
+    businessRowsCopied: false;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExplorationThreadsPayload {
+  ok: boolean;
+  schema: string;
+  workspaceId: string;
+  explorationThreads?: ExplorationThread[];
+  explorationThread?: ExplorationThread;
+  count?: number;
+}
+
+export interface ExplorationMutationPlan {
+  schema: "aibi-exploration-mutation-plan/v1" | string;
+  kind: "thread-create" | "anchor-add" | "board-set" | string;
+  workspaceId: string;
+  proposed: Record<string, unknown>;
+  alreadyExists: boolean;
+  providerCanMutate: false;
+  businessRowsCopied: false;
+  planFingerprint: string;
+}
+
+export interface ExplorationMutationPayload {
+  ok: boolean;
+  workspaceId: string;
+  dryRun?: boolean;
+  requiresConfirmation?: boolean;
+  confirmed?: boolean;
+  changed?: boolean;
+  threadKey?: string;
+  anchorKey?: string;
+  explorationPlan: ExplorationMutationPlan;
+}
+
 export interface ActionDraft {
   action_key: string;
   workspace_id?: string;

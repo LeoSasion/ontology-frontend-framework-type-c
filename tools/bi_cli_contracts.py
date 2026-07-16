@@ -30,6 +30,10 @@ COMMAND_DOMAINS: dict[str, str] = {
     "recall-receipts": "evidence",
     "confirm-query": "context",
     "analysis-runs": "evidence",
+    "exploration-threads": "analysis",
+    "exploration-thread-create": "analysis",
+    "exploration-anchor-add": "analysis",
+    "exploration-board-set": "analysis",
     "analysis-unit-build": "analysis",
     "analysis-units": "analysis",
     "analysis-unit-verify": "analysis",
@@ -191,6 +195,11 @@ IMMEDIATE_RUNTIME_WRITES = {
     "plan-quality-evaluate",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
+STATIC_DRY_RUN_CONFIRM_COMMANDS = {
+    "exploration-thread-create",
+    "exploration-anchor-add",
+    "exploration-board-set",
+}
 
 
 def _subparser_action(parser: argparse.ArgumentParser) -> argparse._SubParsersAction | None:
@@ -239,7 +248,7 @@ def command_semantics(command: str, parser: argparse.ArgumentParser | None = Non
     arguments = []
     if parser is not None:
         arguments = [item for item in (_argument_contract(action) for action in parser._actions) if item]
-    has_yes = any("--yes" in item["flags"] for item in arguments)
+    has_yes = any("--yes" in item["flags"] for item in arguments) or command in STATIC_DRY_RUN_CONFIRM_COMMANDS
     has_output = any("--output" in item["flags"] for item in arguments)
     creates_action_draft = command in ACTION_DRAFT_COMMANDS
     writes_evidence = command in EVIDENCE_WRITING_COMMANDS

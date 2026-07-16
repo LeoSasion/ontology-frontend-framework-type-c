@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getAnalysisRuns } from "../apiTrust";
 import type { AgentAskResult } from "../types";
 import { biText } from "./Bilingual";
+import { ExplorationThreadPanel } from "./ExplorationThreadPanel";
 import "../styles/trustContext.css";
 
 type AgentTrustAdvancedPanelProps = {
@@ -11,10 +12,7 @@ type AgentTrustAdvancedPanelProps = {
 };
 
 export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: AgentTrustAdvancedPanelProps) {
-  const [branchPrompt, setBranchPrompt] = useState("");
-  const [branchLabel, setBranchLabel] = useState("");
   const [branchCount, setBranchCount] = useState(0);
-  const [busy, setBusy] = useState(false);
   const run = result.analysisRun;
   const receipt = result.queryPlanReceipt;
   const storedPathProof = receipt?.selection.relationshipPathProof;
@@ -28,18 +26,6 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
     if (!run?.run_key) return;
     void getAnalysisRuns(run.run_key).then((payload) => setBranchCount(payload.branches?.length ?? 0)).catch(() => setBranchCount(0));
   }, [run?.run_key]);
-
-  async function submitBranch() {
-    if (!run?.run_key || !branchPrompt.trim() || !canBranch) return;
-    setBusy(true);
-    try {
-      await onAskBranch(branchPrompt.trim(), run.run_key, branchLabel.trim());
-      setBranchPrompt("");
-      setBranchLabel("");
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="agentTrustAdvanced" data-testid="agent-trust-advanced">
@@ -65,16 +51,7 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
         <summary>{biText("查看查询计划技术细节", "View query-plan technical details")}</summary>
         <code className="trustSql">{receipt?.runtime.compiledSql || biText("尚无编译 SQL", "No compiled SQL yet")}</code>
       </details>
-      <div className="agentBranchForm">
-        <strong>{biText("从当前结果继续比较", "Compare from this result")}</strong>
-        {canBranch ? (
-          <>
-            <input aria-label={biText("比较分支名称，可选", "Comparison branch label, optional")} placeholder={biText("分支名称，可选", "Branch label, optional")} value={branchLabel} onChange={(event) => setBranchLabel(event.target.value)} />
-            <textarea aria-label={biText("下一项比较内容", "Next comparison request")} placeholder={biText("描述下一项比较", "Describe the next comparison")} value={branchPrompt} onChange={(event) => setBranchPrompt(event.target.value)} />
-            <button className="secondaryButton" disabled={busy || !branchPrompt.trim()} onClick={() => void submitBranch()} type="button">{busy ? biText("生成中", "Creating") : biText("创建比较分支", "Create comparison branch")}</button>
-          </>
-        ) : <span>{biText("确认当前图表后才开放分支，避免从未核对结果继续推导。", "Branches unlock after the chart is confirmed, preventing analysis from unreviewed results.")}</span>}
-      </div>
+      <ExplorationThreadPanel canBranch={canBranch} onAskBranch={onAskBranch} result={result} />
     </div>
   );
 }

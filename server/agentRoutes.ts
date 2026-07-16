@@ -131,6 +131,68 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/agent/exploration-threads" && request.method === "GET") {
+    const args = ["exploration-threads", "--limit", url.searchParams.get("limit") ?? "30"];
+    const threadKey = url.searchParams.get("thread");
+    if (threadKey) args.push("--thread", threadKey);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/exploration-threads/create" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = ["exploration-thread-create", "--run", String(body.analysisRunKey ?? "")];
+    if (body.analysisUnitKey) args.push("--unit", String(body.analysisUnitKey));
+    if (body.sessionKey) args.push("--session", String(body.sessionKey));
+    if (body.turnKey) args.push("--turn", String(body.turnKey));
+    if (body.title) args.push("--title", String(body.title));
+    if (body.label) args.push("--label", String(body.label));
+    if (body.confirm === true) {
+      args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    }
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/exploration-threads/add-anchor" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "exploration-anchor-add",
+      "--thread", String(body.threadKey ?? ""),
+      "--run", String(body.analysisRunKey ?? ""),
+    ];
+    if (body.parentAnchorKey) args.push("--parent-anchor", String(body.parentAnchorKey));
+    if (body.analysisUnitKey) args.push("--unit", String(body.analysisUnitKey));
+    if (body.sessionKey) args.push("--session", String(body.sessionKey));
+    if (body.turnKey) args.push("--turn", String(body.turnKey));
+    if (body.label) args.push("--label", String(body.label));
+    if (body.confirm === true) {
+      args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    }
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/exploration-threads/board" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "exploration-board-set",
+      "--thread", String(body.threadKey ?? ""),
+      "--anchor", String(body.anchorKey ?? ""),
+      "--state", String(body.state ?? "pinned"),
+    ];
+    if (body.position) args.push("--position", String(body.position));
+    if (body.confirm === true) {
+      args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    }
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-runs" && request.method === "GET") {
     const args = ["analysis-runs", "--limit", url.searchParams.get("limit") ?? "30"];
     const run = url.searchParams.get("run");

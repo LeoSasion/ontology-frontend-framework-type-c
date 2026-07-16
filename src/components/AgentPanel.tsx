@@ -132,6 +132,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   const activeActionResult = activeActionKey && resultActionKey(lastActionResult) === activeActionKey ? lastActionResult : null;
   const canBranchAnalysis = Boolean(result.analysisRun?.run_key) && (
     result.analysisRun?.status === "confirmed"
+    || result.analysisRun?.status === "executed"
     || (lastActionResult?.confirmed === true && resultActionKey(lastActionResult) === result.analysisRun?.action_key)
   );
   const currentDashboardDraft = dashboardCreateDraft(currentDraft);
