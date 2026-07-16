@@ -812,6 +812,18 @@ def build_parser() -> argparse.ArgumentParser:
     plan_connector_sync = sub.add_parser("plan-connector-sync")
     plan_connector_sync.add_argument("--connector", required=True)
 
+    federation_proof = sub.add_parser("federation-proof")
+    federation_proof.add_argument("--connectors", required=True, help="Comma-separated active connector keys (2-4).")
+    federation_proof.add_argument("--projections", required=True, help="JSON object mapping connector keys to projected fields.")
+    federation_proof.add_argument("--relationships", required=True, help="Comma-separated validated relationship keys.")
+    federation_proof.add_argument("--grain", required=True, help="Explicit safe analytical grain reference.")
+    federation_proof.add_argument("--entity-key", required=True, help="Identifier semantic in table.field form.")
+    federation_proof.add_argument("--filters", default="[]", help="Declarative JSON filters; arbitrary SQL is not accepted.")
+    federation_proof.add_argument("--max-sources", type=int, default=4)
+    federation_proof.add_argument("--max-fields", type=int, default=32)
+    federation_proof.add_argument("--max-relationships", type=int, default=3)
+    federation_proof.add_argument("--max-filters", type=int, default=8)
+
     infer_semantics = sub.add_parser("infer-semantics")
     infer_semantics.add_argument("--table", default="")
     infer_semantics.add_argument("--overwrite-manual", action="store_true")

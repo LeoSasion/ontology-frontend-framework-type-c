@@ -40,6 +40,7 @@ from evidence_run_store import (
     list_source_intelligence_runs,
     save_source_intelligence_run,
 )
+from federation_proof_service import federation_proof_command as federation_proof_command_service
 from import_command_service import (
     build_import_preview as build_import_preview_service,
     execute_import_commit as execute_import_commit_service,
@@ -393,6 +394,14 @@ def plan_connector_sync_command(args: argparse.Namespace) -> dict[str, Any]:
         connector_by_key_or_name=connector_by_key_or_name,
         registry_for_table=registry_for_table,
         saved_import_policy=saved_import_policy,
+    )
+
+
+def federation_proof_command(args: argparse.Namespace) -> dict[str, Any]:
+    return federation_proof_command_service(
+        args,
+        open_db=open_db,
+        active_workspace_id=active_workspace_id,
     )
 
 

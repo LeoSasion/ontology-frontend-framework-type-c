@@ -230,7 +230,9 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("P2-A：交付只读 forecast readiness") &&
           !developmentRoadmapDocSource.includes("P2-B：以 current Receipt/Unit") &&
           !developmentRoadmapDocSource.includes("P2-C：Metric Monitor") &&
-          developmentRoadmapDocSource.includes("P2-D：只读联邦证明") &&
+          !developmentRoadmapDocSource.includes("P2-D：只读联邦证明") &&
+          developmentRoadmapDocSource.includes("暂无已承诺的未交付项") &&
+          developmentRoadmapDocSource.includes("P2-A 至 P2-D 均已移入") &&
           implementationStatusSource.includes("| Forecast Readiness | 稳定初版 |") &&
           implementationStatusSource.includes("| 物化分析快照 | 稳定初版 |") &&
           implementationStatusSource.includes("| Metric Monitor | 稳定初版 |") &&

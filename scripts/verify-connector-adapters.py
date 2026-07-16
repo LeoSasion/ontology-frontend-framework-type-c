@@ -338,7 +338,7 @@ try:
     contract_envelope = run("cli-contract", ["cli-contract"])["parsed"] or {}
     contract = contract_envelope.get("contract") or {}
     command_contracts = {item.get("name"): item for item in contract.get("commands") or []}
-    adapter_commands = ["list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync"]
+    adapter_commands = ["list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync", "federation-proof"]
     check(
         "adapter-capabilities-are-read-only",
         contract.get("commandCount") == len(contract.get("commands") or [])

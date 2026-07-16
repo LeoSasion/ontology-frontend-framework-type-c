@@ -12,13 +12,13 @@ FILESYSTEM_READ_COMMANDS = {
     "preview-import", "import-commit", "preview-import-folder", "import-folder",
     "source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run",
     "validate-config", "apply-config",
-    "discover-connector", "preview-connector", "plan-connector-sync", "domain-pack-lint", "analytical-skill-lint", "analytical-skill-install",
+    "discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "domain-pack-lint", "analytical-skill-lint", "analytical-skill-install",
 }
 FILESYSTEM_WRITE_COMMANDS = {
     "source-intelligence", "source-intelligence-job-run", "export-evidence", "export-analysis", "export-config", "cli-contract",
     "domain-pack-install", "domain-pack-uninstall", "sync-connector",
 }
-NETWORK_READ_COMMANDS = {"discover-connector", "preview-connector", "plan-connector-sync", "sync-connector"}
+NETWORK_READ_COMMANDS = {"discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "sync-connector"}
 OWNED_WORKER_COMMANDS = {"source-intelligence-job-run"}
 JOB_SUPPORTED_COMMANDS = {"source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run", "jobs", "job-cancel", "job-recover", "job-process-exit"}
 AGENT_ENTRY_COMMANDS = {"ask", "confirm-action", "action-drafts", "semantic-query", "agent-turn-run", "agent-turns", "agent-turn-cancel", "agent-session-create", "agent-sessions", "agent-session-resume", "agent-session-fork", "agent-context-compact", "agent-runtime-profiles", "agent-runtime-profile-set", "agent-provider-evaluations", "agent-provider-evaluation-record", "restricted-workflow-operators", "restricted-workflow-validate", "agent-workflow-graph"}

@@ -237,6 +237,7 @@ from bi_cli_source_commands import (
     build_import_preview,
     delete_source_command,
     discover_connector_command,
+    federation_proof_command,
     execute_import_commit,
     import_commit_command,
     import_folder_command,
@@ -3116,6 +3117,8 @@ def main() -> int:
             result = preview_connector_command(args)
         elif args.command == "plan-connector-sync":
             result = plan_connector_sync_command(args)
+        elif args.command == "federation-proof":
+            result = federation_proof_command(args)
         elif args.command == "infer-semantics":
             result = infer_semantics_command(args)
         elif args.command == "list-semantics":

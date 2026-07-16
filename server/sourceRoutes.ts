@@ -254,6 +254,29 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/connectors/federation-proof" && request.method === "POST") {
+    const body = await readBody(request);
+    const connectors = Array.isArray(body.connectors) ? body.connectors.map(String) : [];
+    const relationships = Array.isArray(body.relationships) ? body.relationships.map(String) : [];
+    const args = [
+      "federation-proof",
+      "--connectors", connectors.join(","),
+      "--projections", JSON.stringify(body.projections ?? {}),
+      "--relationships", relationships.join(","),
+      "--grain", String(body.grain ?? ""),
+      "--entity-key", String(body.entityKey ?? ""),
+      "--filters", JSON.stringify(body.filters ?? []),
+    ];
+    const budget = body.budget && typeof body.budget === "object" ? body.budget as Record<string, unknown> : {};
+    if (budget.maxSources !== undefined) args.push("--max-sources", String(budget.maxSources));
+    if (budget.maxProjectedFields !== undefined) args.push("--max-fields", String(budget.maxProjectedFields));
+    if (budget.maxRelationships !== undefined) args.push("--max-relationships", String(budget.maxRelationships));
+    if (budget.maxFilters !== undefined) args.push("--max-filters", String(budget.maxFilters));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/connectors/remove" && request.method === "POST") {
     const body = await readBody(request);
     const args = ["remove-connector", "--connector", String(body.connector ?? "")];

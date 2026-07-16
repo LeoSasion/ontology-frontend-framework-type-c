@@ -74,8 +74,8 @@ BI_CLI_CAPABILITY_MAP = [
     {
         "area": "connectors-preferences",
         "compatibilityCommands": ["list-connectors", "save-connector", "sync-connector", "delete-connector", "preferences", "theme-palettes"],
-        "commands": ["list-connectors", "save-connector", "list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync", "sync-connector", "remove-connector", "preferences", "theme-palettes", "workbench"],
-        "integration": "mapped-to-read-only-connector-adapters-bounded-preview-controlled-sync-plan-preferences-theme-palettes-and-confirmed-delete",
+        "commands": ["list-connectors", "save-connector", "list-connector-adapters", "discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "sync-connector", "remove-connector", "preferences", "theme-palettes", "workbench"],
+        "integration": "mapped-to-read-only-connector-adapters-bounded-preview-controlled-sync-plan-federation-proof-preferences-theme-palettes-and-confirmed-delete",
         "status": "active",
     },
     {

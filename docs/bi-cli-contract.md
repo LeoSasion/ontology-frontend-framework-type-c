@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `170`
+Command count: `171`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -14,7 +14,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `analysis` | 24 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
-| `connector` | 8 |
+| `connector` | 9 |
 | `context` | 9 |
 | `dashboard` | 19 |
 | `domain-pack` | 5 |
@@ -43,7 +43,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 72 |
 | `evidence-receipt` | 9 |
-| `read-only` | 74 |
+| `read-only` | 75 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -125,6 +125,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `export-analysis` | `evidence` | `artifact-export` | `no` | `no` | `--receipt`, `--unit`, `--output` |
 | `export-config` | `config` | `runtime-receipt` | `no` | `no` | `output` |
 | `export-evidence` | `evidence` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--output` |
+| `federation-proof` | `connector` | `read-only` | `no` | `no` | `--connectors`, `--projections`, `--relationships`, `--grain`, `--entity-key`, `--filters`, `--max-sources`, `--max-fields`, `...` |
 | `field-update` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--field`, `--role`, `--usage`, `--confidence`, `--yes` |
 | `forecast-readiness` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--horizon` |
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |

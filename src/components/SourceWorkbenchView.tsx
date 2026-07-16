@@ -5,6 +5,7 @@ import { invalidateRelationshipRequests } from "../relationshipRequestGuard";
 import type { SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import type { useSourceWorkbenchState } from "../useSourceWorkbenchState";
 import {
+  FederationProofPanel,
   SourceWorkbenchAdvancedLoading,
   SourceWorkbenchBusinessFieldProfilePanel,
   SourceWorkbenchConnectorPanel,
@@ -356,6 +357,12 @@ export function SourceWorkbenchView({
               runBusy={runBusy}
               onRemoveImportJob={onRemoveImportJob}
             />
+
+            {showAdvanced ? <FederationProofPanel
+              workspaceId={status.workspace.id}
+              connectors={connectors}
+              relationships={relationships}
+            /> : null}
           </Suspense>
         ) : null}
       </div>

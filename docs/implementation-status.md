@@ -29,6 +29,7 @@
 | Forecast Readiness | 稳定初版 | current 趋势或异常 Unit 可按明确 horizon 执行来源、样本、节奏、稳定性、泄漏、假设和可解释性七门禁；CLI/API/Agent/UI 同源，blocked 仍是成功诊断，响应固定不生成预测、不调用 Provider、不返回业务行 |
 | 物化分析快照 | 稳定初版 | current Receipt/Unit 可经精确预演确认冻结最多 500 行；refresh/replace 追加不可变子快照，delete 擦除内容并保留 lineage tombstone；公开 CLI/API/UI 不返回冻结行，stale/missing 历史不用于规划且不回退旧快照 |
 | Metric Monitor | 稳定初版 | 用户确认的单值快照可建立不可变本地监控定义；首次手动运行建立 baseline，后续只比较语义、表身份、关系和 Pack 兼容的 current 快照，输出 baseline/normal/warning/breached/blocked 与可重放 Trace；无后台调度、通知、Provider 或业务系统写入 |
+| 只读联邦证明 | 稳定初版 | 2–4 个 active 且同步成功的 Adapter 连接可按字段投影、实体键、validated 关系连通路径、粒度、过滤 allowlist、预算和资源/关系 freshness 生成 `provable | blocked` 证明；只验证计划，不执行跨源查询、不复制业务行、不授予物化或写入权限 |
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
@@ -54,6 +55,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - Forecast Readiness 只判断是否可进入受限评测；至少需要 24 个 current Unit 时间点，且不提供 backtest、模型训练、预测值、预测图或可靠性承诺。
 - 物化分析快照最多保留 current Unit 的 500 行；它不重查来源、不替代来源、不发送通知，stale 或 missing 历史只能审计，不能继续规划。
 - Metric Monitor 首版只接受单行数值快照和用户显式阈值；cadence 不触发后台任务，历史 baseline 仅用于完整性校验后的比较证据，不可作为当前规划输入，也不发送通知或自动解释异常原因。
+- 只读联邦证明首版不执行跨源结果查询；文件与 allowlist SQLite 可用同步资源指纹证明 freshness，HTTP Adapter 尚无可比整源指纹，因此即使元数据发现成功也保持 `blocked`。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。
@@ -78,6 +80,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 npm run verify:docs
 npm run build
 npm run verify
+npm run verify:federation-proof
 npm run verify:analytical-skills
 npm run verify:plan-quality
 npm run verify:exploration-threads

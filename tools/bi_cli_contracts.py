@@ -136,6 +136,7 @@ COMMAND_DOMAINS: dict[str, str] = {
     "discover-connector": "connector",
     "preview-connector": "connector",
     "plan-connector-sync": "connector",
+    "federation-proof": "connector",
     "infer-semantics": "semantic",
     "list-semantics": "semantic",
     "set-semantic": "semantic",
