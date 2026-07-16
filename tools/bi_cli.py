@@ -95,9 +95,11 @@ from evidence_export_service import export_evidence_command
 from analysis_export_service import export_analysis_command
 from confirmed_query_service import (
     confirm_query_command,
+    confirmed_plans_command,
     confirmed_queries_command,
     create_confirmed_query_candidate,
-    recall_confirmed_queries,
+    recall_confirmed_plans,
+    recall_receipts_command,
 )
 from analysis_run_service import analysis_runs_command, create_analysis_run, validate_branch_parent
 from analysis_unit_service import (
@@ -1982,25 +1984,10 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             business_prompt,
             selected_table["table_key"] if selected_table else None,
         )
-        recalled_queries = recall_confirmed_queries(
-            connection,
-            workspace_id=workspace_id,
-            prompt=business_prompt,
-            table_key=selected_table["table_key"] if selected_table else None,
-            now_iso=now_iso,
-        )
-        recalled_fields: list[str] = []
-        for recalled in recalled_queries:
-            receipt = get_query_receipt(connection, workspace_id, recalled["query_receipt_key"])
-            selection = receipt.get("selection") if isinstance(receipt, dict) and isinstance(receipt.get("selection"), dict) else {}
-            for field in [selection.get("measure"), selection.get("group")]:
-                if field and str(field) not in recalled_fields:
-                    recalled_fields.append(str(field))
         resolution_prompt = " ".join(
             [
                 contextualized_prompt(business_prompt, context_matches),
                 platform_knowledge_context(platform_match),
-                *recalled_fields,
             ]
         ).strip()
         selected_dashboard, dashboard_confidence = select_dashboard(
@@ -2045,6 +2032,29 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             else {}
         )
         workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)
+        recall_result = recall_confirmed_plans(
+            connection,
+            workspace_id=workspace_id,
+            prompt=business_prompt,
+            explicit_table_key=semantic_selected_table_key or None,
+            semantic_plan=semantic_plan,
+            context_matches=context_matches,
+            planning_binding=workspace_manifest_ref,
+            now_iso=now_iso,
+        )
+        recalled_plans = list(recall_result.get("candidates") or [])
+        recall_receipt = recall_result.get("receipt") if isinstance(recall_result.get("receipt"), dict) else None
+        recalled_queries = [
+            {
+                "query_key": item.get("queryKey"),
+                "query_receipt_key": item.get("queryReceiptKey"),
+                "question": item.get("question"),
+                "matchScore": item.get("matchScore"),
+                "planMemoryKey": item.get("memoryKey"),
+                "matchChannels": item.get("matchChannels") or {},
+            }
+            for item in recalled_plans
+        ]
         semantic_context = build_semantic_context_bundle(
             workspace_id=workspace_id,
             intent_frame=intent_frame,
@@ -2059,6 +2069,8 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             session_context=getattr(args, "session_context", None),
             business_understanding=business_understanding,
             workspace_manifest_ref=workspace_manifest_ref,
+            recalled_plans=recalled_plans,
+            recall_receipt=recall_receipt,
         )
         clarification = build_agent_clarification(intent_frame, semantic_context, business_understanding)
         business_understanding_blocked = (
@@ -2324,10 +2336,14 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
         ] + [
             {"type": "contextRule", "ruleKey": item["rule_key"], "title": item["title"]}
             for item in context_matches["rules"]
-        ] + [
-            {"type": "confirmedQuery", "queryKey": item["query_key"], "queryReceiptKey": item["query_receipt_key"]}
-            for item in recalled_queries
         ]
+        if recall_receipt:
+            context_refs.append({
+                "type": "recallReceipt",
+                "receiptKey": recall_receipt["receiptKey"],
+                "status": recall_receipt["status"],
+                "candidateOnly": True,
+            })
         if platform_match:
             context_refs.append(
                 {
@@ -2550,6 +2566,18 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                 {"queryKey": item["query_key"], "question": item["question"], "matchScore": item["matchScore"]}
                 for item in recalled_queries
             ],
+            "confirmedPlans": [
+                {
+                    "memoryKey": item.get("memoryKey"),
+                    "queryKey": item.get("queryKey"),
+                    "question": item.get("question"),
+                    "matchScore": item.get("matchScore"),
+                    "matchChannels": item.get("matchChannels") or {},
+                    "canAuthorizeSelection": False,
+                }
+                for item in recalled_plans
+            ],
+            "recallReceipt": recall_receipt,
             "knowledgeRules": [
                 {
                     "packId": platform_match["packId"],
@@ -2863,6 +2891,10 @@ def main() -> int:
             result = export_analysis_command(args, open_db=open_db, active_workspace_id=active_workspace_id, root=ROOT)
         elif args.command == "confirmed-queries":
             result = confirmed_queries_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "confirmed-plans":
+            result = confirmed_plans_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "recall-receipts":
+            result = recall_receipts_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "confirm-query":
             result = confirm_query_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-runs":

@@ -8,11 +8,10 @@
 
 ## 当前队列
 
-1. P0-C：证据绑定的混合语义召回、Recall Receipt 与 Confirmed Plan Memory。
-2. P0-D：确定性 Plan Quality Scorecard、Business Expression Case 和端到端评测集。
-3. P1：Exploration Thread、锚点/分支、语义图表、结果看板和第二批分析 Skills。
-4. P1-C：有限 Research Run、不可变计划修订、反例/敏感性检查和统一追踪。
-5. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
+1. P0-D：确定性 Plan Quality Scorecard、Business Expression Case 和端到端评测集。
+2. P1：Exploration Thread、锚点/分支、语义图表、结果看板和第二批分析 Skills。
+3. P1-C：有限 Research Run、不可变计划修订、反例/敏感性检查和统一追踪。
+4. P2：只在本地可信边界内增加 forecast readiness、Metric Monitor、物化快照和只读联邦证明。
 
 每项只有在实现、专项验证、全量回归、文档和真实运行回执同时成立后才移入 [实现状态](implementation-status.md)；设计文档、Manifest 存在或单一单元测试不单独构成交付。
 

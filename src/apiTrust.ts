@@ -1,5 +1,5 @@
 import { fetchJsonStrict } from "./apiClient";
-import type { AnalysisRunsPayload, ConfirmedQueriesPayload, ContextPackPayload, QueryReceiptsPayload, SemanticPatchCollectionPayload } from "./typesTrust";
+import type { AnalysisRunsPayload, ConfirmedPlansPayload, ConfirmedQueriesPayload, ContextPackPayload, QueryReceiptsPayload, RecallReceiptsPayload, SemanticPatchCollectionPayload } from "./typesTrust";
 
 export function getContextPack() {
   return fetchJsonStrict<ContextPackPayload>("/api/context");
@@ -35,6 +35,16 @@ export function reviewSemanticPatch(proposalKey: string, decision: "accept" | "r
 export function getConfirmedQueries(status = "") {
   const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
   return fetchJsonStrict<ConfirmedQueriesPayload>(`/api/confirmed-queries${suffix}`);
+}
+
+export function getConfirmedPlans(status = "") {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : "";
+  return fetchJsonStrict<ConfirmedPlansPayload>(`/api/confirmed-plans${suffix}`);
+}
+
+export function getRecallReceipts(receipt = "") {
+  const suffix = receipt ? `?receipt=${encodeURIComponent(receipt)}` : "";
+  return fetchJsonStrict<RecallReceiptsPayload>(`/api/recall-receipts${suffix}`);
 }
 
 export function confirmQueryMemory(queryKey: string, confirm: boolean, status = "confirmed") {

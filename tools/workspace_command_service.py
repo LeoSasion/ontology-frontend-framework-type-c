@@ -20,6 +20,8 @@ WORKSPACE_SCOPED_TABLES = [
     "context_rules",
     "context_terms",
     "confirmed_queries",
+    "confirmed_plan_memories",
+    "recall_receipts",
     "agent_turn_events",
     "agent_turns",
     "analysis_job_events",

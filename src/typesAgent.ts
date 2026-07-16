@@ -124,6 +124,19 @@ export interface SemanticContextBundle {
   fingerprint: string;
 }
 
+export interface AgentRecallReceipt {
+  schema: "aibi-recall-receipt/v1" | string;
+  receiptKey: string;
+  workspaceId: string;
+  requestHash: string;
+  status: string;
+  policy: { strategy: string; adoption: string; canAuthorizeExecution: false };
+  candidates: Array<Record<string, unknown>>;
+  returnedCandidates: Array<Record<string, unknown>>;
+  planningBindingFingerprint: string;
+  createdAt: string;
+}
+
 export interface AgentEvidencePlanStep {
   stepKey: string;
   kind: string;
@@ -344,6 +357,8 @@ export interface AgentAskResult {
     terms: Array<{ termKey: string; name: string; definition: string }>;
     rules: Array<{ ruleKey: string; title: string; statement: string }>;
     confirmedQueries: Array<{ queryKey: string; question: string; matchScore: number }>;
+    confirmedPlans?: Array<{ memoryKey: string; queryKey: string; question: string; matchScore: number; matchChannels: Record<string, number>; canAuthorizeSelection: false }>;
+    recallReceipt?: AgentRecallReceipt | null;
     knowledgeRules?: Array<{ packId: string; ruleId: string; title: string; grain: string }>;
   };
   answerCard?: {

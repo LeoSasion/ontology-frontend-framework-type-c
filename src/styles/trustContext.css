@@ -199,6 +199,31 @@
   justify-content: flex-start;
 }
 
+.recallEvidencePanel {
+  margin-top: 18px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent) 6%);
+}
+
+.recallMemoryList {
+  margin-top: 12px;
+}
+
+.recallReceiptSummary {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) 1fr auto;
+  gap: 8px 14px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.recallReceiptSummary small {
+  color: var(--text-muted);
+}
+
 .semanticInboxEmpty {
   display: grid;
   gap: 5px;
@@ -292,5 +317,9 @@
 
   .evidenceTrustButtons {
     flex-wrap: wrap;
+  }
+
+  .recallReceiptSummary {
+    grid-template-columns: 1fr;
   }
 }

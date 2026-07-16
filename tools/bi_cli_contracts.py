@@ -26,6 +26,8 @@ COMMAND_DOMAINS: dict[str, str] = {
     "export-evidence": "evidence",
     "export-analysis": "evidence",
     "confirmed-queries": "context",
+    "confirmed-plans": "context",
+    "recall-receipts": "evidence",
     "confirm-query": "context",
     "analysis-runs": "evidence",
     "analysis-unit-build": "analysis",

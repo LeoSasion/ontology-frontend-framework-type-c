@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { getConfirmedQueries, getContextPack, getSemanticPatches, proposeSemanticPatch, reviewSemanticPatch } from "../apiTrust";
-import type { ConfirmedQuery, ContextPackPayload, SemanticPatchProposal } from "../types";
+import { getConfirmedPlans, getConfirmedQueries, getContextPack, getRecallReceipts, getSemanticPatches, proposeSemanticPatch, reviewSemanticPatch } from "../apiTrust";
+import type { ConfirmedPlanMemory, ConfirmedQuery, ContextPackPayload, RecallReceipt, SemanticPatchProposal } from "../types";
 import { Bilingual, biText } from "./Bilingual";
 import "../styles/trustContext.css";
 
@@ -29,6 +29,8 @@ function compactJson(value: Record<string, unknown> | null) {
 export function TrustContextSettingsPanel() {
   const [pack, setPack] = useState<ContextPackPayload["contextPack"] | null>(null);
   const [queries, setQueries] = useState<ConfirmedQuery[]>([]);
+  const [plans, setPlans] = useState<ConfirmedPlanMemory[]>([]);
+  const [recallReceipts, setRecallReceipts] = useState<RecallReceipt[]>([]);
   const [proposals, setProposals] = useState<SemanticPatchProposal[]>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -53,9 +55,11 @@ export function TrustContextSettingsPanel() {
   }, {});
 
   async function refresh() {
-    const [result, queryResult, patchResult] = await Promise.all([getContextPack(), getConfirmedQueries(), getSemanticPatches()]);
+    const [result, queryResult, planResult, recallResult, patchResult] = await Promise.all([getContextPack(), getConfirmedQueries(), getConfirmedPlans(), getRecallReceipts(), getSemanticPatches()]);
     setPack(result.contextPack);
     setQueries(queryResult.confirmedQueries);
+    setPlans(planResult.confirmedPlans ?? []);
+    setRecallReceipts(recallResult.recallReceipts ?? []);
     setProposals(patchResult.proposals ?? []);
   }
 
@@ -228,6 +232,18 @@ export function TrustContextSettingsPanel() {
             })}
           </div>
         ) : <div className="semanticInboxEmpty"><strong><Bilingual zh="审核收件箱为空" en="Review inbox is empty" /></strong><span><Bilingual zh="提交用户纠正或通过 CLI 接入数据字典后，提案会出现在这里。" en="User corrections and data dictionaries proposed through the CLI appear here." /></span></div>}
+      </section>
+
+      <section className="semanticReviewInbox recallEvidencePanel" data-testid="confirmed-plan-memory">
+        <div className="semanticInboxHeader">
+          <div><span className="eyebrow"><Bilingual zh="受控复用" en="Governed reuse" /></span><h3><Bilingual zh="确认计划记忆与召回回执" en="Confirmed plan memory and recall receipts" /></h3></div>
+          <span className="statusPill">{plans.filter((item) => item.status === "confirmed").length} {biText("项当前可召回", "current memories")}</span>
+        </div>
+        <p className="quietText"><Bilingual zh="历史计划只参与候选排序；字段歧义、跨表关系和执行权限仍按当前证据重新验证。" en="Historical plans rank candidates only. Field ambiguity, relationships, and execution authority are revalidated against current evidence." /></p>
+        {plans.length ? <div className="trustContextList recallMemoryList">
+          {plans.slice(0, 6).map((plan) => <div key={plan.memoryKey}><strong>{plan.question}</strong><span>{[plan.signature.measure, ...(plan.signature.groups ?? [])].filter(Boolean).join(" · ") || biText("结构化计划快照", "Structured plan snapshot")}</span><small>{plan.status} · {plan.memoryKey}</small></div>)}
+        </div> : <p className="quietText"><Bilingual zh="确认并提升一个成功分析后，计划记忆会出现在这里。" en="Confirm and promote a successful analysis to create a plan memory." /></p>}
+        {recallReceipts[0] ? <div className="recallReceiptSummary" data-testid="recall-receipt-summary"><strong><Bilingual zh="最近召回" en="Latest recall" /></strong><span>{recallReceipts[0].status} · {recallReceipts[0].returnedCandidates.length} {biText("个候选", "candidates")}</span><small>{biText("仅候选，不自动采用", "Candidate only; never auto-adopted")}</small></div> : null}
       </section>
 
       {(pack?.terms.length || pack?.rules.length || visibleQueries.length) ? (

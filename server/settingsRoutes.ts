@@ -147,6 +147,24 @@ export async function handleSettingsApi(options: SettingsRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/confirmed-plans" && request.method === "GET") {
+    const args = ["confirmed-plans", "--limit", url.searchParams.get("limit") ?? "20"];
+    const status = url.searchParams.get("status");
+    if (status) args.push("--status", status);
+    const result = await cli(args);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/recall-receipts" && request.method === "GET") {
+    const args = ["recall-receipts", "--limit", url.searchParams.get("limit") ?? "20"];
+    const receipt = url.searchParams.get("receipt");
+    if (receipt) args.push("--receipt", receipt);
+    const result = await cli(args);
+    sendJson(response, 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/preferences" && request.method === "GET") {
     const result = await cli(["preferences"]);
     sendJson(response, 200, result);

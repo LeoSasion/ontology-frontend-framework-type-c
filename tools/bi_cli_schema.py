@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 8
+CURRENT_SQLITE_SCHEMA_VERSION = 9
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -789,6 +789,41 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           stale_reason TEXT NOT NULL,
           PRIMARY KEY(workspace_id, query_key)
         );
+        CREATE TABLE IF NOT EXISTS confirmed_plan_memories (
+          memory_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          query_key TEXT NOT NULL,
+          query_receipt_key TEXT NOT NULL,
+          question TEXT NOT NULL,
+          status TEXT NOT NULL,
+          plan_json TEXT NOT NULL,
+          signature_json TEXT NOT NULL,
+          binding_fingerprint TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          confirmed_at TEXT,
+          stale_reason TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, memory_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_confirmed_plan_workspace_status
+          ON confirmed_plan_memories(workspace_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_confirmed_plan_workspace_query
+          ON confirmed_plan_memories(workspace_id, query_key);
+        CREATE TABLE IF NOT EXISTS recall_receipts (
+          receipt_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          request_hash TEXT NOT NULL,
+          status TEXT NOT NULL,
+          policy_json TEXT NOT NULL,
+          candidates_json TEXT NOT NULL,
+          returned_json TEXT NOT NULL,
+          planning_binding_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, receipt_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_recall_receipts_workspace_created
+          ON recall_receipts(workspace_id, created_at);
         CREATE TABLE IF NOT EXISTS analysis_runs (
           run_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,
@@ -979,6 +1014,25 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         UPDATE workspaces
         SET name = 'AIBI-C 工作区'
         WHERE id = 'default' AND name IN ('AIBI Hybrid Workspace', 'AIBI 工作区')
+        """
+    )
+    connection.execute(
+        """
+        INSERT OR IGNORE INTO confirmed_plan_memories(
+          memory_key, workspace_id, query_key, query_receipt_key, question, status,
+          plan_json, signature_json, binding_fingerprint, evidence_json,
+          created_at, updated_at, confirmed_at, stale_reason
+        )
+        SELECT
+          'plan_memory_' || substr(query_key, 17), q.workspace_id, q.query_key,
+          q.query_receipt_key, q.question, q.status, r.plan_json, '{}',
+          q.schema_fingerprint, q.evidence_json, q.created_at, q.updated_at,
+          q.confirmed_at, q.stale_reason
+        FROM confirmed_queries AS q
+        JOIN query_plan_receipts AS r
+          ON r.workspace_id = q.workspace_id AND r.receipt_key = q.query_receipt_key
+        WHERE q.status IN ('confirmed', 'stale')
+           OR (q.status = 'deprecated' AND q.confirmed_at IS NOT NULL)
         """
     )
     connection.execute(

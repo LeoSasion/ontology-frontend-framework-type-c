@@ -1,6 +1,6 @@
 # 业务理解与分析 Skills
 
-本文件是 AIBI-C 业务理解机制、首批业务理解 Skills 和本专题验收标准的唯一设计事实源。工作区清单、运行目录和字段画像见 [工作区上下文目录](workspace-context-catalog.md)，用户纠正与知识源审核见 [语义补丁与审核收件箱](semantic-review-inbox.md)，语义与跨表执行细节见 [语义查询合同](semantic-query-planning.md)，当前实现状态见 [实现状态](implementation-status.md)。
+本文件是 AIBI-C 业务理解机制、首批业务理解 Skills 和本专题验收标准的唯一设计事实源。工作区清单、运行目录和字段画像见 [工作区上下文目录](workspace-context-catalog.md)，用户纠正与知识源审核见 [语义补丁与审核收件箱](semantic-review-inbox.md)，历史计划复用见 [确认计划记忆](confirmed-plan-memory.md)，语义与跨表执行细节见 [语义查询合同](semantic-query-planning.md)，当前实现状态见 [实现状态](implementation-status.md)。
 
 > 研究快照：2026-07-16。当前状态：稳定初版；后续扩展仍由对应自动化、运行回执和产品验收共同确认。
 
@@ -81,7 +81,7 @@ Workspace Manifest、Runtime Catalog 与 Business Field Profile 已形成首版�
 
 `aibi-agent-evidence-plan/v1` 只消费已解析 Frame、当前 Context 和 Skill Match；查询前必须 dry-plan 并验证字段、粒度、比率和关系。查询后 `aibi-agent-completion-validation/v1` 复核数据/Pack/关系/Skill 指纹、结果形状和证据引用。
 
-只有用户明确确认且 Receipt 当前可用的结果才能成为 Confirmed Query 候选。它保留问题、结构化意图、计划/Receipt 引用和作用域，不把原始 SQL、个人措辞或 Provider 推理当作共享事实；推广到 Domain Pack 必须走独立复核。
+只有用户明确确认且 Receipt 当前可用的结果才能成为 Confirmed Query 候选；候选再次显式提升后才形成 Confirmed Plan Memory。计划记忆保留问题、结构化 selection、计划/Receipt 引用、工作区绑定和作用域，不把原始 SQL、Provider 推理或聊天摘要当作共享事实；召回只排序候选，推广到 Domain Pack 仍必须走独立复核。
 
 ## 首批六个业务理解 Skills
 
@@ -113,7 +113,7 @@ flowchart LR
   E --> V["Post-validate + Analysis Unit"]
   V --> O["证据化解释"]
   O --> K{"用户确认复用?"}
-  K -- "是" --> X["Confirmed Query 候选"]
+  K -- "是" --> X["Confirmed Query 候选；再次提升后形成 Plan Memory"]
   K -- "否" --> Z["只保留本次 Receipt"]
 ```
 
@@ -139,10 +139,9 @@ flowchart LR
 
 本节只维护业务理解专题的后续顺序；跨产品优先级入口见 [未来开发队列](development-roadmap.md)。
 
-1. 建立证据绑定的混合语义召回、Recall Receipt 与 Confirmed Plan Memory；召回只能提供候选，不能绕过歧义和 freshness 门禁。
-2. 建立业务表达基准集与 Plan Quality Scorecard，覆盖同义词、同名指标、比率、去重实体、状态、时间、跨表和 Pack 冲突，并按 Domain Pack 隔离。
-3. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`segment-contribution`、`driver-investigation`、`dashboard-decision-design`。
-4. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
+1. 建立业务表达基准集与 Plan Quality Scorecard，覆盖同义词、同名指标、比率、去重实体、状态、时间、跨表和 Pack 冲突，并按 Domain Pack 隔离。
+2. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`segment-contribution`、`driver-investigation`、`dashboard-decision-design`。
+3. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
 
 ## 公开研究快照
 

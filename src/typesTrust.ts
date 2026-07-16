@@ -45,6 +45,42 @@ export type ConfirmedQuery = {
 };
 
 export type ConfirmedQueriesPayload = { ok: boolean; confirmedQueries: ConfirmedQuery[]; count: number; staleCount: number };
+export type ConfirmedPlanMemory = {
+  schema: string;
+  memoryKey: string;
+  queryKey: string;
+  queryReceiptKey: string;
+  question: string;
+  status: "confirmed" | "stale" | "deprecated" | string;
+  signature: { tables?: string[]; fields?: string[]; measure?: string; groups?: string[]; aggregation?: string };
+  planFingerprint: string;
+  bindingFingerprint: string;
+  staleReason?: string;
+  confirmedAt?: string | null;
+};
+export type ConfirmedPlansPayload = { ok: boolean; workspaceId: string; confirmedPlans: ConfirmedPlanMemory[]; count: number };
+export type RecallCandidate = {
+  memoryKey: string;
+  queryKey: string;
+  question: string;
+  matchScore: number;
+  matchChannels: Record<string, number>;
+  canAuthorizeSelection: false;
+  canBypassAmbiguity: false;
+};
+export type RecallReceipt = {
+  schema: string;
+  receiptKey: string;
+  workspaceId: string;
+  requestHash: string;
+  status: string;
+  policy: { strategy: string; adoption: "candidate-only" | string; canAuthorizeExecution: false };
+  candidates: RecallCandidate[];
+  returnedCandidates: RecallCandidate[];
+  planningBindingFingerprint: string;
+  createdAt: string;
+};
+export type RecallReceiptsPayload = { ok: boolean; workspaceId: string; recallReceipts: RecallReceipt[]; count: number };
 export type AnalysisRunsPayload = { ok: boolean; analysisRuns?: AnalysisRun[]; analysisRun?: AnalysisRun; branches?: AnalysisRun[]; count?: number };
 export type QueryReceiptsPayload = { ok: boolean; queryReceipts?: QueryPlanReceipt[]; queryReceipt?: QueryPlanReceipt; count?: number };
 

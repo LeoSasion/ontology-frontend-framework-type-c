@@ -267,6 +267,14 @@ def build_parser() -> argparse.ArgumentParser:
     confirmed_queries.add_argument("--status", default="", choices=["", "candidate", "confirmed", "stale", "deprecated"])
     confirmed_queries.add_argument("--limit", type=int, default=20)
 
+    confirmed_plans = sub.add_parser("confirmed-plans", description="List evidence-bound plan memories explicitly promoted in the active workspace.")
+    confirmed_plans.add_argument("--status", default="", choices=["", "confirmed", "stale", "deprecated"])
+    confirmed_plans.add_argument("--limit", type=int, default=20)
+
+    recall_receipts = sub.add_parser("recall-receipts", description="List bounded hybrid-recall receipts without exposing raw data rows.")
+    recall_receipts.add_argument("--receipt", default="")
+    recall_receipts.add_argument("--limit", type=int, default=20)
+
     confirm_query = sub.add_parser("confirm-query")
     confirm_query.add_argument("--query", required=True)
     confirm_query.add_argument("--status", default="confirmed", choices=["confirmed", "deprecated"])

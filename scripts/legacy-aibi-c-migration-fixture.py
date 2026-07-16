@@ -105,6 +105,18 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_semantic_patch_%' ORDER BY name"
             ).fetchall()
         ]
+        plan_memory_tables = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('confirmed_plan_memories', 'recall_receipts') ORDER BY name"
+            ).fetchall()
+        ]
+        plan_memory_indexes = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND (name LIKE 'idx_confirmed_plan_%' OR name LIKE 'idx_recall_receipts_%') ORDER BY name"
+            ).fetchall()
+        ]
     with duckdb.connect(str(duckdb_path), read_only=True) as connection:
         duckdb_row = connection.execute("SELECT product, value FROM legacy_aibi_c_rows").fetchone()
         metadata = connection.execute(
@@ -120,6 +132,8 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
         "connectorPrimaryKey": connector_pk,
         "semanticReviewTables": semantic_review_tables,
         "semanticReviewIndexes": semantic_review_indexes,
+        "planMemoryTables": plan_memory_tables,
+        "planMemoryIndexes": plan_memory_indexes,
         "duckdbRow": list(duckdb_row) if duckdb_row else None,
         "duckdbVersion": duckdb_version,
     }

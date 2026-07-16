@@ -50,9 +50,10 @@
 - 关系推荐结合值重叠、基数、复合键、版本和行膨胀；推荐不等于执行许可。
 - 跨表执行仅使用当前工作区已保存且验证有效的关系；路径或版本失效时阻断。
 - 比率、转化率和占比没有已验证分子/分母计划时必须澄清，不得退化为计数。
+- 已确认分析只能先形成复用候选；再次显式提升后才生成 Confirmed Plan Memory。混合召回只排序候选并生成 Recall Receipt，不得替当前计划选字段、关系或执行动作。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
 
-工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
+工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；历史计划复用由 [确认计划记忆](confirmed-plan-memory.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
 
 ### 图表、看板与连续分析
 
@@ -101,6 +102,7 @@
 | 业务理解合同与 Skills | [业务理解与分析 Skills](business-understanding-skills.md) |
 | 工作区上下文与字段画像合同 | [工作区上下文目录](workspace-context-catalog.md) |
 | 知识源、语义提案与人工审核合同 | [语义补丁与审核收件箱](semantic-review-inbox.md) |
+| 计划记忆与召回合同 | [确认计划记忆](confirmed-plan-memory.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

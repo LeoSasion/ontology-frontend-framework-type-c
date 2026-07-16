@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `145`
+Command count: `147`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -15,10 +15,10 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
-| `context` | 8 |
+| `context` | 9 |
 | `dashboard` | 19 |
 | `domain-pack` | 5 |
-| `evidence` | 7 |
+| `evidence` | 8 |
 | `formula` | 4 |
 | `import` | 7 |
 | `job` | 6 |
@@ -43,7 +43,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 58 |
 | `evidence-receipt` | 8 |
-| `read-only` | 65 |
+| `read-only` | 67 |
 | `runtime-receipt` | 9 |
 
 ## Commands
@@ -90,6 +90,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `cli-contract` | `system` | `artifact-export` | `no` | `no` | `--format`, `--output`, `--command` |
 | `confirm-action` | `agent` | `action-confirmation` | `yes` | `no` | `action_key`, `--reject`, `--yes`, `--workspace` |
 | `confirm-query` | `context` | `dry-run-confirm` | `yes` | `no` | `--query`, `--status`, `--yes` |
+| `confirmed-plans` | `context` | `read-only` | `no` | `no` | `--status`, `--limit` |
 | `confirmed-queries` | `context` | `read-only` | `no` | `no` | `--status`, `--limit` |
 | `context-budget` | `context` | `read-only` | `no` | `no` | `--segments-json`, `--max-chars` |
 | `context-pack` | `context` | `read-only` | `no` | `no` | - |
@@ -151,6 +152,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `query-receipts` | `evidence` | `read-only` | `no` | `no` | `--receipt`, `--limit` |
 | `query-relationship` | `relationship` | `read-only` | `no` | `no` | `--relationship`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--join-type`, `...` |
 | `query-table` | `query` | `read-only` | `no` | `no` | `--table`, `--view`, `--mode`, `--column`, `--filter`, `--sort`, `--search`, `--offset`, `...` |
+| `recall-receipts` | `evidence` | `read-only` | `no` | `no` | `--receipt`, `--limit` |
 | `recommend-indexes` | `performance` | `read-only` | `no` | `no` | `--table`, `--limit` |
 | `recommend-relationships` | `relationship` | `read-only` | `no` | `no` | `--limit` |
 | `recommend-widgets` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--all`, `--limit` |

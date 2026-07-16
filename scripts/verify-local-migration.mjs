@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 8 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 9 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -105,6 +105,12 @@ try {
     "v8-semantic-review-tables-and-indexes-are-created",
     inspectedPayload.semanticReviewTables?.join(":") === "knowledge_sources:semantic_patch_proposals"
       && inspectedPayload.semanticReviewIndexes?.join(":") === "idx_semantic_patch_workspace_source:idx_semantic_patch_workspace_status",
+    inspectedPayload,
+  );
+  add(
+    "v9-plan-memory-tables-and-indexes-are-created",
+    inspectedPayload.planMemoryTables?.join(":") === "confirmed_plan_memories:recall_receipts"
+      && inspectedPayload.planMemoryIndexes?.join(":") === "idx_confirmed_plan_workspace_query:idx_confirmed_plan_workspace_status:idx_recall_receipts_workspace_created",
     inspectedPayload,
   );
 

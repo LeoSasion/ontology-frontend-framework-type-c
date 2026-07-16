@@ -13,7 +13,7 @@ def _fingerprint(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None, business_understanding: dict[str, Any] | None = None, workspace_manifest_ref: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None, business_understanding: dict[str, Any] | None = None, workspace_manifest_ref: dict[str, Any] | None = None, recalled_plans: list[dict[str, Any]] | None = None, recall_receipt: dict[str, Any] | None = None) -> dict[str, Any]:
     field_resolution = semantic_plan.get("fieldResolution", {})
     skill_sources: list[dict[str, Any]] = []
     if isinstance(analytical_skill_match, dict):
@@ -39,6 +39,22 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
         "terms": [{"termKey": item.get("term_key"), "name": item.get("canonical_name"), "definition": item.get("definition"), "reason": "context-term-match"} for item in context_matches.get("terms") or []],
         "rules": [{"ruleKey": item.get("rule_key"), "title": item.get("title"), "statement": item.get("statement"), "reason": "context-rule-match"} for item in context_matches.get("rules") or []],
         "confirmedQueries": [{"queryKey": item.get("query_key"), "question": item.get("question"), "score": item.get("matchScore"), "reason": "confirmed-query-recall"} for item in recalled_queries],
+        "confirmedPlans": [{
+            "memoryKey": item.get("memoryKey"),
+            "queryKey": item.get("queryKey"),
+            "question": item.get("question"),
+            "score": item.get("matchScore"),
+            "channels": item.get("matchChannels") or {},
+            "reason": "confirmed-plan-candidate",
+            "canAuthorizeSelection": False,
+        } for item in (recalled_plans or [])],
+        "recallReceipt": {
+            "receiptKey": recall_receipt.get("receiptKey"),
+            "status": recall_receipt.get("status"),
+            "policy": recall_receipt.get("policy"),
+            "planningBindingFingerprint": recall_receipt.get("planningBindingFingerprint"),
+            "candidateOnly": True,
+        } if isinstance(recall_receipt, dict) else None,
         "knowledgeRules": [{"packId": knowledge_match.get("packId"), "version": knowledge_match.get("packVersion"), "ruleId": knowledge_match.get("ruleId"), "title": knowledge_match.get("title"), "grain": knowledge_match.get("grain"), "reason": "enabled-domain-pack-rule"}] if knowledge_match else [],
         "domainPacks": domain_pack_context.get("enabledDomainPacks") or domain_pack_context.get("enabled") or [],
         "workspaceManifest": {
@@ -63,11 +79,18 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
     }
     missing_slots = [{"kind": item.get("kind"), "mention": item.get("mention"), "reason": item.get("reason")} for item in intent_frame.get("unresolved") or []]
     understanding = business_understanding if isinstance(business_understanding, dict) else None
-    fingerprint_input = {"workspaceId": workspace_id, "intent": intent_frame, "semanticPlan": semantic_plan, "sources": sources, "businessUnderstanding": understanding}
+    stable_sources = dict(sources)
+    if isinstance(stable_sources.get("recallReceipt"), dict):
+        stable_sources["recallReceipt"] = {
+            key: value
+            for key, value in stable_sources["recallReceipt"].items()
+            if key != "receiptKey"
+        }
+    fingerprint_input = {"workspaceId": workspace_id, "intent": intent_frame, "semanticPlan": semantic_plan, "sources": stable_sources, "businessUnderstanding": understanding}
     return {
         "schema": CONTEXT_SCHEMA,
         "workspaceId": workspace_id,
-        "retrievalPolicy": {"strategy": "deterministic-first", "reranker": "disabled", "ambiguityGatePreserved": True},
+        "retrievalPolicy": {"strategy": "deterministic-hybrid", "reranker": "bounded-structured-score", "ambiguityGatePreserved": True, "candidateOnly": True},
         "sources": sources,
         "businessUnderstanding": understanding,
         "missingSlots": missing_slots,

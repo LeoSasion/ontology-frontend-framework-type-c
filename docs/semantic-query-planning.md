@@ -8,7 +8,7 @@
 
 `aibi-agent-intent-frame/v1` 将问题规范化为任务类型、指标、维度、时间、筛选、比较、输出、粒度和未决项。字段概念必须保留 `tableKey`、字段、角色、来源与置信度；Provider 不是必需依赖，也不能静默消歧。
 
-`aibi-semantic-context-bundle/v1` 在当前工作区按五层上下文统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack、Analytical Skill、运行证据与展示偏好。每项保留来源、作用域、版本、新鲜度和指纹。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定业务理解、意图、语义计划和来源。
+`aibi-semantic-context-bundle/v1` 在当前工作区按五层上下文统一整理字段候选、Context Term/Rule、Confirmed Plan、Domain Pack、Analytical Skill、运行证据与展示偏好。每项保留来源、作用域、版本、新鲜度和指纹。当前计划仍 deterministic-first；版本化混合召回只调整历史候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定业务理解、意图、语义计划和来源。
 
 Bundle 同时引用 `aibi-workspace-planning-binding/v1` 的 schema、fingerprint 和画像数量，并固定声明 candidate 不能授权 Join。该绑定从 Workspace Manifest 的稳定规划子集派生，覆盖 schema、数据、字段画像、指标、公式、关系、Context、Domain Pack 与 Analytical Skill；任一组件漂移都使新计划与 Receipt 重新绑定。完整的派生、PII 和 freshness 边界见 [工作区上下文目录](workspace-context-catalog.md)。
 
@@ -66,6 +66,7 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 ## 消歧与粒度
 
 - 同名字段不能按导入顺序、列顺序或模型偏好决胜；别名只能召回候选。
+- Confirmed Plan Memory 也只能召回候选；历史字段不得拼入当前问题，当前 Semantic Plan 必须独立重建并保留原有歧义与关系门禁。
 - 用户明确表名后可在目标表内选择，依据必须进入 Receipt。
 - 多个未决字段进入同一类型化队列，但每轮只询问一个高价值问题；回答后重新规划，仍不安全时继续澄清或明确阻断。
 - 复合业务键必须整体保存和验证，不能退化为第一列。
