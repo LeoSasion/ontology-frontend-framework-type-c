@@ -64,10 +64,10 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
 
     initialized = run(["status"], env)
     imported = run(["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"], env)
-    check("schema-v11-initializes", initialized.get("ok") is True and imported.get("committed") is True)
+    check("schema-v12-initializes", initialized.get("ok") is True and imported.get("committed") is True)
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-    check("exploration-schema-is-versioned", version == 11, version)
+    check("exploration-schema-is-versioned", version == 12, version)
 
     root = run(["agent-turn-run", "--read-only", "请用net_sales按channel生成柱状图"], env)
     root_answer = answer(root)

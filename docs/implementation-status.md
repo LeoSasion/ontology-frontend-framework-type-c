@@ -23,13 +23,14 @@
 | 语义补丁与审核收件箱 | 稳定初版 | JSON/Markdown/结构化纠正经声明式 Adapter 形成不可变提案；设置页展示来源和 Before/After，接受/拒绝均需预演与确认；schema/目标漂移阻断接受，reviewed 语义受自动覆盖保护，来源与审核状态可随配置迁移 |
 | Confirmed Plan Memory 与混合召回 | 稳定初版 | 成功动作先生成候选，显式提升后才形成证据绑定计划记忆；lexical、字符 n-gram、结构化计划和 freshness 联合排序并生成 Recall Receipt；召回仅提供候选，不改变 Semantic Plan，漂移后同步 stale |
 | 探索线程与结果板 | 稳定初版 | 已执行或已确认结果可经预演和确认建立不可变 Anchor，并按 Analysis Run 父链追加分支；结果板只保存业务字段、形状与图表摘要，不复制结果行；Run、Receipt、Unit、Turn 或来源漂移后保留历史但阻断续算，不回退旧结果 |
+| 有限 Research Run 与统一追踪 | 稳定初版 | current Anchor 可经预演和确认建立固定预算的研究账本；计划修订只追加不可变版本，Observation 仅采纳同线程 current Anchor，且旧修订证据不计入当前覆盖；结论区分 supported、challenged、mixed、inconclusive，统一 Trace 可重放且不复制业务结果行 |
 | Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；全部读取与适配入口复核多源、关系、版本和 Pack 当前性 |
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v11、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile、Knowledge Source、Semantic Patch、Confirmed Plan Memory、Recall Receipt、Plan Quality Scorecard 与 Exploration Thread 已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
+| 本地运维 | 稳定 | SQLite schema v12、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile、Knowledge Source、Semantic Patch、Confirmed Plan Memory、Recall Receipt、Plan Quality Scorecard、Exploration Thread 与有限 Research Run 已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
@@ -46,7 +47,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 数据库 Adapter 当前只支持 allowlist 本地 SQLite 文件和显式非系统表；不接受 SQL、远程数据库或驱动插件。
 - 外部 Domain Pack 仅接受签名声明式 JSON 与静态资源，不加载脚本、SQL、HTML 或第三方运行时代码。
 - 外部 Analytical Skill 仅接受单个声明式 JSON；安装后默认停用，必须按工作区确认启用，固定 Policy Hook 会在完成前再次复核能力、资源和证据边界。
-- 业务理解合同、六个理解 Skill 和六个第二批方法 Skill 已进入稳定初版；多步骤方法的持续研究、计划修订、反例与敏感性执行仍由后续有限 Research Run 承担，不能把方法计划本身当成已执行结论。
+- 业务理解合同、六个理解 Skill、六个第二批方法 Skill 与有限 Research Run 已进入稳定初版；方法计划仍不是已执行结论，Research Run 也只组织当前线程内的已验证锚点，不自动生成分析分支或扩大执行权限。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。

@@ -225,7 +225,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("P1-A：") &&
           implementationStatusSource.includes("| 探索线程与结果板 | 稳定初版 |") &&
           !developmentRoadmapDocSource.includes("P1-B：第二批通用分析 Skills") &&
-          developmentRoadmapDocSource.includes("P1-C：有限 Research Run") &&
+          implementationStatusSource.includes("| 有限 Research Run 与统一追踪 | 稳定初版 |") &&
+          !developmentRoadmapDocSource.includes("P1-C：") &&
           developmentRoadmapDocSource.includes("P2：只在本地可信边界内增加 forecast readiness") &&
           !developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
           !developmentRoadmapDocSource.includes("| P1 | 业务理解与首批 Skills |") &&

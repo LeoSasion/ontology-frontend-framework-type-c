@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `154`
+Command count: `159`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,7 +11,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 8 |
+| `analysis` | 13 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -41,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 61 |
+| `dry-run-confirm` | 65 |
 | `evidence-receipt` | 8 |
-| `read-only` | 70 |
+| `read-only` | 71 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -172,6 +172,11 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `remove-stale-filters` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--yes` |
 | `remove-widget` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--widget`, `--yes` |
 | `rename-source` | `source` | `dry-run-confirm` | `yes` | `no` | `source`, `--name`, `--yes` |
+| `research-run-create` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--thread`, `--anchor`, `--goal`, `--skill`, `--hypothesis`, `--counterexample`, `--sensitivity`, `--max-observations`, `...` |
+| `research-run-finalize` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--research`, `--expected-revision`, `--expected-plan`, `--yes` |
+| `research-run-observe` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--research`, `--anchor`, `--kind`, `--step`, `--verdict`, `--note`, `--expected-revision`, `--expected-plan`, `...` |
+| `research-run-revise` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--research`, `--reason`, `--goal`, `--skill`, `--hypothesis`, `--counterexample`, `--sensitivity`, `--clear-hypotheses`, `...` |
+| `research-runs` | `analysis` | `read-only` | `no` | `no` | `--research`, `--limit` |
 | `restricted-workflow-operators` | `workflow` | `read-only` | `no` | `no` | - |
 | `restricted-workflow-validate` | `workflow` | `read-only` | `no` | `no` | `--graph-json`, `--workspace` |
 | `runtime-catalog` | `workspace` | `read-only` | `no` | `no` | `--workspace` |

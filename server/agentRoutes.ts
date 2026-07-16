@@ -193,6 +193,94 @@ export async function handleAgentApi(options: AgentRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/agent/research-runs" && request.method === "GET") {
+    const args = ["research-runs", "--limit", url.searchParams.get("limit") ?? "30"];
+    const researchKey = url.searchParams.get("research");
+    if (researchKey) args.push("--research", researchKey);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/research-runs/create" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "research-run-create",
+      "--thread", String(body.threadKey ?? ""),
+      "--goal", String(body.goal ?? ""),
+    ];
+    if (body.anchorKey) args.push("--anchor", String(body.anchorKey));
+    if (body.skillRef) args.push("--skill", String(body.skillRef));
+    if (body.maxObservations) args.push("--max-observations", String(body.maxObservations));
+    if (body.maxRevisions) args.push("--max-revisions", String(body.maxRevisions));
+    for (const item of Array.isArray(body.hypotheses) ? body.hypotheses : []) args.push("--hypothesis", String(item));
+    for (const item of Array.isArray(body.counterexampleChecks) ? body.counterexampleChecks : []) args.push("--counterexample", String(item));
+    for (const item of Array.isArray(body.sensitivityChecks) ? body.sensitivityChecks : []) args.push("--sensitivity", String(item));
+    if (body.confirm === true) args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/research-runs/revise" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "research-run-revise",
+      "--research", String(body.researchKey ?? ""),
+      "--reason", String(body.reason ?? ""),
+      "--expected-revision", String(body.expectedRevisionFingerprint ?? ""),
+    ];
+    if (body.goal) args.push("--goal", String(body.goal));
+    if (body.skillRef !== undefined) args.push("--skill", String(body.skillRef));
+    if (Array.isArray(body.hypotheses)) {
+      args.push("--clear-hypotheses");
+      for (const item of body.hypotheses) args.push("--hypothesis", String(item));
+    }
+    if (Array.isArray(body.counterexampleChecks)) {
+      args.push("--clear-counterexamples");
+      for (const item of body.counterexampleChecks) args.push("--counterexample", String(item));
+    }
+    if (Array.isArray(body.sensitivityChecks)) {
+      args.push("--clear-sensitivities");
+      for (const item of body.sensitivityChecks) args.push("--sensitivity", String(item));
+    }
+    if (body.confirm === true) args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/research-runs/observe" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "research-run-observe",
+      "--research", String(body.researchKey ?? ""),
+      "--anchor", String(body.anchorKey ?? ""),
+      "--kind", String(body.kind ?? ""),
+      "--step", String(body.stepKey ?? ""),
+      "--verdict", String(body.verdict ?? ""),
+      "--note", String(body.note ?? ""),
+      "--expected-revision", String(body.expectedRevisionFingerprint ?? ""),
+    ];
+    if (body.confirm === true) args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/agent/research-runs/finalize" && request.method === "POST") {
+    const body = await readBody(request);
+    const args = [
+      "research-run-finalize",
+      "--research", String(body.researchKey ?? ""),
+      "--expected-revision", String(body.expectedRevisionFingerprint ?? ""),
+    ];
+    if (body.confirm === true) args.push("--yes", "--expected-plan", String(body.expectedPlanFingerprint ?? ""));
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-runs" && request.method === "GET") {
     const args = ["analysis-runs", "--limit", url.searchParams.get("limit") ?? "30"];
     const run = url.searchParams.get("run");

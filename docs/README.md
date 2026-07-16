@@ -25,6 +25,7 @@
 | [确认计划记忆](confirmed-plan-memory.md) | 证据绑定的混合召回、Recall Receipt、显式提升和 stale 边界 |
 | [计划质量评测](plan-quality-evaluation.md) | Business Expression Case、确定性 Scorecard、发布门槛、重放与隔离边界 |
 | [探索线程与可恢复分析上下文](exploration-threads.md) | 分析锚点、父子血缘、结果板、新鲜度与恢复边界 |
+| [有限 Research Run](finite-research-runs.md) | 有限研究预算、不可变计划修订、反例/敏感性证据与统一追踪 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |

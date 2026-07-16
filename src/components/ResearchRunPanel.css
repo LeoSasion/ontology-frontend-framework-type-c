@@ -1,0 +1,28 @@
+.researchRunPanel { min-width: 0; }
+.researchRunBody, .researchRunForm, .researchRevisionList, .researchTrace { display: grid; min-width: 0; gap: 10px; }
+.researchRunBody { padding-top: 12px; }
+.researchRunLead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.researchRunLead > div { display: grid; min-width: 0; gap: 4px; }
+.researchRunLead span, .researchRunForm label > span, .researchRevisionList span, .researchTrace span { color: var(--text-muted); font-size: 12px; }
+.researchRunStatus { display: inline-flex; flex: 0 0 auto; min-height: 26px; align-items: center; padding: 2px 9px; border: 1px solid var(--border-soft); border-radius: 999px; font-size: 11px; }
+.researchRunStatus.current { color: var(--success-text); border-color: color-mix(in srgb, var(--success-text) 28%, var(--border-soft)); }
+.researchRunStatus.stale, .researchRunStatus.missing { color: var(--warning-text); border-color: color-mix(in srgb, var(--warning-text) 30%, var(--border-soft)); }
+.researchRunForm { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); align-items: end; }
+.researchRunForm label { display: grid; min-width: 0; gap: 5px; }
+.researchRevisionEditor { grid-column: 1 / -1; }
+.researchRevisionEditor[open] { display: grid; gap: 10px; }
+.researchRunForm input, .researchRunForm select, .researchRunForm textarea { width: 100%; min-width: 0; }
+.researchRunForm textarea { min-height: 76px; resize: vertical; }
+.researchCoverage { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 130px), 1fr)); gap: 8px; }
+.researchCoverage span { display: flex; justify-content: space-between; gap: 8px; padding: 9px; border: 1px solid var(--border-soft); border-radius: 10px; color: var(--text-muted); font-size: 12px; }
+.researchRevisionList > div { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--border-soft); }
+.researchRevisionList code { color: var(--text-muted); font-size: 10px; }
+.researchTrace { margin: 0; padding: 10px 0 0 20px; }
+.researchTrace li { display: grid; gap: 2px; padding: 4px 0; }
+@media (max-width: 640px) {
+  .researchRunLead { align-items: stretch; flex-direction: column; }
+  .researchRunStatus { align-self: flex-start; }
+  .researchRunForm { grid-template-columns: minmax(0, 1fr); }
+  .researchRevisionList > div { grid-template-columns: auto minmax(0, 1fr); }
+  .researchRevisionList code { grid-column: 2; }
+}

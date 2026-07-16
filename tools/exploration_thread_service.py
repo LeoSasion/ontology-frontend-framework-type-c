@@ -711,6 +711,32 @@ def _thread_payload(connection: sqlite3.Connection, workspace_id: str, row: sqli
     }
 
 
+def get_exploration_thread(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    thread_key: str,
+) -> dict[str, Any] | None:
+    """Return one thread with live Anchor freshness and no stale fallback."""
+    row = _thread_row(connection, workspace_id, thread_key)
+    return _thread_payload(connection, workspace_id, row) if row else None
+
+
+def get_exploration_anchor(
+    connection: sqlite3.Connection,
+    workspace_id: str,
+    thread_key: str,
+    anchor_key: str,
+) -> dict[str, Any] | None:
+    """Resolve one Anchor only inside its owning thread, including live freshness."""
+    thread = get_exploration_thread(connection, workspace_id, thread_key)
+    if not thread:
+        return None
+    return next(
+        (anchor for anchor in thread.get("anchors") or [] if str(anchor.get("anchorKey") or "") == anchor_key),
+        None,
+    )
+
+
 def exploration_threads_command(
     args: argparse.Namespace,
     *,
@@ -724,7 +750,7 @@ def exploration_threads_command(
             row = _thread_row(connection, workspace_id, thread_key)
             if not row:
                 raise ValueError("Unknown Exploration Thread in the active workspace.")
-            thread = _thread_payload(connection, workspace_id, row)
+            thread = get_exploration_thread(connection, workspace_id, thread_key)
             return {"ok": True, "schema": "aibi-exploration-thread-list/v1", "workspaceId": workspace_id, "explorationThread": thread}
         rows = connection.execute(
             "SELECT * FROM exploration_threads WHERE workspace_id = ? ORDER BY updated_at DESC, thread_key LIMIT ?",

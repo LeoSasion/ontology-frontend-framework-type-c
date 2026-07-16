@@ -108,6 +108,13 @@ from exploration_thread_service import (
     exploration_thread_create_command,
     exploration_threads_command,
 )
+from limited_research_run_service import (
+    research_run_create_command,
+    research_run_finalize_command,
+    research_run_observe_command,
+    research_run_revise_command,
+    research_runs_command,
+)
 from analysis_unit_service import (
     analysis_unit_build_command,
     analysis_unit_verify_command,
@@ -2920,6 +2927,16 @@ def main() -> int:
             result = exploration_anchor_add_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "exploration-board-set":
             result = exploration_board_set_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "research-runs":
+            result = research_runs_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "research-run-create":
+            result = research_run_create_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "research-run-revise":
+            result = research_run_revise_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "research-run-observe":
+            result = research_run_observe_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "research-run-finalize":
+            result = research_run_finalize_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-unit-build":
             result = analysis_unit_build_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-units":

@@ -823,6 +823,97 @@ export interface ExplorationMutationPayload {
   explorationPlan: ExplorationMutationPlan;
 }
 
+export interface ResearchPlanRevision {
+  schema: "aibi-research-plan-revision/v1" | string;
+  revisionKey: string;
+  workspaceId: string;
+  researchKey: string;
+  parentRevisionKey?: string | null;
+  revisionNumber: number;
+  parentFingerprint: string;
+  goal: string;
+  skillRef: string;
+  hypotheses: string[];
+  counterexampleChecks: string[];
+  sensitivityChecks: string[];
+  steps: Array<{ stepKey: string; kind: string; question: string; required: boolean }>;
+  reason: string;
+  capabilities: string[];
+  providerCanMutate: false;
+  businessRowsCopied: false;
+  fingerprint: string;
+  createdAt: string;
+}
+
+export interface ResearchObservation {
+  schema: "aibi-research-observation/v1" | string;
+  observationKey: string;
+  workspaceId: string;
+  researchKey: string;
+  revisionKey: string;
+  stepKey: string;
+  kind: "evidence" | "counterexample" | "sensitivity" | string;
+  verdict: "supports" | "challenges" | "inconclusive" | string;
+  note: string;
+  anchorKey: string;
+  anchorBindingFingerprint: string;
+  revisionFingerprint: string;
+  freshness: { status: string; usableForPlanning: boolean; blockers: string[] };
+  anchorSummary: ExplorationAnchor["summary"] | Record<string, unknown>;
+  businessRowsCopied: false;
+  createdAt: string;
+}
+
+export interface LimitedResearchRun {
+  schema: "aibi-limited-research-run/v1" | string;
+  researchKey: string;
+  workspaceId: string;
+  threadKey: string;
+  baselineAnchorKey: string;
+  baselineBindingFingerprint: string;
+  goal: string;
+  storedStatus: "active" | "completed" | "blocked" | string;
+  status: "active" | "completed" | "blocked" | string;
+  currentRevisionKey: string;
+  budget: { maxPlanSteps: number; maxObservations: number; maxRevisions: number };
+  freshness: { status: "current" | "stale" | "missing" | string; usableForPlanning: boolean; missingRefs: string[]; blockers: string[]; staleFallbackUsed: false };
+  baseline?: ExplorationAnchor | null;
+  revisions: ResearchPlanRevision[];
+  revisionCount: number;
+  currentRevision?: ResearchPlanRevision | null;
+  observations: ResearchObservation[];
+  observationCount: number;
+  coverage: { evidence: number; counterexample: number; sensitivity: number };
+  conclusion?: { schema: string; outcome: string; blockers: string[]; fingerprint: string; counterexampleCovered: boolean; sensitivityCovered: boolean; causalClaimAuthorized: false; businessRowsCopied: false } | null;
+  trace: { schema: "aibi-research-run-trace/v1" | string; events: Array<{ sequence: number; revisionKey?: string | null; eventType: string; status: string; summary: string; payload: Record<string, unknown>; createdAt: string }>; eventCount: number; fingerprint: string };
+  providerCanMutate: false;
+  businessRowsCopied: false;
+  fingerprint: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string | null;
+}
+
+export interface ResearchRunsPayload {
+  ok: boolean;
+  schema: string;
+  workspaceId: string;
+  researchRuns?: LimitedResearchRun[];
+  researchRun?: LimitedResearchRun;
+  count?: number;
+}
+
+export interface ResearchMutationPayload {
+  ok: boolean;
+  workspaceId: string;
+  dryRun?: boolean;
+  requiresConfirmation?: boolean;
+  confirmed?: boolean;
+  changed?: boolean;
+  researchPlan: { schema: "aibi-research-mutation-plan/v1" | string; kind: string; workspaceId: string; proposed: Record<string, unknown>; providerCanMutate: false; businessRowsCopied: false; planFingerprint: string };
+  researchRun?: LimitedResearchRun;
+}
+
 export interface ActionDraft {
   action_key: string;
   workspace_id?: string;

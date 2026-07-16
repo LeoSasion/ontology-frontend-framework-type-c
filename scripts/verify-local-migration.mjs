@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 11 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 12 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -123,6 +123,12 @@ try {
     "v11-exploration-thread-tables-and-indexes-are-created",
     inspectedPayload.explorationTables?.join(":") === "exploration_anchors:exploration_board_items:exploration_threads"
       && inspectedPayload.explorationIndexes?.join(":") === "idx_exploration_anchors_thread_created:idx_exploration_board_thread_position:idx_exploration_threads_workspace_updated",
+    inspectedPayload,
+  );
+  add(
+    "v12-limited-research-tables-and-indexes-are-created",
+    inspectedPayload.researchTables?.join(":") === "research_observations:research_plan_revisions:research_run_events:research_runs"
+      && inspectedPayload.researchIndexes?.join(":") === "idx_research_events_run_sequence:idx_research_observations_run_created:idx_research_revisions_run_number:idx_research_runs_workspace_updated",
     inspectedPayload,
   );
 

@@ -19,6 +19,9 @@ const panel = source("src/components/ExplorationThreadPanel.tsx");
 const styles = source("src/components/ExplorationThreadPanel.css");
 const agentPanel = source("src/components/AgentPanel.tsx");
 const trustPanel = source("src/components/AgentTrustAdvancedPanel.tsx");
+const researchApi = source("src/apiResearch.ts");
+const researchPanel = source("src/components/ResearchRunPanel.tsx");
+const researchStyles = source("src/components/ResearchRunPanel.css");
 const paths = [
   "/api/agent/exploration-threads",
   "/api/agent/exploration-threads/create",
@@ -26,6 +29,14 @@ const paths = [
   "/api/agent/exploration-threads/board",
 ];
 const routeBlocks = paths.map((path) => routeBlock(routes, path));
+const researchPaths = [
+  "/api/agent/research-runs",
+  "/api/agent/research-runs/create",
+  "/api/agent/research-runs/revise",
+  "/api/agent/research-runs/observe",
+  "/api/agent/research-runs/finalize",
+];
+const researchRouteBlocks = researchPaths.map((path) => routeBlock(routes, path));
 
 const checks = [
   {
@@ -88,6 +99,39 @@ const checks = [
       && styles.includes("@media (max-width: 640px)")
       && styles.includes("grid-template-columns: minmax(0, 1fr)")
       && !/\.exploration[^{}]*\{[^{}]*width:\s*\d{3,}px/s.test(styles),
+  },
+  {
+    label: "finite-research-client-routes-and-types-cover-full-lifecycle",
+    ok: ["getResearchRuns", "createResearchRun", "reviseResearchRun", "observeResearchRun", "finalizeResearchRun"].every((name) => researchApi.includes(name))
+      && researchRouteBlocks.every((block) => block.length > 0)
+      && researchRouteBlocks.slice(1).every((block) => block.includes("body.confirm === true") && block.includes("--expected-plan"))
+      && types.includes("export interface LimitedResearchRun")
+      && types.includes("export interface ResearchPlanRevision")
+      && types.includes("export interface ResearchObservation"),
+  },
+  {
+    label: "finite-research-ui-is-thread-scoped-confirmed-and-row-free",
+    ok: panel.includes("<ResearchRunPanel thread={thread}")
+      && panel.includes('lazy(() => import("./ResearchRunPanel")')
+      && researchPanel.includes("payload.workspaceId !== thread.workspaceId")
+      && researchPanel.includes("expectedPlanFingerprint: payload.researchPlan.planFingerprint")
+      && researchPanel.includes("revisionHypotheses")
+      && researchPanel.includes("counterexampleChecks: splitItems(revisionCounterexamples)")
+      && researchPanel.includes("sensitivityChecks: splitItems(revisionSensitivities)")
+      && researchRouteBlocks[2].includes("--clear-hypotheses")
+      && researchRouteBlocks[2].includes("--clear-counterexamples")
+      && researchRouteBlocks[2].includes("--clear-sensitivities")
+      && researchPanel.includes('data-testid="research-confirmation"')
+      && researchPanel.includes('data-testid="research-coverage"')
+      && researchPanel.includes("selected.trace.events")
+      && researchPanel.includes("currentAnchors")
+      && !/(?:run|observation|anchor)\.(?:rows|calculation)|businessRowsCopied\s*:\s*true/.test(researchPanel),
+  },
+  {
+    label: "finite-research-layout-is-responsive-without-fixed-width",
+    ok: researchStyles.includes("repeat(auto-fit, minmax(min(100%, 240px), 1fr))")
+      && researchStyles.includes("@media (max-width: 640px)")
+      && !/\.research[^{}]*\{[^{}]*width:\s*\d{3,}px/s.test(researchStyles),
   },
 ];
 

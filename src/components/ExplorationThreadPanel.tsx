@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { addExplorationAnchor, createExplorationThread, getExplorationThreads, setExplorationBoardItem } from "../apiExploration";
 import type { AgentAskResult, ExplorationMutationPayload, ExplorationThread } from "../types";
 import { biText } from "./Bilingual";
 import "./ExplorationThreadPanel.css";
+
+const ResearchRunPanel = lazy(() => import("./ResearchRunPanel").then((module) => ({ default: module.ResearchRunPanel })));
 
 type PendingMutation = {
   payload: ExplorationMutationPayload;
@@ -250,6 +252,8 @@ export function ExplorationThreadPanel({ result, canBranch, onAskBranch }: Explo
           </div>
         </details>
       ) : null}
+
+      {thread ? <Suspense fallback={<p className="explorationMessage">{biText("正在载入有限研究…", "Loading finite research…")}</p>}><ResearchRunPanel thread={thread} /></Suspense> : null}
 
       <div className="agentBranchForm explorationBranchForm">
         <strong>{biText("从当前结果继续比较", "Compare from this result")}</strong>

@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 11
+CURRENT_SQLITE_SCHEMA_VERSION = 12
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -1064,6 +1064,69 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON exploration_anchors(workspace_id, thread_key, created_at);
         CREATE INDEX IF NOT EXISTS idx_exploration_board_thread_position
           ON exploration_board_items(workspace_id, thread_key, position, created_at);
+        CREATE TABLE IF NOT EXISTS research_runs (
+          research_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          thread_key TEXT NOT NULL,
+          baseline_anchor_key TEXT NOT NULL,
+          baseline_binding_fingerprint TEXT NOT NULL,
+          goal TEXT NOT NULL,
+          status TEXT NOT NULL,
+          current_revision_key TEXT NOT NULL,
+          budget_json TEXT NOT NULL,
+          conclusion_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          completed_at TEXT,
+          PRIMARY KEY(workspace_id, research_key)
+        );
+        CREATE TABLE IF NOT EXISTS research_plan_revisions (
+          revision_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          research_key TEXT NOT NULL,
+          parent_revision_key TEXT,
+          revision_number INTEGER NOT NULL,
+          reason TEXT NOT NULL,
+          plan_json TEXT NOT NULL,
+          plan_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, revision_key),
+          UNIQUE(workspace_id, research_key, revision_number)
+        );
+        CREATE TABLE IF NOT EXISTS research_observations (
+          observation_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          research_key TEXT NOT NULL,
+          revision_key TEXT NOT NULL,
+          step_key TEXT NOT NULL,
+          kind TEXT NOT NULL,
+          verdict TEXT NOT NULL,
+          note TEXT NOT NULL,
+          anchor_key TEXT NOT NULL,
+          anchor_binding_fingerprint TEXT NOT NULL,
+          revision_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, observation_key)
+        );
+        CREATE TABLE IF NOT EXISTS research_run_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          research_key TEXT NOT NULL,
+          revision_key TEXT,
+          event_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          public_summary TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_research_runs_workspace_updated
+          ON research_runs(workspace_id, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_research_revisions_run_number
+          ON research_plan_revisions(workspace_id, research_key, revision_number);
+        CREATE INDEX IF NOT EXISTS idx_research_observations_run_created
+          ON research_observations(workspace_id, research_key, created_at);
+        CREATE INDEX IF NOT EXISTS idx_research_events_run_sequence
+          ON research_run_events(workspace_id, research_key, event_sequence);
         """
     )
     connection.execute(

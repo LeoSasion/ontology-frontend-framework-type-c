@@ -34,6 +34,11 @@ COMMAND_DOMAINS: dict[str, str] = {
     "exploration-thread-create": "analysis",
     "exploration-anchor-add": "analysis",
     "exploration-board-set": "analysis",
+    "research-runs": "analysis",
+    "research-run-create": "analysis",
+    "research-run-revise": "analysis",
+    "research-run-observe": "analysis",
+    "research-run-finalize": "analysis",
     "analysis-unit-build": "analysis",
     "analysis-units": "analysis",
     "analysis-unit-verify": "analysis",
@@ -199,6 +204,10 @@ STATIC_DRY_RUN_CONFIRM_COMMANDS = {
     "exploration-thread-create",
     "exploration-anchor-add",
     "exploration-board-set",
+    "research-run-create",
+    "research-run-revise",
+    "research-run-observe",
+    "research-run-finalize",
 }
 
 
