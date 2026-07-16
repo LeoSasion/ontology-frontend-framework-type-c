@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getAnalysisSnapshots, mutateAnalysisSnapshot, type AnalysisSnapshotMutation, type AnalysisSnapshotOperation } from "../apiAnalysisSnapshots";
 import type { AnalysisSnapshot, AnalysisSnapshotPlan } from "../types";
 import { biText } from "./Bilingual";
+import { MetricMonitorPanel } from "./MetricMonitorPanel";
 import "./AnalysisSnapshotPanel.css";
 
 type AnalysisSnapshotPanelProps = {
@@ -169,6 +170,7 @@ export function AnalysisSnapshotPanel({ unitKey }: AnalysisSnapshotPanelProps) {
           </article>
         )) : <p className="analysisSnapshotEmpty">{busy ? biText("正在读取快照…", "Loading Snapshots…") : biText("尚未保存物化快照。", "No materialized Snapshot yet.")}</p>}
       </div>
+      <MetricMonitorPanel snapshots={snapshots} />
       {message ? <p className="analysisSnapshotMessage" role="status">{message}</p> : null}
       <p className="analysisSnapshotBoundary">{biText("Provider 未参与；列表只显示摘要、状态和指纹，不返回冻结的业务结果行。", "No Provider participated; this list exposes only summaries, status, and fingerprints—not frozen business rows.")}</p>
     </section>

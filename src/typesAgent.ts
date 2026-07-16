@@ -566,6 +566,101 @@ export interface AnalysisSnapshotsPayload {
   error?: string;
 }
 
+export interface MetricMonitor {
+  schema: "aibi-metric-monitor/v1" | string;
+  monitorKey: string;
+  workspaceId: string;
+  parentMonitorKey?: string | null;
+  operation: "create" | "replace" | string;
+  status: "active" | "replaced" | "deleted" | string;
+  label: string;
+  metric: string;
+  cadence: "manual" | "daily" | "weekly" | "monthly" | string;
+  comparisonStrategy: "absolute-change" | "percent-change" | string;
+  direction: "increase" | "decrease" | "absolute" | string;
+  threshold?: number | null;
+  thresholdSource: "none" | "user" | string;
+  warningRatio: number;
+  semanticFingerprint: string;
+  baselineSnapshotKey: string;
+  latestSnapshotKey?: string | null;
+  latestEvaluationKey?: string | null;
+  latestStatus: "not-run" | "baseline" | "normal" | "warning" | "breached" | "blocked" | string;
+  capabilityVersion: string;
+  definitionFingerprint: string;
+  inputFingerprint: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+  notificationsSent: 0;
+  businessSystemWrites: 0;
+  backgroundSchedulerEnabled: false;
+}
+
+export interface MetricMonitorEvaluation {
+  schema: "aibi-metric-monitor-evaluation/v1" | string;
+  evaluationKey: string;
+  workspaceId: string;
+  monitorKey: string;
+  sequence: number;
+  status: "baseline" | "normal" | "warning" | "breached" | "blocked" | string;
+  baselineSnapshotKey: string;
+  currentSnapshotKey: string;
+  baselineValue?: number | null;
+  currentValue?: number | null;
+  absoluteChange?: number | null;
+  percentChange?: number | null;
+  threshold?: number | null;
+  thresholdSource: "none" | "user" | string;
+  blockers: string[];
+  trace: Record<string, unknown>;
+  traceFingerprint: string;
+  createdAt: string;
+  providerUsed: false;
+  notificationsSent: 0;
+  businessSystemWrites: 0;
+  businessRowsExposed: 0;
+}
+
+export interface MetricMonitorPlan {
+  schema: "aibi-metric-monitor-plan/v1" | string;
+  status: string;
+  operation: "create" | "replace" | "delete" | string;
+  workspaceId: string;
+  monitorKey?: string;
+  definitionFingerprint?: string;
+  inputFingerprint?: string;
+  planFingerprint: string;
+  alreadyExists?: boolean;
+  alreadyDeleted?: boolean;
+  writesBusinessState: true;
+  notificationsPlanned: 0;
+  businessSystemWritesPlanned: 0;
+}
+
+export interface MetricMonitorsPayload {
+  ok: boolean;
+  schema?: string;
+  workspaceId?: string;
+  metricMonitors?: MetricMonitor[];
+  metricMonitor?: MetricMonitor;
+  metricMonitorPlan?: MetricMonitorPlan;
+  metricMonitorEvaluation?: MetricMonitorEvaluation;
+  metricMonitorEvaluations?: MetricMonitorEvaluation[];
+  count?: number;
+  dryRun?: boolean;
+  requiresConfirmation?: boolean;
+  confirmed?: boolean;
+  changed?: boolean;
+  writesEvidence?: boolean;
+  writesBusinessState?: false;
+  nextAction?: string;
+  notificationsSent?: 0;
+  businessSystemWrites?: 0;
+  backgroundSchedulerEnabled?: false;
+  error?: string;
+}
+
 export interface RelationshipTraversalMapping {
   leftField: string;
   rightField: string;

@@ -46,6 +46,11 @@ COMMAND_DOMAINS: dict[str, str] = {
     "analysis-snapshot-refresh": "analysis",
     "analysis-snapshot-replace": "analysis",
     "analysis-snapshot-delete": "analysis",
+    "metric-monitors": "analysis",
+    "metric-monitor-create": "analysis",
+    "metric-monitor-replace": "analysis",
+    "metric-monitor-delete": "analysis",
+    "metric-monitor-run": "analysis",
     "analysis-unit-verify": "analysis",
     "forecast-readiness": "analysis",
     "chart-adapt": "analysis",
@@ -187,6 +192,7 @@ EVIDENCE_WRITING_COMMANDS = {
     "analysis-unit-build",
     "query",
     "semantic-query",
+    "metric-monitor-run",
 }
 IMMEDIATE_RUNTIME_WRITES = {
     "source-intelligence",
@@ -204,6 +210,7 @@ IMMEDIATE_RUNTIME_WRITES = {
     "agent-runtime-profile-set",
     "agent-provider-evaluation-record",
     "plan-quality-evaluate",
+    "metric-monitor-run",
 }
 CONFIRMATION_COMMANDS = {"confirm-action"}
 STATIC_DRY_RUN_CONFIRM_COMMANDS = {
@@ -218,6 +225,9 @@ STATIC_DRY_RUN_CONFIRM_COMMANDS = {
     "analysis-snapshot-refresh",
     "analysis-snapshot-replace",
     "analysis-snapshot-delete",
+    "metric-monitor-create",
+    "metric-monitor-replace",
+    "metric-monitor-delete",
 }
 
 

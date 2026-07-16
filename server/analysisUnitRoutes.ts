@@ -11,6 +11,55 @@ type AnalysisUnitRoutesOptions = {
 const nonEmpty = (value: unknown) => String(value ?? "").trim();
 
 export async function handleAnalysisUnitApi({ cli, request, response, url }: AnalysisUnitRoutesOptions) {
+  if (url.pathname === "/api/metric-monitors" && request.method === "GET") {
+    const args = ["metric-monitors"];
+    const monitor = nonEmpty(url.searchParams.get("monitor"));
+    const status = nonEmpty(url.searchParams.get("status"));
+    const limit = nonEmpty(url.searchParams.get("limit")) || "30";
+    if (monitor) args.push("--monitor", monitor);
+    if (status) args.push("--status", status);
+    args.push("--limit", limit);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 404 : 200, result);
+    return true;
+  }
+
+  const monitorMutation = url.pathname.match(/^\/api\/metric-monitors\/(create|replace|delete|run)$/);
+  if (monitorMutation && request.method === "POST") {
+    const operation = monitorMutation[1];
+    const body = await readBody(request);
+    const monitor = nonEmpty(body.monitor ?? body.monitorKey);
+    const snapshot = nonEmpty(body.snapshot ?? body.snapshotKey);
+    if (["replace", "delete", "run"].includes(operation) && !monitor) {
+      sendJson(response, 400, { ok: false, action: `metric-monitor-${operation}`, error: "monitor is required" });
+      return true;
+    }
+    if (["create", "replace"].includes(operation) && (!snapshot || !nonEmpty(body.label))) {
+      sendJson(response, 400, { ok: false, action: `metric-monitor-${operation}`, error: "snapshot and label are required" });
+      return true;
+    }
+    const args = [`metric-monitor-${operation}`];
+    if (monitor) args.push("--monitor", monitor);
+    if (snapshot) args.push("--snapshot", snapshot);
+    if (["create", "replace"].includes(operation)) {
+      args.push("--label", nonEmpty(body.label));
+      if (nonEmpty(body.metric)) args.push("--metric", nonEmpty(body.metric));
+      args.push("--cadence", nonEmpty(body.cadence) || "manual");
+      args.push("--strategy", nonEmpty(body.comparisonStrategy) || "absolute-change");
+      args.push("--direction", nonEmpty(body.direction) || "absolute");
+      args.push("--warning-ratio", nonEmpty(body.warningRatio) || "0.8");
+      if (body.threshold !== undefined && body.threshold !== null && nonEmpty(body.threshold)) {
+        args.push("--threshold", nonEmpty(body.threshold));
+      }
+    }
+    if (["create", "replace", "delete"].includes(operation) && body.confirm === true) {
+      args.push("--yes", "--expected-plan", nonEmpty(body.expectedPlanFingerprint));
+    }
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-snapshots" && request.method === "GET") {
     const args = ["analysis-snapshots"];
     const snapshot = nonEmpty(url.searchParams.get("snapshot"));

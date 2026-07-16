@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 13
+CURRENT_SQLITE_SCHEMA_VERSION = 14
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -888,6 +888,60 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON analysis_snapshots(workspace_id, parent_snapshot_key, created_at);
         CREATE INDEX IF NOT EXISTS idx_analysis_snapshots_workspace_input
           ON analysis_snapshots(workspace_id, input_fingerprint);
+        CREATE TABLE IF NOT EXISTS metric_monitors (
+          monitor_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          parent_monitor_key TEXT,
+          operation TEXT NOT NULL,
+          status TEXT NOT NULL,
+          label TEXT NOT NULL,
+          metric_key TEXT NOT NULL,
+          cadence TEXT NOT NULL,
+          comparison_strategy TEXT NOT NULL,
+          direction TEXT NOT NULL,
+          threshold_value REAL,
+          threshold_source TEXT NOT NULL,
+          warning_ratio REAL NOT NULL,
+          semantic_fingerprint TEXT NOT NULL,
+          baseline_snapshot_key TEXT NOT NULL,
+          latest_snapshot_key TEXT,
+          latest_evaluation_key TEXT,
+          latest_status TEXT NOT NULL,
+          capability_version TEXT NOT NULL,
+          definition_fingerprint TEXT NOT NULL,
+          input_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          deleted_at TEXT,
+          PRIMARY KEY(workspace_id, monitor_key)
+        );
+        CREATE TABLE IF NOT EXISTS metric_monitor_evaluations (
+          evaluation_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          monitor_key TEXT NOT NULL,
+          evaluation_sequence INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          baseline_snapshot_key TEXT NOT NULL,
+          current_snapshot_key TEXT NOT NULL,
+          baseline_value REAL,
+          current_value REAL,
+          absolute_change REAL,
+          percent_change REAL,
+          threshold_value REAL,
+          threshold_source TEXT NOT NULL,
+          blockers_json TEXT NOT NULL,
+          trace_json TEXT NOT NULL,
+          trace_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, evaluation_key),
+          UNIQUE(workspace_id, monitor_key, evaluation_sequence)
+        );
+        CREATE INDEX IF NOT EXISTS idx_metric_monitors_workspace_status
+          ON metric_monitors(workspace_id, status, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_metric_monitors_workspace_input
+          ON metric_monitors(workspace_id, input_fingerprint);
+        CREATE INDEX IF NOT EXISTS idx_metric_monitor_evaluations_workspace_monitor
+          ON metric_monitor_evaluations(workspace_id, monitor_key, evaluation_sequence);
         CREATE TABLE IF NOT EXISTS analysis_jobs (
           job_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,
@@ -1241,6 +1295,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     ensure_column(connection, "action_drafts", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
     ensure_column(connection, "source_intelligence_runs", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
     ensure_column(connection, "analysis_jobs", "capability_id", "TEXT NOT NULL DEFAULT ''")
+    ensure_column(connection, "metric_monitors", "semantic_fingerprint", "TEXT NOT NULL DEFAULT ''")
     migrate_workspace_scoped_constraints(connection)
     for relationship in connection.execute(
         """

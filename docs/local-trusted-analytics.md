@@ -6,7 +6,7 @@
 
 - 所有能力只作用于当前 AIBI-C 工作区，不读取其他 AIBI 仓库、远程账号或未登记来源。
 - 本地确定性运行时拥有字段、关系、计算、刷新与持久化权；Provider 不能生成预测、阈值、查询、快照或监控状态。
-- 任何消费入口都实时复核数据、schema、关系、Domain Pack、Receipt 和 Analysis Unit 新鲜度；stale 历史可查看但不能作为当前输入。
+- 任何消费入口都实时复核数据、schema、关系、Domain Pack、Receipt 和 Analysis Unit 新鲜度；stale 历史可查看但不能作为当前规划输入。Metric Monitor 的 baseline 是唯一受限例外：它只能作为内容哈希、原 Unit/Receipt 绑定均完整的历史比较证据，不能续算、规划或替代当前快照。
 - 新能力不接受任意 SQL、Python、Shell、脚本、插件或无限重试；有界 Adapter 和 Capability 是唯一执行面。
 - 只读评估不要求确认；创建、替换、刷新或删除持久对象必须 dry-run、精确 fingerprint 和一次显式确认。
 - 公开合同默认只返回统计、指纹、状态和证据引用，不复制业务结果行、源文件路径、凭据或 Provider 推理。
@@ -39,19 +39,19 @@ CLI、API、Agent 与按需展开的分析面板消费同一合同。诊断命�
 - 快照保留 Unit/Receipt key 与定义、结果、数据、schema、关系、来源、Domain Pack、Workspace Manifest 指纹，以及创建原因、行数上限、内容哈希和父快照。公开列表只返回摘要、状态和指纹，不返回冻结行、任意查询、外部路径或 Provider 内容。
 - `refresh` 只接受指标、维度、聚合、筛选、参与表、关系路径和结果形状相同的新 Unit，并追加不可变子快照；语义变化必须显式 `replace`，同样追加子快照而不覆盖父对象。
 - 来源漂移、Unit/Receipt 缺失或绑定变化后旧快照进入 `stale | missing`；历史仍可审计，但 `usableForPlanning=false` 且所有消费者固定 `staleFallbackUsed=false`。
-- 删除只擦除冻结内容并保留 lineage tombstone；快照最多保存 500 行，工作区删除会清理全部快照，SQLite schema v13 的隔离迁移、恢复点和回滚覆盖该表。
+- 删除只擦除冻结内容并保留 lineage tombstone；快照最多保存 500 行，工作区删除会清理全部快照，SQLite schema v14 的隔离迁移、恢复点和回滚覆盖该表。
 
 CLI、API 与 Analysis Unit 下按需展开的面板消费同一合同。面板在操作期间禁用重复提交并拒绝晚到请求；创建原因和行数上限可核对，确认成功后保留明确结果消息。Provider 不参与快照生成、刷新、替换或删除。
 
-## P2-C：Metric Monitor
+## P2-C：Metric Monitor（已交付）
 
-Metric Monitor 只比较同一已确认指标定义、相同粒度和兼容窗口下的物化快照，不直接轮询业务来源，也不自动执行动作。
+`aibi-metric-monitor/v1` 只比较同一已确认指标定义、相同粒度和兼容窗口下的单值物化快照，不直接轮询业务来源，也不自动执行动作。
 
-- 监控定义必须绑定指标、时间节奏、比较策略、阈值来源、当前快照和 Capability 版本。
-- 首次运行只建立 baseline；后续运行产生 `normal | warning | breached | blocked` 评估和可重放 Trace。
-- 阈值必须由用户明确提供或来自经审查的 Domain Pack；没有阈值时只报告变化，不制造告警。
-- 任何口径、粒度、来源或快照漂移都阻断比较；不得把缺失值当零或把异常自动解释为业务原因。
-- 本地 UI 只展示状态、差异、证据和下一步；不发送通知、不写业务系统、不后台无限调度。
+- `create | replace | delete` 都先返回 `aibi-metric-monitor-plan/v1`，精确 `planFingerprint` 与显式确认同时满足才改变定义；定义绑定指标字段、复核节奏、比较策略、方向、用户阈值、warning ratio、baseline Snapshot、Capability 版本和定义指纹。replace 追加不可变子定义并退休父定义，delete 保留 tombstone 与历史评估。
+- 首次手动运行只建立 `baseline`；后续手动运行产生 `normal | warning | breached | blocked` 的 `aibi-metric-monitor-evaluation/v1`，Trace 固定保存定义、baseline/current 快照内容哈希、兼容性、比较规则、blocker 与零副作用回执。
+- baseline 必须在定义创建时 current；后续数据版本变化使其 stale 时，只要冻结内容、原 Unit/Receipt 绑定仍完整，仍可作为历史比较证据。current Snapshot 必须实时 current；两者的 semantic fingerprint、参与表身份、关系路径与 Domain Pack 必须一致。数据内容版本可以变化，已使用字段或结果形状变化会进入 semantic fingerprint 并阻断比较。
+- 首版阈值只接受用户明确输入，未配置阈值时只报告变化并保持 `normal`，不制造告警。缺失值、非数值、多行结果、百分比基线为零、语义或关系漂移都产生 `blocked`，从不把缺失值当零或把异常状态解释为业务原因。
+- CLI、API 与快照面板消费同一合同。cadence 只记录人工复核意图；没有后台 scheduler、来源轮询、通知、Webhook、业务系统写入或 Provider 参与。运行只写工作区隔离的本地评估证据，不要求业务写入确认。
 
 ## P2-D：只读联邦证明
 

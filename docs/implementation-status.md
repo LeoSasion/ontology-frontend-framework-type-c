@@ -28,11 +28,12 @@
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；全部读取与适配入口复核多源、关系、版本和 Pack 当前性 |
 | Forecast Readiness | 稳定初版 | current 趋势或异常 Unit 可按明确 horizon 执行来源、样本、节奏、稳定性、泄漏、假设和可解释性七门禁；CLI/API/Agent/UI 同源，blocked 仍是成功诊断，响应固定不生成预测、不调用 Provider、不返回业务行 |
 | 物化分析快照 | 稳定初版 | current Receipt/Unit 可经精确预演确认冻结最多 500 行；refresh/replace 追加不可变子快照，delete 擦除内容并保留 lineage tombstone；公开 CLI/API/UI 不返回冻结行，stale/missing 历史不用于规划且不回退旧快照 |
+| Metric Monitor | 稳定初版 | 用户确认的单值快照可建立不可变本地监控定义；首次手动运行建立 baseline，后续只比较语义、表身份、关系和 Pack 兼容的 current 快照，输出 baseline/normal/warning/breached/blocked 与可重放 Trace；无后台调度、通知、Provider 或业务系统写入 |
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v13、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile、Knowledge Source、Semantic Patch、Confirmed Plan Memory、Recall Receipt、Plan Quality Scorecard、Exploration Thread、有限 Research Run 与 Analysis Snapshot 已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
+| 本地运维 | 稳定 | SQLite schema v14、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile、Knowledge Source、Semantic Patch、Confirmed Plan Memory、Recall Receipt、Plan Quality Scorecard、Exploration Thread、有限 Research Run、Analysis Snapshot 与 Metric Monitor 已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
@@ -52,6 +53,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 - 业务理解合同、六个理解 Skill、六个第二批方法 Skill 与有限 Research Run 已进入稳定初版；方法计划仍不是已执行结论，Research Run 也只组织当前线程内的已验证锚点，不自动生成分析分支或扩大执行权限。
 - Forecast Readiness 只判断是否可进入受限评测；至少需要 24 个 current Unit 时间点，且不提供 backtest、模型训练、预测值、预测图或可靠性承诺。
 - 物化分析快照最多保留 current Unit 的 500 行；它不重查来源、不替代来源、不发送通知，stale 或 missing 历史只能审计，不能继续规划。
+- Metric Monitor 首版只接受单行数值快照和用户显式阈值；cadence 不触发后台任务，历史 baseline 仅用于完整性校验后的比较证据，不可作为当前规划输入，也不发送通知或自动解释异常原因。
 - Session Resume 只在同一工作区开放；缺失 Receipt、Run、Draft 或 Turn 会先显示失效引用并阻断静默续跑，显式复核后才可继续。
 - 远程 OpenAI-compatible origin 默认拒绝；当前只允许 DeepSeek 官方端点和显式 loopback endpoint，Provider 无字段绑定、Capability、SQL、工具或写入权限。
 - ERP 等专用复杂 UI 仍由 AIBI-C 自有可选模块提供，仅在对应 Pack 启用且证据满足时加载。

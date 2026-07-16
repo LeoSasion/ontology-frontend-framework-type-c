@@ -15,6 +15,7 @@
 | 有限研究 | 从 current 探索锚点建立 Research Run，修订计划并采纳同线程的反例/敏感性结果 | 每次修订新增不可变 revision；预算、父 fingerprint、证据 freshness 和同线程约束可见；完成前覆盖反例与敏感性；统一 Trace 可重放 | 覆盖旧计划、自动扩大预算、采纳跨线程/stale 结果、复制业务结果行、缺少反证仍宣称已验证结论或无限循环重规划 |
 | 预测准备度 | 对 current 趋势或异常 Analysis Unit 检查一个明确 horizon | 分别展示来源、样本、节奏、稳定性、泄漏、假设和可解释性门禁；失败项给出 blocker；响应明确不生成预测 | 返回未来数值、复制输入行、用 Provider 补阈值、接受 stale Unit、忽略不规则时间或把“可评估”表述成“预测可靠” |
 | 物化分析快照 | 从 current、ready Analysis Unit 预演创建、刷新、替换或删除并确认精确计划 | 创建有界不可变快照；refresh/replace 保留父链；delete 擦除内容并保留 tombstone；列表只显示状态、摘要和指纹，来源漂移后明确 stale 且无 fallback | 未确认写入、覆盖父快照、语义变化被当作 refresh、返回冻结业务行、删除 lineage、跨工作区可见或 stale 快照继续规划 |
+| 指标监控 | 从 current 单值快照预演并确认监控定义，手动建立 baseline 后用兼容 current 快照运行 | 定义显示指标、节奏、比较策略、方向、用户阈值和 Capability；评估显示 baseline/normal/warning/breached/blocked、差异、blocker 与可重放 Trace；无后台调度、通知、Provider 或业务写入 | 自动轮询来源、缺失值当零、无阈值制造告警、比较语义/表/关系/Pack 不兼容快照、历史 baseline 参与规划、自动解释业务原因或跨工作区可见 |
 
 ## 语义、跨表与领域边界
 

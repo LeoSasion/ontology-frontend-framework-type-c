@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `165`
+Command count: `170`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,7 +11,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 19 |
+| `analysis` | 24 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -41,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 69 |
-| `evidence-receipt` | 8 |
-| `read-only` | 73 |
+| `dry-run-confirm` | 72 |
+| `evidence-receipt` | 9 |
+| `read-only` | 74 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -151,6 +151,11 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `list-semantics` | `semantic` | `read-only` | `no` | `no` | `--table` |
 | `list-tables` | `source` | `read-only` | `no` | `no` | - |
 | `list-views` | `view` | `read-only` | `no` | `no` | `--table` |
+| `metric-monitor-create` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--snapshot`, `--label`, `--metric`, `--cadence`, `--strategy`, `--direction`, `--threshold`, `--warning-ratio`, `...` |
+| `metric-monitor-delete` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--monitor`, `--expected-plan`, `--yes` |
+| `metric-monitor-replace` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--monitor`, `--snapshot`, `--label`, `--metric`, `--cadence`, `--strategy`, `--direction`, `--threshold`, `...` |
+| `metric-monitor-run` | `analysis` | `evidence-receipt` | `no` | `yes` | `--monitor`, `--snapshot` |
+| `metric-monitors` | `analysis` | `read-only` | `no` | `no` | `--monitor`, `--status`, `--limit` |
 | `navigation-op` | `navigation` | `dry-run-confirm` | `yes` | `no` | `--module`, `--op`, `--name`, `--sort`, `--yes` |
 | `plan-connector-sync` | `connector` | `read-only` | `no` | `no` | `--connector` |
 | `plan-quality-evaluate` | `agent` | `runtime-receipt` | `no` | `no` | `--workspace` |

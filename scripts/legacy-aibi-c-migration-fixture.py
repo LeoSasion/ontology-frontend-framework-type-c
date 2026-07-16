@@ -165,6 +165,18 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_analysis_snapshots_%' ORDER BY name"
             ).fetchall()
         ]
+        metric_monitor_tables = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('metric_monitors', 'metric_monitor_evaluations') ORDER BY name"
+            ).fetchall()
+        ]
+        metric_monitor_indexes = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_metric_monitor%' ORDER BY name"
+            ).fetchall()
+        ]
     with duckdb.connect(str(duckdb_path), read_only=True) as connection:
         duckdb_row = connection.execute("SELECT product, value FROM legacy_aibi_c_rows").fetchone()
         metadata = connection.execute(
@@ -190,6 +202,8 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
         "researchIndexes": research_indexes,
         "analysisSnapshotTables": analysis_snapshot_tables,
         "analysisSnapshotIndexes": analysis_snapshot_indexes,
+        "metricMonitorTables": metric_monitor_tables,
+        "metricMonitorIndexes": metric_monitor_indexes,
         "duckdbRow": list(duckdb_row) if duckdb_row else None,
         "duckdbVersion": duckdb_version,
     }
