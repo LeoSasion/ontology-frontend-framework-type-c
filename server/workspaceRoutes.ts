@@ -25,6 +25,29 @@ export async function handleWorkspaceApi({ cli, port, request, response, url }: 
     return true;
   }
 
+  if (url.pathname === "/api/workspace/manifest" && request.method === "GET") {
+    const result = await cli(["workspace-manifest"]);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/runtime/catalog" && request.method === "GET") {
+    const result = await cli(["runtime-catalog"]);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/business-field-profiles" && request.method === "GET") {
+    const args = ["business-field-profiles"];
+    const table = url.searchParams.get("table") ?? "";
+    const field = url.searchParams.get("field") ?? "";
+    if (table) args.push("--table", table);
+    if (field) args.push("--field", field);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 400 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/workspaces" && request.method === "GET") {
     const status = await cli(["status"]);
     sendJson(response, 200, { ok: true, workspaces: status.workspaces ?? [status.workspace], status });

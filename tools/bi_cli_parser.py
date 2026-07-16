@@ -165,6 +165,18 @@ def build_parser() -> argparse.ArgumentParser:
     agent_provider_evaluation_record.add_argument("--audit-json", default="{}")
 
     sub.add_parser("status")
+
+    workspace_manifest = sub.add_parser("workspace-manifest", description="Build the deterministic read-only manifest for one workspace.")
+    workspace_manifest.add_argument("--workspace", default="")
+
+    runtime_catalog = sub.add_parser("runtime-catalog", description="List the workspace-scoped semantic and execution catalog without credentials or raw rows.")
+    runtime_catalog.add_argument("--workspace", default="")
+
+    business_field_profiles = sub.add_parser("business-field-profiles", description="Derive bounded field-shape evidence without promoting candidates to confirmed semantics.")
+    business_field_profiles.add_argument("--workspace", default="")
+    business_field_profiles.add_argument("--table", default="")
+    business_field_profiles.add_argument("--field", default="")
+
     sub.add_parser("quality-doctor")
 
     sub.add_parser("context-pack")

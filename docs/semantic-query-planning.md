@@ -10,6 +10,8 @@
 
 `aibi-semantic-context-bundle/v1` 在当前工作区按五层上下文统一整理字段候选、Context Term/Rule、Confirmed Query、Domain Pack、Analytical Skill、运行证据与展示偏好。每项保留来源、作用域、版本、新鲜度和指纹。路由固定为 deterministic-first；可选 reranker 只能调整候选顺序，不能移除歧义门禁。Bundle 使用 SHA-256 绑定业务理解、意图、语义计划和来源。
 
+Bundle 同时引用 `aibi-workspace-planning-binding/v1` 的 schema、fingerprint 和画像数量，并固定声明 candidate 不能授权 Join。该绑定从 Workspace Manifest 的稳定规划子集派生，覆盖 schema、数据、字段画像、指标、公式、关系、Context、Domain Pack 与 Analytical Skill；任一组件漂移都使新计划与 Receipt 重新绑定。完整的派生、PII 和 freshness 边界见 [工作区上下文目录](workspace-context-catalog.md)。
+
 `aibi-agent-clarification/v1` 为未决项标记 metric definition、population、grain、time、baseline、status、relationship path 等类型和 materiality，一次只询问一个最能缩小计划空间的高价值问题；每个候选都必须声明表级来源和选择影响。前端“我理解的问题”默认显示任务类型、指标、维度、时间、输出和粒度；只有存在歧义时自动展开。回答若改变语义，旧 Intent、Evidence Plan 和未执行 Receipt 必须失效并重新规划。
 
 ## Evidence Plan 与 Agent Turn
@@ -59,7 +61,7 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 3. 为每个字段声明表、角色和统计粒度，保留全部指标、维度与筛选。
 4. 只在当前工作区已保存关系图中寻找路径，并记录版本、方向和行膨胀。
 5. 缺路径返回 `needs-relationship`；低置信、版本过期或放大风险返回 `needs-validation`。
-6. Receipt 保存候选、选择、未决项、参与表、路径、风险、版本和计划哈希。
+6. Receipt 保存候选、选择、未决项、参与表、路径、风险、版本、计划哈希和当前 Workspace Planning Binding；执行前重新计算并核对。
 
 ## 消歧与粒度
 
@@ -92,7 +94,7 @@ Provider 只接收 `aibi-agent-provider-context/v1` 白名单字段；原始行�
 
 当前阻断：超过三跳、非线性关系树、反向 `LEFT JOIN`、未证明安全的 M:N、多个等价业务路径、未穷尽的高密度路径搜索、无法安全 rollup 的预聚合，以及指标不在路径末端的计划。
 
-执行前必须在同一事务内重新构建计划、读取当前版本、生成运行时证明、执行查询并写入 Receipt。关系被删除、替换或改版时返回 `semantic-plan-changed-before-execution`，不得回退到单表猜测。Receipt、Analysis Unit、图表适配、导出和 Confirmed Query 都要重新核对全部源表、路径证明、关系定义、数据版本和 Domain Pack 指纹。
+执行前必须在同一事务内重新构建计划、读取当前版本、生成运行时证明、执行查询并写入 Receipt。关系被删除、替换或改版时返回 `semantic-plan-changed-before-execution`，不得回退到单表猜测。Receipt、Analysis Unit、图表适配、导出和 Confirmed Query 都要重新核对全部源表、路径证明、关系定义、数据版本、Domain Pack 和 Workspace Planning Binding 指纹。
 
 ## 验证
 

@@ -10,6 +10,9 @@ CONTRACT_SCHEMA_VERSION = "aibi-bi-cli-contract/v1"
 
 COMMAND_DOMAINS: dict[str, str] = {
     "status": "system",
+    "workspace-manifest": "workspace",
+    "runtime-catalog": "workspace",
+    "business-field-profiles": "semantic",
     "quality-doctor": "system",
     "context-pack": "context",
     "context-term": "context",

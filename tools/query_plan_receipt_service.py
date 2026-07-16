@@ -525,6 +525,17 @@ def current_query_receipt_source_state(
     )
     receipt_domain_pack_fingerprint = str(receipt.get("domainPackFingerprint") or "")
     domain_pack_matches = current_domain_pack_fingerprint == receipt_domain_pack_fingerprint
+    from workspace_manifest_service import workspace_planning_binding
+
+    current_workspace_manifest = workspace_planning_binding(connection, workspace_id)
+    stored_workspace_manifest = receipt.get("workspaceManifest") if isinstance(receipt.get("workspaceManifest"), dict) else None
+    workspace_manifest_matches = (
+        stored_workspace_manifest is None
+        or (
+            str(stored_workspace_manifest.get("workspaceId") or "") == workspace_id
+            and str(stored_workspace_manifest.get("fingerprint") or "") == current_workspace_manifest["fingerprint"]
+        )
+    )
     source_fingerprint = _fingerprint({
         "workspaceId": workspace_id,
         "tableKeys": sorted(table_keys),
@@ -550,6 +561,8 @@ def current_query_receipt_source_state(
         blockers.append("query-receipt-relationship-path-drifted")
     if not domain_pack_matches:
         blockers.append("query-receipt-domain-pack-drifted")
+    if not workspace_manifest_matches:
+        blockers.append("query-receipt-workspace-manifest-drifted")
     return {
         "tableKeys": table_keys,
         "tables": entries,
@@ -572,9 +585,12 @@ def current_query_receipt_source_state(
         "domainPacks": current_domain_packs,
         "domainPackFingerprint": current_domain_pack_fingerprint,
         "domainPackMatchesReceipt": domain_pack_matches,
+        "workspaceManifest": current_workspace_manifest,
+        "workspaceManifestBound": stored_workspace_manifest is not None,
+        "workspaceManifestMatchesReceipt": workspace_manifest_matches,
         "receiptBindingFingerprint": query_receipt_binding_fingerprint(receipt),
         "blockers": blockers,
-        "matchesReceipt": source_tables_match and relationship_path_matches and domain_pack_matches,
+        "matchesReceipt": source_tables_match and relationship_path_matches and domain_pack_matches and workspace_manifest_matches,
     }
 
 
@@ -604,6 +620,7 @@ def create_query_plan_receipt(
     action_key: str | None = None,
     result_rows: list[Any] | None = None,
     now_iso: Callable[[], str],
+    workspace_manifest: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     created_at = now_iso()
     receipt_key = _receipt_key(workspace_id, request_text, created_at)
@@ -615,6 +632,14 @@ def create_query_plan_receipt(
     else:
         domain_packs = list(domain_packs)
     domain_pack_fingerprint = domain_pack_set_fingerprint({"enabledDomainPacks": domain_packs})
+    if workspace_manifest is None:
+        from workspace_manifest_service import workspace_planning_binding
+
+        workspace_manifest = workspace_planning_binding(connection, workspace_id)
+    elif str(workspace_manifest.get("workspaceId") or "") != workspace_id:
+        raise ValueError("Workspace Manifest binding does not belong to the receipt workspace")
+    else:
+        workspace_manifest = dict(workspace_manifest)
     unresolved = list(unresolved or [])
     filters = list(filters or [])
     groups = list(groups or [])
@@ -760,6 +785,7 @@ def create_query_plan_receipt(
         "contextRefs": context_refs,
         "domainPacks": domain_packs,
         "domainPackFingerprint": domain_pack_fingerprint,
+        "workspaceManifest": workspace_manifest,
         "evidenceRefs": evidence_refs,
         "unresolved": unresolved,
         "actionKey": action_key,

@@ -1,0 +1,127 @@
+.workspaceContextStats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.workspaceContextStats > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 9px 10px;
+}
+
+.workspaceContextStats strong { color: var(--text); font-size: 17px; }
+.workspaceContextStats small { color: var(--muted); font-size: 11px; }
+
+.businessFieldProfileList {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.businessFieldProfileRow {
+  border-bottom: 1px solid var(--line);
+}
+
+.businessFieldProfileRow > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 2px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.businessFieldProfileRow > summary::-webkit-details-marker { display: none; }
+.businessFieldProfileRow > summary > span:first-child { display: grid; gap: 2px; min-width: 0; }
+.businessFieldProfileRow > summary strong { color: var(--text); overflow-wrap: anywhere; }
+.businessFieldProfileRow > summary small { color: var(--muted); }
+
+.workspaceContextPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  padding: 2px 9px;
+  font-size: 11px;
+  font-weight: 760;
+  white-space: nowrap;
+}
+
+.workspaceContextPill.ready,
+.workspaceContextPill.current { border-color: color-mix(in srgb, var(--success) 42%, var(--line)); color: var(--success); }
+.workspaceContextPill.ambiguous,
+.workspaceContextPill.incomplete { border-color: color-mix(in srgb, var(--amber) 48%, var(--line)); color: color-mix(in srgb, var(--amber) 84%, var(--text)); }
+.workspaceContextPill.blocked,
+.workspaceContextPill.stale { border-color: color-mix(in srgb, var(--danger) 42%, var(--line)); color: var(--danger); }
+
+.businessFieldProfileBody {
+  display: grid;
+  gap: 10px;
+  padding: 2px 0 12px;
+}
+
+.businessFieldProfileBody dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.businessFieldProfileBody dl > div {
+  min-width: 0;
+  border-radius: 7px;
+  background: var(--surface);
+  padding: 7px 8px;
+}
+
+.businessFieldProfileBody dt { color: var(--muted); font-size: 10px; }
+.businessFieldProfileBody dd { margin: 2px 0 0; color: var(--text); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.businessFieldProfileBody p { display: grid; gap: 3px; margin: 0; color: var(--text); font-size: 12px; }
+.businessFieldProfileBody p span { color: var(--muted); overflow-wrap: anywhere; }
+.workspaceContextTechnical { color: var(--muted); font-family: var(--font-mono); overflow-wrap: anywhere; }
+
+.workspaceContextLoading { display: grid; gap: 7px; padding: 12px 0; }
+.workspaceContextLoading span { height: 9px; border-radius: 4px; background: color-mix(in srgb, var(--line) 65%, transparent); animation: workspace-context-pulse 1.2s ease-in-out infinite alternate; }
+.workspaceContextLoading span:nth-child(2) { width: 78%; }
+.workspaceContextLoading span:nth-child(3) { width: 56%; }
+
+.workspaceContextError {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 36%, var(--line));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--danger) 6%, var(--surface));
+  color: var(--danger);
+  padding: 9px 10px;
+  font-size: 12px;
+}
+
+.workspaceManifestPanel { display: grid; gap: 12px; }
+.workspaceManifestFacts { margin: 0; }
+.workspaceManifestWarnings { margin: 0; color: color-mix(in srgb, var(--amber) 82%, var(--text)); font-size: 12px; }
+.workspaceManifestFingerprints { display: grid; gap: 6px; margin: 8px 0 0; }
+.workspaceManifestFingerprints div { display: grid; grid-template-columns: minmax(100px, .25fr) minmax(0, 1fr); gap: 8px; }
+.workspaceManifestFingerprints dt { color: var(--muted); font-size: 11px; }
+.workspaceManifestFingerprints dd { margin: 0; color: var(--text); font-family: var(--font-mono); font-size: 10px; overflow-wrap: anywhere; }
+
+@keyframes workspace-context-pulse { from { opacity: .45; } to { opacity: .9; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .workspaceContextLoading span { animation: none; }
+}
+
+@container source-workbench (max-width: 720px) {
+  .workspaceContextStats,
+  .businessFieldProfileBody dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

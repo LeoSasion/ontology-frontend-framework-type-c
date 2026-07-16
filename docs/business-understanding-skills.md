@@ -1,6 +1,6 @@
 # 业务理解与分析 Skills
 
-本文件是 AIBI-C 业务理解机制、首批业务理解 Skills 和本专题验收标准的唯一设计事实源。语义与跨表执行细节见 [语义查询合同](semantic-query-planning.md)，当前实现状态见 [实现状态](implementation-status.md)。
+本文件是 AIBI-C 业务理解机制、首批业务理解 Skills 和本专题验收标准的唯一设计事实源。工作区清单、运行目录和字段画像见 [工作区上下文目录](workspace-context-catalog.md)，语义与跨表执行细节见 [语义查询合同](semantic-query-planning.md)，当前实现状态见 [实现状态](implementation-status.md)。
 
 > 研究快照：2026-07-16。当前状态：稳定初版；后续扩展仍由对应自动化、运行回执和产品验收共同确认。
 
@@ -19,13 +19,15 @@
 
 | 层次 | 回答的问题 | AIBI-C 权威来源 | 禁止行为 |
 | --- | --- | --- | --- |
-| Structural | 有哪些表、字段、类型、键、值形状和关系候选 | 当前工作区 schema、画像和关系证据 | 从字段名或样例值断言业务含义 |
+| Structural | 有哪些表、字段、类型、键、值形状和关系候选 | 当前工作区 Manifest、Runtime Catalog、字段画像和关系证据 | 从字段名或样例值断言业务含义 |
 | Semantic | 字段承担什么角色，指标如何聚合，粒度和时间语义是什么 | 手工语义、指标/公式、已验证关系与 Domain Pack 声明 | 用模型偏好解决同名字段、比率或粒度冲突 |
 | Business | 术语、状态、口径、排除项和规范来源是什么 | 已启用 Domain Pack、版本化规则和已确认示例 | 无 Pack 时注入行业默认值；按加载顺序解决冲突 |
 | Operational | 本次能用哪些数据、版本、Evidence Run、Skill 和 Capability | 当前数据/Pack 指纹、运行状态、Policy 与资源预算 | 复用 stale 证据或让 Skill 扩权 |
 | Behavioral | 用户希望怎样表达、展示和继续分析 | 当前工作区或 Session 的展示偏好与已确认交互 | 把个人措辞、图表偏好或聊天摘要晋级为共享业务事实 |
 
 共享业务事实必须有来源、作用域、版本、状态和复核记录；个人表达只影响叙述或展示，不能改变公式、筛选、关系、粒度和执行权限。聊天纠正只能形成待审查提议，不能自动改写 Domain Pack、指标或全局别名。
+
+Workspace Manifest、Runtime Catalog 与 Business Field Profile 已形成首版只读上下文。字段形状、角色候选、分类基数、空值/基数、时间覆盖和 PII 风险只作为 Structural/Operational 证据；分类原值始终保留在本地数据层而不进入上下文合同。当前只有手工保存语义形成 confirmed 引用，候选不能授权 Join 或业务口径。字段清单与 freshness 规则不在本文复制，统一见 [工作区上下文目录](workspace-context-catalog.md)。
 
 ## 借鉴与拒绝
 
@@ -137,11 +139,10 @@ flowchart LR
 
 本节只维护业务理解专题的后续顺序；跨产品优先级入口见 [未来开发队列](development-roadmap.md)。
 
-1. 增加 `BusinessFieldProfile`：样例形状、角色候选、状态候选、空值/基数、时间覆盖和 PII 风险分离记录，业务含义只能由人工或已验证 Pack 确认。
-2. 增加 `SemanticPatchProposal`：把用户纠正、数据字典和文档发现转成可审查差异，不自动修改共享事实。
-3. 建立业务表达基准集，覆盖同义词、同名指标、比率、去重实体、状态、时间、跨表和 Pack 冲突，并按 Domain Pack 隔离。
-4. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`dashboard-decision-design`。
-5. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
+1. 增加 `SemanticPatchProposal`：把用户纠正、数据字典和文档发现转成可审查差异，不自动修改共享事实。
+2. 建立业务表达基准集，覆盖同义词、同名指标、比率、去重实体、状态、时间、跨表和 Pack 冲突，并按 Domain Pack 隔离。
+3. 第二批方法 Skill：`funnel-analysis`、`cohort-retention-analysis`、`business-anomaly-triage`、`dashboard-decision-design`。
+4. `forecast-readiness` 仅在样本量、稳定性、泄漏、假设和可解释性门禁完成后进入开发；未达门槛时只输出准备度，不生成预测。
 
 ## 公开研究快照
 

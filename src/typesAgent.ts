@@ -1,5 +1,6 @@
 import type { CoreSemanticRuntime, SourcePipelineContract } from "./typesSource";
 import type { SelectionConfidence } from "./typesWorkspace";
+import type { WorkspacePlanningBinding } from "./typesWorkspaceContext";
 
 export interface BusinessIntentFrame {
   schema: "aibi-agent-intent-frame/v1" | string;
@@ -539,6 +540,7 @@ export interface QueryPlanReceipt {
   contextRefs: Array<Record<string, unknown>>;
   domainPacks?: Array<{ packId: string; version: string; fingerprint: string; capabilities?: string[] }>;
   domainPackFingerprint?: string;
+  workspaceManifest?: WorkspacePlanningBinding;
   evidenceRefs: Array<Record<string, unknown>>;
   unresolved: unknown[];
   actionKey?: string | null;

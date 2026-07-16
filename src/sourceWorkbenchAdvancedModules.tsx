@@ -7,6 +7,7 @@ export const SourceWorkbenchFieldMetricPanel = lazy(() => loadAdvancedPanels().t
 export const SourceWorkbenchOperationsPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchOperationsPanel })));
 export const SourceWorkbenchQueryFormulaPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchQueryFormulaPanel })));
 export const SourceWorkbenchRelationshipPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchRelationshipPanel })));
+export const SourceWorkbenchBusinessFieldProfilePanel = lazy(() => import("./components/SourceWorkbenchBusinessFieldProfilePanel"));
 
 export function SourceWorkbenchAdvancedLoading() {
   return (

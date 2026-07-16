@@ -1,5 +1,5 @@
 import "./agentEvidenceWorkspace.css";
-import { Suspense, useMemo } from "react";
+import { Suspense, useMemo, useState } from "react";
 import type { AgentAskResult, EvidenceFocus, WorkbenchPayload } from "../types";
 import type { BusinessPathStepKey } from "../businessPathModel";
 import type { SourceIntelligenceRunOptions } from "../sourceIntelligenceRunModel";
@@ -32,6 +32,7 @@ import { MetricSemanticRepairActions } from "./MetricSemanticRepairActions";
 
 const EvidenceTrustActions = lazyWithRetry(() => import("./EvidenceTrustActions"));
 const EvidenceNumberExplainerPanel = lazyWithRetry(() => import("./EvidenceNumberExplainerPanel").then((module) => ({ default: module.EvidenceNumberExplainerPanel })));
+const EvidenceWorkspaceManifestPanel = lazyWithRetry(() => import("./EvidenceWorkspaceManifestPanel"));
 
 type EvidenceViewProps = {
   agent: AgentAskResult;
@@ -47,6 +48,7 @@ type EvidenceViewProps = {
 };
 
 export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount, workbench, onSetSemantic, onSourceIntelligenceRun, onOpenBusinessStep, onOpenAgent, onOpenDashboard }: EvidenceViewProps) {
+  const [showWorkspaceManifest, setShowWorkspaceManifest] = useState(false);
   const runs = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
   const activeRun = sourceRunFromFocus(focus, runs);
   const activeRefs = focus?.refs?.length ? focus.refs : agent.ontology.evidenceFiles;
@@ -264,9 +266,10 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
           </div>
         </details>
 
-        <details className="progressiveDetails evidenceProgressiveDetails" data-testid="evidence-receipts-details">
+        <details className="progressiveDetails evidenceProgressiveDetails" data-testid="evidence-receipts-details" onToggle={(event) => setShowWorkspaceManifest(event.currentTarget.open)}>
           <summary>{biText("查看回执、动作边界和原始合同", "View receipts, action boundaries, and raw contracts")}</summary>
           <div className="progressiveDetailsBody evidenceProgressiveGrid">
+            {showWorkspaceManifest ? <Suspense fallback={null}><EvidenceWorkspaceManifestPanel /></Suspense> : null}
             <article data-testid="evidence-source-intelligence-summary">
               <h3><Bilingual zh="证据摘要回执" en="Evidence summary receipt" /></h3>
               {activeRun ? (

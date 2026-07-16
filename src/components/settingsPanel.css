@@ -665,6 +665,33 @@
   font-size: 12px;
 }
 
+.runtimeCatalogSummary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.runtimeCatalogSummary span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 8px;
+}
+
+.runtimeCatalogSummary strong { color: var(--text); font-size: 15px; }
+.runtimeCatalogSummary small { color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
+
+.runtimeCatalogDetails { margin-top: 10px; }
+.runtimeCatalogDetails summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+.runtimeCatalogDetails dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; margin: 9px 0 0; }
+.runtimeCatalogDetails dl > div { min-width: 0; border-radius: 8px; background: var(--surface-2); padding: 8px; }
+.runtimeCatalogDetails dt { color: var(--muted); font-size: 10px; }
+.runtimeCatalogDetails dd { margin: 3px 0 0; color: var(--text); font-size: 11px; font-weight: 700; overflow-wrap: anywhere; }
+
 @container settings-panel (max-width: 980px) {
   .settingsGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -676,6 +703,8 @@
 }
 
 @container settings-panel (max-width: 680px) {
+  .runtimeCatalogSummary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .runtimeCatalogDetails dl { grid-template-columns: minmax(0, 1fr); }
   .settingsHeader {
     display: grid;
     grid-template-columns: minmax(0, 1fr);

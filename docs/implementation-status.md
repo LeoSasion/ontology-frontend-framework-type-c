@@ -12,6 +12,7 @@
 | --- | --- | --- |
 | 工作区与导航 | 稳定 | 工作区隔离；对象级 URL 可恢复；简化主导航和状态驱动首页已落地 |
 | 导入与画像 | 稳定 | CSV/XLSX/XLSM、文件与文件夹统一预检；旧 XLS 仅画像读取 |
+| 工作区上下文目录 | 首版已接入 | Workspace Manifest、Runtime Catalog 与 Business Field Profile 从当前工作区只读派生，并通过 CLI/API 供证据页、数据工作台和 Agent 使用；候选与手工确认分离，敏感字段只公开风险和统计，规划绑定覆盖数据、画像、语义、关系、Context、Pack 与 Skill 指纹 |
 | Connector Adapter | 稳定受控 | 本地表格、allowlist HTTP JSON 与 allowlist SQLite table 支持有界预览、计划和确认导入 |
 | 语义与关系 | 稳定受控 | 一至三跳全局线性覆盖、INNER 反向遍历、跨跳筛选/预聚合、组合字段消歧、复合键、版本失效、根到事实可达性、NULL 语义和放大阻断进入 Receipt；等价根表、同表异键或未穷尽的高密度路径搜索必须由用户显式选择 |
 | 查询与可信单图 | 稳定 | 白名单查询、保存视图、单图草案、一次确认和真实对象跳转可用 |
@@ -23,7 +24,7 @@
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
-| 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema 与 Pack 指纹；stale 记录不用于当前规划 |
+| 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；stale 记录不用于当前规划 |
 | 本地运维 | 稳定 | SQLite schema v7、DuckDB schema v1；Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile 选择与 Provider 评估已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
 | 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
 

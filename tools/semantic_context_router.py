@@ -13,7 +13,7 @@ def _fingerprint(payload: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None, business_understanding: dict[str, Any] | None = None) -> dict[str, Any]:
+def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, Any], semantic_plan: dict[str, Any], selected_table: dict[str, Any] | None, table_selection_confidence: str, context_matches: dict[str, Any], recalled_queries: list[dict[str, Any]], domain_pack_context: dict[str, Any], knowledge_match: dict[str, Any] | None, analytical_skill_match: dict[str, Any] | None = None, session_context: dict[str, Any] | None = None, business_understanding: dict[str, Any] | None = None, workspace_manifest_ref: dict[str, Any] | None = None) -> dict[str, Any]:
     field_resolution = semantic_plan.get("fieldResolution", {})
     skill_sources: list[dict[str, Any]] = []
     if isinstance(analytical_skill_match, dict):
@@ -41,6 +41,13 @@ def build_semantic_context_bundle(*, workspace_id: str, intent_frame: dict[str, 
         "confirmedQueries": [{"queryKey": item.get("query_key"), "question": item.get("question"), "score": item.get("matchScore"), "reason": "confirmed-query-recall"} for item in recalled_queries],
         "knowledgeRules": [{"packId": knowledge_match.get("packId"), "version": knowledge_match.get("packVersion"), "ruleId": knowledge_match.get("ruleId"), "title": knowledge_match.get("title"), "grain": knowledge_match.get("grain"), "reason": "enabled-domain-pack-rule"}] if knowledge_match else [],
         "domainPacks": domain_pack_context.get("enabledDomainPacks") or domain_pack_context.get("enabled") or [],
+        "workspaceManifest": {
+            "schema": workspace_manifest_ref.get("schema"),
+            "workspaceId": workspace_manifest_ref.get("workspaceId"),
+            "fingerprint": workspace_manifest_ref.get("fingerprint"),
+            "profileCount": workspace_manifest_ref.get("profileCount"),
+            "candidateCanAuthorizeJoin": False,
+        } if isinstance(workspace_manifest_ref, dict) else None,
         "analyticalSkills": skill_sources,
         "session": {
             "sessionKey": session_context.get("sessionKey"),

@@ -43,6 +43,7 @@
 ### 语义、关系与查询
 
 - 字段语义记录结构角色、用途、置信度和手工覆盖，自动能力排除内部 `__*` 字段。
+- 系统从当前工作区派生只读 Workspace Manifest、Runtime Catalog 和 Business Field Profile；结构画像、自动候选与手工确认必须分层，PII、原始行、凭据和物理路径不得进入公开合同，stale 或 blocked 画像不得作为规划依据。
 - 同名或近义字段跨表竞争时，显式表名优先；证据不足时一次只询问一个最高价值的类型化问题。
 - 多维问题完整记录指标、维度、筛选、参与表和统计粒度。
 - 关系推荐结合值重叠、基数、复合键、版本和行膨胀；推荐不等于执行许可。
@@ -50,7 +51,7 @@
 - 比率、转化率和占比没有已验证分子/分母计划时必须澄清，不得退化为计数。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
 
-详细规则由 [语义查询合同](semantic-query-planning.md) 维护。
+工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
 
 ### 图表、看板与连续分析
 
@@ -97,6 +98,7 @@
 | 当前实现与限制 | [实现状态](implementation-status.md) |
 | 未交付事项 | [未来开发队列](development-roadmap.md) |
 | 业务理解合同与 Skills | [业务理解与分析 Skills](business-understanding-skills.md) |
+| 工作区上下文与字段画像合同 | [工作区上下文目录](workspace-context-catalog.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 某次验证结果 | [证据索引](../artifacts/README.md) |
 

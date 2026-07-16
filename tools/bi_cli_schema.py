@@ -1107,6 +1107,10 @@ def upsert_navigation_module(
         (module_key, workspace_id),
     ).fetchone()
     if existing:
+        next_table_key = table_key or None
+        next_dashboard_key = dashboard_key or None
+        if existing["table_key"] == next_table_key and existing["dashboard_key"] == next_dashboard_key:
+            return
         connection.execute(
             """
             UPDATE navigation_modules
@@ -1115,7 +1119,7 @@ def upsert_navigation_module(
                 updated_at = ?
             WHERE module_key = ? AND workspace_id = ?
             """,
-            (table_key or None, dashboard_key or None, now, module_key, workspace_id),
+            (next_table_key, next_dashboard_key, now, module_key, workspace_id),
         )
         return
     connection.execute(

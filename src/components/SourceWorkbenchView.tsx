@@ -6,6 +6,7 @@ import type { SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import type { useSourceWorkbenchState } from "../useSourceWorkbenchState";
 import {
   SourceWorkbenchAdvancedLoading,
+  SourceWorkbenchBusinessFieldProfilePanel,
   SourceWorkbenchConnectorPanel,
   SourceWorkbenchFieldMetricPanel,
   SourceWorkbenchOperationsPanel,
@@ -254,6 +255,11 @@ export function SourceWorkbenchView({
               setNavigationSort={setNavigationSort}
               runBusy={runBusy}
               runNavigationOperation={runNavigationOperation}
+            />
+
+            <SourceWorkbenchBusinessFieldProfilePanel
+              tableKey={selectedTableKey}
+              workspaceId={status.workspace.id}
             />
 
             <SourceWorkbenchFieldMetricPanel

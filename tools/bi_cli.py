@@ -68,6 +68,7 @@ from bi_cli_core import (
     unique_key,
 )
 from bi_cli_contracts import build_cli_contract, command_contract_by_name, contract_to_markdown, filter_commands
+from capability_contract_service import capability_registry
 from bi_cli_envelope import enrich_cli_output, error_output
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
@@ -110,6 +111,7 @@ from agent_turn_service import agent_turns_command, cancel_agent_turn_command, r
 from agent_session_service import agent_context_compact_command, agent_session_create_command, agent_session_fork_command, agent_session_resume_command, agent_sessions_command
 from agent_runtime_profile_service import agent_provider_evaluation_record_command, agent_provider_evaluations_command, agent_runtime_profile_set_command, agent_runtime_profiles_command
 from restricted_workflow_graph_service import agent_workflow_graph_command, restricted_workflow_operators_command, restricted_workflow_validate_command
+from workspace_manifest_service import business_field_profiles_command, runtime_catalog_command, workspace_manifest_command, workspace_planning_binding
 from bi_cli_schema import (
     active_workspace_id,
     all_available_fields,
@@ -2035,6 +2037,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             if isinstance(business_understanding.get("skillMatch"), dict)
             else {}
         )
+        workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)
         semantic_context = build_semantic_context_bundle(
             workspace_id=workspace_id,
             intent_frame=intent_frame,
@@ -2048,6 +2051,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             analytical_skill_match=analytical_skill_match,
             session_context=getattr(args, "session_context", None),
             business_understanding=business_understanding,
+            workspace_manifest_ref=workspace_manifest_ref,
         )
         clarification = build_agent_clarification(intent_frame, semantic_context, business_understanding)
         business_understanding_blocked = (
@@ -2418,6 +2422,7 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             action_key=action_key if should_create_draft else None,
             result_rows=list(answer_card.get("rows") or []),
             now_iso=now_iso,
+            workspace_manifest=workspace_manifest_ref,
         )
         answer_card["queryPlanReceipt"] = query_receipt
         analysis_run = create_analysis_run(
@@ -2805,6 +2810,26 @@ def main() -> int:
             result = agent_provider_evaluation_record_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "status":
             result = status_command(args)
+        elif args.command == "workspace-manifest":
+            result = workspace_manifest_command(
+                args,
+                command_capabilities=capability_registry(parser),
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+            )
+        elif args.command == "runtime-catalog":
+            result = runtime_catalog_command(
+                args,
+                command_capabilities=capability_registry(parser),
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+            )
+        elif args.command == "business-field-profiles":
+            result = business_field_profiles_command(
+                args,
+                open_db=open_db,
+                active_workspace_id=active_workspace_id,
+            )
         elif args.command == "quality-doctor":
             result = quality_doctor_command(args)
         elif args.command == "context-pack":

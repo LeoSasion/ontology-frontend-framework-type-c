@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `137`
+Command count: `140`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -27,14 +27,14 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `performance` | 2 |
 | `query` | 4 |
 | `relationship` | 6 |
-| `semantic` | 4 |
+| `semantic` | 5 |
 | `settings` | 2 |
 | `source` | 5 |
 | `system` | 6 |
 | `view` | 4 |
 | `workbench` | 1 |
 | `workflow` | 4 |
-| `workspace` | 4 |
+| `workspace` | 6 |
 
 | Mutation mode | Commands |
 |---|---:|
@@ -43,7 +43,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 56 |
 | `evidence-receipt` | 8 |
-| `read-only` | 59 |
+| `read-only` | 62 |
 | `runtime-receipt` | 9 |
 
 ## Commands
@@ -66,7 +66,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `agent-session-resume` | `agent` | `read-only` | `no` | `no` | `session`, `--workspace` |
 | `agent-sessions` | `agent` | `read-only` | `no` | `no` | `--session`, `--workspace`, `--limit` |
 | `agent-turn-cancel` | `agent` | `runtime-receipt` | `no` | `no` | `turn`, `--workspace` |
-| `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--session`, `--review-stale-context`, `--read-only` |
+| `agent-turn-run` | `agent` | `runtime-receipt` | `no` | `no` | `prompt`, `--workspace`, `--parent-turn`, `--parent-run`, `--branch-label`, `--session`, `--review-stale-context`, `--read-only` |
 | `agent-turns` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--turn`, `--after-sequence`, `--limit` |
 | `agent-workflow-graph` | `workflow` | `read-only` | `no` | `no` | `--turn`, `--workspace` |
 | `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
@@ -82,6 +82,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `apply-config` | `config` | `dry-run-confirm` | `yes` | `no` | `input`, `--yes` |
 | `ask` | `agent` | `action-draft` | `yes` | `no` | `--read-only`, `--parent-run`, `--branch-label`, `--workspace`, `prompt` |
 | `business-dashboard` | `dashboard` | `dry-run-confirm` | `yes` | `yes` | `--op`, `--dashboard`, `--name`, `--table`, `--template`, `--limit`, `--yes` |
+| `business-field-profiles` | `semantic` | `read-only` | `no` | `no` | `--workspace`, `--table`, `--field` |
 | `capability-contracts` | `system` | `read-only` | `no` | `no` | `--command`, `--domain` |
 | `chart-adapt` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--preferred-chart` |
 | `clear-filters` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--yes` |
@@ -151,8 +152,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `recommend-indexes` | `performance` | `read-only` | `no` | `no` | `--table`, `--limit` |
 | `recommend-relationships` | `relationship` | `read-only` | `no` | `no` | `--limit` |
 | `recommend-widgets` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--all`, `--limit` |
-| `relationship-preview` | `relationship` | `read-only` | `no` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
-| `relationship-save` | `relationship` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `--filter-json`, `...` |
+| `relationship-preview` | `relationship` | `read-only` | `no` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `...` |
+| `relationship-save` | `relationship` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--filter`, `...` |
 | `remove-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--yes` |
 | `remove-filter` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--filter`, `--yes` |
 | `remove-import-job` | `import` | `dry-run-confirm` | `yes` | `no` | `--job`, `--yes` |
@@ -162,6 +163,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `rename-source` | `source` | `dry-run-confirm` | `yes` | `no` | `source`, `--name`, `--yes` |
 | `restricted-workflow-operators` | `workflow` | `read-only` | `no` | `no` | - |
 | `restricted-workflow-validate` | `workflow` | `read-only` | `no` | `no` | `--graph-json`, `--workspace` |
+| `runtime-catalog` | `workspace` | `read-only` | `no` | `no` | `--workspace` |
 | `save-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--name`, `--type`, `--provider`, `--status`, `--endpoint`, `--resource`, `--page-param`, `...` |
 | `save-dashboard-modules` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--name`, `--default-table`, `--canvas-width-mode`, `--widgets-json`, `--layout-json`, `--filters-json`, `--yes` |
 | `save-formula` | `formula` | `dry-run-confirm` | `yes` | `no` | `--id`, `--name`, `--table`, `--expression`, `--mode`, `--dimension`, `--time-field`, `--value-format`, `...` |
@@ -185,5 +187,6 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `workflow-plan` | `workflow` | `read-only` | `no` | `no` | `target_command`, `--entrypoint`, `--workspace`, `--input-json`, `--confirmed` |
 | `workspace-create` | `workspace` | `dry-run-confirm` | `yes` | `no` | `--name`, `--yes` |
 | `workspace-delete` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--yes` |
+| `workspace-manifest` | `workspace` | `read-only` | `no` | `no` | `--workspace` |
 | `workspace-rename` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--name`, `--yes` |
 | `workspace-select` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--yes` |
