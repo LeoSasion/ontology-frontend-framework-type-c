@@ -30,6 +30,10 @@ CONFIG_TABLES = [
     "workspace_analytical_skills",
     "workspace_domain_packs",
     "workspace_agent_runtime_profiles",
+    "context_terms",
+    "context_rules",
+    "knowledge_sources",
+    "semantic_patch_proposals",
     "action_drafts",
 ]
 
@@ -173,6 +177,14 @@ def validate_metadata_config(
             errors.append(f"Missing config table: {table_name}")
 
     registry = {row["table_key"]: dict(row) for row in connection.execute("SELECT table_key, physical_table FROM table_registry").fetchall()}
+    knowledge_source_keys = {
+        (str(row["workspace_id"]), str(row["source_key"]))
+        for row in connection.execute("SELECT workspace_id, source_key FROM knowledge_sources").fetchall()
+    }
+    for row in connection.execute("SELECT workspace_id, proposal_key, source_key FROM semantic_patch_proposals").fetchall():
+        source_ref = (str(row["workspace_id"]), str(row["source_key"]))
+        if source_ref not in knowledge_source_keys:
+            errors.append(f"Semantic patch references missing knowledge source: {row['proposal_key']} -> {row['source_key']}")
     dashboard_keys_for_navigation = {
         (row["workspace_id"], row["dashboard_key"])
         for row in connection.execute("SELECT workspace_id, dashboard_key FROM dashboards").fetchall()

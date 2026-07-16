@@ -30,7 +30,7 @@ Manifest 的 `current | stale | incomplete` 表示工作区整体可用性；Bus
 
 1. `observedShape` 只描述存储类型、逻辑类型证据、空值、基数、有限样本规模和时间覆盖，不声明业务意义。
 2. 导入画像和自动语义只形成 `roleCandidates` 或分类基数统计；authority 保持 candidate-only 或 statistics-only，绝不输出分类原值。
-3. 当前版本只有来源为 manual 的已保存字段语义形成 `manual-confirmed` 和 `confirmedSemanticRef`。Domain Pack 可通过业务上下文提供有来源的规则，但不会把字段画像候选静默晋级为手工确认。
+3. 来源为 `manual` 的已保存字段语义形成 `manual-confirmed`；经 Review Inbox 接受的来源形成 `reviewed-confirmed`。两者都生成 `confirmedSemanticRef` 并受自动推断覆盖保护。Domain Pack 可通过业务上下文提供有来源的规则，但不会把字段画像候选静默晋级为确认。
 4. 候选不能授权 Join、指标公式、筛选口径、统计粒度或写入。Runtime Catalog 固定声明 `candidateCanAuthorizeJoin: false`；跨表仍必须使用当前工作区已保存且验证有效的关系。
 5. Provider 只能解释已经进入白名单上下文的引用和统计，不能修改候选、确认语义、Capability 或规划指纹。
 

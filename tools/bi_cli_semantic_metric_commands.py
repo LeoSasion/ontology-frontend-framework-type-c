@@ -173,8 +173,10 @@ def upsert_semantic_config(connection: sqlite3.Connection, item: dict[str, Any],
         "SELECT source FROM field_semantics WHERE table_key = ? AND field_name = ? AND workspace_id = ?",
         (table_key, field, workspace_id),
     ).fetchone()
-    if current and str(current["source"] or "") == "manual" and not overwrite_manual:
-        return False
+    if current:
+        current_source = str(current["source"] or "")
+        if current_source == "reviewed" or (current_source == "manual" and not overwrite_manual):
+            return False
     connection.execute(
         """
         INSERT INTO field_semantics(workspace_id, table_key, field_name, role, usage, confidence, tags_json, usage_json, source, note, updated_at)

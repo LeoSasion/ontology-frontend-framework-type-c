@@ -72,6 +72,13 @@ from capability_contract_service import capability_registry
 from bi_cli_envelope import enrich_cli_output, error_output
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from context_pack_service import context_pack_command, context_rule_command, context_term_command, contextualized_prompt, matched_context
+from semantic_patch_service import (
+    knowledge_source_adapters_command,
+    knowledge_sources_command,
+    semantic_patch_proposals_command,
+    semantic_patch_propose_command,
+    semantic_patch_review_command,
+)
 from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
 from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
 from analytical_skill_service import analytical_skill_runtime_context
@@ -2838,6 +2845,16 @@ def main() -> int:
             result = context_term_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "context-rule":
             result = context_rule_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "knowledge-source-adapters":
+            result = knowledge_source_adapters_command(args)
+        elif args.command == "knowledge-sources":
+            result = knowledge_sources_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "semantic-patch-propose":
+            result = semantic_patch_propose_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "semantic-patch-proposals":
+            result = semantic_patch_proposals_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "semantic-patch-review":
+            result = semantic_patch_review_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "query-receipts":
             result = query_receipts_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "export-evidence":

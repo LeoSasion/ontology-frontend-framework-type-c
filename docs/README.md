@@ -21,6 +21,7 @@
 | --- | --- |
 | [业务理解与分析 Skills](business-understanding-skills.md) | 五层业务上下文、业务理解合同、首批 Skills、专题验收与后续顺序 |
 | [工作区上下文目录](workspace-context-catalog.md) | Workspace Manifest、Runtime Catalog、字段画像、PII 边界、新鲜度与规划绑定 |
+| [语义补丁与审核收件箱](semantic-review-inbox.md) | 知识源适配、不可变语义提案、人工审核、漂移阻断与配置可移植 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |
@@ -37,6 +38,7 @@
 | 用户如何验收 | `docs/product-acceptance-matrix.md` |
 | 助手如何理解业务、选择 Skill | `docs/business-understanding-skills.md` |
 | 工作区对象、字段画像与规划指纹如何派生 | `docs/workspace-context-catalog.md` |
+| 用户纠正和外部知识如何进入受信语义 | `docs/semantic-review-inbox.md` |
 | 某次验证是否通过 | `artifacts/` 中对应日期回执 |
 | CLI 当前命令与参数 | `docs/bi-cli-contract.md` 的实时生成结果 |
 

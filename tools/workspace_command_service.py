@@ -15,6 +15,8 @@ WORKSPACE_SCOPED_TABLES = [
     "agent_sessions",
     "workspace_analytical_skills",
     "workspace_domain_packs",
+    "semantic_patch_proposals",
+    "knowledge_sources",
     "context_rules",
     "context_terms",
     "confirmed_queries",

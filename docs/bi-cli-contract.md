@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `140`
+Command count: `145`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -15,7 +15,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
-| `context` | 6 |
+| `context` | 8 |
 | `dashboard` | 19 |
 | `domain-pack` | 5 |
 | `evidence` | 7 |
@@ -27,7 +27,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `performance` | 2 |
 | `query` | 4 |
 | `relationship` | 6 |
-| `semantic` | 5 |
+| `semantic` | 8 |
 | `settings` | 2 |
 | `source` | 5 |
 | `system` | 6 |
@@ -41,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 56 |
+| `dry-run-confirm` | 58 |
 | `evidence-receipt` | 8 |
-| `read-only` | 62 |
+| `read-only` | 65 |
 | `runtime-receipt` | 9 |
 
 ## Commands
@@ -125,6 +125,8 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `job-process-exit` | `job` | `runtime-receipt` | `no` | `no` | `--job`, `--workspace`, `--exit-code`, `--signal` |
 | `job-recover` | `job` | `dry-run-confirm` | `yes` | `no` | `--all`, `--yes` |
 | `jobs` | `job` | `read-only` | `no` | `no` | `--job`, `--status`, `--limit`, `--include-events`, `--events-after`, `--event-limit` |
+| `knowledge-source-adapters` | `context` | `read-only` | `no` | `no` | - |
+| `knowledge-sources` | `context` | `read-only` | `no` | `no` | `--workspace`, `--limit` |
 | `list-commands` | `system` | `read-only` | `no` | `no` | `--domain`, `--mutation-mode`, `--writes` |
 | `list-connector-adapters` | `connector` | `read-only` | `no` | `no` | - |
 | `list-connectors` | `connector` | `read-only` | `no` | `no` | `--type`, `--status`, `--search` |
@@ -168,6 +170,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `save-dashboard-modules` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--name`, `--default-table`, `--canvas-width-mode`, `--widgets-json`, `--layout-json`, `--filters-json`, `--yes` |
 | `save-formula` | `formula` | `dry-run-confirm` | `yes` | `no` | `--id`, `--name`, `--table`, `--expression`, `--mode`, `--dimension`, `--time-field`, `--value-format`, `...` |
 | `save-view` | `view` | `dry-run-confirm` | `yes` | `no` | `--view`, `--table`, `--name`, `--tag`, `--mode`, `--columns`, `--filter`, `--sort`, `...` |
+| `semantic-patch-proposals` | `semantic` | `read-only` | `no` | `no` | `--workspace`, `--proposal`, `--status`, `--limit` |
+| `semantic-patch-propose` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--input`, `--adapter`, `--source-type`, `--source-name`, `--kind`, `--term`, `--name`, `...` |
+| `semantic-patch-review` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--proposal`, `--decision`, `--note`, `--yes` |
 | `semantic-query` | `query` | `evidence-receipt` | `no` | `yes` | `prompt`, `--table`, `--limit` |
 | `set-filter` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--filter`, `--field`, `--operator`, `--value`, `--disabled`, `--yes` |
 | `set-import-policy` | `import` | `dry-run-confirm` | `yes` | `no` | `--table`, `--unique-fields`, `--conflict-rule`, `--yes` |

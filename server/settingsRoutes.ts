@@ -56,6 +56,79 @@ export async function handleSettingsApi(options: SettingsRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/knowledge-source-adapters" && request.method === "GET") {
+    const result = await cli(["knowledge-source-adapters"]);
+    sendJson(response, 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/knowledge-sources" && request.method === "GET") {
+    const result = await cli(["knowledge-sources", "--limit", url.searchParams.get("limit") ?? "50"]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/semantic-patches" && request.method === "GET") {
+    const args = ["semantic-patch-proposals", "--limit", url.searchParams.get("limit") ?? "100"];
+    const proposal = url.searchParams.get("proposal");
+    const status = url.searchParams.get("status");
+    if (proposal) args.push("--proposal", proposal);
+    if (status) args.push("--status", status);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/semantic-patches/propose" && request.method === "POST") {
+    const body = await readBody(request);
+    const kind = String(body.kind ?? "");
+    if (!new Set(["term", "rule", "field-semantic"]).has(kind)) {
+      sendJson(response, 400, { ok: false, error: "kind must be term, rule, or field-semantic" });
+      return true;
+    }
+    const args = [
+      "semantic-patch-propose", "--adapter", "user-correction-v1", "--source-type", "user-correction",
+      "--source-name", String(body.sourceName ?? "User correction"), "--kind", kind,
+      "--confidence", String(body.confidence ?? 1),
+    ];
+    if (kind === "term") {
+      args.push("--name", String(body.name ?? ""), "--definition", String(body.definition ?? ""));
+      if (body.termKey) args.push("--term", String(body.termKey));
+      args.push("--scope-type", String(body.scopeType ?? "workspace"), "--scope-ref", String(body.scopeRef ?? ""));
+      if (Array.isArray(body.aliases)) for (const alias of body.aliases) args.push("--alias", String(alias));
+    } else if (kind === "rule") {
+      args.push("--title", String(body.title ?? ""), "--statement", String(body.statement ?? ""), "--type", String(body.ruleType ?? "other"));
+      if (body.ruleKey) args.push("--rule", String(body.ruleKey));
+      if (Array.isArray(body.appliesTo)) for (const target of body.appliesTo) args.push("--applies-to", String(target));
+    } else {
+      args.push(
+        "--table", String(body.tableKey ?? ""), "--field", String(body.fieldName ?? ""),
+        "--role", String(body.role ?? ""), "--note", String(body.note ?? ""),
+      );
+      if (Array.isArray(body.usage)) for (const usage of body.usage) args.push("--usage", String(usage));
+      if (Array.isArray(body.tags)) for (const tag of body.tags) args.push("--tag", String(tag));
+    }
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/semantic-patches/review" && request.method === "POST") {
+    const body = await readBody(request);
+    const proposalKey = String(body.proposalKey ?? "");
+    const decision = String(body.decision ?? "");
+    if (!proposalKey || !new Set(["accept", "reject"]).has(decision)) {
+      sendJson(response, 400, { ok: false, error: "proposalKey and a valid decision are required" });
+      return true;
+    }
+    const args = ["semantic-patch-review", "--proposal", proposalKey, "--decision", decision, "--note", String(body.note ?? "")];
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/confirmed-queries" && request.method === "GET") {
     const args = ["confirmed-queries", "--limit", url.searchParams.get("limit") ?? "20"];
     const status = url.searchParams.get("status");

@@ -47,3 +47,43 @@ export type ConfirmedQuery = {
 export type ConfirmedQueriesPayload = { ok: boolean; confirmedQueries: ConfirmedQuery[]; count: number; staleCount: number };
 export type AnalysisRunsPayload = { ok: boolean; analysisRuns?: AnalysisRun[]; analysisRun?: AnalysisRun; branches?: AnalysisRun[]; count?: number };
 export type QueryReceiptsPayload = { ok: boolean; queryReceipts?: QueryPlanReceipt[]; queryReceipt?: QueryPlanReceipt; count?: number };
+
+export type KnowledgeSource = {
+  sourceKey: string;
+  adapterId: string;
+  sourceType: string;
+  name: string;
+  version: string;
+  locatorRef: string;
+  contentFingerprint: string;
+  status: string;
+};
+
+export type SemanticPatchProposal = {
+  schema: string;
+  proposalKey: string;
+  workspaceId: string;
+  sourceKey: string;
+  patchType: "term" | "rule" | "field-semantic";
+  operation: "create" | "update";
+  targetRef: string;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown>;
+  confidence: number;
+  status: "pending" | "accepted" | "rejected" | "stale";
+  storedStatus: string;
+  freshness: { status: string; usableForReview: boolean; mismatches: string[] };
+  review: Record<string, unknown>;
+  source: { adapterId: string; sourceType: string; name: string; version: string; locatorRef: string; contentFingerprint: string } | null;
+  createdAt: string;
+  reviewedAt?: string | null;
+};
+
+export type SemanticPatchCollectionPayload = {
+  ok: boolean;
+  workspaceId: string;
+  proposals: SemanticPatchProposal[];
+  proposal?: SemanticPatchProposal;
+  count: number;
+  counts: Record<string, number>;
+};

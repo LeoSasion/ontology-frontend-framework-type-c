@@ -93,6 +93,18 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
             )
             if row[5] > 0
         ] if connector_exists else []
+        semantic_review_tables = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('knowledge_sources', 'semantic_patch_proposals') ORDER BY name"
+            ).fetchall()
+        ]
+        semantic_review_indexes = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_semantic_patch_%' ORDER BY name"
+            ).fetchall()
+        ]
     with duckdb.connect(str(duckdb_path), read_only=True) as connection:
         duckdb_row = connection.execute("SELECT product, value FROM legacy_aibi_c_rows").fetchone()
         metadata = connection.execute(
@@ -106,6 +118,8 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
         "sqliteVersion": sqlite_version,
         "connectorRow": list(connector_row) if connector_row else None,
         "connectorPrimaryKey": connector_pk,
+        "semanticReviewTables": semantic_review_tables,
+        "semanticReviewIndexes": semantic_review_indexes,
         "duckdbRow": list(duckdb_row) if duckdb_row else None,
         "duckdbVersion": duckdb_version,
     }

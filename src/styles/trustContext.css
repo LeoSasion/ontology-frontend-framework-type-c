@@ -101,6 +101,113 @@
   color: var(--success-text);
 }
 
+.semanticReviewInbox {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+}
+
+.semanticReviewHeader,
+.semanticProposalTopline,
+.semanticReviewActions,
+.semanticProposalSubmit {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.semanticReviewHeader h4,
+.semanticProposalTopline h5 {
+  margin: 3px 0 0;
+}
+
+.semanticGuardrail,
+.semanticStatusChip {
+  padding: 5px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.semanticProposalList {
+  display: grid;
+  gap: 12px;
+}
+
+.semanticProposalCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+.semanticProposalCard.status-stale {
+  border-color: var(--warning-border, var(--border-soft));
+}
+
+.semanticProposalMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.semanticDiff {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.semanticDiff > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.semanticDiff pre {
+  overflow: auto;
+  max-height: 190px;
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.semanticStaleReason {
+  margin: 0;
+  color: var(--warning-text, var(--text-muted));
+}
+
+.semanticReviewActions {
+  justify-content: flex-start;
+}
+
+.semanticProposalSubmit {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+
+.semanticInboxEmpty {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px dashed var(--border-soft);
+  border-radius: 12px;
+  color: var(--text-muted);
+}
+
 .agentTrustSummary {
   flex-wrap: wrap;
   margin-bottom: 14px;
@@ -168,8 +275,15 @@
 
   .trustContextList > div,
   .trustContextForm,
-  .agentTrustPlan {
+  .agentTrustPlan,
+  .semanticDiff {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .semanticReviewHeader,
+  .semanticProposalTopline {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .trustContextForm .wide {

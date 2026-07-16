@@ -423,7 +423,7 @@ def build_business_field_profiles(
             usage = str(semantic.get("usage") or imported.get("usage") or "unknown")
             confidence = float(semantic.get("confidence") or imported.get("confidence") or 0)
             source = str(semantic.get("source") or "auto")
-            manual = source == "manual"
+            confirmed = source in {"manual", "reviewed"}
             imported_role = str(imported.get("role") or "").strip()
             role_candidates = []
             if imported_role:
@@ -434,7 +434,7 @@ def build_business_field_profiles(
                     "source": "import-profile-heuristic",
                     "confirmed": False,
                 })
-            if semantic and not manual and not any(item["role"] == role for item in role_candidates):
+            if semantic and not confirmed and not any(item["role"] == role for item in role_candidates):
                 role_candidates.append({
                     "role": role,
                     "usage": usage,
@@ -450,7 +450,7 @@ def build_business_field_profiles(
                 blockers.append("source-profile-shape-mismatch")
             if not semantic:
                 warnings.append("business-meaning-unreviewed")
-            elif not manual:
+            elif not confirmed:
                 warnings.append("business-meaning-candidate-only")
             if logical_type == "mixed":
                 warnings.append("mixed-value-types")
@@ -498,8 +498,8 @@ def build_business_field_profiles(
                     "savedRole": role,
                     "savedUsage": usage,
                     "confidence": round(confidence, 4),
-                    "authority": "manual-confirmed" if manual else "saved-auto-candidate" if semantic else "import-candidate-only",
-                    "confirmedSemanticRef": f"field-semantic:{current_table_key}.{current_field}" if manual else None,
+                    "authority": f"{source}-confirmed" if confirmed else "saved-auto-candidate" if semantic else "import-candidate-only",
+                    "confirmedSemanticRef": f"field-semantic:{current_table_key}.{current_field}" if confirmed else None,
                     "roleCandidates": sorted(role_candidates, key=lambda item: (-item["confidence"], item["role"])),
                     "statusCandidates": {
                         "observedDistinctCount": unique_count if role in {"status", "dimension"} else 0,
@@ -507,8 +507,8 @@ def build_business_field_profiles(
                         "authority": "statistics-only-no-raw-values",
                     },
                     "tags": _json_value(semantic.get("tags_json"), []),
-                    "notePresent": bool(str(semantic.get("note") or "").strip()) if manual else False,
-                    "noteFingerprint": _fingerprint(str(semantic.get("note") or "")) if manual and str(semantic.get("note") or "").strip() else None,
+                    "notePresent": bool(str(semantic.get("note") or "").strip()) if confirmed else False,
+                    "noteFingerprint": _fingerprint(str(semantic.get("note") or "")) if confirmed and str(semantic.get("note") or "").strip() else None,
                 },
                 "sensitivity": sensitivity,
                 "bindings": {
@@ -523,7 +523,7 @@ def build_business_field_profiles(
                     "sourceRunCreatedAt": str(source_run.get("created_at") or "") if source_run else None,
                     "tableUpdatedAt": str(registry["updated_at"] or ""),
                     "usableForPlanning": not blockers,
-                    "planningAuthority": "confirmed-business-meaning" if manual else "shape-and-candidate-only",
+                    "planningAuthority": "confirmed-business-meaning" if confirmed else "shape-and-candidate-only",
                 },
                 "status": status,
                 "blockers": sorted(set(blockers)),
@@ -954,7 +954,7 @@ def build_workspace_manifest(
             "status": item["status"],
             "fingerprint": item["fingerprint"],
             "usableForPlanning": item["freshness"]["usableForPlanning"],
-            "businessMeaningConfirmed": item["semantic"]["authority"] == "manual-confirmed",
+            "businessMeaningConfirmed": item["semantic"]["authority"] in {"manual-confirmed", "reviewed-confirmed"},
         }
         for item in profiles
     ]

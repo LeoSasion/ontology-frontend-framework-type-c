@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 7 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 8 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -99,6 +99,12 @@ try {
     "v1-connectors-migrate-to-workspace-scoped-composite-key",
     inspectedPayload.connectorRow?.join(":") === "workspace-red:legacy-file:Legacy file connector"
       && inspectedPayload.connectorPrimaryKey?.join(":") === "workspace_id:connector_key",
+    inspectedPayload,
+  );
+  add(
+    "v8-semantic-review-tables-and-indexes-are-created",
+    inspectedPayload.semanticReviewTables?.join(":") === "knowledge_sources:semantic_patch_proposals"
+      && inspectedPayload.semanticReviewIndexes?.join(":") === "idx_semantic_patch_workspace_source:idx_semantic_patch_workspace_status",
     inspectedPayload,
   );
 

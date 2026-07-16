@@ -196,7 +196,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           implementationStatusSource.includes("“工作区”只显示当前必要任务"),
       },
     {
-        label: "frontend-production-copy-no-example-placeholders",
+        label: "frontend-production-copy-and-current-roadmap-contract",
         ok: productAcceptanceMatrixDocSource.includes("- `npm run preflight`") &&
           dashboardCanvasSource.includes('name: biText("未命名看板", "Untitled dashboard")') &&
           !dashboardCanvasSource.includes("临时看板") &&
@@ -220,10 +220,12 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           implementationStatusSource.includes("| Connector Adapter | 稳定受控 |") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
-          !developmentRoadmapDocSource.includes("### P0.") &&
-          !developmentRoadmapDocSource.includes("### P1.") &&
-          !developmentRoadmapDocSource.includes("### P2.") &&
-          developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
+          developmentRoadmapDocSource.includes("P0-C：证据绑定的混合语义召回") &&
+          developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&
+          developmentRoadmapDocSource.includes("P1：Exploration Thread") &&
+          developmentRoadmapDocSource.includes("P1-C：有限 Research Run") &&
+          developmentRoadmapDocSource.includes("P2：只在本地可信边界内增加 forecast readiness") &&
+          !developmentRoadmapDocSource.includes("当前没有已批准但尚未交付的主项") &&
           !developmentRoadmapDocSource.includes("| P1 | 业务理解与首批 Skills |") &&
           implementationStatusSource.includes("| 业务理解与首批 Skills | 稳定初版 |") &&
           developmentRoadmapDocSource.includes("## 暂不开发") &&

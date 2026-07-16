@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 7
+CURRENT_SQLITE_SCHEMA_VERSION = 8
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -716,6 +716,48 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           confirmed_at TEXT,
           PRIMARY KEY(workspace_id, rule_key)
         );
+        CREATE TABLE IF NOT EXISTS knowledge_sources (
+          source_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          adapter_id TEXT NOT NULL,
+          source_type TEXT NOT NULL,
+          name TEXT NOT NULL,
+          source_version TEXT NOT NULL,
+          locator_ref TEXT NOT NULL,
+          content_fingerprint TEXT NOT NULL,
+          snapshot_json TEXT NOT NULL,
+          status TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, source_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_knowledge_sources_workspace_status
+          ON knowledge_sources(workspace_id, status, created_at);
+        CREATE TABLE IF NOT EXISTS semantic_patch_proposals (
+          proposal_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          source_key TEXT NOT NULL,
+          patch_type TEXT NOT NULL,
+          operation TEXT NOT NULL,
+          target_ref TEXT NOT NULL,
+          before_json TEXT NOT NULL,
+          after_json TEXT NOT NULL,
+          evidence_json TEXT NOT NULL,
+          source_fingerprint TEXT NOT NULL,
+          workspace_schema_fingerprint TEXT NOT NULL,
+          target_fingerprint TEXT NOT NULL,
+          confidence REAL NOT NULL,
+          status TEXT NOT NULL,
+          review_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          reviewed_at TEXT,
+          PRIMARY KEY(workspace_id, proposal_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_semantic_patch_workspace_status
+          ON semantic_patch_proposals(workspace_id, status, created_at);
+        CREATE INDEX IF NOT EXISTS idx_semantic_patch_workspace_source
+          ON semantic_patch_proposals(workspace_id, source_key, proposal_key);
         CREATE TABLE IF NOT EXISTS query_plan_receipts (
           receipt_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,
