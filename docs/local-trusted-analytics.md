@@ -31,14 +31,17 @@
 
 CLI、API、Agent 与按需展开的分析面板消费同一合同。诊断命令成功与门禁结果分离：成功评估返回 `ok=true`，是否可进入受限评测由 `readyForEvaluation` 和合同 `status` 表达；`blocked` 是有效诊断，不是运行故障。
 
-## P2-B：物化分析快照
+## P2-B：物化分析快照（已交付）
 
-物化快照将只冻结 current Receipt/Unit 的有界结果与完整来源绑定，供重复读取和后续监控使用，不充当来源替代品。
+`aibi-analysis-snapshot/v1` 只冻结 current、ready、Receipt 绑定 Analysis Unit 的有界结果与完整来源绑定，供重复读取和后续监控使用，不充当来源替代品。
 
-- 创建、刷新、替换和删除均为显式确认写入；同一精确输入幂等。
-- 快照保留 Unit、Receipt、数据/schema/关系/Pack 指纹、创建原因、行数上限、内容哈希和父快照；不保存任意查询或外部路径。
-- 来源漂移后旧快照进入 `stale`；历史仍可审计，但默认消费者不回退到最近旧快照。
-- 快照最多保留 Analysis Unit 已允许的有界行数，工作区删除和本地迁移必须完整覆盖。
+- `create | refresh | replace | delete` 都先返回 `aibi-analysis-snapshot-plan/v1`，只有精确 `planFingerprint` 与显式确认同时满足才写入；同一精确输入幂等且不重复新增。
+- 快照保留 Unit/Receipt key 与定义、结果、数据、schema、关系、来源、Domain Pack、Workspace Manifest 指纹，以及创建原因、行数上限、内容哈希和父快照。公开列表只返回摘要、状态和指纹，不返回冻结行、任意查询、外部路径或 Provider 内容。
+- `refresh` 只接受指标、维度、聚合、筛选、参与表、关系路径和结果形状相同的新 Unit，并追加不可变子快照；语义变化必须显式 `replace`，同样追加子快照而不覆盖父对象。
+- 来源漂移、Unit/Receipt 缺失或绑定变化后旧快照进入 `stale | missing`；历史仍可审计，但 `usableForPlanning=false` 且所有消费者固定 `staleFallbackUsed=false`。
+- 删除只擦除冻结内容并保留 lineage tombstone；快照最多保存 500 行，工作区删除会清理全部快照，SQLite schema v13 的隔离迁移、恢复点和回滚覆盖该表。
+
+CLI、API 与 Analysis Unit 下按需展开的面板消费同一合同。面板在操作期间禁用重复提交并拒绝晚到请求；创建原因和行数上限可核对，确认成功后保留明确结果消息。Provider 不参与快照生成、刷新、替换或删除。
 
 ## P2-C：Metric Monitor
 

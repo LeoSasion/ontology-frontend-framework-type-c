@@ -41,6 +41,11 @@ COMMAND_DOMAINS: dict[str, str] = {
     "research-run-finalize": "analysis",
     "analysis-unit-build": "analysis",
     "analysis-units": "analysis",
+    "analysis-snapshots": "analysis",
+    "analysis-snapshot-create": "analysis",
+    "analysis-snapshot-refresh": "analysis",
+    "analysis-snapshot-replace": "analysis",
+    "analysis-snapshot-delete": "analysis",
     "analysis-unit-verify": "analysis",
     "forecast-readiness": "analysis",
     "chart-adapt": "analysis",
@@ -209,6 +214,10 @@ STATIC_DRY_RUN_CONFIRM_COMMANDS = {
     "research-run-revise",
     "research-run-observe",
     "research-run-finalize",
+    "analysis-snapshot-create",
+    "analysis-snapshot-refresh",
+    "analysis-snapshot-replace",
+    "analysis-snapshot-delete",
 }
 
 

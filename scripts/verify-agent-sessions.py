@@ -87,7 +87,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-agent-session-") as temp:
 
     snapshots = [(item.get("snapshot") or {}) for item in compactions]
     ref_counts = [len(item.get("preservedRefs") or []) for item in snapshots]
-    check("schema-v12-bootstrap", status_code == 0 and schema_version == 12, schema_version)
+    check("schema-v13-bootstrap", status_code == 0 and schema_version == 13, schema_version)
     check("session-create-contract", create_code == 0 and session_key.startswith("session-"), created)
     check("same-session-turn-chain", first_code == 0 and second_code == 0 and (first.get("turn") or {}).get("sessionKey") == session_key and (second.get("turn") or {}).get("parentTurnKey") == first_turn, second)
     check("restart-safe-session-inspection", inspect_code == 0 and (inspected.get("context") or {}).get("turnCount") == 2 and len((inspected.get("context") or {}).get("fingerprint") or "") == 64, inspected)

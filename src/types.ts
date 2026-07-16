@@ -1,4 +1,4 @@
-export type { ActionDraft, ActionDraftPayload, AgentAskResult, ExplorationAnchor, ExplorationAnchorFreshness, ExplorationMutationPayload, ExplorationMutationPlan, ExplorationThread, ExplorationThreadsPayload, ForecastReadiness, ForecastReadinessGate, LimitedResearchRun, ResearchMutationPayload, ResearchObservation, ResearchPlanRevision, ResearchRunsPayload } from "./typesAgent";
+export type { ActionDraft, ActionDraftPayload, AgentAskResult, AnalysisSnapshot, AnalysisSnapshotFreshness, AnalysisSnapshotPlan, AnalysisSnapshotsPayload, ExplorationAnchor, ExplorationAnchorFreshness, ExplorationMutationPayload, ExplorationMutationPlan, ExplorationThread, ExplorationThreadsPayload, ForecastReadiness, ForecastReadinessGate, LimitedResearchRun, ResearchMutationPayload, ResearchObservation, ResearchPlanRevision, ResearchRunsPayload } from "./typesAgent";
 export type { DashboardFilterPayload, DashboardFilterRule, DashboardPage, DashboardPayload, DashboardWidget, NavigationModule } from "./typesDashboard";
 export type { QueryResult } from "./typesQuery";
 export type {

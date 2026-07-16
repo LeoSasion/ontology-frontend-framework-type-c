@@ -59,7 +59,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-plan-quality-", ignore_cleanup_err
     with sqlite3.connect(sqlite_path) as connection:
         pragma_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    check("schema-v12-plan-quality-store-boots", status.get("ok") is True and pragma_version == 12 and "plan_quality_scorecards" in tables, {"status": status, "pragma": pragma_version})
+    check("schema-v13-plan-quality-store-boots", status.get("ok") is True and pragma_version == 13 and "plan_quality_scorecards" in tables, {"status": status, "pragma": pragma_version})
 
     cases = run(["business-expression-cases"], env)
     case_items = cases.get("cases") or []

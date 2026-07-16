@@ -492,6 +492,80 @@ export interface ForecastReadiness {
   fingerprint: string;
 }
 
+export interface AnalysisSnapshotFreshness {
+  schema: "aibi-analysis-snapshot-consumer-state/v1" | string;
+  snapshotKey: string;
+  status: "current" | "stale" | "missing" | "deleted" | string;
+  usableForPlanning: boolean;
+  blockers: string[];
+  staleFallbackUsed: false;
+  unitFreshness?: Record<string, unknown> | null;
+}
+
+export interface AnalysisSnapshot {
+  schema: "aibi-analysis-snapshot/v1" | string;
+  snapshotKey: string;
+  workspaceId: string;
+  parentSnapshotKey?: string | null;
+  operation: "create" | "refresh" | "replace" | string;
+  storedStatus: "active" | "deleted" | string;
+  status: "current" | "stale" | "missing" | "deleted" | string;
+  reason: string;
+  unitKey: string;
+  queryReceiptKey: string;
+  semanticFingerprint: string;
+  bindingFingerprint: string;
+  binding: Record<string, unknown>;
+  rowLimit: number;
+  rowCount: number;
+  contentHash: string;
+  inputFingerprint: string;
+  createdAt: string;
+  deletedAt?: string | null;
+  summary: {
+    kind?: string | null;
+    title?: string | null;
+    columns: string[];
+    dimensionColumns: string[];
+    measureColumn?: string | null;
+    truncated: boolean;
+    rowsIncluded: false;
+  };
+  freshness: AnalysisSnapshotFreshness;
+}
+
+export interface AnalysisSnapshotPlan {
+  schema: "aibi-analysis-snapshot-plan/v1" | string;
+  status: string;
+  operation: "create" | "refresh" | "replace" | "delete" | string;
+  workspaceId: string;
+  snapshotKey?: string;
+  inputFingerprint?: string;
+  planFingerprint: string;
+  alreadyExists?: boolean;
+  alreadyDeleted?: boolean;
+  requested?: Record<string, unknown>;
+  writesBusinessState: true;
+  businessRowsInResponse: 0;
+}
+
+export interface AnalysisSnapshotsPayload {
+  ok: boolean;
+  schema?: string;
+  workspaceId?: string;
+  analysisSnapshots?: AnalysisSnapshot[];
+  analysisSnapshot?: AnalysisSnapshot;
+  analysisSnapshotPlan?: AnalysisSnapshotPlan;
+  count?: number;
+  dryRun?: boolean;
+  requiresConfirmation?: boolean;
+  confirmed?: boolean;
+  changed?: boolean;
+  businessRowsCopied?: false;
+  staleFallbackUsed?: false;
+  error?: string;
+}
+
 export interface RelationshipTraversalMapping {
   leftField: string;
   rightField: string;

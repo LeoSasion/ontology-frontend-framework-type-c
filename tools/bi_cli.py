@@ -122,6 +122,13 @@ from analysis_unit_service import (
     attach_analysis_unit,
     chart_adapt_command,
 )
+from analysis_snapshot_service import (
+    analysis_snapshot_create_command,
+    analysis_snapshot_delete_command,
+    analysis_snapshot_refresh_command,
+    analysis_snapshot_replace_command,
+    analysis_snapshots_command,
+)
 from forecast_readiness_service import forecast_readiness_command
 from job_command_service import job_cancel_command, job_recover_command, jobs_command
 from source_intelligence_job_service import (
@@ -2942,6 +2949,16 @@ def main() -> int:
             result = analysis_unit_build_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-units":
             result = analysis_units_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "analysis-snapshots":
+            result = analysis_snapshots_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
+        elif args.command == "analysis-snapshot-create":
+            result = analysis_snapshot_create_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "analysis-snapshot-refresh":
+            result = analysis_snapshot_refresh_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "analysis-snapshot-replace":
+            result = analysis_snapshot_replace_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
+        elif args.command == "analysis-snapshot-delete":
+            result = analysis_snapshot_delete_command(args, open_db=open_db, active_workspace_id=active_workspace_id, now_iso=now_iso)
         elif args.command == "analysis-unit-verify":
             result = analysis_unit_verify_command(args, open_db=open_db, active_workspace_id=active_workspace_id)
         elif args.command == "forecast-readiness":

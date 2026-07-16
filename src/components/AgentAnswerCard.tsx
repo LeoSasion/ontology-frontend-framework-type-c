@@ -8,6 +8,7 @@ const AgentProviderNarrative = lazy(() => import("./AgentProviderNarrative").the
 const AgentSemanticPlan = lazy(() => import("./AgentSemanticPlan").then((module) => ({ default: module.AgentSemanticPlan })));
 const AgentEvidencePlan = lazy(() => import("./AgentEvidencePlan").then((module) => ({ default: module.AgentEvidencePlan })));
 const ForecastReadinessPanel = lazy(() => import("./ForecastReadinessPanel").then((module) => ({ default: module.ForecastReadinessPanel })));
+const AnalysisSnapshotPanel = lazy(() => import("./AnalysisSnapshotPanel").then((module) => ({ default: module.AnalysisSnapshotPanel })));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
@@ -247,9 +248,11 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
   const analysisUnitKey = answerCard.analysisUnitRef?.unitKey ?? "";
   const hasInitialForecastReadiness = Boolean(forecastReadiness);
   const [forecastOpen, setForecastOpen] = useState(hasInitialForecastReadiness);
+  const [snapshotOpen, setSnapshotOpen] = useState(false);
 
   useEffect(() => {
     setForecastOpen(hasInitialForecastReadiness);
+    setSnapshotOpen(false);
   }, [analysisUnitKey, forecastReadinessFingerprint, hasInitialForecastReadiness]);
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
@@ -532,6 +535,9 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
                   : biText("导出 Excel + 报告", "Export Excel + report")}
               </button>
               {analysisExportMessage ? <small className={analysisExportStatus}>{analysisExportMessage}</small> : null}
+              <button className="miniButton" data-testid="analysis-snapshot-open" onClick={() => setSnapshotOpen((current) => !current)} type="button">
+                {snapshotOpen ? biText("收起物化快照", "Hide Snapshots") : biText("管理物化快照", "Manage Snapshots")}
+              </button>
               {["trend", "anomaly"].includes(answerCard.analysisUnitRef.kind) ? (
                 <button className="miniButton" data-testid="forecast-readiness-open" onClick={() => setForecastOpen((current) => !current)} type="button">
                   {forecastOpen ? biText("收起预测准备度", "Hide forecast readiness") : biText("检查预测准备度", "Check forecast readiness")}
@@ -542,6 +548,11 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
           {forecastOpen && ["trend", "anomaly"].includes(answerCard.analysisUnitRef.kind) ? (
             <Suspense fallback={null}>
               <ForecastReadinessPanel initialReadiness={forecastReadiness} unitKey={answerCard.analysisUnitRef.unitKey} />
+            </Suspense>
+          ) : null}
+          {snapshotOpen ? (
+            <Suspense fallback={null}>
+              <AnalysisSnapshotPanel unitKey={answerCard.analysisUnitRef.unitKey} />
             </Suspense>
           ) : null}
         </div>

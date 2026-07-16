@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 12
+CURRENT_SQLITE_SCHEMA_VERSION = 13
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -861,6 +861,33 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON analysis_units(workspace_id, query_receipt_key, updated_at);
         CREATE INDEX IF NOT EXISTS idx_analysis_units_workspace_kind
           ON analysis_units(workspace_id, kind, status, updated_at);
+        CREATE TABLE IF NOT EXISTS analysis_snapshots (
+          snapshot_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          parent_snapshot_key TEXT,
+          operation TEXT NOT NULL,
+          status TEXT NOT NULL,
+          reason TEXT NOT NULL,
+          unit_key TEXT NOT NULL,
+          query_receipt_key TEXT NOT NULL,
+          semantic_fingerprint TEXT NOT NULL,
+          binding_fingerprint TEXT NOT NULL,
+          binding_json TEXT NOT NULL,
+          row_limit INTEGER NOT NULL,
+          row_count INTEGER NOT NULL,
+          content_hash TEXT NOT NULL,
+          content_json TEXT NOT NULL,
+          input_fingerprint TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          deleted_at TEXT,
+          PRIMARY KEY(workspace_id, snapshot_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_analysis_snapshots_workspace_unit
+          ON analysis_snapshots(workspace_id, unit_key, created_at);
+        CREATE INDEX IF NOT EXISTS idx_analysis_snapshots_workspace_parent
+          ON analysis_snapshots(workspace_id, parent_snapshot_key, created_at);
+        CREATE INDEX IF NOT EXISTS idx_analysis_snapshots_workspace_input
+          ON analysis_snapshots(workspace_id, input_fingerprint);
         CREATE TABLE IF NOT EXISTS analysis_jobs (
           job_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,

@@ -8,9 +8,8 @@
 
 ## 当前队列
 
-1. P2-B：以 current Receipt/Unit 建立可确认、不可变、无 stale fallback 的物化快照。
-2. P2-C：Metric Monitor 只比较兼容快照并输出本地状态，不发送通知或自动写业务系统。
-3. P2-D：只读联邦证明只验证多 Adapter 计划可行性，首版不跨源执行结果查询。
+1. P2-C：Metric Monitor 只比较兼容快照并输出本地状态，不发送通知或自动写业务系统。
+2. P2-D：只读联邦证明只验证多 Adapter 计划可行性，首版不跨源执行结果查询。
 
 每项只有在实现、专项验证、全量回归、文档和真实运行回执同时成立后才移入 [实现状态](implementation-status.md)；设计文档、Manifest 存在或单一单元测试不单独构成交付。
 

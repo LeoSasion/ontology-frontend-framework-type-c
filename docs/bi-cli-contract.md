@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/bi_cli.py --json <command>`
-Command count: `160`
+Command count: `165`
 
 This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,7 +11,7 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 14 |
+| `analysis` | 19 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
 | `connector` | 8 |
@@ -41,9 +41,9 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 65 |
+| `dry-run-confirm` | 69 |
 | `evidence-receipt` | 8 |
-| `read-only` | 72 |
+| `read-only` | 73 |
 | `runtime-receipt` | 10 |
 
 ## Commands
@@ -70,6 +70,11 @@ This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as
 | `agent-turns` | `agent` | `read-only` | `no` | `no` | `--workspace`, `--turn`, `--after-sequence`, `--limit` |
 | `agent-workflow-graph` | `workflow` | `read-only` | `no` | `no` | `--turn`, `--workspace` |
 | `analysis-runs` | `evidence` | `read-only` | `no` | `no` | `--run`, `--limit` |
+| `analysis-snapshot-create` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--unit`, `--reason`, `--row-limit`, `--expected-plan`, `--yes` |
+| `analysis-snapshot-delete` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--snapshot`, `--expected-plan`, `--yes` |
+| `analysis-snapshot-refresh` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--snapshot`, `--unit`, `--reason`, `--row-limit`, `--expected-plan`, `--yes` |
+| `analysis-snapshot-replace` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--snapshot`, `--unit`, `--reason`, `--row-limit`, `--expected-plan`, `--yes` |
+| `analysis-snapshots` | `analysis` | `read-only` | `no` | `no` | `--snapshot`, `--unit`, `--status`, `--limit` |
 | `analysis-unit-build` | `analysis` | `evidence-receipt` | `no` | `yes` | `--receipt`, `--kind`, `--rows-json`, `--title`, `--preferred-chart` |
 | `analysis-unit-verify` | `analysis` | `read-only` | `no` | `no` | `--unit` |
 | `analysis-units` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--receipt`, `--limit` |

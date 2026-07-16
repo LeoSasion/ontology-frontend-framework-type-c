@@ -11,6 +11,51 @@ type AnalysisUnitRoutesOptions = {
 const nonEmpty = (value: unknown) => String(value ?? "").trim();
 
 export async function handleAnalysisUnitApi({ cli, request, response, url }: AnalysisUnitRoutesOptions) {
+  if (url.pathname === "/api/analysis-snapshots" && request.method === "GET") {
+    const args = ["analysis-snapshots"];
+    const snapshot = nonEmpty(url.searchParams.get("snapshot"));
+    const unit = nonEmpty(url.searchParams.get("unit"));
+    const status = nonEmpty(url.searchParams.get("status"));
+    const limit = nonEmpty(url.searchParams.get("limit")) || "30";
+    if (snapshot) args.push("--snapshot", snapshot);
+    if (unit) args.push("--unit", unit);
+    if (status) args.push("--status", status);
+    args.push("--limit", limit);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 404 : 200, result);
+    return true;
+  }
+
+  const snapshotMutation = url.pathname.match(/^\/api\/analysis-snapshots\/(create|refresh|replace|delete)$/);
+  if (snapshotMutation && request.method === "POST") {
+    const operation = snapshotMutation[1];
+    const body = await readBody(request);
+    const snapshot = nonEmpty(body.snapshot ?? body.snapshotKey);
+    const unit = nonEmpty(body.unit ?? body.unitKey);
+    const reason = nonEmpty(body.reason);
+    if (operation !== "delete" && !unit) {
+      sendJson(response, 400, { ok: false, action: `analysis-snapshot-${operation}`, error: "unit is required" });
+      return true;
+    }
+    if (["refresh", "replace", "delete"].includes(operation) && !snapshot) {
+      sendJson(response, 400, { ok: false, action: `analysis-snapshot-${operation}`, error: "snapshot is required" });
+      return true;
+    }
+    if (operation !== "delete" && !reason) {
+      sendJson(response, 400, { ok: false, action: `analysis-snapshot-${operation}`, error: "reason is required" });
+      return true;
+    }
+    const args = [`analysis-snapshot-${operation}`];
+    if (snapshot) args.push("--snapshot", snapshot);
+    if (unit) args.push("--unit", unit);
+    if (reason) args.push("--reason", reason);
+    if (operation !== "delete") args.push("--row-limit", nonEmpty(body.rowLimit) || "500");
+    if (body.confirm === true) args.push("--yes", "--expected-plan", nonEmpty(body.expectedPlanFingerprint));
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/analysis-units" && request.method === "GET") {
     const args = ["analysis-units"];
     const unit = nonEmpty(url.searchParams.get("unit"));

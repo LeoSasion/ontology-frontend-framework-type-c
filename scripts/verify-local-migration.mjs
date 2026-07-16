@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 12 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 13 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -129,6 +129,12 @@ try {
     "v12-limited-research-tables-and-indexes-are-created",
     inspectedPayload.researchTables?.join(":") === "research_observations:research_plan_revisions:research_run_events:research_runs"
       && inspectedPayload.researchIndexes?.join(":") === "idx_research_events_run_sequence:idx_research_observations_run_created:idx_research_revisions_run_number:idx_research_runs_workspace_updated",
+    inspectedPayload,
+  );
+  add(
+    "v13-analysis-snapshot-table-and-indexes-are-created",
+    inspectedPayload.analysisSnapshotTables?.join(":") === "analysis_snapshots"
+      && inspectedPayload.analysisSnapshotIndexes?.join(":") === "idx_analysis_snapshots_workspace_input:idx_analysis_snapshots_workspace_parent:idx_analysis_snapshots_workspace_unit",
     inspectedPayload,
   );
 

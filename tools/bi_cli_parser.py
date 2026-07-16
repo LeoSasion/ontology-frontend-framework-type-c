@@ -387,6 +387,40 @@ def build_parser() -> argparse.ArgumentParser:
     analysis_units.add_argument("--receipt", default="")
     analysis_units.add_argument("--limit", type=int, default=30)
 
+    analysis_snapshots = sub.add_parser("analysis-snapshots", description="List or inspect immutable workspace Analysis Snapshots with live freshness.")
+    analysis_snapshots.add_argument("--snapshot", default="")
+    analysis_snapshots.add_argument("--unit", default="")
+    analysis_snapshots.add_argument("--status", default="", choices=["", "current", "stale", "missing", "deleted"])
+    analysis_snapshots.add_argument("--limit", type=int, default=30)
+
+    analysis_snapshot_create = sub.add_parser("analysis-snapshot-create", description="Preview or confirm freezing one current ready Analysis Unit as an immutable Snapshot.")
+    analysis_snapshot_create.add_argument("--unit", required=True)
+    analysis_snapshot_create.add_argument("--reason", required=True)
+    analysis_snapshot_create.add_argument("--row-limit", type=int, default=500)
+    analysis_snapshot_create.add_argument("--expected-plan", default="")
+    analysis_snapshot_create.add_argument("--yes", action="store_true")
+
+    analysis_snapshot_refresh = sub.add_parser("analysis-snapshot-refresh", description="Preview or confirm a same-semantics child Snapshot from a newer current Analysis Unit.")
+    analysis_snapshot_refresh.add_argument("--snapshot", required=True)
+    analysis_snapshot_refresh.add_argument("--unit", required=True)
+    analysis_snapshot_refresh.add_argument("--reason", required=True)
+    analysis_snapshot_refresh.add_argument("--row-limit", type=int, default=500)
+    analysis_snapshot_refresh.add_argument("--expected-plan", default="")
+    analysis_snapshot_refresh.add_argument("--yes", action="store_true")
+
+    analysis_snapshot_replace = sub.add_parser("analysis-snapshot-replace", description="Preview or confirm a semantic replacement child Snapshot from a current Analysis Unit.")
+    analysis_snapshot_replace.add_argument("--snapshot", required=True)
+    analysis_snapshot_replace.add_argument("--unit", required=True)
+    analysis_snapshot_replace.add_argument("--reason", required=True)
+    analysis_snapshot_replace.add_argument("--row-limit", type=int, default=500)
+    analysis_snapshot_replace.add_argument("--expected-plan", default="")
+    analysis_snapshot_replace.add_argument("--yes", action="store_true")
+
+    analysis_snapshot_delete = sub.add_parser("analysis-snapshot-delete", description="Preview or confirm deleting Snapshot content while preserving its immutable lineage tombstone.")
+    analysis_snapshot_delete.add_argument("--snapshot", required=True)
+    analysis_snapshot_delete.add_argument("--expected-plan", default="")
+    analysis_snapshot_delete.add_argument("--yes", action="store_true")
+
     analysis_unit_verify = sub.add_parser("analysis-unit-verify", description="Recalculate an Analysis Unit from its frozen snapshot and compare fingerprints.")
     analysis_unit_verify.add_argument("--unit", required=True)
 

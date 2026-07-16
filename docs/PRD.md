@@ -53,6 +53,7 @@
 - 已确认分析只能先形成复用候选；再次显式提升后才生成 Confirmed Plan Memory。混合召回只排序候选并生成 Recall Receipt，不得替当前计划选字段、关系或执行动作。
 - 有限 Research Run 只能从 current Exploration Anchor 建立；计划、修订、反例、敏感性和结论均受固定预算、同线程证据、不可变版本与 freshness 约束，详见 [有限 Research Run](finite-research-runs.md)。
 - 预测类请求必须先通过 current Analysis Unit 的确定性 Forecast Readiness 门禁；它只报告样本量、节奏、稳定性、泄漏策略、假设与可解释性，不生成预测值或未来结果。
+- current Receipt/Unit 可经 dry-run、精确计划指纹和一次确认建立有界物化快照；刷新和替换必须追加不可变子快照，来源漂移后历史只可审计且不得 stale fallback，公开响应不得返回冻结业务行。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
 
 工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；历史计划复用由 [确认计划记忆](confirmed-plan-memory.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
