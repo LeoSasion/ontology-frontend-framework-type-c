@@ -167,7 +167,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-restricted-workflow-") as temp_d
     env["AIBI_HYBRID_DUCKDB_PATH"] = str(Path(temp_dir) / "workflow.duckdb")
 
     def cli(*args: str) -> tuple[int, dict[str, object]]:
-        completed = subprocess.run([sys.executable, "tools/bi_cli.py", "--json", *args], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
+        completed = subprocess.run([sys.executable, "tools/aibi_cli.py", "--json", *args], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8")
         try:
             payload = json.loads(completed.stdout or completed.stderr or "{}")
         except json.JSONDecodeError:

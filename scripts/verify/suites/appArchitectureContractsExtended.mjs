@@ -2,7 +2,6 @@ export function appendAppArchitectureContractExtendedChecks(context) {
   const {
     checks,
     actionRecoveryModelSource,
-    agentCommandDockSource,
     agentEvidenceStylesSource,
     agentPanelModelSource,
     agentPanelSource,
@@ -40,7 +39,6 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     biCliSourceCommandsSource,
     biCliSystemCommandsSource,
     biCliWidgetCommandsSource,
-    businessPathBarSource,
     byLabel,
     dashboardBusinessTaskStripSource,
     dashboardCanvasSource,
@@ -53,16 +51,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     existsSync,
     globalStylesSource,
     hasCssRule,
-    homeActionDockSource,
-    homeDetailedPathPanelSource,
-    homeOperatingSummaryPanelSource,
-    homeOverviewModelSource,
     homeOverviewSource,
-    homeProductIntelligencePanelSource,
-    homeScenarioPacksPanelSource,
-    homeWorkspaceStartGuideSource,
     implementationStatusSource,
-    inspectorControllerSource,
     join,
     metricRepairModelSource,
     metricSemanticRepairActionsSource,
@@ -89,10 +79,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     serverStaticSource,
     serverWorkspaceRoutesSource,
     settingsPanelSource,
-    sidebarAssetSectionsSource,
-    sidebarAssetModulesSource,
     sidebarSource,
-    sidebarWorkspaceCardSource,
     sourceWorkbenchModelSource,
     sourceWorkbenchActionPanelSource,
     sourceWorkbenchSource,
@@ -117,7 +104,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     viewWorkspaceSource,
     workspaceFlowModelSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   const biCliRuntimeSource = [
     biCliSource,
     biCliParserSource,
@@ -196,7 +183,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           implementationStatusSource.includes("“工作区”只显示当前必要任务"),
       },
     {
-        label: "frontend-production-copy-and-current-roadmap-contract",
+        label: "frontend-production-copy-and-prioritized-roadmap-contract",
         ok: productAcceptanceMatrixDocSource.includes("- `npm run preflight`") &&
           dashboardCanvasSource.includes('name: biText("未命名看板", "Untitled dashboard")') &&
           !dashboardCanvasSource.includes("临时看板") &&
@@ -205,15 +192,17 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           dashboardBusinessTaskStripSource.includes("Describe the metric, dimension, time range, or comparison") &&
           !dashboardBusinessTaskStripSource.includes("例如：") &&
           !dashboardBusinessTaskStripSource.includes("Example:") &&
-          agentCommandDockSource.includes("输入你想分析的问题或要生成的图表") &&
-          agentCommandDockSource.includes("Enter the question to analyze or chart to create") &&
-          !agentCommandDockSource.includes("直接问：") &&
-          !agentCommandDockSource.includes("Ask: which channel") &&
           docsReadmeSource.includes("development-roadmap.md") &&
           docsReadmeSource.includes("`npm run preflight` 是本地交付前总入口") &&
           prdDocSource.includes("`npm run preflight` 通过，作为本地交付前总入口") &&
           developmentRoadmapDocSource.includes("## 不变的主流程") &&
-          developmentRoadmapDocSource.includes("## 当前队列") &&
+          developmentRoadmapDocSource.includes("## 目标架构") &&
+          developmentRoadmapDocSource.includes("## P0：消除运行时结构性风险") &&
+          developmentRoadmapDocSource.includes("### P0-A｜拆出 Application Use Case") &&
+          developmentRoadmapDocSource.includes("### P0-B｜建立长驻 Runtime Host 与单写者队列") &&
+          developmentRoadmapDocSource.includes("### P0-C｜把 DuckDB 改为版本化分析副本") &&
+          developmentRoadmapDocSource.includes("## P1：降低前后端耦合与刷新成本") &&
+          developmentRoadmapDocSource.includes("## P2：形成可扩展但不扩权的插件面") &&
           !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
           !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
           implementationStatusSource.includes("| Analysis Unit 与图表适配 | 稳定初版 |") &&
@@ -231,8 +220,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           !developmentRoadmapDocSource.includes("P2-B：以 current Receipt/Unit") &&
           !developmentRoadmapDocSource.includes("P2-C：Metric Monitor") &&
           !developmentRoadmapDocSource.includes("P2-D：只读联邦证明") &&
-          developmentRoadmapDocSource.includes("暂无已承诺的未交付项") &&
-          developmentRoadmapDocSource.includes("P2-A 至 P2-D 均已移入") &&
+          !developmentRoadmapDocSource.includes("暂无已承诺的未交付项") &&
+          !developmentRoadmapDocSource.includes("P2-A 至 P2-D 均已移入") &&
           implementationStatusSource.includes("| Forecast Readiness | 稳定初版 |") &&
           implementationStatusSource.includes("| 物化分析快照 | 稳定初版 |") &&
           implementationStatusSource.includes("| Metric Monitor | 稳定初版 |") &&
@@ -472,30 +461,6 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appNavigationModelSource.includes('if (section === "home" || section === "settings") return {}'),
       },
     {
-        label: "frontend-desktop-shell-fluid-width",
-        ok: stylesSource.includes("--shell-asset-width: clamp(280px, 17vw, 324px)") &&
-          stylesSource.includes("--shell-inspector-width: clamp(300px, 18vw, 340px)") &&
-          stylesSource.includes("grid-template-columns: var(--shell-rail-width) var(--shell-asset-width) minmax(0, 1fr) var(--shell-inspector-width)") &&
-          stylesSource.includes("grid-template-columns: var(--shell-rail-width) var(--shell-asset-width) minmax(0, 1fr) var(--shell-inspector-collapsed-width)") &&
-          stylesSource.includes("@media (min-width: 761px) and (max-width: 1040px)") &&
-          stylesSource.includes("grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-collapsed-width)") &&
-          stylesSource.includes("grid-column: 2;") &&
-          stylesSource.includes("height: 100dvh") &&
-          stylesSource.includes("overflow: hidden") &&
-          !stylesSource.includes("--desktop-width") &&
-          !stylesSource.includes("min-width: var(--desktop-width)") &&
-          !stylesSource.includes("width: max(100vw"),
-      },
-    {
-        label: "frontend-sidebar-dashboard-asset-typing",
-        ok: sidebarAssetSectionsSource.includes("resolveDashboardAsset(item: NavigationModule | DashboardPage") &&
-          sidebarAssetSectionsSource.includes("type DashboardAsset") &&
-          sidebarAssetSectionsSource.includes('import type { ActionDraft, AgentAskResult, DashboardPage, DashboardPayload, NavigationModule') &&
-          sidebarAssetSectionsSource.includes("const asset = resolveDashboardAsset(item, dashboardPages)") &&
-          !sidebarAssetSectionsSource.includes("as any") &&
-          !sidebarSource.includes("as any"),
-      },
-    {
         label: "frontend-home-draft-state-requires-confirmation",
         ok: homeOverviewSource.includes("const hasPendingDraft = agent.requiresConfirmation === true || (status.counts.actionDrafts ?? 0) > 0") &&
           homeOverviewSource.includes(") : hasPendingDraft ? (") &&
@@ -516,14 +481,13 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-product-intelligence-model",
-        ok: productIntelligenceModelSource.includes("export function buildScenarioPacks") &&
-          productIntelligenceModelSource.includes("export function buildDataQualityDoctor") &&
-          productIntelligenceModelSource.includes("export function buildObjectInspectorModel") &&
-          productIntelligenceModelSource.includes("export function buildEvidenceNarrative") &&
-          productIntelligenceModelSource.includes("export function buildSandboxComparison") &&
-          productIntelligenceModelSource.includes('candidate?.status !== "ready"') &&
-          productIntelligenceModelSource.includes('item.status === "executed"') &&
-          productIntelligenceModelSource.includes("return []"),
+        ok: productIntelligenceModelSource.includes("export function buildEvidenceNarrative") &&
+          productIntelligenceModelSource.includes("sourceRunFromRefs") &&
+          productIntelligenceModelSource.includes("latestUsableSourceIntelligenceRun") &&
+          !productIntelligenceModelSource.includes("buildScenarioPacks") &&
+          !productIntelligenceModelSource.includes("buildDataQualityDoctor") &&
+          !productIntelligenceModelSource.includes("buildObjectInspectorModel") &&
+          !productIntelligenceModelSource.includes("buildSandboxComparison"),
       },
     {
         label: "frontend-home-scenario-quality-sandbox-panels",
@@ -615,7 +579,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           biCliRuntimeSource.includes("metric-sql-compiler.json") &&
           biCliRuntimeSource.includes("metric-query-results.json") &&
           biCliRuntimeSource.includes('sub.add_parser("quality-doctor")') &&
-          biCliSource.includes('elif args.command == "quality-doctor"') &&
+          /args\.command == ['"]quality-doctor['"]/.test(biCliSource) &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/quality/doctor"') &&
           serverWorkspaceRoutesSource.includes('cli(["quality-doctor"])') &&
           apiSource.includes("export function getQualityDoctor()") &&

@@ -366,7 +366,7 @@ def import_commit_command(
         if not args.yes:
             preview = build_import_preview(connection, args.file, args.table, args.unique_fields, args.conflict_rule)
             preview["requiresConfirmation"] = True
-            preview["recommendedCommand"] = f"python tools/bi_cli.py --json import-commit {args.file} --mode {args.mode} --yes"
+            preview["recommendedCommand"] = f"python tools/aibi_cli.py --json import-commit {args.file} --mode {args.mode} --yes"
             return preview
         result = execute_import_commit(connection, args.file, args.table, args.name, args.mode, args.unique_fields, args.conflict_rule)
         connection.commit()
@@ -408,7 +408,7 @@ def import_folder_command(
             return {
                 **plan,
                 "requiresConfirmation": True,
-                "recommendedCommand": f"python tools/bi_cli.py --json import-folder {args.path} --yes",
+                "recommendedCommand": f"python tools/aibi_cli.py --json import-folder {args.path} --yes",
             }
         results = []
         for item in plan["items"]:

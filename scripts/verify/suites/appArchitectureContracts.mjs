@@ -4,7 +4,6 @@ export function appendAppArchitectureContractChecks(context) {
   const {
     checks,
     actionRecoveryModelSource,
-    agentCommandDockSource,
     agentEvidenceStylesSource,
     agentPanelModelSource,
     agentPanelSource,
@@ -42,7 +41,6 @@ export function appendAppArchitectureContractChecks(context) {
     biCliSourceCommandsSource,
     biCliSystemCommandsSource,
     biCliWidgetCommandsSource,
-    businessPathBarSource,
     byLabel,
     dashboardBusinessTaskStripSource,
     dashboardCanvasSource,
@@ -55,16 +53,8 @@ export function appendAppArchitectureContractChecks(context) {
     existsSync,
     globalStylesSource,
     hasCssRule,
-    homeActionDockSource,
-    homeDetailedPathPanelSource,
-    homeOperatingSummaryPanelSource,
-    homeOverviewModelSource,
     homeOverviewSource,
-    homeProductIntelligencePanelSource,
-    homeScenarioPacksPanelSource,
-    homeWorkspaceStartGuideSource,
     implementationStatusSource,
-    inspectorControllerSource,
     join,
     metricRepairModelSource,
     metricSemanticRepairActionsSource,
@@ -90,10 +80,7 @@ export function appendAppArchitectureContractChecks(context) {
     serverStaticSource,
     serverWorkspaceRoutesSource,
     settingsPanelSource,
-    sidebarAssetSectionsSource,
-    sidebarAssetModulesSource,
     sidebarSource,
-    sidebarWorkspaceCardSource,
     sourceWorkbenchModelSource,
     sourceWorkbenchSource,
     stylesSource,
@@ -114,7 +101,7 @@ export function appendAppArchitectureContractChecks(context) {
     viewWorkspaceSource,
     workspaceFlowModelSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   const biCliRuntimeSource = [
     biCliSource,
     biCliParserSource,
@@ -550,14 +537,11 @@ export function appendAppArchitectureContractChecks(context) {
           safeValueSource.includes("export function objectRecord") &&
           safeValueSource.includes("export function recordArray") &&
           safeValueSource.includes("export function stringValue") &&
-          homeOverviewModelSource.includes('from "./safeValue"') &&
           agentPanelModelSource.includes('from "./safeValue"') &&
           agentPanelModelSource.includes("export { objectRecord }") &&
           sourceWorkbenchModelSource.includes('from "./safeValue"') &&
           sourceWorkbenchModelSource.includes("export { numberValue }") &&
           metricRepairModelSource.includes('from "./safeValue"') &&
-          !homeOverviewModelSource.includes("export function numberValue(value: unknown)") &&
-          !homeOverviewModelSource.includes("export function objectRecord(value: unknown)") &&
           !agentPanelModelSource.includes("export function objectRecord(value: unknown)") &&
           !metricRepairModelSource.includes("function numberValue(value: unknown)") &&
           !metricRepairModelSource.includes("function objectRecord(value: unknown)") &&

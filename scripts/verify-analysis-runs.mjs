@@ -13,7 +13,7 @@ const env = {
 };
 
 function run(label, args, expectedStatus = 0) {
-  const result = spawnSync("python", ["tools/bi_cli.py", "--json", ...args], { cwd: process.cwd(), env, encoding: "utf8", windowsHide: true });
+  const result = spawnSync("python", ["tools/aibi_cli.py", "--json", ...args], { cwd: process.cwd(), env, encoding: "utf8", windowsHide: true });
   let parsed = null;
   try { parsed = JSON.parse(result.stdout.trim()); } catch { parsed = null; }
   return { label, ok: result.status === expectedStatus && (expectedStatus !== 0 || parsed?.ok === true), status: result.status, parsed, stderr: result.stderr, stdout: result.stdout };

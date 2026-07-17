@@ -50,7 +50,6 @@ export function appendCoreContractChecks(context) {
     importJobCommandServiceSource,
     importTableWriterServiceSource,
     indexHtmlSource,
-    inspectorControllerSource,
     join,
     metricFormulaCommandServiceSource,
     packageJson,
@@ -85,7 +84,7 @@ export function appendCoreContractChecks(context) {
     verifyUiRealImportSource,
     workspaceCommandServiceSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   const biCliRuntimeSource = [
     biCliSource,
     biCliParserSource,
@@ -260,10 +259,10 @@ export function appendCoreContractChecks(context) {
           biCliRuntimeSource.includes("recommended = build_agent_recommended_commands(") &&
           !biCliRuntimeSource.includes("recommended.append(") &&
           agentRecommendedCommandsSource.includes("def build_agent_recommended_commands(") &&
-          agentRecommendedCommandsSource.includes("python tools/bi_cli.py --json status") &&
-          agentRecommendedCommandsSource.includes("python tools/bi_cli.py --json add-widget") &&
-          agentRecommendedCommandsSource.includes("python tools/bi_cli.py --json add-filter") &&
-          agentRecommendedCommandsSource.includes("python tools/bi_cli.py --json save-view") &&
+          agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json status") &&
+          agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json add-widget") &&
+          agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json add-filter") &&
+          agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json save-view") &&
           byLabel["cli-agent-widget-draft"].parsed?.recommendedCommands?.some((command) => command.includes("add-widget")) &&
           byLabel["cli-agent-dashboard-filter-draft"].parsed?.recommendedCommands?.some((command) => command.includes("add-filter")) &&
           readOnlyAgentCheck.parsed?.recommendedCommands?.some((command) => command.includes("--json query")),

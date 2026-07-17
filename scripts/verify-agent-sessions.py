@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def run_cli(env: dict[str, str], *args: str) -> tuple[int, dict]:
-    completed = subprocess.run([sys.executable, "tools/bi_cli.py", "--json", *args], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", timeout=90)
+    completed = subprocess.run([sys.executable, "tools/aibi_cli.py", "--json", *args], cwd=ROOT, env=env, capture_output=True, text=True, encoding="utf-8", timeout=90)
     try:
         payload = json.loads(completed.stdout)
     except json.JSONDecodeError:

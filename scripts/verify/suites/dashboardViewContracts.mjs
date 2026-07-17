@@ -51,7 +51,6 @@ export function appendDashboardViewContractChecks(context) {
     globalStylesSource,
     hasCssRule,
     implementationStatusSource,
-    inspectorControllerSource,
     join,
     root,
     sourceWorkbenchActionPanelSource,
@@ -69,7 +68,7 @@ export function appendDashboardViewContractChecks(context) {
     viewWorkspaceSource,
     viewWorkspaceStylesSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   checks.push(
     {
         label: "frontend-evidence-business-summary-first",

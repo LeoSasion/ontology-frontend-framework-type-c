@@ -4,15 +4,14 @@ export function appendProductUxContractChecks(context) {
     actionRecoveryModelSource,
     agentAnswerCardSource,
     agentCanAnswerPanelSource,
-    agentCommandDockSource,
     agentContextPlanPanelSource,
     agentEvidenceAuditPanelsSource,
     agentPanelModelSource,
     agentPanelSource,
     agentPendingChangesPanelSource,
     agentPromptComposerSource,
-    agentPromptRoutingSource,
     agentTaskPacketSource,
+    appChromeStylesSource,
     appLazyModulesSource,
     appAgentActionsSource,
     appDataActionsSource,
@@ -37,18 +36,11 @@ export function appendProductUxContractChecks(context) {
     globalStylesSource,
     homeOverviewSource,
     implementationStatusSource,
-    inspectorControllerSource,
-    inspectorContextPanelSource,
-    inspectorEvidenceDetailsSource,
-    inspectorPanelModelSource,
-    inspectorPanelSource,
-    inspectorTaskQueuePanelSource,
     join,
     metricSemanticRepairActionsSource,
     packageJson,
     readmeSource,
     root,
-    settingsAcceptanceEvidencePanelSource,
     settingsConfigPortabilityPanelSource,
     settingsPanelSource,
     settingsPanelStylesSource,
@@ -61,8 +53,7 @@ export function appendProductUxContractChecks(context) {
     stylesSource,
     typesAgentSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
-  const inspectorFeatureSource = `${inspectorPanelSource}\n${inspectorContextPanelSource}\n${inspectorTaskQueuePanelSource}\n${inspectorEvidenceDetailsSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   checks.push(
     {
         label: "agent-business-surface-hides-technical-identifiers-and-raw-floats",
@@ -74,7 +65,7 @@ export function appendProductUxContractChecks(context) {
           agentPanelModelSource.includes('value === "query-runtime"') &&
           agentPendingChangesPanelSource.includes("resolveDraftTarget(currentDraft)") &&
           agentPanelModelSource.includes('value === "chart_preview"') &&
-          evidenceViewModelSource.includes("evidenceBusinessIdentifier(ref.id") &&
+          evidenceViewModelSource.includes("businessIdentifier(ref.id") &&
           evidenceViewSource.includes("可直接回答（共识别"),
       },
     {
@@ -95,10 +86,12 @@ export function appendProductUxContractChecks(context) {
           agentTaskPacketSource.includes("agentTaskPacketTechnical"),
       },
     {
-        label: "responsive-square-desktop-collapses-secondary-rails",
-        ok: globalStylesSource.includes("@media (min-width: 761px) and (max-width: 1180px)") &&
-          globalStylesSource.includes(".assetPanel") &&
-          globalStylesSource.includes("display: none"),
+        label: "responsive-shell-uses-current-two-column-layout",
+        ok: appChromeStylesSource.includes("@media (max-width: 980px)") &&
+          appChromeStylesSource.includes("grid-template-columns: 212px minmax(0, 1fr)") &&
+          appChromeStylesSource.includes("@media (max-width: 720px)") &&
+          appChromeStylesSource.includes("grid-template-columns: minmax(0, 1fr)") &&
+          appChromeStylesSource.includes(".workspaceSidebar"),
       },
     {
         label: "deferred-ui-recovers-without-global-page-failure",
@@ -155,40 +148,6 @@ export function appendProductUxContractChecks(context) {
           agentPendingChangesPanelSource.includes('<details className="advancedDetails compactAdvanced agentActionTechnical"') &&
           appDataActionsSource.includes('action: "source-intelligence"') &&
           appDataActionsSource.includes("throw error"),
-      },
-    {
-        label: "frontend-inspector-action-queue-business-first",
-        ok: inspectorPanelModelSource.includes("export function actionNextStep") &&
-          inspectorPanelModelSource.includes("export function payloadTarget") &&
-          inspectorPanelModelSource.includes("export function actionKindLabel") &&
-          inspectorTaskQueuePanelSource.includes("actionNextStep(draft)") &&
-          inspectorTaskQueuePanelSource.includes("payloadTarget(draft)") &&
-          inspectorTaskQueuePanelSource.includes("actionKindLabel(draft.kind)") &&
-          inspectorTaskQueuePanelSource.includes('data-testid="action-queue-next-step"') &&
-          inspectorTaskQueuePanelSource.includes('data-testid={`action-queue-technical-${draft.action_key}`}') &&
-          inspectorTaskQueuePanelSource.includes("查看证据和编号") &&
-          inspectorTaskQueuePanelSource.includes("查看错误原文") &&
-          inspectorTaskQueuePanelSource.includes("证据线索") &&
-          !inspectorTaskQueuePanelSource.includes("evidence refs`)") &&
-          stylesSource.includes(".taskNextStep") &&
-          stylesSource.includes(".taskEvidenceRow summary"),
-      },
-    {
-        label: "frontend-object-inspector-v2",
-        ok: inspectorContextPanelSource.includes("buildObjectInspectorModel({ activeSection") &&
-          inspectorContextPanelSource.includes('data-testid="object-inspector-lens"') &&
-          inspectorContextPanelSource.includes('data-testid="object-inspector-facts"') &&
-          inspectorContextPanelSource.includes('data-testid="object-inspector-editor-slots"') &&
-          inspectorContextPanelSource.includes("objectModel.primaryAction") &&
-          inspectorPanelSource.includes('import { InspectorEvidenceDetails } from "./InspectorEvidenceDetails"') &&
-          inspectorPanelSource.includes("<InspectorEvidenceDetails") &&
-          inspectorEvidenceDetailsSource.includes('<details className="contextReservePanel">') &&
-          inspectorEvidenceDetailsSource.includes("扩展能力") &&
-          inspectorFeatureSource.includes('data-testid="action-queue"') &&
-          stylesSource.includes(".objectInspectorLens") &&
-          stylesSource.includes(".objectInspectorFacts") &&
-          stylesSource.includes(".objectInspectorSlots") &&
-          stylesSource.includes(".contextReservePanel summary"),
       },
     {
         label: "frontend-evidence-number-explainer",
@@ -336,28 +295,6 @@ export function appendProductUxContractChecks(context) {
           stylesSource.includes(".configResultDetails"),
       },
     {
-        label: "frontend-settings-closure-workbench",
-        ok: settingsAcceptanceEvidencePanelSource.includes("const closureItems") &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-workbench"') &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-lead"') &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid="settings-closure-grid"') &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid={`settings-closure-${item.key}`}') &&
-          settingsAcceptanceEvidencePanelSource.includes("刷新不白屏") &&
-          settingsAcceptanceEvidencePanelSource.includes("本地 BI 操作已并入当前工作区") &&
-          settingsAcceptanceEvidencePanelSource.includes("空工作区只引导导入") &&
-          settingsAcceptanceEvidencePanelSource.includes("看板阅读和编辑动作集中可验收") &&
-          settingsAcceptanceEvidencePanelSource.includes("新手路径已收敛") &&
-          settingsAcceptanceEvidencePanelSource.includes("docs/implementation-status.md") &&
-          settingsAcceptanceEvidencePanelSource.includes("python tools/bi_cli.py --json cli-capabilities") &&
-          settingsAcceptanceEvidencePanelSource.includes('data-testid={`settings-closure-technical-${item.key}`}') &&
-          settingsAcceptanceEvidencePanelSource.includes("empty-workspace-data-boundary") &&
-          settingsAcceptanceEvidencePanelSource.includes("frontend-b-widget-acceptance-gallery") &&
-          stylesSource.includes(".closureWorkbenchCard") &&
-          stylesSource.includes(".closureGrid") &&
-          stylesSource.includes(".closureItem.ok") &&
-          stylesSource.includes(".closureTechnical"),
-      },
-    {
         label: "settings-acceptance-evidence-panel-component-boundary",
         ok: !settingsPanelSource.includes('import { SettingsAcceptanceEvidencePanel } from "./SettingsAcceptanceEvidencePanel"') &&
           !settingsPanelSource.includes("<SettingsAcceptanceEvidencePanel") &&
@@ -420,7 +357,7 @@ export function appendProductUxContractChecks(context) {
           implementationStatusSource.includes("## 已知限制") &&
           implementationStatusSource.includes("## 架构归属") &&
           implementationStatusSource.includes("npm run verify") &&
-          implementationStatusSource.includes("python tools/bi_cli.py --json status") &&
+          implementationStatusSource.includes("python tools/aibi_cli.py --json status") &&
           implementationStatusSource.includes("single-user and local-only"),
       },
     {

@@ -1,13 +1,7 @@
 import type { EvidenceFocus, SourceIntelligenceRunSummary } from "./types";
 import { biText } from "./components/Bilingual";
+import { businessIdentifier } from "./businessPresentation";
 import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
-
-function evidenceBusinessIdentifier(value: unknown, fallback: string) {
-  const text = typeof value === "string" ? value.trim() : "";
-  if (!text || /^(source|run|action|workspace)_[a-z0-9_-]+$/i.test(text)) return fallback;
-  if (text === "chart_preview") return biText("图表生成规则", "Chart generation rule");
-  return text;
-}
 
 export function sourceRunFromFocus(focus: EvidenceFocus | null | undefined, runs: SourceIntelligenceRunSummary[]) {
   const sourceIntelligenceRef = focus?.refs.find((ref) => ref.startsWith("source-intelligence:"));
@@ -144,7 +138,7 @@ export function actionReceiptDetail(result: Record<string, unknown> | null | und
   if (result.requiresConfirmation === true || result.dryRun === true) {
     return biText(`${subject}已完成预演，确认前不会写入。`, `${subject} was previewed; nothing writes before confirmation.`);
   }
-  return biText("动作结果已记录；上下文抽屉显示摘要，证据页保留完整 JSON。", "Action result recorded; the context drawer shows the summary, and Evidence keeps the full JSON.");
+  return biText("动作结果已记录；证据页显示摘要，并保留可展开的完整 JSON。", "Action result recorded; Evidence shows the summary and keeps the full JSON available to expand.");
 }
 
 export function actionReceiptTechnical(result: Record<string, unknown> | null | undefined) {
@@ -173,14 +167,14 @@ export function agentEvidenceBusinessLabel(ref: Record<string, unknown>) {
 
 export function agentEvidenceBusinessDetail(ref: Record<string, unknown>) {
   const type = String(ref.type ?? "");
-  if (type === "sourceRun" || type === "table") return evidenceBusinessIdentifier(ref.name ?? ref.tableName, biText("当前工作区数据", "Current workspace data"));
+  if (type === "sourceRun" || type === "table") return businessIdentifier(ref.name ?? ref.tableName, biText("当前工作区数据", "Current workspace data"));
   if (type === "metricDefinition") return String(ref.label ?? ref.metric_key ?? biText("当前指标", "Current metric"));
   if (type === "queryRuntime") return biText("可追溯到查询回执，技术信息可展开查看。", "Traceable to a query receipt; technical details are expandable.");
-  if (type === "ontologyFunction") return evidenceBusinessIdentifier(ref.id, biText("图表生成规则", "Chart generation rule"));
+  if (type === "ontologyFunction") return businessIdentifier(ref.id, biText("图表生成规则", "Chart generation rule"));
   if (type === "contextTerm") return String(ref.name ?? ref.termKey ?? biText("业务术语", "Business term"));
   if (type === "contextRule") return String(ref.title ?? ref.ruleKey ?? biText("工作区规则", "Workspace rule"));
   if (type === "confirmedQuery") return String(ref.question ?? ref.queryKey ?? biText("确认问法", "Confirmed query"));
-  return evidenceBusinessIdentifier(ref.name ?? ref.label, biText("已引用业务证据", "Business evidence referenced"));
+  return businessIdentifier(ref.name ?? ref.label, biText("已引用业务证据", "Business evidence referenced"));
 }
 
 export function agentEvidenceTechnicalText(ref: Record<string, unknown>) {

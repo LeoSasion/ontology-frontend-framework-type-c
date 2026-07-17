@@ -27,6 +27,185 @@
   margin: 0;
 }
 
+.dashboardComponentAcceptanceStrip {
+  grid-column: 1 / -1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: var(--dashboard-lead-column) minmax(0, 1fr) auto;
+  gap: var(--dashboard-grid-gap);
+  align-items: center;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 12px;
+}
+
+.dashboardComponentAcceptanceStrip.compactAcceptance {
+  padding: 10px 12px;
+}
+
+.dashboardComponentAcceptanceLead {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  align-content: center;
+}
+
+.dashboardComponentAcceptanceLead p {
+  display: none;
+  margin: 0;
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.dashboardComponentAcceptanceDetails summary {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  color: var(--bi-text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 760;
+  line-height: 1.2;
+  padding: 0 10px;
+}
+
+.dashboardComponentAcceptanceDetails[open] summary {
+  border-color: var(--bi-border-strong);
+  background: var(--bi-accent-soft);
+  color: var(--bi-accent-strong);
+}
+
+.dashboardComponentAcceptanceDetails:not([open]) .dashboardComponentAcceptanceItems {
+  display: none;
+}
+
+.dashboardComponentAcceptanceItems {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.dashboardComponentAcceptanceItems span {
+  min-height: 23px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 999px;
+  background: var(--bi-surface);
+  color: var(--bi-text);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.2;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+
+.bWidgetAcceptanceGallery {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid var(--bi-border);
+  border-radius: 8px;
+  background: var(--bi-panel);
+  padding: 14px;
+}
+
+.bWidgetAcceptanceLead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.bWidgetAcceptanceLead h4 {
+  margin-top: 4px;
+  color: var(--bi-text);
+  font-size: 15px;
+  line-height: 1.25;
+}
+
+.bWidgetAcceptanceLead p {
+  margin-top: 5px;
+  max-width: 86ch;
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.bWidgetAcceptanceGrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.bWidgetAcceptanceItem {
+  min-width: 0;
+  min-height: 88px;
+  display: grid;
+  align-content: start;
+  gap: 5px;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--bi-surface);
+  padding: 10px;
+}
+
+.bWidgetAcceptanceItem.ready {
+  border-color: color-mix(in srgb, var(--bi-accent) 24%, var(--bi-border));
+}
+
+.bWidgetAcceptanceItem em {
+  align-self: end;
+  color: var(--bi-accent-strong);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 760;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.bWidgetAcceptanceTechnical {
+  margin-top: 5px;
+  border-top: 1px solid var(--bi-border-soft);
+  padding-top: 7px;
+}
+
+.bWidgetAcceptanceTechnical summary {
+  cursor: pointer;
+  color: var(--bi-text);
+  font-size: 11px;
+  font-weight: 760;
+  line-height: 1.25;
+}
+
+.bWidgetAcceptanceTechnical small,
+.bWidgetAcceptanceTechnical code {
+  display: block;
+  margin-top: 6px;
+  color: var(--bi-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.bWidgetAcceptanceTechnical code {
+  width: fit-content;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 6px;
+  background: var(--bi-panel);
+  color: var(--bi-accent-strong);
+  padding: 3px 6px;
+}
+
 @media (max-width: 760px) {
   .dashboardGrid {
     --dashboard-lead-column: minmax(0, 1fr);
@@ -64,6 +243,11 @@
   .filterComposer,
   .widgetWorkbenchGrid,
   .dashboardAdminGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bWidgetAcceptanceLead,
+  .bWidgetAcceptanceGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

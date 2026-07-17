@@ -21,7 +21,7 @@ def check(label: str, ok: bool, detail: Any = None) -> None:
 
 def run(arguments: list[str], env: dict[str, str]) -> dict[str, Any]:
     completed = subprocess.run(
-        [sys.executable, "tools/bi_cli.py", "--json", *arguments],
+        [sys.executable, "tools/aibi_cli.py", "--json", *arguments],
         cwd=ROOT, env=env, text=True, encoding="utf-8", capture_output=True, check=False,
     )
     try:

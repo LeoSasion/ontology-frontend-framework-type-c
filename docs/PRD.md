@@ -118,14 +118,15 @@
 | 有限研究、不可变计划修订与统一 Trace | [有限 Research Run](finite-research-runs.md) |
 | 预测准备度、物化快照、Metric Monitor 与只读联邦证明 | [本地可信分析后续能力](local-trusted-analytics.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
-| 某次验证结果 | [证据索引](../artifacts/README.md) |
+| 日期证据保留规则 | [验收证据策略](../artifacts/README.md) |
 
 ## 发布条件
 
 - 仓库身份与隔离门禁通过，默认构建和测试不读取其他 AIBI 工作树。
+- 生产源码全部可从 `src/main.tsx` 或 `server/index.ts` 到达，`npm run verify:architecture` 通过。
 - `npm run preflight` 通过，作为本地交付前总入口。
 - [产品验收矩阵](product-acceptance-matrix.md) 的稳定场景全部通过。
 - 新工作区为空；生产 UI 不出现测试素材、默认问题或默认业务结论。
 - 中性数据不出现行业语义；Pack 启停、并存、冲突和版本失效行为可解释。
 - 浏览器覆盖真实导入、单图、证据、跨表、Connector、响应式窗口和干净控制台。
-- 当前能力与限制已更新到 [实现状态](implementation-status.md)，日期结果写入 [证据索引](../artifacts/README.md)。
+- 当前能力与限制已更新到 [实现状态](implementation-status.md)；只有无法由当前回归重建且仍有独立审计价值的结果才写入 [验收证据策略](../artifacts/README.md)。

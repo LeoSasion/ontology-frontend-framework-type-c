@@ -14,7 +14,7 @@
     { "label": "home-route-js", "pattern": "^HomeOverview-[^.]+\\.js$", "maxBytes": 31000 },
     { "label": "dashboard-deferred-js", "pattern": "^DashboardDeferredPanels-[^.]+\\.js$", "maxBytes": 52000 },
     { "label": "source-advanced-js", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.js$", "maxBytes": 48500 },
-    { "label": "agent-evidence-css", "pattern": "^agentEvidenceWorkspace-[^.]+\\.css$", "maxBytes": 30000 },
+    { "label": "agent-evidence-shared-css", "pattern": "^businessPresentation-[^.]+\\.css$", "maxBytes": 30000 },
     { "label": "agent-semantic-plan-css", "pattern": "^AgentSemanticPlan-[^.]+\\.css$", "maxBytes": 4000 },
     { "label": "dashboard-deferred-css", "pattern": "^DashboardDeferredPanels-[^.]+\\.css$", "maxBytes": 22000 },
     { "label": "source-advanced-css", "pattern": "^SourceWorkbenchAdvancedPanels-[^.]+\\.css$", "maxBytes": 12000 },

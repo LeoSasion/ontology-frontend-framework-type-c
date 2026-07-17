@@ -174,24 +174,3 @@ export function ModuleLoadingPanel({ section, language }: { section: AppSection;
     </section>
   );
 }
-
-export function InspectorLoadingPanel({ language }: { language: "zh" | "en" }) {
-  return (
-    <aside className="inspector inspectorLoadingPanel" data-testid="lazy-inspector-loading" aria-busy="true">
-      <div className="inspectorLoadingHeader">
-        <p className="eyebrow">{language === "zh" ? "上下文抽屉" : "Context drawer"}</p>
-        <h2>{language === "zh" ? "正在准备当前对象" : "Preparing current object"}</h2>
-      </div>
-      <div className="inspectorLoadingStack" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <p className="inspectorLoadingHint">
-        {language === "zh"
-          ? "这里会显示当前页面对象、证据入口和待确认草案。"
-          : "This area will show the current object, evidence entry points, and pending drafts."}
-      </p>
-    </aside>
-  );
-}

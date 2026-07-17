@@ -6,9 +6,128 @@
 
 接入并识别数据 → 形成业务理解 → 生成受约束的分析计划 → 执行或只澄清一个关键歧义 → 用证据回执交付结果；任何写入仍需显式确认。
 
-## 当前队列
+## 目标架构
 
-暂无已承诺的未交付项。P2-A 至 P2-D 均已移入 [实现状态](implementation-status.md)；下一项必须按下方排序规则重新立项，不能把“联邦计划可证明”直接扩张为跨源执行权限。
+下图是本地单体产品的目标边界，不意味着拆成远程微服务。绿色节点已经落地；红、橙、蓝节点分别是 P0、P1、P2 演进面。
+
+```mermaid
+flowchart TB
+  subgraph Experience["交互与状态"]
+    UI["React 功能切片<br/>工作区 · 数据 · 分析 · 看板 · 证据"]
+    CACHE["Resource Cache<br/>按 workspace / object key 增量失效（P1）"]
+  end
+
+  subgraph Boundary["本地进程边界"]
+    API["Node API Gateway :8787<br/>输入校验 · 下载流 · Provider 边界"]
+    SSE["SSE 事件通道（P1）"]
+    HOST["AIBI Runtime Host（P0）<br/>长驻进程 · 写入串行化 · Job 调度"]
+    CLI["tools/aibi_cli.py<br/>薄适配器 · 自动化 · 诊断"]
+  end
+
+  subgraph Application["应用运行时"]
+    REG["Parser + Command Registry"]
+    ROUTE["领域分发<br/>Control · Analysis · Data · Delivery"]
+    CASES["Application Use Cases（P0）<br/>Ask · Query · Import · Confirm · Deliver"]
+    GUARD["Policy / Trust Gates<br/>权限 · 新鲜度 · 工作区 · 预算 · 确认"]
+  end
+
+  subgraph Domain["确定性领域"]
+    SEM["Business Understanding<br/>语义 · 指标 · 关系 · 粒度"]
+    PLAN["Plan / Execute<br/>计划 · 查询 · 图表 · 工作流"]
+    EVIDENCE["Evidence<br/>Receipt · Analysis Unit · Lineage"]
+    EXT["声明式扩展（P2）<br/>Domain Pack · Skill · Adapter"]
+  end
+
+  subgraph Infrastructure["基础设施"]
+    REPO["Repository + Unit of Work（P0）"]
+    SQLITE[("SQLite 控制面")]
+    DUCK[("DuckDB 分析面<br/>版本化权威副本（P0）")]
+    CAS[("Evidence Artifact Store<br/>内容寻址与保留策略（P1）")]
+    PROVIDER["可选 Provider<br/>只解释有界证据"]
+  end
+
+  UI --> CACHE --> API --> HOST
+  CLI --> HOST
+  HOST --> REG --> ROUTE --> CASES --> GUARD
+  GUARD --> SEM --> PLAN
+  GUARD --> EVIDENCE
+  EXT --> SEM
+  PLAN --> REPO
+  EVIDENCE --> REPO
+  REPO --> SQLITE
+  REPO --> DUCK
+  EVIDENCE --> CAS
+  CASES -. "脱敏、有界证据" .-> PROVIDER
+  HOST -. "领域事件" .-> SSE --> CACHE
+
+  classDef shipped fill:#dcfce7,stroke:#15803d,color:#14532d;
+  classDef p0 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+  classDef p1 fill:#ffedd5,stroke:#ea580c,color:#7c2d12;
+  classDef p2 fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+  class CLI,REG,ROUTE,API,UI,GUARD,SEM,PLAN,EVIDENCE,SQLITE,PROVIDER shipped;
+  class HOST,CASES,REPO,DUCK p0;
+  class CACHE,SSE,CAS p1;
+  class EXT p2;
+```
+
+在 P0 Runtime Host 落地前，Node API 与 CLI 仍各自启动 CLI 流程并直接进入 Registry；迁移完成后，两者只保留协议适配职责，业务行为仍由同一组 Use Case 和 Guard 决定。
+
+## P0：消除运行时结构性风险
+
+### P0-A｜拆出 Application Use Case
+
+- 用户结果：网页、CLI、Job 对同一动作得到完全一致的计划、阻断和回执。
+- 实现边界：把当前组合内核中的 `ask`、语义查询、导入、确认、看板交付拆成显式 Use Case；每个 Use Case 接收类型化 Command，返回统一 Result，不读取进程参数。
+- 失败行为：未知命令、缺失工作区或不满足 Guard 时返回结构化失败，不回退到其他命令或通用聚合。
+- 退出条件：组合内核只负责依赖装配且不超过 800 行；171 条现有命令合同无非预期变化；专项和完整回归通过。
+
+### P0-B｜建立长驻 Runtime Host 与单写者队列
+
+- 用户结果：连续提问、后台 Job 和大文件操作不再为每次请求重复启动 Python，互相竞争写锁时仍能得到可预测状态。
+- 实现边界：仅监听 loopback 的长驻 Python Host；Node 与 CLI 使用版本化 Command Envelope、request id、workspace id 和 deadline；所有写入经单写者队列，互不依赖的只读任务仍可并行。
+- 失败行为：Host 不可用、超时或 envelope 版本不兼容时明确失败；禁止静默退回另一数据库或另起无约束写进程。
+- 退出条件：生产 API 不再按请求 `spawn` CLI；中断恢复、重复请求幂等、写锁竞争、Job 取消与优雅退出均有确定性验证。
+
+### P0-C｜把 DuckDB 改为版本化分析副本
+
+- 用户结果：大表查询不再每次把 SQLite 物理表整表复制到 DuckDB；同一 Receipt 可证明读取的确切数据版本。
+- 实现边界：导入或确认写入时更新分析副本与 manifest；查询只读已发布版本；SQLite 保存控制面和元数据，DuckDB 保存分析数据，跨库发布由 Unit of Work 记录阶段和恢复点。
+- 失败行为：副本缺失、版本漂移或发布中断时阻断查询并给出可恢复动作，不使用旧副本冒充 current。
+- 退出条件：常规查询路径不存在整表同步；崩溃恢复、schema 变更、删除/重命名、freshness 和双库回滚验证通过，并建立基准数据集性能预算。
+
+## P1：降低前后端耦合与刷新成本
+
+### P1-A｜资源缓存、精确失效与 SSE
+
+- 用户结果：保存一个关系或看板组件时，只刷新受影响对象；长任务进度自动更新，页面不再全局闪烁。
+- 实现边界：客户端按 `workspaceId + resourceType + objectKey` 缓存；Mutation Receipt 返回 invalidation keys；SSE 只传领域事件和版本，不传业务结果行。
+- 退出条件：核心写入路径没有无条件全量刷新；断线重连、跨工作区切换、历史路由和 stale event 均有测试。
+
+### P1-B｜建立跨语言合同层并纠正依赖方向
+
+- 用户结果：前端、API、CLI 的字段和错误语义同步演进，升级后不会因隐式 shape 差异破坏页面。
+- 实现边界：建立独立 `shared/contracts`，从同一 schema 生成或校验 TypeScript/Python 类型；`server/` 不再导入 `src/` 页面模型，页面只依赖公共合同和客户端适配器。
+- 退出条件：架构门禁阻断 server → UI 反向依赖、未登记 envelope 和未版本化公共字段；兼容性夹具覆盖前一合同版本。
+
+### P1-C｜证据制品内容寻址与保留策略
+
+- 用户结果：相同证据不重复占用空间，删除、导出和审计都能解释引用关系。
+- 实现边界：大结果、快照和导出进入 workspace 隔离的 CAS；SQLite 只保存 hash、大小、mime、lineage 和引用计数；保留、擦除与 tombstone 由显式策略驱动。
+- 退出条件：原子写入、hash 校验、孤儿回收、配额、导出重放和安全删除验证通过。
+
+## P2：形成可扩展但不扩权的插件面
+
+### P2-A｜声明式扩展 SDK 与静态 lint
+
+- 用户结果：新行业语义、分析 Skill 和 Connector Adapter 可以独立安装、检查、启停和升级，不污染 Core 默认行为。
+- 实现边界：只开放版本化 Manifest、schema、Capability 引用和受控 Adapter 接口；不加载任意 Python、SQL、HTML 或 Shell。
+- 退出条件：兼容矩阵、签名、权限差异、升级/回滚、workspace portability 和隔离测试闭环。
+
+### P2-B｜统一 Trace、容量预算与测试分层
+
+- 用户结果：慢请求、阻断、重试和证据漂移可以沿 request → plan → query → receipt 定位，发布等待时间可预测。
+- 实现边界：结构化本地 Trace 默认脱敏且可关闭；单元、合同、集成、真实 UI 和发布门禁分层，按改动面并行运行并保留最终串行可信门禁。
+- 退出条件：关键路径有 latency、memory、row/byte budget；故障注入覆盖进程退出、锁竞争、磁盘不足和 Provider 超时；CI 能指出最小失败层。
 
 每项只有在实现、专项验证、全量回归、文档和真实运行回执同时成立后才移入 [实现状态](implementation-status.md)；设计文档、Manifest 存在或单一单元测试不单独构成交付。
 
@@ -33,6 +152,6 @@
 
 ## 维护规则
 
-- 本文件只保留未交付工作流及退出条件；完成项进入 [实现状态](implementation-status.md)，日期证据进入 [证据索引](../artifacts/README.md)。
+- 本文件只保留未交付工作流及退出条件；完成项进入 [实现状态](implementation-status.md)，日期证据按 [验收证据策略](../artifacts/README.md) 决定是否保留。
 - 外部公开项目只作为 clean-room 设计证据，不形成运行依赖或默认权限；研究快照归对应专题设计文档。
 - 不复制实时命令数、检查数、性能值、合同字段清单或已完成流水账。

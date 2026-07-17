@@ -84,7 +84,7 @@ export class DurableJobRuntime {
     if (this.workers.has(identity.jobKey)) {
       throw new Error(`Job already has an owned worker: ${identity.jobKey}`);
     }
-    const child = spawn("python", [resolve(this.root, "tools/bi_cli.py"), "--json", ...args], {
+    const child = spawn("python", [resolve(this.root, "tools/aibi_cli.py"), "--json", ...args], {
       cwd: this.root,
       env: {
         ...process.env,

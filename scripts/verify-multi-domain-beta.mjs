@@ -11,7 +11,7 @@ const fixtures = writeMultiDomainBetaFixtures(fixtureRoot);
 const receipts = [];
 
 function runCli(env, args) {
-  const result = spawnSync("python", ["tools/bi_cli.py", "--json", ...args], {
+  const result = spawnSync("python", ["tools/aibi_cli.py", "--json", ...args], {
     cwd: root,
     env: { ...process.env, ...env, PYTHONIOENCODING: "utf-8" },
     encoding: "utf8",

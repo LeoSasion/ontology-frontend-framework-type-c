@@ -88,7 +88,7 @@ def build_dashboard_widget_catalog_payload(
             "contractSource": [
                 "src/types.ts DashboardWidget",
                 "src/dashboardCanvasModel.ts widget restore/filter/layout helpers",
-                "tools/bi_cli.py add-widget/add-relationship-widget/query-table command surface",
+                "tools/aibi_cli.py add-widget/add-relationship-widget/query-table command surface",
             ],
         },
         "integration": {

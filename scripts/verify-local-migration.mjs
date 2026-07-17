@@ -178,7 +178,7 @@ try {
     future.status !== 0 && hash(sqlitePath) === futureBefore.sqlite && hash(duckdbPath) === futureBefore.duckdb,
     future.stderr || future.stdout,
   );
-  const futureCli = run(process.env.PYTHON ?? "python", ["tools/bi_cli.py", "--json", "workspace-list"]);
+  const futureCli = run(process.env.PYTHON ?? "python", ["tools/aibi_cli.py", "--json", "workspace-list"]);
   add(
     "future-schema-blocks-runtime-startup-without-writing",
     futureCli.status !== 0 && hash(sqlitePath) === futureBefore.sqlite && hash(duckdbPath) === futureBefore.duckdb,

@@ -20,7 +20,7 @@ def check(label: str, ok: bool, detail: object = None) -> None:
 
 def run(args: list[str], env: dict[str, str]) -> dict[str, object]:
     completed = subprocess.run(
-        [sys.executable, "tools/bi_cli.py", "--json", *args],
+        [sys.executable, "tools/aibi_cli.py", "--json", *args],
         cwd=ROOT,
         env=env,
         text=True,

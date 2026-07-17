@@ -339,8 +339,8 @@ def recommend_relationships_for_connection(
                             "existing": existing,
                             "reasons": sorted(set(reasons)),
                             "previewMetrics": metrics,
-                            "previewCommand": f"python tools/bi_cli.py --json relationship-preview --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field}",
-                            "saveCommand": f"python tools/bi_cli.py --json relationship-save --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field} --yes",
+                            "previewCommand": f"python tools/aibi_cli.py --json relationship-preview --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field}",
+                            "saveCommand": f"python tools/aibi_cli.py --json relationship-save --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field} --yes",
                             "source": "recommend-relationships adapted to workspace relationship evidence",
                         }
                     )

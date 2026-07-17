@@ -55,6 +55,6 @@ npm run migrate:local -- --confirm
 
 - [产品定位](PRODUCT.md)
 - [文档总索引](docs/README.md)
-- [验收证据索引](artifacts/README.md)
+- [验收证据策略](artifacts/README.md)
 
 当前版本为 single-user and local-only，只监听回环地址。新工作区为空；查询和后台任务仅使用白名单能力，真实写入必须经过预演和一次显式确认。

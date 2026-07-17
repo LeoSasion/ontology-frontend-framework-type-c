@@ -48,7 +48,6 @@ export function appendCoreContractExtendedChecks(context) {
     importJobCommandServiceSource,
     importTableWriterServiceSource,
     indexHtmlSource,
-    inspectorControllerSource,
     join,
     metricFormulaCommandServiceSource,
     packageJson,
@@ -82,7 +81,7 @@ export function appendCoreContractExtendedChecks(context) {
     verifyUiRealImportSource,
     workspaceCommandServiceSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   const biCliRuntimeSource = [
     biCliSource,
     biCliParserSource,

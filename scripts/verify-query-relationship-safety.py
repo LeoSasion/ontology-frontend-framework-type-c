@@ -22,7 +22,7 @@ def check(label: str, ok: bool, detail: Any = "") -> None:
 
 def cli(env: dict[str, str], *args: str) -> dict[str, Any]:
     result = subprocess.run(
-        [sys.executable, str(TOOLS / "bi_cli.py"), "--json", *args],
+        [sys.executable, str(TOOLS / "aibi_cli.py"), "--json", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,

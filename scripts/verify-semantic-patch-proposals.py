@@ -41,7 +41,7 @@ def main() -> None:
 
         def cli_result(arguments: list[str]) -> tuple[int, dict[str, Any]]:
             completed = subprocess.run(
-                [PYTHON, "tools/bi_cli.py", "--json", *arguments],
+                [PYTHON, "tools/aibi_cli.py", "--json", *arguments],
                 cwd=ROOT,
                 env=env,
                 text=True,

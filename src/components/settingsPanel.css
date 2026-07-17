@@ -248,128 +248,6 @@
   justify-content: center;
 }
 
-.settingsEvidenceList {
-  display: grid;
-  gap: 10px;
-  margin: 0;
-}
-
-.settingsEvidenceList div {
-  border-radius: 8px;
-  background: var(--surface-2);
-  padding: 11px;
-}
-
-.settingsEvidenceList dt {
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.settingsEvidenceList dd {
-  margin: 5px 0 0;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.closureWorkbenchCard {
-  grid-column: 1 / -1;
-}
-
-.closureLead {
-  max-width: 920px;
-  margin: 0;
-  color: var(--bi-muted);
-  font-size: 13px;
-  line-height: 1.55;
-}
-
-.closureGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.closureItem {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 34px minmax(0, 1fr);
-  gap: 10px;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--bi-surface);
-  padding: 12px;
-}
-
-.closureItem.ok {
-  border-color: rgba(42, 115, 74, 0.28);
-  background: linear-gradient(180deg, rgb(42 115 74 / 7%), transparent 68%), var(--bi-surface);
-}
-
-.closureItem.warn {
-  border-color: rgba(180, 83, 9, 0.28);
-  background: linear-gradient(180deg, rgb(180 83 9 / 7%), transparent 68%), var(--bi-surface);
-}
-
-.closureIcon {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--bi-panel);
-  color: var(--bi-accent-strong);
-}
-
-.closureIcon svg {
-  stroke: currentColor;
-}
-
-.closureItem p {
-  min-height: 40px;
-  margin: 5px 0 8px;
-  color: var(--bi-muted);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.closureItem code {
-  display: block;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 7px;
-  background: var(--bi-panel);
-  color: var(--bi-text);
-  font-size: 11px;
-  line-height: 1.2;
-  padding: 6px 7px;
-  white-space: nowrap;
-}
-
-.closureItem small {
-  display: block;
-  margin-top: 6px;
-  color: var(--bi-accent-strong);
-  font-size: 11px;
-  font-weight: 760;
-  line-height: 1.25;
-  white-space: nowrap;
-}
-
-.closureTechnical {
-  margin-top: 8px;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 7px;
-  background: var(--bi-panel);
-  padding: 7px;
-}
-
-.closureTechnical code {
-  margin-top: 7px;
-}
-
 .configActionGrid .primaryButton,
 .configActionGrid .secondaryButton {
   justify-content: center;
@@ -723,7 +601,6 @@
 
   .themePaletteGrid,
   .settingsSandboxGrid,
-  .closureGrid,
   .configMigrationSteps,
   .runtimeProfileGrid {
     grid-template-columns: minmax(0, 1fr);

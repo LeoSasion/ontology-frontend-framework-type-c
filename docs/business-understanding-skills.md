@@ -154,9 +154,7 @@ flowchart LR
 
 固定 Business Expression Case、确定性评分算法、freshness 和设置页回执已按 [计划质量评测](plan-quality-evaluation.md) 交付；它们属于本地发布门禁，不再列入未来队列。
 
-## Forecast Readiness
-
-`forecast-readiness` 已作为第七个中立方法 Skill 交付：只在显式预测准备度请求下匹配，并要求目标、时间字段、粒度、截止点和 horizon。槽位完整后消费 current Analysis Unit，输出确定性七门禁准备度；不生成预测、未来值或 Provider 结果。运行时合同、门槛与无预测边界见 [本地可信分析后续能力](local-trusted-analytics.md#p2-aforecast-readiness已交付)，后续队列见 [未来开发队列](development-roadmap.md)。
+`forecast-readiness` 的运行时合同、门槛与无预测边界统一由 [本地可信分析后续能力](local-trusted-analytics.md#p2-aforecast-readiness已交付) 维护，后续事项见 [未来开发队列](development-roadmap.md)。
 
 ## 公开研究快照
 

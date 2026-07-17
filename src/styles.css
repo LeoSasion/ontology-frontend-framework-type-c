@@ -60,19 +60,10 @@
   --bi-accent-tint: #ccecf1;
   --bi-accent-border: #8bd8e6;
   --bi-on-accent: var(--on-accent);
-  --bi-rail-top: #eef4f8;
-  --bi-rail-mid: #e8f0f6;
-  --bi-rail-bottom: #dbe8f0;
-  --bi-rail-active: #ffffff;
-  --bi-rail-muted: color-mix(in srgb, var(--bi-muted) 58%, var(--bi-text));
   --bi-amber: #8a4b0b;
   --bi-red: #b42318;
   --bi-radius: 8px;
   --bi-shadow-color: #0f172a;
-  --shell-rail-width: 64px;
-  --shell-asset-width: clamp(280px, 17vw, 324px);
-  --shell-inspector-width: clamp(300px, 18vw, 340px);
-  --shell-inspector-collapsed-width: 64px;
 }
 
 * {
@@ -112,7 +103,6 @@ button[data-loading="true"]:disabled {
 
 .appShell {
   display: grid;
-  grid-template-columns: var(--shell-rail-width) var(--shell-asset-width) minmax(0, 1fr) var(--shell-inspector-width);
   width: 100%;
   height: 100dvh;
   min-width: 0;
@@ -120,68 +110,6 @@ button[data-loading="true"]:disabled {
   overflow: hidden;
   background: var(--bi-bg);
   color: var(--bi-text);
-}
-
-.appShell[data-inspector-state="collapsed"] {
-  grid-template-columns: var(--shell-rail-width) var(--shell-asset-width) minmax(0, 1fr) var(--shell-inspector-collapsed-width);
-}
-
-@media (max-width: 760px) {
-  .appShell,
-  .appShell[data-inspector-state="expanded"],
-  .appShell[data-inspector-state="collapsed"] {
-    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .biSidebarShell {
-    grid-column: 1;
-    grid-row: 1;
-    grid-template-columns: var(--shell-rail-width);
-    min-height: 0;
-    border-right: 1px solid var(--bi-border);
-    border-bottom: 0;
-  }
-
-  .biRail {
-    min-height: 0;
-    overflow: auto;
-  }
-
-  .assetPanel {
-    display: none;
-  }
-
-  .contentShell {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 0;
-    padding: 10px;
-  }
-
-  .businessPathBar {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
-    margin-bottom: 8px;
-    padding: 8px;
-  }
-
-  .businessPathSteps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .businessPathStep {
-    min-height: 50px;
-    grid-template-columns: 22px 28px minmax(0, 1fr);
-  }
-
-  .businessPathStep em {
-    display: none;
-  }
-
-  .inspector {
-    display: none;
-  }
 }
 
 .appFallback {
@@ -209,133 +137,6 @@ button[data-loading="true"]:disabled {
   line-height: 1.55;
 }
 
-.sidebar,
-.inspector {
-  background: var(--surface-2);
-  border-right: 1px solid var(--line);
-  min-width: 0;
-}
-
-.biSidebarShell {
-  grid-column: span 2;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: 64px minmax(0, 336px);
-  background: var(--bi-surface);
-  border-right: 1px solid var(--bi-border);
-}
-
-.biRail {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  border-right: 1px solid var(--bi-border);
-  background:
-    linear-gradient(180deg, var(--bi-rail-top) 0%, var(--bi-rail-mid) 52%, var(--bi-rail-bottom) 100%);
-  padding: 14px 8px;
-}
-
-.railBrand {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 8px;
-  background: var(--bi-accent-strong);
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.railNav {
-  display: grid;
-  gap: 8px;
-  width: 100%;
-}
-
-.railButton {
-  width: 48px;
-  min-height: 54px;
-  display: grid;
-  place-items: center;
-  gap: 4px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--bi-rail-muted);
-  padding: 6px 4px;
-}
-
-.railButton span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.1;
-}
-
-.railButton:hover,
-.railButton.active {
-  border-color: var(--bi-accent-border, #8bd8e6);
-  background: var(--bi-rail-active);
-  color: var(--bi-rail-active-text, var(--bi-accent-strong));
-}
-
-.railButton.locked:not(.active) {
-  color: color-mix(in srgb, var(--bi-rail-muted) 72%, var(--bi-rail-active-text, var(--bi-accent-strong)));
-}
-
-.railButton.locked:hover {
-  border-color: color-mix(in srgb, var(--bi-rail-active-text, var(--bi-accent-strong)) 44%, transparent);
-}
-
-.railUtility {
-  margin-top: auto;
-  color: var(--bi-rail-muted);
-}
-
-.railStatus {
-  display: grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  background: var(--bi-rail-active);
-  border: 1px solid var(--bi-border);
-}
-
-.assetPanel {
-  min-width: 0;
-  height: 100%;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  background: var(--bi-surface);
-  padding: 16px 14px;
-}
-
-.assetPanelHeader {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.assetPanelHeader h2 {
-  margin: 0;
-  color: var(--bi-text);
-  font-size: 16px;
-  line-height: 1.2;
-}
-
 .assetModeChip,
 .storyMode {
   display: inline-flex;
@@ -356,118 +157,25 @@ button[data-loading="true"]:disabled {
   white-space: nowrap;
 }
 
-.assetWorkspaceCard,
-.assetSection {
-  min-width: 0;
-  border: 1px solid var(--bi-border);
-  border-radius: 8px;
-  background: var(--bi-panel);
-  padding: 12px;
-}
-
-.assetWorkspaceCard p {
-  margin: 9px 0 0;
-  color: var(--bi-muted);
-  font-size: 12px;
-  line-height: 1.45;
-}
-
-.workspaceSwitcher {
-  display: grid;
-  gap: 8px;
-  margin-top: 10px;
-}
-
-.workspaceSwitcher label {
-  display: grid;
-  gap: 5px;
-  color: var(--bi-muted);
-  font-size: 11px;
-  font-weight: 720;
-}
-
-.workspaceSwitcher select,
-.workspaceCreateRow input,
-.workspaceRenameRow input {
-  width: 100%;
-  min-width: 0;
-  height: 32px;
-  border: 1px solid var(--bi-border);
-  border-radius: 7px;
-  background: var(--bi-surface);
-  color: var(--bi-text);
-  font: inherit;
-  font-size: 12px;
-  padding: 0 8px;
-}
-
-.workspaceCreateRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 58px;
-  gap: 6px;
-}
-
-.workspaceRenameRow {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 70px;
-  gap: 6px;
-  padding: 8px;
-}
-
-.workspaceCreateRow button,
-.workspaceRenameRow button {
-  min-width: 0;
-  height: 32px;
-  border: 1px solid var(--bi-border);
-  border-radius: 7px;
-  background: var(--bi-accent);
-  color: white;
-  font-size: 12px;
-  font-weight: 760;
-  cursor: pointer;
-}
-
-.workspaceCreateRow button:disabled,
-.workspaceRenameRow button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.workspaceManageDetails {
-  min-width: 0;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 7px;
-  background: var(--bi-surface);
-}
-
-.workspaceManageDetails summary {
-  min-height: 30px;
-  display: flex;
+span.assetModeChip,
+span.storyMode,
+span.assetSourceBadge,
+span.statusBadge,
+span.settingsSandboxBadge,
+span.widgetCountBadge {
+  display: inline-flex;
   align-items: center;
-  color: var(--bi-muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 760;
-  padding: 0 9px;
+  justify-content: center;
+  justify-self: start;
+  width: fit-content;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1;
+  white-space: nowrap;
 }
 
-.workspaceManageDetails[open] summary {
-  border-bottom: 1px solid var(--bi-border-soft);
-}
-
-.workspaceManageDetails:not([open]) > :not(summary),
-.sidebarAssetDetails:not([open]) > :not(summary),
-.homeSecondaryDetails:not([open]) > :not(summary),
 .evidenceProgressiveDetails:not([open]) > :not(summary) {
   display: none;
-}
-
-.workspaceDeleteList {
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-  border-top: 1px solid var(--bi-border-soft);
-  padding: 8px;
 }
 
 .srOnly {
@@ -478,193 +186,6 @@ button[data-loading="true"]:disabled {
   clip: rect(0, 0, 0, 0) !important;
   white-space: nowrap !important;
   clip-path: inset(50%) !important;
-}
-
-.workspaceDeleteList label,
-.workspaceDeleteList select,
-.workspaceDeleteList button {
-  width: 100%;
-  max-width: 100%;
-}
-
-.workspaceDeleteList select {
-  min-width: 0;
-}
-
-.workspaceDeleteList button {
-  min-width: 0;
-  min-height: 30px;
-  border: 1px solid rgb(168 63 56 / 36%);
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--danger) 7%, var(--bi-panel));
-  color: var(--danger);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 760;
-  cursor: pointer;
-  text-align: left;
-  white-space: normal;
-}
-
-.workspaceNotice {
-  color: var(--success);
-  font-size: 11px;
-  font-weight: 760;
-}
-
-.workspaceDeleteList > small,
-.workspaceDeletePreview span,
-.workspaceDeletePreview small {
-  color: var(--bi-muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.workspaceDeletePreview {
-  width: 100%;
-  max-width: 100%;
-  min-width: 0;
-  display: grid;
-  gap: 6px;
-  border: 1px solid color-mix(in srgb, var(--danger) 34%, var(--bi-border));
-  border-radius: 7px;
-  background: color-mix(in srgb, var(--danger) 5%, var(--bi-panel));
-  padding: 9px;
-}
-
-.workspaceDeletePreview strong {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.workspaceDeleteList button:hover {
-  border-color: var(--danger);
-}
-
-.workspaceDeleteList button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.assetSectionTitle strong {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--bi-text);
-  font-size: 13px;
-  line-height: 1.25;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.assetCounts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin: 12px 0 0;
-}
-
-.assetCounts.stacked {
-  grid-template-columns: 1fr;
-}
-
-.assetCounts div {
-  min-width: 0;
-  border-radius: 7px;
-  background: var(--bi-surface);
-  padding: 8px;
-}
-
-.assetCounts dt {
-  color: var(--bi-muted);
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.assetCounts dd {
-  margin: 4px 0 0;
-  color: var(--bi-text);
-  font-size: 17px;
-  font-weight: 780;
-  line-height: 1;
-}
-
-.assetList {
-  display: grid;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.assetRow {
-  width: 100%;
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--bi-surface);
-  color: var(--bi-text);
-  padding: 10px;
-  text-align: left;
-}
-
-.assetRow.primaryAssetRow {
-  margin-top: 12px;
-  border-color: var(--bi-accent-border);
-  background: var(--bi-accent-soft);
-}
-
-.assetRow strong {
-  font-size: 12px;
-  line-height: 1.25;
-}
-
-.assetRow span,
-.assetRow small,
-.assetSubsection > span {
-  color: var(--bi-muted);
-  font-size: 11px;
-  line-height: 1.3;
-}
-
-.assetAction {
-  width: 100%;
-  min-height: 36px;
-  display: inline-flex;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  margin-top: 12px;
-  border: 1px solid var(--bi-accent);
-  border-radius: 8px;
-  background: var(--bi-accent);
-  color: #ffffff;
-  font-size: 12px;
-  font-weight: 750;
-}
-
-.assetSubsection {
-  display: grid;
-  gap: 7px;
-  margin-top: 14px;
-}
-
-.assetMiniRow {
-  min-width: 0;
-  border-radius: 7px;
-  background: var(--bi-surface);
-  padding: 8px;
-}
-
-.compactEvidenceList .assetRow strong {
-  color: var(--bi-accent-strong);
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-  padding: 22px 18px;
 }
 
 .biStack {
@@ -738,81 +259,10 @@ button[data-loading="true"]:disabled {
 
 .contentShell {
   display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
-  gap: 0;
   min-width: 0;
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  padding: 16px 20px 20px;
-}
-
-@media (min-width: 761px) and (max-width: 1180px) {
-  .appShell,
-  .appShell[data-inspector-state="expanded"] {
-    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-width);
-  }
-
-  .appShell[data-inspector-state="collapsed"] {
-    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr) var(--shell-inspector-collapsed-width);
-  }
-
-  .biSidebarShell {
-    grid-column: 1;
-    grid-row: 1;
-    grid-template-columns: var(--shell-rail-width);
-    width: var(--shell-rail-width);
-    min-width: var(--shell-rail-width);
-    overflow: hidden;
-  }
-
-  .assetPanel {
-    display: none;
-  }
-
-  .contentShell {
-    grid-column: 2;
-    grid-row: 1;
-    min-width: 0;
-    padding: 12px;
-  }
-
-  .inspector {
-    grid-column: 3;
-    grid-row: 1;
-  }
-}
-
-@media (max-width: 760px) {
-  .appShell,
-  .appShell[data-inspector-state="expanded"],
-  .appShell[data-inspector-state="collapsed"] {
-    grid-template-columns: var(--shell-rail-width) minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  .biSidebarShell {
-    grid-column: 1;
-    grid-row: 1;
-    grid-template-columns: var(--shell-rail-width);
-    width: var(--shell-rail-width);
-    min-width: var(--shell-rail-width);
-    overflow: hidden;
-  }
-
-  .assetPanel,
-  .inspector {
-    display: none;
-  }
-
-  .contentShell {
-    grid-column: 2;
-    grid-row: 1;
-    width: auto;
-    min-width: 0;
-    overflow: auto;
-    padding: 10px;
-  }
 }
 
 .topBarStack {
@@ -834,170 +284,6 @@ button[data-loading="true"]:disabled {
   align-items: flex-start;
 }
 
-.businessPathBar {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-  align-items: stretch;
-  margin-bottom: 12px;
-  border: 1px solid var(--bi-border);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 10px;
-}
-
-.businessPathBar.compact {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 8px;
-}
-
-.businessPathBar.compact .businessPathLead {
-  display: none;
-}
-
-.businessPathMobileCurrent {
-  display: none;
-}
-
-.businessPathMobileCurrent .businessPathStep {
-  cursor: default;
-}
-
-.businessPathBar.compact .businessPathStep {
-  min-height: 44px;
-  grid-template-columns: 22px 28px minmax(0, 1fr);
-  padding: 6px 8px;
-}
-
-.businessPathBar.compact .businessPathStep em,
-.businessPathBar.compact .businessPathText small {
-  display: none;
-}
-
-.businessPathLead {
-  min-width: 0;
-  display: flex;
-  gap: 8px;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-.businessPathLead strong {
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.businessPathLead span {
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.3;
-}
-
-.businessPathSteps {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 168px), 1fr));
-  gap: 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.businessPathStep {
-  width: 100%;
-  min-width: 0;
-  min-height: 44px;
-  display: grid;
-  grid-template-columns: 24px 30px minmax(0, 1fr);
-  gap: 8px;
-  align-items: center;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background: var(--surface-2);
-  color: var(--bi-text);
-  padding: 8px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.businessPathStep.active {
-  border-color: var(--bi-accent);
-  background: color-mix(in srgb, var(--bi-accent-soft) 76%, var(--surface));
-}
-
-.businessPathStep.locked:not(.active) {
-  border-color: var(--bi-border-soft);
-  background: color-mix(in srgb, var(--surface-2) 82%, var(--surface));
-  color: var(--bi-muted);
-  opacity: 0.78;
-}
-
-.businessPathStep.locked:not(.active):hover {
-  border-color: color-mix(in srgb, var(--bi-accent) 30%, var(--bi-border));
-  background: var(--surface);
-}
-
-.businessPathStep.locked .businessPathIcon,
-.businessPathStep.locked .businessPathIndex {
-  color: var(--bi-muted);
-}
-
-.businessPathBar:not(.compact) .businessPathStep.locked .businessPathText small {
-  display: block;
-  white-space: normal;
-}
-
-.businessPathBar:not(.compact) .businessPathStep.locked em {
-  display: none;
-  color: var(--bi-muted);
-}
-
-.businessPathIndex,
-.businessPathIcon {
-  display: grid;
-  place-items: center;
-  border-radius: 8px;
-}
-
-.businessPathIndex {
-  width: 24px;
-  height: 24px;
-  background: var(--surface);
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.businessPathIcon {
-  width: 30px;
-  height: 30px;
-  background: var(--surface);
-  color: var(--bi-accent-strong);
-}
-
-.businessPathText strong {
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.18;
-}
-
-.businessPathText small {
-  display: none;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.2;
-}
-
-.businessPathStep em {
-  display: none;
-  color: var(--bi-accent-strong);
-  font-size: 11px;
-  font-style: normal;
-  font-weight: 760;
-}
-
 @media (max-width: 760px) {
   .topBar {
     flex-direction: column;
@@ -1012,49 +298,6 @@ button[data-loading="true"]:disabled {
   .topBarMeta {
     align-items: flex-start;
   }
-
-  .businessPathLead {
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: baseline;
-    column-gap: 8px;
-  }
-
-  .businessPathLead span {
-    display: none;
-  }
-
-  .businessPathMobileCurrent {
-    display: grid;
-  }
-
-  .businessPathSteps {
-    display: none;
-  }
-
-  .businessPathBar.compact .businessPathStep,
-  .businessPathStep {
-    min-height: 52px;
-    grid-template-columns: 22px 28px minmax(0, 1fr);
-    justify-items: stretch;
-    gap: 7px;
-    padding: 7px 8px;
-    text-align: left;
-  }
-
-  .businessPathText small,
-  .businessPathStep em {
-    display: none;
-  }
-
-  .businessPathIndex {
-    width: 22px;
-    height: 22px;
-  }
-
-  .businessPathText strong {
-    font-size: 12px;
-    white-space: nowrap;
-  }
 }
 
 .kicker,
@@ -1068,8 +311,7 @@ button[data-loading="true"]:disabled {
 }
 
 .topBar h1,
-.mainPanel h2,
-.inspector h2 {
+.mainPanel h2 {
   margin: 0;
   color: var(--text);
 }

@@ -20,7 +20,7 @@ writeFileSync(ordersFile, "order_id,channel\nO1,web\nO2,store\n", "utf8");
 writeFileSync(refundsFile, "order_id,refund_amount\nO1,10\nO2,5\n", "utf8");
 
 function run(args) {
-  const result = spawnSync("python", ["tools/bi_cli.py", "--json", ...args], {
+  const result = spawnSync("python", ["tools/aibi_cli.py", "--json", ...args], {
     cwd: root,
     encoding: "utf8",
     env,

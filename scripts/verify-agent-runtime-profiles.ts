@@ -19,7 +19,7 @@ const baseEnv = {
 };
 
 function cli(args: string[], env = baseEnv) {
-  const result = spawnSync(process.env.PYTHON ?? "python", ["tools/bi_cli.py", "--json", ...args], {
+  const result = spawnSync(process.env.PYTHON ?? "python", ["tools/aibi_cli.py", "--json", ...args], {
     cwd: root,
     env,
     encoding: "utf8",

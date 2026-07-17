@@ -190,7 +190,7 @@ export const emptyAgentResult: AgentAskResult = {
     "先接入一个文件或文件夹。 / Connect a file or folder first.",
     "生成证据摘要后再创建图表。 / Create an evidence summary before drafting charts.",
   ],
-  recommendedCommands: ["python tools/bi_cli.py --json status"],
+  recommendedCommands: ["python tools/aibi_cli.py --json status"],
   requiresConfirmation: false,
   actionDraft: {
     actionKey: "",

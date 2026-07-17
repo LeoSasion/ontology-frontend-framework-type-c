@@ -14,7 +14,7 @@ const env = {
 };
 
 function run(args, expectedStatus = 0) {
-  const result = spawnSync("python", ["tools/bi_cli.py", "--json", ...args], {
+  const result = spawnSync("python", ["tools/aibi_cli.py", "--json", ...args], {
     cwd: root,
     env,
     encoding: "utf8",

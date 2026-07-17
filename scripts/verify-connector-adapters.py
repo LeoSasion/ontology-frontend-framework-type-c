@@ -60,7 +60,7 @@ def check(label: str, ok: bool, detail: Any = None) -> None:
 
 def run(label: str, arguments: list[str], expected_status: int = 0) -> dict[str, Any]:
     completed = subprocess.run(
-        ["python", "tools/bi_cli.py", "--json", *arguments],
+        ["python", "tools/aibi_cli.py", "--json", *arguments],
         cwd=ROOT,
         env=ENV,
         text=True,

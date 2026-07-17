@@ -32,11 +32,11 @@
 安装、升级、卸载和工作区启停都先 dry-run，列出版本、冲突、受影响工作区与对象。升级只有在 Manifest 声明兼容迁移时保留启用状态；卸载不改写历史 Receipt 或证据。冲突按声明和证据解析，禁止按目录或加载顺序决胜。
 
 ```powershell
-python tools/bi_cli.py --json domain-pack-lint --package <package-directory>
-python tools/bi_cli.py --json domain-pack-install --package <package-directory>
-python tools/bi_cli.py --json domain-pack-install --package <package-directory> --yes
-python tools/bi_cli.py --json domain-pack-set --pack <pack-id> --state enabled --yes
-python tools/bi_cli.py --json domain-pack-uninstall --pack <pack-id> --yes
+python tools/aibi_cli.py --json domain-pack-lint --package <package-directory>
+python tools/aibi_cli.py --json domain-pack-install --package <package-directory>
+python tools/aibi_cli.py --json domain-pack-install --package <package-directory> --yes
+python tools/aibi_cli.py --json domain-pack-set --pack <pack-id> --state enabled --yes
+python tools/aibi_cli.py --json domain-pack-uninstall --pack <pack-id> --yes
 ```
 
 信任键由 `AIBI_DOMAIN_PACK_TRUST_KEYS` 提供，安装目录可用 `AIBI_DOMAIN_PACK_ROOT` 覆盖；真实密钥只存在本地环境。
@@ -98,9 +98,9 @@ npm run verify:provider-live
 选择流程：读取当前工作区字段 -> 验证 Pack -> 匹配角色 -> 删除缺必需字段单元 -> 按证据评分 -> 在上限内选择 -> 返回命中、覆盖、省略原因和所需字段。每个组件保存 Pack 版本、单元 key、匹配字段、来源和证据引用。
 
 ```powershell
-python tools/bi_cli.py --json erp-unit-library --summary
-python tools/bi_cli.py --json erp-unit-library --select --summary --table <table-key> --limit 24
-python tools/bi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
+python tools/aibi_cli.py --json erp-unit-library --summary
+python tools/aibi_cli.py --json erp-unit-library --select --summary --table <table-key> --limit 24
+python tools/aibi_cli.py --json business-dashboard --template erp-units --op draft --limit 24
 npm run verify:erp-units
 npm run verify:multi-domain-beta
 ```

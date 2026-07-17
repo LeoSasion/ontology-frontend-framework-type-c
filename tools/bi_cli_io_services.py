@@ -411,7 +411,7 @@ def metric_sql_doctor_from_run(run: dict[str, Any]) -> dict[str, Any]:
         ],
         "semanticBindingDrafts": semantic_binding_drafts,
         "confirmRequired": True,
-        "safeCommand": "python tools/bi_cli.py --json source-intelligence <source-path> --label repair-metric-sql",
+        "safeCommand": "python tools/aibi_cli.py --json source-intelligence <source-path> --label repair-metric-sql",
     }
     return {
         "artifactDir": str(output_dir) if str(output_dir) else "",

@@ -30,7 +30,7 @@
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |
-| [验收证据索引](../artifacts/README.md) | 当前发布回执、专项机器回执和历史视觉证据 |
+| [验收证据策略](../artifacts/README.md) | 日期证据的保留条件、禁止内容和当前归档状态 |
 
 ## 事实归属
 
@@ -48,14 +48,14 @@
 | 业务表达与计划质量如何评测 | `docs/plan-quality-evaluation.md` |
 | 已验证结果如何形成可恢复分支与结果板 | `docs/exploration-threads.md` |
 | 本地预测准备度、快照、监控和联邦证明如何受限 | `docs/local-trusted-analytics.md` |
-| 某次验证是否通过 | `artifacts/` 中对应日期回执 |
+| 当前提交是否通过 | 在该提交运行对应验证；仅有独立审计价值的日期证据才进入 `artifacts/` |
 | CLI 当前命令与参数 | `docs/bi-cli-contract.md` 的实时生成结果 |
 
 ## 维护规则
 
 - 同一可变事实只写一次；其他文档链接到事实源，不复制清单。
-- 历史流水账不长期保留：稳定结论进入实现状态，日期证据进入 `artifacts/`。
+- 历史流水账不长期保留：稳定结论进入实现状态；可由当前自动化重建的日期证据直接删除。
 - UX 文档只写用户可观察约束；技术合同不复制组件或测试文件目录。
 - 易漂移的数量、耗时和性能值只出现在脚本输出或日期回执。
 - `npm run preflight` 是本地交付前总入口。
-- Markdown 增删改名后必须更新本索引或证据索引，并运行 `npm run verify:docs`。
+- Markdown 增删改名后必须更新本索引或验收证据策略，并运行 `npm run verify:docs`。

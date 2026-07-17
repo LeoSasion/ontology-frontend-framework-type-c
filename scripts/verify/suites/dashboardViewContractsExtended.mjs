@@ -49,7 +49,6 @@ export function appendDashboardViewContractExtendedChecks(context) {
     globalStylesSource,
     hasCssRule,
     implementationStatusSource,
-    inspectorControllerSource,
     join,
     root,
     sourceWorkbenchActionPanelSource,
@@ -67,7 +66,7 @@ export function appendDashboardViewContractExtendedChecks(context) {
     viewWorkspaceSource,
     viewWorkspaceStylesSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   checks.push(
 
     {

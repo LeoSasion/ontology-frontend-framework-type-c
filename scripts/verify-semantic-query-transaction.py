@@ -26,7 +26,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
     os.environ["AIBI_HYBRID_DUCKDB_PATH"] = str(Path(temp_dir) / "runtime.duckdb")
     os.environ["AIBI_EVIDENCE_BUNDLE_ROOT"] = str(Path(temp_dir) / "evidence")
 
-    import bi_cli  # noqa: E402
+    from aibi_runtime import kernel  # noqa: E402
+    from aibi_runtime.dispatch import main as cli_main  # noqa: E402
 
     writer_blocked = False
 
@@ -48,20 +49,20 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             "query": {},
         }
 
-    original = bi_cli.execute_workspace_semantic_query
-    original_attach = bi_cli.attach_analysis_unit
-    bi_cli.execute_workspace_semantic_query = execution_probe
-    bi_cli.attach_analysis_unit = lambda result, **_: result
+    original = kernel.execute_workspace_semantic_query
+    original_attach = kernel.attach_analysis_unit
+    kernel.execute_workspace_semantic_query = execution_probe
+    kernel.attach_analysis_unit = lambda result, **_: result
     previous_argv = sys.argv
     output = io.StringIO()
     try:
-        sys.argv = ["bi_cli.py", "--json", "semantic-query", "transaction probe"]
+        sys.argv = ["aibi_cli.py", "--json", "semantic-query", "transaction probe"]
         with contextlib.redirect_stdout(output):
-            status = bi_cli.main()
+            status = cli_main()
     finally:
         sys.argv = previous_argv
-        bi_cli.execute_workspace_semantic_query = original
-        bi_cli.attach_analysis_unit = original_attach
+        kernel.execute_workspace_semantic_query = original
+        kernel.attach_analysis_unit = original_attach
 
     payload = json.loads(output.getvalue())
     check("semantic-command-completes-with-blocked-receipt", status == 0 and payload.get("queryPlanReceipt", {}).get("status") == "blocked", payload)
@@ -148,22 +149,22 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             }],
         },
     }
-    original_execute = bi_cli.execute_workspace_semantic_query
-    original_plan = bi_cli.build_workspace_semantic_plan
-    original_attach = bi_cli.attach_analysis_unit
-    bi_cli.execute_workspace_semantic_query = ask_execution_probe
-    bi_cli.build_workspace_semantic_plan = lambda *_args, **_kwargs: ready_semantic_plan
-    bi_cli.attach_analysis_unit = lambda result, **_: result
+    original_execute = kernel.execute_workspace_semantic_query
+    original_plan = kernel.build_workspace_semantic_plan
+    original_attach = kernel.attach_analysis_unit
+    kernel.execute_workspace_semantic_query = ask_execution_probe
+    kernel.build_workspace_semantic_plan = lambda *_args, **_kwargs: ready_semantic_plan
+    kernel.attach_analysis_unit = lambda result, **_: result
     output = io.StringIO()
     try:
-        sys.argv = ["bi_cli.py", "--json", "ask", "按 root.id 汇总 facts.value", "--read-only"]
+        sys.argv = ["aibi_cli.py", "--json", "ask", "按 root.id 汇总 facts.value", "--read-only"]
         with contextlib.redirect_stdout(output):
-            ask_status = bi_cli.main()
+            ask_status = cli_main()
     finally:
         sys.argv = previous_argv
-        bi_cli.execute_workspace_semantic_query = original_execute
-        bi_cli.build_workspace_semantic_plan = original_plan
-        bi_cli.attach_analysis_unit = original_attach
+        kernel.execute_workspace_semantic_query = original_execute
+        kernel.build_workspace_semantic_plan = original_plan
+        kernel.attach_analysis_unit = original_attach
 
     ask_payload = json.loads(output.getvalue())
     check("agent-command-reaches-semantic-execution", ask_status == 0 and ask_probe_called, ask_payload)

@@ -29,7 +29,7 @@ def check(label: str, ok: bool, detail: Any = None) -> None:
 
 def run_cli(env: dict[str, str], label: str, args: list[str], expected_status: int = 0) -> dict[str, Any]:
     completed = subprocess.run(
-        [sys.executable, "tools/bi_cli.py", "--json", *args],
+        [sys.executable, "tools/aibi_cli.py", "--json", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,

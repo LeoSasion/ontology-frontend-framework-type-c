@@ -175,7 +175,7 @@ const cases = [
 ];
 
 function runCli(args) {
-  const result = spawnSync("python", ["tools/bi_cli.py", "--json", ...args], {
+  const result = spawnSync("python", ["tools/aibi_cli.py", "--json", ...args], {
     cwd: process.cwd(),
     env,
     encoding: "utf8",

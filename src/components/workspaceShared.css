@@ -79,16 +79,14 @@
   box-shadow: var(--shadow);
 }
 
-.moduleLoadingPanel,
-.inspectorLoadingPanel {
+.moduleLoadingPanel {
   display: grid;
   align-content: center;
   gap: 8px;
   padding: 24px;
 }
 
-.moduleLoadingPanel h2,
-.inspectorLoadingPanel h2 {
+.moduleLoadingPanel h2 {
   color: var(--text);
   font-size: 20px;
   line-height: 1.2;
@@ -185,8 +183,7 @@
   font-weight: 820;
 }
 
-.moduleLoadingSupport span,
-.inspectorLoadingHint {
+.moduleLoadingSupport span {
   color: var(--bi-muted);
   font-size: 11px;
   font-weight: 690;
@@ -228,14 +225,12 @@
 }
 
 @media (max-width: 760px) {
-  .moduleLoadingPanel,
-  .inspectorLoadingPanel {
+  .moduleLoadingPanel {
     align-content: start;
     padding: 14px;
   }
 
-  .moduleLoadingPanel h2,
-  .inspectorLoadingPanel h2 {
+  .moduleLoadingPanel h2 {
     font-size: 18px;
     line-height: 1.18;
   }
@@ -437,41 +432,6 @@
   }
 }
 
-.inspectorLoadingPanel {
-  align-content: start;
-  gap: 12px;
-}
-
-.inspectorLoadingPanel h2 {
-  font-size: 16px;
-}
-
-.inspectorLoadingStack span {
-  height: 46px;
-  border: 1px solid var(--bi-border-soft);
-  border-radius: 8px;
-  background:
-    linear-gradient(90deg, transparent 0%, color-mix(in srgb, var(--bi-accent-soft) 48%, transparent) 44%, transparent 86%),
-    var(--bi-panel);
-  background-size: 220% 100%;
-  animation: skeletonSweep 1.45s ease-in-out infinite;
-}
-
-.inspectorLoadingStack span:nth-child(2) {
-  height: 76px;
-}
-
-.inspectorLoadingStack span:nth-child(3) {
-  height: 34px;
-  width: 72%;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .inspectorLoadingStack span {
-    animation: none;
-  }
-}
-
 .noDataRoutePanel {
   min-width: 0;
   display: grid;
@@ -503,24 +463,10 @@
 }
 
 @media (max-width: 960px) {
-  .homeActionDock,
-  .productActivationSteps,
-  .workspaceGuideSteps,
-  .scenarioPackGrid,
-  .operatingSummaryGrid {
+  .productActivationSteps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .quickQuestionBox,
-  .homeIntelligenceGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .quickQuestionActions {
-    justify-content: flex-start;
-  }
-
-  .homeActionDock.firstRun,
   .productActivationHeader,
   .productActivationFooter {
     grid-template-columns: minmax(0, 1fr);
@@ -532,12 +478,8 @@
 }
 
 @media (max-width: 560px) {
-  .homeActionDock,
   .productActivationSteps,
-  .productActivationFactGrid,
-  .workspaceGuideSteps,
-  .scenarioPackGrid,
-  .operatingSummaryGrid {
+  .productActivationFactGrid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -635,71 +577,8 @@
   display: none;
 }
 
-.sidebarAssetDetails {
-  min-width: 0;
-  border-top: 1px solid var(--bi-border-soft);
-  padding-top: 8px;
-}
-
-.sidebarAssetDetails summary {
-  min-height: 28px;
-  color: var(--bi-muted);
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 760;
-}
-
-.sidebarAssetDetails .assetList {
-  margin-top: 8px;
-}
-
-.workspaceStartGuideDetails .workspaceStartGuide,
-.scenarioPackDetails .scenarioPackPanel,
-.homeProductIntelligenceDetails .homeIntelligenceGrid {
-  margin: 0;
-  border: 0;
-  border-radius: 0;
-}
-
-.homeProductIntelligenceDetails .homeIntelligenceGrid,
-.homeOperatingDetails .quickQuestionBox,
-.homeOperatingDetails .operatingSummaryGrid {
-  margin: 14px;
-}
-
-.homeSecondaryDetails .workspaceStartGuide,
-.homeSecondaryDetails .quickQuestionBox,
-.homeSecondaryDetails .operatingSummaryGrid {
-  margin: 14px;
-}
-
-.homeOperatingDetails > .advancedDetails {
-  margin: 12px 14px 14px;
-}
-
 .compactAdvanced {
   margin: 12px 0 0;
-}
-
-.trustGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  padding: 14px;
-}
-
-.trustGrid div {
-  min-width: 0;
-  border-radius: 7px;
-  background: var(--surface);
-  padding: 12px;
-}
-
-.trustGrid span {
-  margin-top: 5px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 input,

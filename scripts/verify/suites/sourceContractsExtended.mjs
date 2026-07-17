@@ -17,7 +17,6 @@ export function appendSourceContractExtendedChecks(context) {
     biDashboardRuntimeSource,
     biDashboardValueModelSource,
     biDashboardWidgetFactorySource,
-    businessPathBarSource,
     businessPathModelSource,
     bWidgetKitModelSource,
     bWidgetKitOverviewSource,
@@ -51,13 +50,8 @@ export function appendSourceContractExtendedChecks(context) {
     existsSync,
     globalStylesSource,
     hasCssRule,
-    homeActionDockSource,
-    homeOperatingSummaryPanelSource,
     homeOverviewSource,
-    homeProductIntelligencePanelSource,
     implementationStatusSource,
-    inspectorControllerSource,
-    inspectorPanelModelSource,
     join,
     metricSemanticRepairActionsSource,
     relationshipAutoModelGraphModelSource,
@@ -66,7 +60,6 @@ export function appendSourceContractExtendedChecks(context) {
     run,
     serverDashboardRoutesSource,
     serverSourceRoutesSource,
-    sidebarAssetSectionsSource,
     sourceCoverageAllRuns,
     sourceCoverageRuns,
     sourceIntelligenceRunModelSource,
@@ -75,7 +68,6 @@ export function appendSourceContractExtendedChecks(context) {
     sourceWorkbenchDeferredModulesSource,
     sourceWorkbenchAdvancedPanelsSource,
     sourceWorkbenchAdvancedStylesSource,
-    sourceWorkbenchAgentStarterSource,
     sourceWorkbenchCommandModelSource,
     sourceWorkbenchConnectorControllerSource,
     sourceWorkbenchConnectorPanelSource,
@@ -99,7 +91,7 @@ export function appendSourceContractExtendedChecks(context) {
     sourceWorkbenchSource,
     stylesSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   checks.push(
 
     {
@@ -691,7 +683,7 @@ export function appendSourceContractExtendedChecks(context) {
           stylesSource.includes("min-height: 32px;") &&
           dashboardCanvasSource.includes("onOpenEvidence={onOpenEvidence}") &&
           appSource.includes("const [evidenceFocus, setEvidenceFocus]") &&
-          (appSource.includes("setSection(\"evidence\")") || appSource.includes("openSection(\"evidence\")")) &&
+          (appSource.includes("setSection(\"evidence\")") || appSource.includes("openSection(\"evidence\")") || appSource.includes('section: "evidence"')) &&
           evidenceViewSource.includes("data-testid=\"evidence-focus-card\"") &&
           evidenceViewSource.includes("data-testid=\"evidence-source-intelligence-summary\"") &&
           evidenceViewSource.includes('data-testid="evidence-technical-ref-details"') &&

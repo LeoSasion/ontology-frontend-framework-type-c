@@ -113,7 +113,7 @@ def main() -> None:
 
         def cli(arguments: list[str]) -> dict[str, Any]:
             completed = subprocess.run(
-                [PYTHON, "tools/bi_cli.py", "--json", *arguments],
+                [PYTHON, "tools/aibi_cli.py", "--json", *arguments],
                 cwd=ROOT,
                 env=env,
                 text=True,
@@ -509,11 +509,11 @@ def main() -> None:
             len(bounded_sample_reads) == len(physical_tables),
             {"tableCount": len(physical_tables), "sampleReadCount": len(bounded_sample_reads)},
         )
-        bi_cli_source = (ROOT / "tools" / "bi_cli.py").read_text(encoding="utf-8")
+        runtime_kernel_source = (ROOT / "tools" / "aibi_runtime" / "kernel.py").read_text(encoding="utf-8")
         check(
             "ask-reuses-precomputed-planning-binding-for-receipt",
-            "workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)" in bi_cli_source
-            and "workspace_manifest=workspace_manifest_ref" in bi_cli_source,
+            "workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)" in runtime_kernel_source
+            and "workspace_manifest=workspace_manifest_ref" in runtime_kernel_source,
         )
 
         def receipt_state(value: dict[str, Any]) -> dict[str, Any]:

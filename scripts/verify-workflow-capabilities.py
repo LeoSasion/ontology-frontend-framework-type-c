@@ -11,7 +11,7 @@ if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
 
 from bi_cli_envelope import enrich_cli_output
-from bi_cli_parser import build_parser
+from aibi_runtime.parser import build_parser
 from capability_contract_service import build_capability_contract, capability_registry, validate_capability_invocation
 from context_budget_service import compact_context_segments
 from workflow_stage_service import build_workflow_stage

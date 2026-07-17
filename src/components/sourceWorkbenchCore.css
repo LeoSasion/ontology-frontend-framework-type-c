@@ -405,16 +405,6 @@
   margin-bottom: 10px;
 }
 
-.sourceAgentStarter {
-  display: grid;
-  gap: 10px;
-  margin: 12px 0 14px;
-  border: 1px solid var(--bi-border);
-  border-radius: 8px;
-  background: var(--surface);
-  padding: 12px;
-}
-
 .agentPromptGrid {
   min-width: 0;
   display: grid;
@@ -434,11 +424,6 @@
   color: var(--bi-text);
   padding: 9px;
   text-align: left;
-}
-
-.sourceAgentStarter .agentPromptGrid button {
-  border-color: var(--bi-border-soft);
-  background: var(--bi-panel);
 }
 
 .viewAgentTaskStrip .agentPromptGrid button {
@@ -505,14 +490,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.homeDashboardPreview {
-  margin-top: 2px;
-}
-
-.homeDashboardPreview .buttonRow {
-  margin-top: 2px;
 }
 
 .fullWidthButton {
@@ -1144,30 +1121,14 @@
 }
 
 [data-theme-mode="dark"] .workbenchPanel,
-[data-theme-mode="dark"] .nextStep,
 [data-theme-mode="dark"] .readinessCard,
-[data-theme-mode="dark"] .quickQuestionBox,
 [data-theme-mode="dark"] .advancedDetails,
-[data-theme-mode="dark"] .assetMiniRow,
 [data-theme-mode="dark"] .questionChip,
 [data-theme-mode="dark"] input,
 [data-theme-mode="dark"] select,
 [data-theme-mode="dark"] textarea {
   background: var(--surface-2);
   color: var(--text);
-}
-
-[data-theme-mode="dark"] .primaryStep,
-[data-theme-mode="dark"] .overviewHero {
-  background: var(--surface);
-}
-
-[data-theme-mode="dark"] {
-  --bi-rail-muted: color-mix(in srgb, var(--bi-muted) 68%, var(--bi-text));
-}
-
-[data-theme-mode="dark"] .railButton {
-  color: var(--bi-rail-muted);
 }
 
 [data-theme-mode="dark"] .settingsActions button,
@@ -1313,8 +1274,7 @@
   line-height: 1.2;
 }
 
-.mainPanel h3,
-.inspector h2 {
+.mainPanel h3 {
   margin: 0;
   color: var(--text);
   font-size: 14px;

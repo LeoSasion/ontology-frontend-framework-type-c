@@ -1,10 +1,10 @@
 # BI CLI Contract
 
 Schema: `aibi-bi-cli-contract/v1`
-Entrypoint: `python tools/bi_cli.py --json <command>`
+Entrypoint: `python tools/aibi_cli.py --json <command>`
 Command count: `171`
 
-This file is generated from the live argparse surface. Keep `tools/bi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
+This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
 ## Summary
 

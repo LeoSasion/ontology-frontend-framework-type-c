@@ -93,7 +93,7 @@ export function readBody(request: IncomingMessage): Promise<Record<string, unkno
 
 export function runCli(root: string, args: string[]): Promise<Record<string, unknown>> {
   return new Promise((resolveCli, reject) => {
-    const child = spawn("python", ["tools/bi_cli.py", "--json", ...args], {
+    const child = spawn("python", ["tools/aibi_cli.py", "--json", ...args], {
       cwd: root,
       env: {
         ...process.env,

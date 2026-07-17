@@ -2,10 +2,10 @@ import { readFileSync } from "node:fs";
 
 const packPath = new URL("../knowledge/platform-commerce.v1.json", import.meta.url);
 const loaderPath = new URL("../tools/platform_analytics_knowledge.py", import.meta.url);
-const cliPath = new URL("../tools/bi_cli.py", import.meta.url);
+const runtimeKernelPath = new URL("../tools/aibi_runtime/kernel.py", import.meta.url);
 const pack = JSON.parse(readFileSync(packPath, "utf8"));
 const loader = readFileSync(loaderPath, "utf8");
-const cli = readFileSync(cliPath, "utf8");
+const runtimeKernel = readFileSync(runtimeKernelPath, "utf8");
 const intents = Array.isArray(pack.intents) ? pack.intents : [];
 const ids = intents.map((intent) => intent.id);
 const checks = [
@@ -26,11 +26,11 @@ const checks = [
   { label: "knowledge-loader-normalizes-percent-threshold", ok: loader.includes("float(percent_match.group(1)) / 100") && ids.includes("jushuitan-multi-package-threshold") },
   {
     label: "agent-injects-model-independent-knowledge",
-    ok: cli.includes("match_platform_knowledge(connection, workspace_id, business_prompt)")
-      && cli.includes("platform_knowledge_context(platform_match)")
-      && cli.includes('"modelIndependent": True'),
+    ok: runtimeKernel.includes("match_platform_knowledge(connection, workspace_id, business_prompt)")
+      && runtimeKernel.includes("platform_knowledge_context(platform_match)")
+      && runtimeKernel.includes('"modelIndependent": True'),
   },
-  { label: "query-receipt-carries-knowledge-rule", ok: cli.includes("knowledge_rule=answer_card.get(\"knowledgeRule\")") },
+  { label: "query-receipt-carries-knowledge-rule", ok: runtimeKernel.includes("knowledge_rule=answer_card.get(\"knowledgeRule\")") },
 ];
 const failedChecks = checks.filter((check) => !check.ok);
 console.log(JSON.stringify({

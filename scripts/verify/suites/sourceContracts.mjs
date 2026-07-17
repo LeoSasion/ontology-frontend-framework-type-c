@@ -19,7 +19,6 @@ export function appendSourceContractChecks(context) {
     biDashboardRuntimeSource,
     biDashboardValueModelSource,
     biDashboardWidgetFactorySource,
-    businessPathBarSource,
     businessPathModelSource,
     bWidgetKitModelSource,
     bWidgetKitOverviewSource,
@@ -53,13 +52,8 @@ export function appendSourceContractChecks(context) {
     existsSync,
     globalStylesSource,
     hasCssRule,
-    homeActionDockSource,
-    homeOperatingSummaryPanelSource,
     homeOverviewSource,
-    homeProductIntelligencePanelSource,
     implementationStatusSource,
-    inspectorControllerSource,
-    inspectorPanelModelSource,
     join,
     metricSemanticRepairActionsSource,
     relationshipAutoModelGraphModelSource,
@@ -68,7 +62,6 @@ export function appendSourceContractChecks(context) {
     run,
     serverDashboardRoutesSource,
     serverSourceRoutesSource,
-    sidebarAssetSectionsSource,
     sourceCoverageAllRuns,
     sourceCoverageRuns,
     sourceIntelligenceRunModelSource,
@@ -77,7 +70,6 @@ export function appendSourceContractChecks(context) {
     sourceWorkbenchDeferredModulesSource,
     sourceWorkbenchAdvancedPanelsSource,
     sourceWorkbenchAdvancedStylesSource,
-    sourceWorkbenchAgentStarterSource,
     sourceWorkbenchCommandModelSource,
     sourceWorkbenchConnectorControllerSource,
     sourceWorkbenchConnectorPanelSource,
@@ -101,7 +93,7 @@ export function appendSourceContractChecks(context) {
     sourceWorkbenchSource,
     stylesSource,
   } = context;
-  const appSource = `${appEntrySource}\n${appMainViewSource}\n${inspectorControllerSource}`;
+  const appSource = `${appEntrySource}\n${appMainViewSource}`;
   checks.push(
     {
         label: "workbench-surface-complete",
@@ -473,7 +465,6 @@ export function appendSourceContractChecks(context) {
           !appDataActionsSource.includes("aTestdata0305SourceIntelligenceRequest()") &&
           !homeOverviewSource.includes("aTestdata0305SourceIntelligenceOptions({") &&
           evidenceViewSource.includes("type { SourceIntelligenceRunOptions }") &&
-          homeProductIntelligencePanelSource.includes("type { SourceIntelligenceRunOptions }") &&
           !metricSemanticRepairActionsSource.includes("aTestdata0305SourceIntelligenceOptions({") &&
           sourceWorkbenchActionPanelSource.includes('from "../sourceIntelligenceRunModel"') &&
           sourceWorkbenchDataEntryPanelSource.includes('from "../sourceIntelligenceRunModel"') &&

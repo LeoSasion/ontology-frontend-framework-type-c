@@ -143,6 +143,11 @@ for (const retiredReference of [
   "erp-dashboard-unit-library.md",
   "release-2026-07-14/SUMMARY.md",
   "platform-commerce-agent-validation-2026-07-13/SUMMARY.md",
+  "platform-commerce-agent-validation-2026-07-13/receipt.json",
+  "release-2026-07-15/SUMMARY.md",
+  "release-2026-07-15/receipt.json",
+  "product-design-audit-2026-07-12",
+  "ux-audit-2026-07-12",
 ]) {
   check(
     `retired-reference-absent:${retiredReference}`,
@@ -153,26 +158,26 @@ for (const retiredReference of [
 
 const cliResult = spawnSync(
   "python",
-  [resolve(root, "tools", "bi_cli.py"), "--json", "cli-contract"],
+  [resolve(root, "tools", "aibi_cli.py"), "--json", "cli-contract", "--format", "markdown"],
   { cwd: root, encoding: "utf8", windowsHide: true },
 );
 let liveCommandCount = null;
+let generatedCliContract = null;
 try {
   const parsed = JSON.parse(cliResult.stdout || "{}");
   liveCommandCount = parsed.contract?.commandCount ?? null;
+  generatedCliContract = typeof parsed.markdown === "string" ? parsed.markdown.replace(/\r\n/gu, "\n") : null;
 } catch {
   liveCommandCount = null;
+  generatedCliContract = null;
 }
-const cliContractDoc = readFileSync(resolve(root, "docs", "bi-cli-contract.md"), "utf8");
-const documentedCommandCount = Number(
-  cliContractDoc.match(/Command count: `(\d+)`/u)?.[1] ?? Number.NaN,
-);
+const cliContractDoc = readFileSync(resolve(root, "docs", "bi-cli-contract.md"), "utf8").replace(/\r\n/gu, "\n");
 check(
   "generated-cli-contract-current",
   cliResult.status === 0 &&
     Number.isInteger(liveCommandCount) &&
-    documentedCommandCount === liveCommandCount,
-  `live=${liveCommandCount}; documented=${documentedCommandCount}; status=${cliResult.status}`,
+    generatedCliContract === cliContractDoc,
+  `live=${liveCommandCount}; exactMarkdownMatch=${generatedCliContract === cliContractDoc}; status=${cliResult.status}`,
 );
 
 const result = {

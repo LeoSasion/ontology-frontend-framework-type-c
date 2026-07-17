@@ -34,7 +34,7 @@ def logical_state(path: Path) -> dict[str, list[list[Any]]]:
 
 def run(args: list[str], env: dict[str, str], expected: int = 0) -> dict[str, Any]:
     completed = subprocess.run(
-        [sys.executable, "tools/bi_cli.py", "--json", *args],
+        [sys.executable, "tools/aibi_cli.py", "--json", *args],
         cwd=ROOT,
         env=env,
         capture_output=True,

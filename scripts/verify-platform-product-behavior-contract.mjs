@@ -9,7 +9,6 @@ const relationship = source("tools/relationship_tools.py");
 const draftStore = source("tools/agent_action_draft_store.py");
 const canvasState = source("src/useDashboardCanvasState.ts");
 const widgetManage = source("src/components/DashboardWidgetManagePanel.tsx");
-const agentDock = source("src/components/AgentCommandDock.tsx");
 const platformVerify = source("scripts/verify-platform-commerce-agent.mjs");
 const fixtureVerify = source("scripts/verify-platform-commerce-fixtures.mjs");
 
@@ -38,11 +37,6 @@ const checks = [
       && widgetManage.includes("draggable")
       && widgetManage.includes("widget-edit-")
       && widgetManage.includes("widget-remove-preview-"),
-  },
-  {
-    label: "assistant-collapses-after-page-navigation",
-    ok: agentDock.includes("previousSection.current !== activeSection")
-      && agentDock.includes("setAssistantOpen(false)"),
   },
   {
     label: "relationship-preview-exposes-quality-and-expansion",

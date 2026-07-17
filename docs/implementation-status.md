@@ -2,7 +2,7 @@
 
 ## 当前发布边界
 
-当前发布版本为 v0.3.0，是 single-user and local-only 的通用可信分析工作台。新工作区为空且不启用领域包；本地确定性运行时拥有数据与写入边界，可选 Provider 仅解释。最近一次已归档的日期证据见 [2026-07-15 发布回执](../artifacts/release-2026-07-15/SUMMARY.md)，v0.3.0 以当前提交的自动化和浏览器验收为准。
+当前发布版本为 v0.3.0，是 single-user and local-only 的通用可信分析工作台。新工作区为空且不启用领域包；本地确定性运行时拥有数据与写入边界，可选 Provider 仅解释。当前交付状态以本文件、当前提交和 `npm run preflight` 为准；已被当前回归覆盖的旧版日期回执不再保留。
 
 “工作区”只显示当前必要任务：无数据时接入来源，有数据无证据时生成摘要，有证据时发起分析，有草案时核对确认。高级工具和设置按需展开。
 
@@ -69,15 +69,18 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 | `domain-packs/` | AIBI-C 自有可选领域 Manifest；不得承载 Core 默认行为 |
 | `analytical-skills/` | AIBI-C 内置中性分析方法 Manifest；只组合登记能力，不承载业务口径或执行代码 |
 | `knowledge/` | 版本化只读知识资产；只有已启用 Pack 才能引用 |
-| `tools/` | 确定性 BI、语义、关系、证据、Job、导出、扩展运行时和公共 CLI |
+| `tools/aibi_cli.py` | 公共 CLI 薄适配器；只负责进入统一运行时，不承载命令实现 |
+| `tools/aibi_runtime/` | CLI parser、命令注册表、Control/Analysis/Data/Delivery 四个领域分发器与当前组合内核 |
+| `tools/*.py` | 确定性 BI、语义、关系、证据、Job、导出、扩展和基础设施服务 |
 | `scripts/` | 构建、迁移、浏览器、发布、安全与回归门禁 |
 
-组件依赖和文件清单由代码与自动化维护，不在 Markdown 复制。
+Web 生产入口固定为 `src/main.tsx` 和 `server/index.ts`，自动化与诊断入口固定为 `tools/aibi_cli.py`。组件依赖、CLI 注册完整性和文件清单由代码与自动化维护，不在 Markdown 复制；`npm run verify:architecture` 会阻断入口不可达的 TypeScript、JavaScript 与 CSS 源码，也会阻断旧 CLI 路径回流、parser/registry 不一致和组合内核继续膨胀。
 
 ## 验证入口
 
 ```powershell
 npm run verify:docs
+npm run verify:architecture
 npm run build
 npm run verify
 npm run verify:federation-proof
@@ -95,8 +98,8 @@ npm run verify:ui
 npm run verify:migration
 npm run verify:production
 npm run preflight
-python tools/bi_cli.py --json status
-python tools/bi_cli.py --json cli-contract
+python tools/aibi_cli.py --json status
+python tools/aibi_cli.py --json cli-contract
 ```
 
 开发时运行与改动面对应的 `verify:*`；本地交付前运行完整 `npm run preflight`。检查数、命令数和性能值只记录在脚本输出或日期回执。

@@ -14,12 +14,12 @@ def cli_capabilities_command(args: argparse.Namespace) -> dict[str, Any]:
         "ok": True,
         "source": {
             "project": "AIBI-C",
-            "entrypoint": "python tools/bi_cli.py --json <command>",
+            "entrypoint": "python tools/aibi_cli.py --json <command>",
             "executionPolicy": "Execute only AIBI-C commands against the active AIBI-C workspace with existing read and confirmation boundaries.",
         },
         "target": {
             "project": "AIBI-C",
-            "entrypoint": "python tools/bi_cli.py --json <command>",
+            "entrypoint": "python tools/aibi_cli.py --json <command>",
             "metadataStore": str(DB_PATH),
             "duckdbRuntime": str(DUCKDB_PATH),
         },

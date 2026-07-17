@@ -16,7 +16,7 @@ from agent_evidence_plan_service import (  # noqa: E402
     public_turn_events,
     verify_evidence_plan,
 )
-from bi_cli import merge_receipt_unresolved_with_execution_blockers  # noqa: E402
+from aibi_runtime.kernel import merge_receipt_unresolved_with_execution_blockers  # noqa: E402
 
 
 checks: list[dict[str, object]] = []
