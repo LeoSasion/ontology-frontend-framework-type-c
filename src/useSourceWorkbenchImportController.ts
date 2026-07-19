@@ -109,7 +109,14 @@ export function useSourceWorkbenchImportController({
   }
 
   async function runFolderImportPreviewAction() {
-    const result = await onPreviewFolderImport({ path: filePath, limit: 200, recursive: true });
+    const selectedUniqueFields = uniqueFields.split(",").map((field) => field.trim()).filter(Boolean);
+    const result = await onPreviewFolderImport({
+      path: filePath,
+      limit: 200,
+      recursive: true,
+      uniqueFields: selectedUniqueFields,
+      conflictRule,
+    });
     setFolderImportPlan(result);
     const firstGroup = result.groups[0];
     if (firstGroup) {
@@ -119,7 +126,7 @@ export function useSourceWorkbenchImportController({
       setUniqueFields(firstGroup.uniqueFields.join(", "));
     }
     setImportOperationReceipt({
-      tone: result.fileCount > 0 ? "ok" : "warn",
+      tone: result.readyToCommit ? "ok" : "warn",
       title: result.fileCount > 0
         ? biText(`发现 ${result.fileCount} 个可导入文件`, `${result.fileCount} importable files found`)
         : biText("没有发现可导入文件", "No importable files found"),
@@ -127,14 +134,24 @@ export function useSourceWorkbenchImportController({
         ? biText(`将归并为 ${result.tableCount} 张业务表。`, `They will be grouped into ${result.tableCount} business tables.`)
         : biText("请选择包含 CSV 或 Excel 的文件夹。", "Choose a folder with CSV or Excel files."),
       nextStep: result.fileCount > 0
-        ? biText("确认后按同类表合并导入，导入前不会写入。", "Confirm to merge similar files. Nothing writes before confirmation.")
+        ? result.readyToCommit
+          ? biText("确认后按同类表原子导入，导入前不会写入。", "Confirm the atomic grouped import. Nothing writes before confirmation.")
+          : biText("先确认唯一键并重新预检；阻断未解除前不能提交。", "Confirm the unique key and preview again; blocked plans cannot commit.")
         : biText("粘贴文件夹路径后重新检查。", "Paste a folder path and check again."),
-      technical: result.groups.map((group) => `${group.displayName}: ${group.fileCount} files, ${group.rowCount} rows`).join("; ") || result.path,
+      technical: [...(result.blockers ?? []), result.planFingerprint ? `plan=${result.planFingerprint}` : ""].filter(Boolean).join("; ") || result.path,
     });
   }
 
   async function runFolderImportCommitAction(confirm: boolean) {
-    const result = await onCommitFolderImport({ path: filePath, limit: 200, recursive: true, confirm });
+    const result = await onCommitFolderImport({
+      path: filePath,
+      limit: 200,
+      recursive: true,
+      uniqueFields: uniqueFields.split(",").map((field) => field.trim()).filter(Boolean),
+      conflictRule,
+      expectedPlan: folderImportPlan?.planFingerprint,
+      confirm,
+    });
     setFolderImportPlan(result);
     setImportOperationReceipt({
       tone: result.committed ? "ok" : "warn",
@@ -145,7 +162,9 @@ export function useSourceWorkbenchImportController({
       nextStep: result.committed
         ? biText("下一步可以让 Agent 生成单图或看板草案。", "Next, ask Agent to create a chart or dashboard draft.")
         : biText("确认后才会写入工作区。", "Confirm before writing to the workspace."),
-      technical: result.groups.map((group) => `${group.displayName}: ${group.fileCount} files, ${group.rowCount} rows`).join("; ") || result.path,
+      technical: result.sourceRunId
+        ? `sourceRun=${result.sourceRunId}; plan=${result.planFingerprint ?? "-"}`
+        : [...(result.blockers ?? []), result.planFingerprint ? `plan=${result.planFingerprint}` : ""].filter(Boolean).join("; ") || result.path,
     });
     if (confirm && result.committed && filePath.trim()) await onCommittedInputs?.([filePath.trim()]);
   }

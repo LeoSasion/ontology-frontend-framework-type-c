@@ -31,6 +31,42 @@ function run(label, args, expectedStatus = 0) {
   return parsed;
 }
 
+function bindCurrentBatch(tableKeys) {
+  const script = `
+import json, sqlite3, sys
+database, raw_keys = sys.argv[1], sys.argv[2]
+keys = json.loads(raw_keys)
+connection = sqlite3.connect(database)
+try:
+    placeholders = ", ".join("?" for _ in keys)
+    rows = connection.execute(
+        f"SELECT table_key, data_version, row_count FROM table_registry WHERE workspace_id = 'default' AND table_key IN ({placeholders})",
+        keys,
+    ).fetchall()
+    batch_id = "fixture-batch-current"
+    connection.execute(
+        "INSERT INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at) VALUES(?, 'default', '__batch__', ?, 'ready', 'fixture-batch', ?, 0, '{}', '[]', '2026-07-19T12:00:00Z')",
+        (batch_id, batch_id, sum(int(row[2] or 0) for row in rows)),
+    )
+    for table_key, data_version, row_count in rows:
+        connection.execute(
+            "INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, row_count, created_at) VALUES(?, 'default', ?, ?, ?, '2026-07-19T12:00:00Z')",
+            (batch_id, table_key, int(data_version or 0), int(row_count or 0)),
+        )
+    connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = 'default'", (batch_id,))
+    connection.commit()
+finally:
+    connection.close()
+`;
+  const result = spawnSync("python", ["-c", script, env.AIBI_HYBRID_DB_PATH, JSON.stringify(tableKeys)], {
+    cwd: process.cwd(), env, encoding: "utf8", windowsHide: true,
+  });
+  check("bind-current-source-run-batch", result.status === 0, {
+    status: result.status,
+    stderr: result.stderr?.slice(-800),
+  });
+}
+
 try {
   const files = {
     regions: "region_id,region_name\nr1,North\nr2,South\n",
@@ -44,6 +80,7 @@ try {
     const imported = run(`import-${table}`, ["import-commit", file, "--table", table, "--name", table, "--mode", "create", "--yes"]);
     check(`import-${table}-committed`, imported?.ok === true && imported?.committed === true && imported?.result?.tableKey === table, imported);
   }
+  bindCurrentBatch(Object.keys(files));
 
   const relationships = [
     ["regions", "sites", "region_id"],

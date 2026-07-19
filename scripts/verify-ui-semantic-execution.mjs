@@ -26,10 +26,21 @@ const checks = [];
 let browserIssues = [];
 
 const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ temporaryWorkspaceId }) => {
-  await postJson("/api/import/commit", { filePath: regionsFile, table: "regions", name: "地区表", mode: "create", confirm: true });
-  await postJson("/api/import/commit", { filePath: sitesFile, table: "sites", name: "站点表", mode: "create", confirm: true });
-  await postJson("/api/import/commit", { filePath: assetsFile, table: "assets", name: "资产表", mode: "create", confirm: true });
-  await postJson("/api/import/commit", { filePath: observationsFile, table: "observations", name: "观测表", mode: "create", confirm: true });
+  const importPlan = await postJson("/api/import/folder/preview", {
+    path: screenshotDir,
+    recursive: false,
+    limit: 20,
+  });
+  if (importPlan.readyToCommit !== true || !importPlan.planFingerprint) {
+    throw new Error(`Semantic fixture atomic import is blocked: ${JSON.stringify(importPlan.blockers ?? [])}`);
+  }
+  const atomicImport = await postJson("/api/import/folder/commit", {
+    path: screenshotDir,
+    recursive: false,
+    limit: 20,
+    expectedPlan: importPlan.planFingerprint,
+    confirm: true,
+  });
   const regionSitesSaved = await postJson("/api/relationships/save", {
     workspaceId: temporaryWorkspaceId,
     leftTable: "regions",
@@ -105,6 +116,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
   const directValues = new Map((directQuery.rows ?? []).map((row) => [String(row.label), Number(row.value)]));
   const pathCandidates = pathClarification.semanticPlan?.joinPlan?.targets?.flatMap((target) => target.pathCandidates ?? []) ?? [];
   checks.push(
+    check("semantic-ui-fixture-shares-one-current-source-run", atomicImport.atomic === true && atomicImport.committed === true && atomicImport.tableCount === 4 && Boolean(atomicImport.sourceRunId), { atomicImport }),
     check("semantic-ui-fixture-relationships-validated", [regionSitesSaved, siteAssetsSaved, assetObservationsSaved, ownerObservationsSaved].every((saved) => saved.saved?.workspace_id === temporaryWorkspaceId && saved.saved?.validation?.status === "validated"), { regionSites: regionSitesSaved.saved, siteAssets: siteAssetsSaved.saved, assetObservations: assetObservationsSaved.saved, ownerObservations: ownerObservationsSaved.saved }),
     check("semantic-ui-api-requires-explicit-path-for-equal-safe-routes", pathClarification.semanticPlan?.status === "needs-clarification" && (pathClarification.executionPlan == null || pathClarification.executionPlan?.status === "blocked") && pathClarification.queryPlanReceipt?.status === "blocked" && pathCandidates.length === 2 && pathCandidates.every((candidate) => candidate.hops?.length === 3), { semanticPlan: pathClarification.semanticPlan, executionPlan: pathClarification.executionPlan, receiptStatus: pathClarification.queryPlanReceipt?.status, pathCandidateCount: pathCandidates.length }),
     check("semantic-ui-api-executes-three-hop", apiAnswer.answerCard?.kind === "semantic-relationship-analysis" && apiAnswer.semanticPlan?.joinPlan?.targets?.some((target) => target.selectedPathReason === "explicit-relationship-path") && apiAnswer.executionPlan?.status === "ready" && apiAnswer.executionPlan?.relationships?.map((relationship) => relationship.relationKey).join(",") === selectedRelationKeys.join(",") && apiAnswer.executionPlan?.relationshipPathProof?.hopProofs?.length === 3 && apiAnswer.queryPlanReceipt?.status === "executed" && apiAnswer.queryPlanReceipt?.source?.tableKeys?.join(",") === "regions,sites,assets,observations", { answerKind: apiAnswer.answerCard?.kind, semanticPlan: apiAnswer.semanticPlan, executionPlan: apiAnswer.executionPlan, receiptSource: apiAnswer.queryPlanReceipt?.source }),
@@ -175,7 +187,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     }));
     checks.push(
       check("semantic-ui-agent-question-submitted", filled && submitted.ok, { filled, submitted }),
-      check("semantic-ui-execution-plan-rendered", rendered.ok && /计划哈希|Plan hash/.test(visibleState.execution) && /最终粒度|Final grain/.test(visibleState.execution) && visibleState.pathHopCount === 3 && /地区表/.test(visibleState.path) && /观测表/.test(visibleState.path), visibleState),
+      check("semantic-ui-execution-plan-rendered", rendered.ok && /计划哈希|Plan hash/.test(visibleState.execution) && /最终粒度|Final grain/.test(visibleState.execution) && visibleState.pathHopCount === 3 && /regions/.test(visibleState.path) && /observations/.test(visibleState.path), visibleState),
       check("semantic-ui-business-answer-rendered", /受控跨表分析|Controlled cross-table analysis/.test(visibleState.answer) && /执行引擎: sqlite|Engine: sqlite/.test(visibleState.answer) && !visibleState.answer.includes("[object Object]") && !visibleState.hasError, visibleState),
       check("semantic-ui-analysis-unit-rationale-visible", /可复算分析单元|Recomputable analysis unit/.test(visibleState.unit) && /比较|comparison/.test(visibleState.unit) && /柱状图|bar chart/.test(visibleState.unit), visibleState),
       check("semantic-ui-analysis-export-action-visible", /导出 Excel \+ 报告|Export Excel \+ report/.test(visibleState.exportButton), visibleState),
@@ -333,8 +345,8 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     }), null, { timeoutMs: 60000, intervalMs: 250 });
     const candidatesSelected = await evaluate(browser.client, () => {
       const buttons = Array.from(document.querySelectorAll('[data-testid="agent-semantic-candidate"]'));
-      const sitesId = buttons.find((button) => button.textContent?.includes("站点表.site_id"));
-      const observationsStatus = buttons.find((button) => button.textContent?.includes("观测表.status"));
+      const sitesId = buttons.find((button) => button.textContent?.includes("sites.site_id"));
+      const observationsStatus = buttons.find((button) => button.textContent?.includes("observations.status"));
       if (!(sitesId instanceof HTMLButtonElement) || !(observationsStatus instanceof HTMLButtonElement)) return false;
       sitesId.click();
       observationsStatus.click();

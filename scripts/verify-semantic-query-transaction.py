@@ -26,8 +26,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
     os.environ["AIBI_HYBRID_DUCKDB_PATH"] = str(Path(temp_dir) / "runtime.duckdb")
     os.environ["AIBI_EVIDENCE_BUNDLE_ROOT"] = str(Path(temp_dir) / "evidence")
 
-    from aibi_runtime import kernel  # noqa: E402
     from aibi_runtime.dispatch import main as cli_main  # noqa: E402
+    from aibi_runtime.use_cases import agent_interaction, delivery, lifecycle  # noqa: E402
 
     writer_blocked = False
 
@@ -49,10 +49,10 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             "query": {},
         }
 
-    original = kernel.execute_workspace_semantic_query
-    original_attach = kernel.attach_analysis_unit
-    kernel.execute_workspace_semantic_query = execution_probe
-    kernel.attach_analysis_unit = lambda result, **_: result
+    original = delivery.execute_workspace_semantic_query
+    original_attach = lifecycle.attach_analysis_unit
+    delivery.execute_workspace_semantic_query = execution_probe
+    lifecycle.attach_analysis_unit = lambda result, **_: result
     previous_argv = sys.argv
     output = io.StringIO()
     try:
@@ -61,8 +61,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             status = cli_main()
     finally:
         sys.argv = previous_argv
-        kernel.execute_workspace_semantic_query = original
-        kernel.attach_analysis_unit = original_attach
+        delivery.execute_workspace_semantic_query = original
+        lifecycle.attach_analysis_unit = original_attach
 
     payload = json.loads(output.getvalue())
     check("semantic-command-completes-with-blocked-receipt", status == 0 and payload.get("queryPlanReceipt", {}).get("status") == "blocked", payload)
@@ -149,12 +149,12 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             }],
         },
     }
-    original_execute = kernel.execute_workspace_semantic_query
-    original_plan = kernel.build_workspace_semantic_plan
-    original_attach = kernel.attach_analysis_unit
-    kernel.execute_workspace_semantic_query = ask_execution_probe
-    kernel.build_workspace_semantic_plan = lambda *_args, **_kwargs: ready_semantic_plan
-    kernel.attach_analysis_unit = lambda result, **_: result
+    original_execute = agent_interaction.execute_workspace_semantic_query
+    original_plan = agent_interaction.build_workspace_semantic_plan
+    original_attach = lifecycle.attach_analysis_unit
+    agent_interaction.execute_workspace_semantic_query = ask_execution_probe
+    agent_interaction.build_workspace_semantic_plan = lambda *_args, **_kwargs: ready_semantic_plan
+    lifecycle.attach_analysis_unit = lambda result, **_: result
     output = io.StringIO()
     try:
         sys.argv = ["aibi_cli.py", "--json", "ask", "按 root.id 汇总 facts.value", "--read-only"]
@@ -162,9 +162,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-semantic-transaction-") as temp_
             ask_status = cli_main()
     finally:
         sys.argv = previous_argv
-        kernel.execute_workspace_semantic_query = original_execute
-        kernel.build_workspace_semantic_plan = original_plan
-        kernel.attach_analysis_unit = original_attach
+        agent_interaction.execute_workspace_semantic_query = original_execute
+        agent_interaction.build_workspace_semantic_plan = original_plan
+        lifecycle.attach_analysis_unit = original_attach
 
     ask_payload = json.loads(output.getvalue())
     check("agent-command-reaches-semantic-execution", ask_status == 0 and ask_probe_called, ask_payload)

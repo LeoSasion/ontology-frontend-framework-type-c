@@ -5,6 +5,10 @@ from typing import Any
 
 
 INTENT_SCHEMA = "aibi-agent-intent-frame/v1"
+FORECAST_PARAMETER_FIELDS = {
+    "预测跨度", "预测步数", "评估截止", "预测截止", "截止日期", "粒度",
+    "forecast horizon", "evaluation cutoff", "forecast cutoff", "time grain",
+}
 TASK_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("reconciliation", ("对账", "核对", "一致", "reconcile", "reconciliation")),
     ("diagnosis", ("为什么", "原因", "诊断", "驱动", "why", "diagnose", "driver")),
@@ -63,19 +67,31 @@ def _requested_output(prompt: str) -> str:
 
 def _time_scope(prompt: str) -> dict[str, Any] | None:
     for pattern in (
-        r"(?P<year>20\d{2})[-/.年](?P<month>0?[1-9]|1[0-2])(?:月)?",
+        r"(?P<year>20\d{2})[-/.年](?P<month>1[0-2]|0?[1-9])(?!\d)(?:月)?",
         r"(?P<year>20\d{2})年",
         r"(?P<relative>今天|昨日|昨天|本周|上周|本月|上月|今年|去年|today|yesterday|this week|last week|this month|last month|this year|last year)",
     ):
-        match = re.search(pattern, prompt, re.IGNORECASE)
-        if match:
+        for match in re.finditer(pattern, prompt, re.IGNORECASE):
+            prefix = prompt[max(0, match.start() - 32):match.start()]
+            if re.search(r"(?:评估截止|预测截止|截止日期|evaluation cutoff|forecast cutoff)\s*(?:为|是|=|is)?\s*$", prefix, re.IGNORECASE):
+                continue
             return {"expression": match.group(0), "parts": {key: value for key, value in match.groupdict().items() if value}}
     return None
 
 
 def _filters(prompt: str) -> list[dict[str, str]]:
     matches = re.finditer(r"([\u4e00-\u9fffA-Za-z_][\u4e00-\u9fffA-Za-z0-9_ .-]{0,30}?)\s*(=|等于|为|是|contains?|equals?)\s*([\u4e00-\u9fffA-Za-z0-9_.@\-]+)", prompt, re.IGNORECASE)
-    return [{"fieldExpression": _compact(match.group(1)), "operator": match.group(2), "value": match.group(3)} for match in matches][:12]
+    forecast_prompt = bool(re.search(r"(?:预测|forecast)", prompt, re.IGNORECASE))
+    filters: list[dict[str, str]] = []
+    for match in matches:
+        field_expression = _compact(match.group(1))
+        normalized_field = re.sub(r"[\s,，:：]+", "", field_expression).casefold()
+        if forecast_prompt and any(normalized_field.endswith(item.replace(" ", "").casefold()) for item in FORECAST_PARAMETER_FIELDS):
+            continue
+        filters.append({"fieldExpression": field_expression, "operator": match.group(2), "value": match.group(3)})
+        if len(filters) == 12:
+            break
+    return filters
 
 
 def _comparisons(prompt: str) -> list[str]:

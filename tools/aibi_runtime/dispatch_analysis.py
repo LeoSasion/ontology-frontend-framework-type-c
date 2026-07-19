@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import kernel as runtime
+from .use_cases import analysis as runtime
 
 
 COMMANDS = frozenset({

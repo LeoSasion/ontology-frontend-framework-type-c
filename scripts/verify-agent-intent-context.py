@@ -57,6 +57,17 @@ lexical_boundary_failures = [
 check("ranking-prefix-does-not-confuse-current-data", not lexical_boundary_failures, lexical_boundary_failures)
 check("provider-independent", all(frame["resolution"]["providerRequired"] is False for _, frame in generated))
 check("no-silent-disambiguation", all(frame["resolution"]["silentDisambiguation"] is False for _, frame in generated))
+forecast_parameters = build_business_intent_frame(
+    "检查 value 按 event_date 合计的预测准备度，预测跨度为3，评估截止为2025-12-01，粒度为月",
+    semantic_plan={},
+)
+check(
+    "forecast-method-parameters-are-not-data-filters-or-month-windows",
+    forecast_parameters["filters"] == [] and forecast_parameters["timeScope"] is None,
+    forecast_parameters,
+)
+december_scope = build_business_intent_frame("查看2025-12销售额", semantic_plan={}).get("timeScope") or {}
+check("two-digit-month-is-not-truncated", december_scope.get("parts", {}).get("month") == "12", december_scope)
 
 semantic_plan = {
     "schema": "aibi-semantic-query-plan/v1", "status": "needs-clarification",

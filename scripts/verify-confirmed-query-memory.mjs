@@ -26,11 +26,33 @@ try {
   ];
   const unconfirmedAsk = run("unconfirmed-ask", ["ask", "请用quantity按category生成柱状图"]);
   checks.push(unconfirmedAsk);
+  checks.push({
+    label: "implicit-aggregation-draft-is-not-executed",
+    ok: unconfirmedAsk.parsed?.queryPlanReceipt?.status === "blocked"
+      && unconfirmedAsk.parsed?.queryPlanReceipt?.selection?.queryIntent?.blockers?.includes("aggregation-not-explicitly-resolved"),
+  });
   const beforeConfirm = run("no-candidate-before-action-confirm", ["confirmed-queries", "--limit", "10"]);
   checks.push(beforeConfirm);
   checks.push({ label: "draft-does-not-become-memory", ok: beforeConfirm.parsed?.count === 0 });
+  const blockedActionKey = unconfirmedAsk.parsed?.actionDraft?.actionKey;
+  const blockedConfirm = run("blocked-query-cannot-write-chart", ["confirm-action", blockedActionKey, "--yes"]);
+  checks.push({
+    label: "blocked-query-cannot-write-chart",
+    ok: blockedConfirm.status !== 0
+      && /executed Query Receipt bound to the current sourceRun/i.test(`${blockedConfirm.stderr}\n${blockedConfirm.stdout}`),
+    status: blockedConfirm.status,
+    parsed: blockedConfirm.parsed,
+    stderr: blockedConfirm.stderr,
+    stdout: blockedConfirm.stdout,
+  });
+  const blockedDrafts = run("blocked-chart-draft-remains-unconfirmed", ["action-drafts", "--limit", "10"]);
+  checks.push(blockedDrafts);
+  checks.push({
+    label: "blocked-chart-draft-remains-unconfirmed",
+    ok: blockedDrafts.parsed?.actionDrafts?.some((item) => item?.action_key === blockedActionKey && item?.status === "draft"),
+  });
 
-  const ask = run("ask", ["ask", "请用net_sales按channel生成柱状图"]);
+  const ask = run("ask", ["ask", "请将net_sales按channel合计并生成柱状图"]);
   checks.push(ask);
   const actionKey = ask.parsed?.actionDraft?.actionKey;
   const actionConfirm = run("confirm-chart", ["confirm-action", actionKey, "--yes"]);
@@ -42,7 +64,7 @@ try {
       && candidate?.originating_action_key === actionKey
       && candidate?.query_receipt_key === ask.parsed?.queryPlanReceipt?.receiptKey,
   });
-  const beforePromotionAsk = run("candidate-not-recalled", ["ask", "请用net_sales按channel生成柱状图"]);
+  const beforePromotionAsk = run("candidate-not-recalled", ["ask", "请将net_sales按channel合计并生成柱状图"]);
   checks.push(beforePromotionAsk);
   checks.push({ label: "candidate-is-not-active-memory", ok: beforePromotionAsk.parsed?.context?.confirmedQueries?.length === 0 });
 
@@ -60,7 +82,7 @@ try {
   checks.push(readOnlyPlanList);
   checks.push({ label: "confirmed-plan-list-does-not-mutate-plan-state", ok: JSON.stringify(planList.parsed?.confirmedPlans) === JSON.stringify(readOnlyPlanList.parsed?.confirmedPlans) });
 
-  const recalled = run("confirmed-query-recalled", ["ask", "请用net_sales按channel生成柱状图"]);
+  const recalled = run("confirmed-query-recalled", ["ask", "请将net_sales按channel合计并生成柱状图"]);
   checks.push(recalled);
   checks.push({
     label: "confirmed-plan-recall-is-candidate-only-and-auditable",
@@ -74,7 +96,7 @@ try {
     label: "recall-never-mutates-current-semantic-plan",
     ok: JSON.stringify(recalled.parsed?.semanticPlan) === JSON.stringify(beforePromotionAsk.parsed?.semanticPlan),
   });
-  const repeatedRecall = run("repeated-confirmed-plan-recall", ["ask", "请用net_sales按channel生成柱状图"]);
+  const repeatedRecall = run("repeated-confirmed-plan-recall", ["ask", "请将net_sales按channel合计并生成柱状图"]);
   checks.push(repeatedRecall);
   checks.push({
     label: "recall-context-fingerprint-is-replay-stable",
@@ -94,12 +116,21 @@ try {
     ok: recallList.parsed?.recallReceipts?.some((item) => item?.receiptKey === recalled.parsed?.context?.recallReceipt?.receiptKey && item?.requestHash?.length === 64 && !Object.hasOwn(item, "request") && item?.planningBindingFingerprint),
   });
 
-  const secondAsk = run("second-plan-ask", ["ask", "请用net_sales按category生成柱状图"]);
+  const secondAsk = run("second-plan-ask", ["ask", "请将net_sales按category合计并生成柱状图"]);
   checks.push(secondAsk);
   const secondActionKey = secondAsk.parsed?.actionDraft?.actionKey;
   const secondConfirm = run("second-plan-action-confirm", ["confirm-action", secondActionKey, "--yes"]);
   checks.push(secondConfirm);
   const secondCandidate = secondConfirm.parsed?.confirmedQueryCandidate;
+  checks.push({
+    label: "second-confirmed-chart-creates-a-distinct-candidate",
+    ok: secondCandidate?.status === "candidate" && secondCandidate?.query_key !== candidate?.query_key,
+    parsed: {
+      confirmation: secondConfirm.parsed,
+      receipt: secondAsk.parsed?.queryPlanReceipt,
+      actionDraft: secondAsk.parsed?.actionDraft,
+    },
+  });
   const secondPromote = run("second-plan-promote", ["confirm-query", "--query", secondCandidate?.query_key, "--yes"]);
   checks.push(secondPromote);
   checks.push({ label: "second-distinct-plan-is-confirmed", ok: secondPromote.parsed?.confirmedPlanMemory?.status === "confirmed" && secondPromote.parsed?.confirmedPlanMemory?.planFingerprint !== planMemory?.planFingerprint });

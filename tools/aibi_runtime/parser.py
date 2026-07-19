@@ -748,11 +748,16 @@ def build_parser() -> argparse.ArgumentParser:
     preview_folder.add_argument("path")
     preview_folder.add_argument("--limit", type=int, default=200)
     preview_folder.add_argument("--no-recursive", action="store_true")
+    preview_folder.add_argument("--unique-fields")
+    preview_folder.add_argument("--conflict-rule", choices=["overwrite", "fill-empty", "skip-existing"])
 
     import_folder = sub.add_parser("import-folder")
     import_folder.add_argument("path")
     import_folder.add_argument("--limit", type=int, default=200)
     import_folder.add_argument("--no-recursive", action="store_true")
+    import_folder.add_argument("--unique-fields")
+    import_folder.add_argument("--conflict-rule", choices=["overwrite", "fill-empty", "skip-existing"])
+    import_folder.add_argument("--expected-plan")
     import_folder.add_argument("--yes", action="store_true")
 
     list_import_jobs = sub.add_parser("list-import-jobs")

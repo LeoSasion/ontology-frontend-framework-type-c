@@ -1,8 +1,16 @@
 from __future__ import annotations
 
-from . import kernel as runtime
+import sys
+
 from .parser import build_parser
 from .registry import build_command_registry
+from .use_cases import lifecycle as runtime
+
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
 
 
 def main() -> int:

@@ -347,7 +347,7 @@ try {
       const chartMeasure = (workbenchAfterImport.metrics ?? []).find((metric) => metric.table_key === importedTable?.table_key)?.measure
         ?? (workbenchAfterImport.fields ?? []).find((field) => field.table_key === importedTable?.table_key && field.role === "measure")?.field_name
         ?? "";
-      chartPromptText = chartMeasure ? `请用 ${chartMeasure} 生成一个指标卡` : "";
+      chartPromptText = chartMeasure ? `请将 ${chartMeasure} 合计并生成一个指标卡` : "";
       const rowCountsByName = Object.fromEntries(importedTables.map((table) => [table.display_name, table.row_count]));
       checks.push(
         check("api-import-created-table", Number(importStatus.status.counts?.tables ?? 0) > 0, { counts: importStatus.status.counts }),

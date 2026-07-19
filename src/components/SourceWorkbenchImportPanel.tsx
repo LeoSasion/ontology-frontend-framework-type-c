@@ -170,14 +170,17 @@ export function SourceWorkbenchImportPanel({
         <div className="folderImportPlan" data-testid="folder-import-plan">
           <div className="folderImportPlanHeader">
             <div>
-              <span className="statusBadge ok">{biText("文件夹计划", "Folder plan")}</span>
+              <span className={`statusBadge ${folderImportPlan.readyToCommit ? "ok" : "warn"}`}>
+                {folderImportPlan.readyToCommit ? biText("原子计划可提交", "Atomic plan ready") : biText("计划已阻断", "Plan blocked")}
+              </span>
               <h4>{biText(`导入 ${folderImportPlan.fileCount} 个文件`, `Import ${folderImportPlan.fileCount} files`)}</h4>
               <p>{biText(`按文件名归并为 ${folderImportPlan.tableCount} 张业务表。`, `Grouped into ${folderImportPlan.tableCount} business tables by file name.`)}</p>
+              <small>{folderImportPlan.planFingerprint ? `plan ${folderImportPlan.planFingerprint.slice(0, 16)}` : ""}</small>
             </div>
             <button
               className="primaryButton compactAction"
               data-testid="folder-import-confirm-button"
-              disabled={busy === "folder-confirm"}
+              disabled={busy === "folder-confirm" || folderImportPlan.readyToCommit !== true}
               onClick={() => runBusy("folder-confirm", () => runFolderImportCommitAction(true))}
               type="button"
             >
@@ -191,6 +194,8 @@ export function SourceWorkbenchImportPanel({
                 <strong>{group.displayName}</strong>
                 <span>{biText(`${group.fileCount} 个文件 · ${group.rowCount.toLocaleString()} 行`, `${group.fileCount} files · ${group.rowCount.toLocaleString()} rows`)}</span>
                 <small>{group.uniqueFields.length ? group.uniqueFields.join(", ") : biText("自动唯一键", "Auto unique key")}</small>
+                <small>{group.keyDecision?.authority === "owner_confirmed" ? biText("唯一键已由业务方确认", "Owner-confirmed key") : biText("唯一键仍是候选", "Key is still a candidate")}</small>
+                {group.blockers?.length ? <small className="folderImportBlocker">{group.blockers.join(" · ")}</small> : null}
               </div>
             ))}
           </div>

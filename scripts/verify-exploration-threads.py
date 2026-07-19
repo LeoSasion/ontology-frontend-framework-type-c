@@ -64,12 +64,12 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
 
     initialized = run(["status"], env)
     imported = run(["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"], env)
-    check("schema-v14-initializes", initialized.get("ok") is True and imported.get("committed") is True)
+    check("schema-v15-initializes", initialized.get("ok") is True and imported.get("committed") is True)
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-    check("exploration-schema-is-versioned", version == 14, version)
+    check("exploration-schema-is-versioned", version == 15, version)
 
-    root = run(["agent-turn-run", "--read-only", "请用net_sales按channel生成柱状图"], env)
+    root = run(["agent-turn-run", "--read-only", "请将net_sales按channel合计并生成柱状图"], env)
     root_answer = answer(root)
     root_run = root_answer.get("analysisRun") or {}
     root_unit = root_answer.get("analysisUnit") or {}
@@ -156,7 +156,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
         "--session", str(root_session.get("sessionKey") or ""),
         "--parent-run", str(root_run.get("run_key") or ""),
         "--branch-label", "品类比较",
-        "请用net_sales按category生成柱状图",
+        "请将net_sales按category合计并生成柱状图",
     ], env)
     branch_answer = answer(branch)
     branch_run = branch_answer.get("analysisRun") or {}
@@ -201,7 +201,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
         after_add,
     )
 
-    unrelated = run(["agent-turn-run", "--read-only", "--session", str(root_session.get("sessionKey") or ""), "请再次用net_sales按channel生成柱状图"], env)
+    unrelated = run(["agent-turn-run", "--read-only", "--session", str(root_session.get("sessionKey") or ""), "请再次将net_sales按channel合计并生成柱状图"], env)
     unrelated_answer = answer(unrelated)
     unrelated_run = unrelated_answer.get("analysisRun") or {}
     unrelated_unit = unrelated_answer.get("analysisUnit") or {}
@@ -251,7 +251,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
     )
 
     run(["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Isolated orders", "--mode", "create", "--yes"], env)
-    isolated_root = run(["agent-turn-run", "--read-only", "请用net_sales按channel生成柱状图"], env)
+    isolated_root = run(["agent-turn-run", "--read-only", "请将net_sales按channel合计并生成柱状图"], env)
     isolated_answer = answer(isolated_root)
     isolated_create_args = [
         "exploration-thread-create",

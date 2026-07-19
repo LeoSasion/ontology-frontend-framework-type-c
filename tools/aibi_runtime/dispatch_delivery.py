@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from . import kernel as runtime
+from .use_cases import delivery as runtime
 
 
 COMMANDS = frozenset({
@@ -110,11 +110,11 @@ def dispatch(args, parser):
         result = runtime.delete_formula_command(args)
     elif args.command == 'ask':
         args.prompt = ' '.join(args.prompt)
-        result = runtime.attach_analysis_unit(runtime.ask_command(args), open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+        result = runtime.ask_command(args)
     elif args.command == 'confirm-action':
         result = runtime.confirm_action_command(args)
         if not result.get('workspaceId'):
-            with runtime.open_db() as connection:
+            with runtime.closing(runtime.open_db()) as connection:
                 result['workspaceId'] = str(getattr(args, 'workspace', '') or runtime.active_workspace_id(connection))
     elif args.command == 'action-drafts':
         result = runtime.action_drafts_command(args)

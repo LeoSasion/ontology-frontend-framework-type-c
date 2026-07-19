@@ -151,6 +151,28 @@ def competing_writer_probe(database: Path) -> dict[str, Any]:
         connection.close()
 
 
+def bind_current_batch(database: Path, batch_id: str, table_keys: list[str]) -> None:
+    connection = connection_for(database)
+    try:
+        rows = connection.execute(
+            f"SELECT table_key, data_version, row_count FROM table_registry WHERE workspace_id = 'default' AND table_key IN ({', '.join('?' for _ in table_keys)})",
+            table_keys,
+        ).fetchall()
+        connection.execute(
+            "INSERT INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at) VALUES(?, 'default', '__batch__', ?, 'ready', 'fixture-batch', ?, 0, '{}', '[]', '2026-07-16T12:00:00Z')",
+            (batch_id, batch_id, sum(int(row["row_count"] or 0) for row in rows)),
+        )
+        for row in rows:
+            connection.execute(
+                "INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, row_count, created_at) VALUES(?, 'default', ?, ?, ?, '2026-07-16T12:00:00Z')",
+                (batch_id, row["table_key"], int(row["data_version"] or 0), int(row["row_count"] or 0)),
+            )
+        connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = 'default'", (batch_id,))
+        connection.commit()
+    finally:
+        connection.close()
+
+
 with tempfile.TemporaryDirectory(prefix="aibi-c-receipt-freshness-p2-") as temporary:
     temp_root = Path(temporary)
     database = temp_root / "runtime.sqlite"
@@ -169,6 +191,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-receipt-freshness-p2-") as tempo
     for table, path in (("regions", regions), ("facts", facts)):
         status, payload = cli(env, "import-commit", str(path), "--table", table, "--name", table, "--mode", "create", "--yes")
         check(f"import-{table}", status == 0 and payload.get("ok") is True, payload)
+    bind_current_batch(database, "fixture-batch-initial", ["regions", "facts"])
     status, payload = cli(
         env,
         "relationship-save",
@@ -242,6 +265,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-receipt-freshness-p2-") as tempo
     )
 
     # Revalidate the relationship after the source replacement and create a fresh receipt.
+    bind_current_batch(database, "fixture-batch-replaced", ["regions", "facts"])
     status, payload = cli(
         env,
         "relationship-save",

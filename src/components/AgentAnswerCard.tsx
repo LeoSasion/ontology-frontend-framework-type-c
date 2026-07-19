@@ -1,14 +1,16 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import type { AgentAskResult } from "../types";
-import { confidenceText, evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
+import { evidenceRefText, pairText, type AnswerEvidenceStep } from "../agentPanelModel";
 import { formatBusinessValue } from "../businessPresentation";
 import { Bilingual, biText } from "./Bilingual";
+import { evaluateTrustedReceiptGate, evaluateVisualizationGate } from "./agentAnswerVisualizationModel";
 
 const AgentProviderNarrative = lazy(() => import("./AgentProviderNarrative").then((module) => ({ default: module.AgentProviderNarrative })));
 const AgentSemanticPlan = lazy(() => import("./AgentSemanticPlan").then((module) => ({ default: module.AgentSemanticPlan })));
 const AgentEvidencePlan = lazy(() => import("./AgentEvidencePlan").then((module) => ({ default: module.AgentEvidencePlan })));
 const ForecastReadinessPanel = lazy(() => import("./ForecastReadinessPanel").then((module) => ({ default: module.ForecastReadinessPanel })));
 const AnalysisSnapshotPanel = lazy(() => import("./AnalysisSnapshotPanel").then((module) => ({ default: module.AnalysisSnapshotPanel })));
+const AgentAnswerVisualization = lazy(() => import("./AgentAnswerVisualization"));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
@@ -32,6 +34,7 @@ type AgentAnswerCardProps = {
   analysisExportStatus?: "idle" | "exporting" | "ready" | "error";
   analysisExportMessage?: string;
   forecastReadiness?: AgentAskResult["forecastReadiness"];
+  analysisUnit?: AgentAskResult["analysisUnit"];
 };
 
 function widgetTypeText(widgetType?: string) {
@@ -50,6 +53,37 @@ function analysisKindText(kind?: string) {
   if (kind === "ranking") return biText("排名", "ranking");
   if (kind === "anomaly") return biText("异常", "anomaly");
   return biText("比较", "comparison");
+}
+
+type TrustedResultState = "executed" | "draft" | "blocked" | "simulation" | "stale";
+
+function trustedResultState(value: unknown): TrustedResultState {
+  const normalized = String(value ?? "").toLowerCase();
+  return ["executed", "draft", "blocked", "simulation", "stale"].includes(normalized)
+    ? normalized as TrustedResultState
+    : "blocked";
+}
+
+function trustedResultStateText(state: TrustedResultState) {
+  const labels: Record<TrustedResultState, string> = {
+    executed: biText("已执行结果", "Executed result"),
+    draft: biText("草稿预览", "Draft preview"),
+    blocked: biText("已阻断", "Blocked"),
+    simulation: biText("模拟结果", "Simulation"),
+    stale: biText("证据已过期", "Stale evidence"),
+  };
+  return labels[state];
+}
+
+function trustedResultStateSummary(state: TrustedResultState) {
+  const summaries: Record<TrustedResultState, string> = {
+    executed: biText("执行证据未通过可信门禁，当前不展示经营数字。", "Execution evidence did not pass the trust gate; business numbers are withheld."),
+    draft: biText("当前仅为待确认草稿，尚未执行查询。", "This is an unexecuted draft awaiting confirmation."),
+    blocked: biText("当前问题未满足执行条件，请先处理阻断项。", "Execution requirements are not met; resolve the blockers first."),
+    simulation: biText("当前仅为模拟结构，不包含可发布的经营数字。", "This is a simulation structure without publishable business numbers."),
+    stale: biText("来源或语义已变化，旧结论必须重新验证后再执行。", "The source or semantics changed; revalidate before execution."),
+  };
+  return summaries[state];
 }
 
 function rowFieldValues(rows: Array<Record<string, unknown>>, role: string) {
@@ -243,7 +277,7 @@ function IntentFrameChips({ frame }: { frame: NonNullable<AgentAskResult["intent
   );
 }
 
-export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, businessUnderstanding, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, onSelectSemanticPath, onSelectSemanticRoot, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "", forecastReadiness }: AgentAnswerCardProps) {
+export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, businessUnderstanding, clarificationBundle, evidencePlan, executionPlan, intentFrame, onAskCandidate, onSelectSemanticCandidates, onSelectSemanticPath, onSelectSemanticRoot, providerResponse, queryRuntimeRef, runtimeEngine, semanticPlan, tableNameByKey, onExportAnalysis, analysisExportStatus = "idle", analysisExportMessage = "", forecastReadiness, analysisUnit }: AgentAnswerCardProps) {
   const forecastReadinessFingerprint = forecastReadiness?.fingerprint ?? "";
   const analysisUnitKey = answerCard.analysisUnitRef?.unitKey ?? "";
   const hasInitialForecastReadiness = Boolean(forecastReadiness);
@@ -255,6 +289,15 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
     setSnapshotOpen(false);
   }, [analysisUnitKey, forecastReadinessFingerprint, hasInitialForecastReadiness]);
   const fallbackReason = queryRuntimeRef?.fallbackReason ?? answerQuery?.fallbackReason;
+  const queryReceipt = answerCard.queryPlanReceipt;
+  const resultState = trustedResultState(answerCard.resultState ?? answerQuery?.resultState ?? queryReceipt?.resultState ?? queryReceipt?.status);
+  const trustedReceiptGate = evaluateTrustedReceiptGate({ ...answerCard, resultState });
+  const visualizationGate = evaluateVisualizationGate({ ...answerCard, resultState }, analysisUnit);
+  const canSupportConclusion = trustedReceiptGate.allowed;
+  const canRenderVisualization = visualizationGate.allowed && Boolean(analysisUnit && queryReceipt && answerCard.chartAdapter);
+  const sourceRunId = String(queryReceipt?.source.currentSourceRunId ?? objectValue(answerQuery?.sourceRunBinding)?.currentSourceRunId ?? "");
+  const coverage = objectValue(queryReceipt?.selection.executionCoverage ?? answerQuery?.executionCoverage);
+  const coverageComplete = coverage?.complete === true;
   const clarification = answerCard.clarification?.kind === "widget-fields" ? answerCard.clarification : null;
   const candidateMeasures = clarification?.candidateMeasures?.length ? clarification.candidateMeasures : rowFieldValues(answerCard.rows, "measure");
   const candidateDimensions = clarification?.candidateDimensions?.length ? clarification.candidateDimensions : rowFieldValues(answerCard.rows, "dimension");
@@ -325,19 +368,72 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
   }
 
   return (
-    <article className="agentAnswerCard" data-testid="agent-answer-card">
+    <article className={`agentAnswerCard result-${resultState}`} data-result-state={resultState} data-testid="agent-answer-card">
       <div className="agentAnswerLead">
         <div>
           <p className="kicker">{biText("业务回答", "Business answer")}</p>
           <h3>{pairText(answerCard.title)}</h3>
-          <p>{pairText(answerCard.summary)}</p>
+          <p>{canSupportConclusion ? pairText(answerCard.summary) : trustedResultStateSummary(resultState)}</p>
         </div>
-        <span className="statusPill compact">{confidenceText(answerCard.confidence)}</span>
+        <span className={`statusPill compact trustedState ${resultState}`} data-testid="agent-result-state">{trustedResultStateText(resultState)}</span>
       </div>
-      {providerResponse?.summary ? (
+      <section className={`agentTrustedResultState ${resultState}`} data-testid="agent-trusted-result-state" role={canSupportConclusion ? "status" : "alert"}>
+        <div>
+          <strong>{trustedResultStateText(resultState)}</strong>
+          <span>{canSupportConclusion
+            ? biText("只有这张已执行 Receipt 可以支撑当前经营结论。", "Only this executed Receipt can support the current business conclusion.")
+            : biText("当前内容不能作为确定经营数字发布。", "This content cannot be published as a definitive business number.")}</span>
+        </div>
+        <dl>
+          <div><dt>sourceRun</dt><dd>{sourceRunId ? sourceRunId.slice(0, 16) : "-"}</dd></div>
+          <div><dt>{biText("执行覆盖", "Coverage")}</dt><dd>{coverageComplete ? biText("完整", "Complete") : biText("未完成", "Incomplete")}</dd></div>
+          <div><dt>Receipt</dt><dd>{queryReceipt?.receiptKey?.slice(0, 16) || "-"}</dd></div>
+        </dl>
+      </section>
+      {providerResponse?.summary && canSupportConclusion ? (
         <Suspense fallback={null}>
           <AgentProviderNarrative response={providerResponse} />
         </Suspense>
+      ) : null}
+      {canRenderVisualization && analysisUnit && queryReceipt && answerCard.chartAdapter ? (
+        <Suspense fallback={<div className="agentVisualizationLoading" role="status">{biText("正在绘制可信结果…", "Rendering trusted result…")}</div>}>
+          <AgentAnswerVisualization
+            analysisUnit={analysisUnit}
+            chartAdapter={answerCard.chartAdapter}
+            evidenceRefs={queryReceipt.evidenceRefs}
+            queryPlanReceipt={queryReceipt}
+            title={pairText(answerCard.title)}
+          />
+        </Suspense>
+      ) : null}
+      {!canRenderVisualization && (answerCard.analysisUnitRef || answerCard.chartAdapter || analysisUnit) ? (
+        <div className={`agentVisualizationGuard ${canSupportConclusion ? "text-only" : resultState}`} data-testid="agent-visualization-guard" data-visual-state={resultState} role={canSupportConclusion ? "status" : "alert"}>
+          <span aria-hidden="true">{canSupportConclusion ? "◫" : "⊘"}</span>
+          <div>
+            <strong>{canSupportConclusion ? biText("图表绑定未通过，保留可信文本结果", "Chart binding did not pass; keeping the trusted text result") : biText("经营图表未挂载", "Business chart not mounted")}</strong>
+            <small>{canSupportConclusion
+              ? biText("没有重查、补数或改用旧结果。", "No re-query, invented values, or stale fallback was used.")
+              : biText("只有 current 且已执行的 Receipt 可以显示确定金额、排名、比例或趋势。", "Only a current executed Receipt may show definitive amounts, ranks, ratios, or trends.")}</small>
+          </div>
+        </div>
+      ) : null}
+      {canSupportConclusion && !canRenderVisualization ? <div className="agentAnswerMetrics">
+        {answerCard.metrics.map((metric, index) => (
+          <div key={`${pairText(metric.label)}-${index}`}>
+            <span>{pairText(metric.label)}</span>
+            <strong>{formatBusinessValue(metric.value)}</strong>
+          </div>
+        ))}
+      </div> : null}
+      {canSupportConclusion && !canRenderVisualization && answerCard.rows.length && !clarification ? (
+        <div className="agentAnswerRows" data-testid="agent-answer-rows">
+          {answerCard.rows.slice(0, 5).map((row, index) => (
+            <div key={`${String(row.label ?? index)}-${index}`}>
+              <span>{String(row.label ?? biText("合计", "Total"))}</span>
+              <strong>{formatBusinessValue(row.value)}</strong>
+            </div>
+          ))}
+        </div>
       ) : null}
       {intentFrame || businessUnderstanding ? (
         <details className={`agentIntentFrame ${businessUnderstanding ? understandingTone(businessUnderstanding.status) : "ready"}`} data-testid="agent-intent-frame" open={understandingNeedsAttention}>
@@ -454,24 +550,6 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
         <Suspense fallback={null}>
           <AgentSemanticPlan executionPlan={executionPlan} onSelectCandidates={onSelectSemanticCandidates} onSelectPath={onSelectSemanticPath} onSelectRoot={onSelectSemanticRoot} plan={semanticPlan} tableNameByKey={tableNameByKey} />
         </Suspense>
-      ) : null}
-      <div className="agentAnswerMetrics">
-        {answerCard.metrics.map((metric, index) => (
-          <div key={`${pairText(metric.label)}-${index}`}>
-            <span>{pairText(metric.label)}</span>
-            <strong>{formatBusinessValue(metric.value)}</strong>
-          </div>
-        ))}
-      </div>
-      {answerCard.rows.length && !clarification ? (
-        <div className="agentAnswerRows" data-testid="agent-answer-rows">
-          {answerCard.rows.slice(0, 5).map((row, index) => (
-            <div key={`${String(row.label ?? index)}-${index}`}>
-              <span>{String(row.label ?? biText("合计", "Total"))}</span>
-              <strong>{formatBusinessValue(row.value)}</strong>
-            </div>
-          ))}
-        </div>
       ) : null}
       {clarification ? (
         <div className="agentClarificationChoices" data-testid="agent-clarification-choices">

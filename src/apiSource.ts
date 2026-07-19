@@ -25,6 +25,10 @@ function normalizeFolderImportPlan(value: FolderImportPlan | Record<string, unkn
     fileCount: Number(plan.fileCount ?? 0),
     tableCount: Number(plan.tableCount ?? 0),
     willWrite: Boolean(plan.willWrite),
+    planFingerprint: plan.planFingerprint,
+    blockers: Array.isArray(plan.blockers) ? plan.blockers : [],
+    readyToCommit: plan.readyToCommit === true,
+    sourceRunId: plan.sourceRunId,
     items: Array.isArray(plan.items) ? plan.items : [],
     groups: Array.isArray(plan.groups) ? plan.groups : [],
     results: Array.isArray(plan.results) ? plan.results : undefined,
@@ -103,6 +107,8 @@ export function previewFolderImport(options: {
   path: string;
   limit?: number;
   recursive?: boolean;
+  uniqueFields?: string[];
+  conflictRule?: string;
 }) {
   return fetchJson<FolderImportPlan>("/api/import/folder/preview", emptyFolderImportPlan, {
     method: "POST",
@@ -114,6 +120,9 @@ export function commitFolderImport(options: {
   path: string;
   limit?: number;
   recursive?: boolean;
+  uniqueFields?: string[];
+  conflictRule?: string;
+  expectedPlan?: string;
   confirm?: boolean;
 }) {
   return fetchJson<FolderImportPlan>("/api/import/folder/commit", emptyFolderImportPlan, {

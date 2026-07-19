@@ -519,7 +519,7 @@ const checks = [
   run("cli-agent-formula-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "保存平均值公式 AVG([net_sales])"]),
   run("cli-agent-view-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "把 orders 中 channel=Douyin 的明细保存为 Douyin订单视图"]),
   run("cli-agent-metric-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "新增 orders 的 net_sales 合计指标，按 channel 分组"]),
-  run("cli-agent-widget-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "在默认看板添加 orders 的 net_sales 指标卡"]),
+  run("cli-agent-widget-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "在默认看板添加 orders 的 net_sales 合计指标卡"]),
   run("cli-agent-view-bridge-widget-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "基于当前视图起草一个 orders 的 net_sales 指标卡，不要直接写入"]),
   run("cli-agent-dashboard-filter-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "给 default 看板筛选 channel=Douyin"]),
   run("cli-agent-semantic-draft", "python", ["tools/aibi_cli.py", "--json", "ask", "把 orders 的 channel 字段设为维度"]),
@@ -541,6 +541,14 @@ checks.push({
     readOnlyAgentCheck.parsed?.actionDraft?.kind === "analysis.explain" &&
     readOnlyAgentCheck.parsed?.actionDraft?.status === "read-only",
 });
+
+const agentWidgetDraftKey = checks.find((check) => check.label === "cli-agent-widget-draft")?.parsed?.actionDraft?.actionKey;
+if (agentWidgetDraftKey) {
+  checks.push(run("cli-agent-confirm-widget-dry-run", "python", ["tools/aibi_cli.py", "--json", "confirm-action", agentWidgetDraftKey]));
+  checks.push(run("cli-agent-confirm-widget", "python", ["tools/aibi_cli.py", "--json", "confirm-action", agentWidgetDraftKey, "--yes"]));
+  checks.push(run("cli-agent-action-drafts-after-widget-confirm", "python", ["tools/aibi_cli.py", "--json", "action-drafts", "--limit", "20"]));
+  checks.push(run("cli-agent-dashboard-after-widget-confirm", "python", ["tools/aibi_cli.py", "--json", "dashboards", "--dashboard", "default"]));
+}
 
 const bootstrapOrdersSourceRunId = checks.find((check) => check.label === "verify-bootstrap-import-orders")?.parsed?.result?.sourceRunId;
 if (bootstrapOrdersSourceRunId) {
@@ -643,13 +651,6 @@ if (agentMetricDraftKey) {
   checks.push(run("cli-agent-confirm-metric", "python", ["tools/aibi_cli.py", "--json", "confirm-action", agentMetricDraftKey, "--yes"]));
   checks.push(run("cli-agent-action-drafts-after-metric-confirm", "python", ["tools/aibi_cli.py", "--json", "action-drafts", "--limit", "20"]));
   checks.push(run("cli-agent-metrics-after-confirm", "python", ["tools/aibi_cli.py", "--json", "list-metrics", "--table", "orders", "--all"]));
-}
-const agentWidgetDraftKey = checks.find((check) => check.label === "cli-agent-widget-draft")?.parsed?.actionDraft?.actionKey;
-if (agentWidgetDraftKey) {
-  checks.push(run("cli-agent-confirm-widget-dry-run", "python", ["tools/aibi_cli.py", "--json", "confirm-action", agentWidgetDraftKey]));
-  checks.push(run("cli-agent-confirm-widget", "python", ["tools/aibi_cli.py", "--json", "confirm-action", agentWidgetDraftKey, "--yes"]));
-  checks.push(run("cli-agent-action-drafts-after-widget-confirm", "python", ["tools/aibi_cli.py", "--json", "action-drafts", "--limit", "20"]));
-  checks.push(run("cli-agent-dashboard-after-widget-confirm", "python", ["tools/aibi_cli.py", "--json", "dashboards", "--dashboard", "default"]));
 }
 const agentDashboardFilterDraftKey = checks.find((check) => check.label === "cli-agent-dashboard-filter-draft")?.parsed?.actionDraft?.actionKey;
 if (agentDashboardFilterDraftKey) {

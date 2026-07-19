@@ -8,6 +8,7 @@ from contextlib import closing
 from typing import Any, Callable
 
 from bi_cli_core import now_iso, slug
+from apparel_entity_mapping_service import build_apparel_entity_mapping_proof
 
 
 def parse_json_object(value: Any, default: Any | None = None) -> Any:
@@ -97,6 +98,9 @@ def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
     # with duplicate keys on both sides is intrinsically ambiguous here.
     if expands and int(metrics.get("leftDuplicateKeyGroups") or 0) > 0 and int(metrics.get("rightDuplicateKeyGroups") or 0) > 0:
         blockers.append("many-to-many-row-expansion")
+    apparel_proof = preview.get("apparelEntityMappingProof") if isinstance(preview.get("apparelEntityMappingProof"), dict) else None
+    if apparel_proof and apparel_proof.get("applicable") is True and apparel_proof.get("status") != "validated":
+        blockers.extend(f"apparel:{item}" for item in apparel_proof.get("blockers") or ["entity-mapping-proof-not-validated"])
     return {
         "schema": "aibi-relationship-validation/v1",
         "status": "validated" if not blockers else "review-required",
@@ -105,6 +109,7 @@ def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
         "warnings": list(preview.get("warnings") or []),
         "filters": list(preview.get("filters") or []),
         "preaggregation": preview.get("preaggregation") or {},
+        "apparelEntityMappingProof": apparel_proof,
         "validatedAt": now_iso(),
     }
 
@@ -867,6 +872,16 @@ def build_relationship_save_plan(
         filters=filters,
         preaggregation=preaggregation,
     )
+    resolved_workspace_id = str(workspace_id or left["workspace_id"])
+    apparel_mapping_proof = build_apparel_entity_mapping_proof(
+        connection,
+        workspace_id=resolved_workspace_id,
+        left_table_key=str(left["table_key"]),
+        right_table_key=str(right["table_key"]),
+        mappings=normalized_mappings,
+        relationship_preview=preview,
+    )
+    preview["apparelEntityMappingProof"] = apparel_mapping_proof
     relationship = {
         "leftTable": left_table,
         "rightTable": right_table,
@@ -898,6 +913,7 @@ def build_relationship_save_plan(
         "confidence": relationship["confidence"],
         "filters": preview["filters"],
         "preaggregation": preview["preaggregation"] or {},
+        "apparelEntityMappingProof": apparel_mapping_proof,
     }
     return {"relationship": proposed, "relationshipPreview": preview}
 

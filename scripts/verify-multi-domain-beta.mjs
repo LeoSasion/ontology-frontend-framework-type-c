@@ -77,12 +77,12 @@ function executeDomain(fixture, iteration) {
   ]);
   checks.push(check("single-chart-container-created", seedDashboard.ok && seedDashboard.parsed?.savedDashboardModules === 1, seedDashboard.parsed));
 
-  const explicit = runCli(env, ["ask", `请用 ${fixture.measure} 按 ${fixture.dimension} 生成一个柱状图`]);
+  const explicit = runCli(env, ["ask", `请将 ${fixture.measure} 按 ${fixture.dimension} 求和并生成一个柱状图`]);
   const explicitQuery = explicit.parsed?.answerCard?.query;
   const actionKey = explicit.parsed?.actionDraft?.actionKey;
   checks.push(check(
     "explicit-single-chart-uses-requested-fields",
-    explicit.ok && explicit.parsed?.requiresConfirmation === true && explicitQuery?.measure === fixture.measure && explicitQuery?.group === fixture.dimension && actionKey,
+    explicit.ok && explicit.parsed?.requiresConfirmation === true && explicitQuery?.measure === fixture.measure && explicitQuery?.group === fixture.dimension && explicitQuery?.aggregation === "sum" && actionKey,
     { query: explicitQuery, actionDraft: explicit.parsed?.actionDraft },
   ));
   const explicitConfirm = actionKey ? runCli(env, ["confirm-action", actionKey, "--yes"]) : { ok: false, parsed: null };

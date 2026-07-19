@@ -41,6 +41,47 @@ def numeric_sql(expression: str) -> str:
     return f"TRY_CAST(NULLIF(REPLACE(TRIM(CAST({expression} AS VARCHAR)), ',', ''), '') AS DOUBLE)"
 
 
+def sql_literal(value: Any) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def compile_filter_sql(filters: list[dict[str, Any]] | None, *, dialect: str) -> str:
+    clauses: list[str] = []
+    for item in filters or []:
+        field = quote_identifier(str(item.get("field") or ""))
+        operator = str(item.get("operator") or "")
+        value = sql_literal(item.get("value"))
+        if not field or field == '""':
+            raise QueryRuntimeError("Filter field is required")
+        if operator == "equals":
+            clauses.append(f"CAST({field} AS VARCHAR) = {value}")
+        elif operator == "not-equals":
+            clauses.append(f"CAST({field} AS VARCHAR) <> {value}")
+        elif operator == "contains":
+            clauses.append(f"CAST({field} AS VARCHAR) LIKE '%' || {value} || '%'")
+        elif operator == "not-contains":
+            clauses.append(f"CAST({field} AS VARCHAR) NOT LIKE '%' || {value} || '%'")
+        elif operator in {"gt", "gte", "lt", "lte"}:
+            comparison = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[operator]
+            if dialect == "duckdb":
+                clauses.append(f"{numeric_sql(field)} {comparison} TRY_CAST({value} AS DOUBLE)")
+            elif dialect == "sqlite":
+                clauses.append(f"CAST(NULLIF(REPLACE({field}, ',', ''), '') AS REAL) {comparison} CAST({value} AS REAL)")
+            else:
+                raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
+        elif operator in {"date-gte", "date-lt"}:
+            comparison = ">=" if operator == "date-gte" else "<"
+            if dialect == "duckdb":
+                clauses.append(f"TRY_CAST({field} AS TIMESTAMP) {comparison} TRY_CAST({value} AS TIMESTAMP)")
+            elif dialect == "sqlite":
+                clauses.append(f"datetime({field}) {comparison} datetime({value})")
+            else:
+                raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
+        else:
+            raise QueryRuntimeError(f"Unsupported filter operator: {operator}")
+    return " AND ".join(clauses)
+
+
 def cursor_rows(cursor: Any) -> list[dict[str, Any]]:
     columns = [column[0] for column in cursor.description or []]
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -71,6 +112,7 @@ def compile_aggregate_sql(
     measure: str,
     aggregation: str,
     limit: int,
+    filters: list[dict[str, Any]] | None = None,
 ) -> str:
     if aggregation not in SAFE_AGGREGATIONS:
         raise QueryRuntimeError(f"Unsupported aggregation: {aggregation}")
@@ -80,17 +122,20 @@ def compile_aggregate_sql(
         select_measure = f"COUNT(DISTINCT {quote_identifier(measure)}) AS value"
     else:
         select_measure = f"{aggregation.upper()}({numeric_sql(quote_identifier(measure))}) AS value"
+    where_sql = compile_filter_sql(filters, dialect="duckdb")
+    where_clause = f"WHERE {where_sql} " if where_sql else ""
     if group:
         safe_limit = max(1, min(int(limit), 500))
         group_sql = quote_identifier(group)
         return (
             f"SELECT {group_sql} AS label, {select_measure} "
             f"FROM {quote_identifier(physical_table)} "
+            f"{where_clause}"
             f"GROUP BY {group_sql} "
             f"ORDER BY value DESC NULLS LAST "
             f"LIMIT {safe_limit}"
         )
-    return f"SELECT {select_measure} FROM {quote_identifier(physical_table)}"
+    return f"SELECT {select_measure} FROM {quote_identifier(physical_table)} {where_clause}".strip()
 
 
 def run_duckdb_aggregate_query(
@@ -103,6 +148,7 @@ def run_duckdb_aggregate_query(
     measure: str,
     aggregation: str,
     limit: int,
+    filters: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     try:
         import duckdb  # type: ignore
@@ -116,6 +162,7 @@ def run_duckdb_aggregate_query(
         measure=measure,
         aggregation=aggregation,
         limit=limit,
+        filters=filters,
     )
     try:
         with duckdb.connect(str(duckdb_path)) as duck_connection:
@@ -145,6 +192,7 @@ def run_sqlite_aggregate_query(
     measure: str,
     aggregation: str,
     limit: int,
+    filters: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if aggregation == "count":
         select_measure = "COUNT(*) AS value"
@@ -154,16 +202,19 @@ def run_sqlite_aggregate_query(
         select_measure = (
             f"{aggregation.upper()}(CAST(NULLIF(REPLACE({quote_identifier(measure)}, ',', ''), '') AS REAL)) AS value"
         )
+    where_sql = compile_filter_sql(filters, dialect="sqlite")
+    where_clause = f"WHERE {where_sql} " if where_sql else ""
     if group:
         sql = (
             f"SELECT {quote_identifier(group)} AS label, {select_measure} "
             f"FROM {quote_identifier(physical_table)} "
+            f"{where_clause}"
             f"GROUP BY {quote_identifier(group)} "
             "ORDER BY value DESC LIMIT ?"
         )
         rows = sqlite_cursor_rows(sqlite_connection.execute(sql, (limit,)))
     else:
-        sql = f"SELECT {select_measure} FROM {quote_identifier(physical_table)}"
+        sql = f"SELECT {select_measure} FROM {quote_identifier(physical_table)} {where_clause}".strip()
         rows = sqlite_cursor_rows(sqlite_connection.execute(sql))
     return {
         "engine": "sqlite",

@@ -118,13 +118,13 @@ export function useAppDataActions({
     });
   }, [navigateTo, setLastActionResult, setStatus, setWorkbench]);
 
-  const handlePreviewFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean }) => {
+  const handlePreviewFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string }) => {
     const result = await previewFolderImport(options);
     setSection("sources");
     return result;
   }, [setSection]);
 
-  const handleCommitFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; confirm?: boolean }) => {
+  const handleCommitFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => {
     const result = await commitFolderImport(options);
     const refreshed = await refreshStatusAndWorkbench();
     setLastActionResult(result as unknown as Record<string, unknown>);
