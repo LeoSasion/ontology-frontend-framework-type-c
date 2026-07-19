@@ -76,9 +76,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
-    check("schema-v14-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 14 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
+    check("schema-v15-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 15 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
 
-    root_turn, root_run, root_unit = create_result(env, "请用net_sales按channel生成柱状图")
+    root_turn, root_run, root_unit = create_result(env, "请将net_sales按channel合计并生成柱状图")
     session_key = str((root_turn.get("session") or {}).get("sessionKey") or "")
     thread_args = ["exploration-thread-create", "--run", str(root_run.get("run_key") or ""), "--unit", str(root_unit.get("unitKey") or ""), "--session", session_key, "--turn", str((root_turn.get("turn") or {}).get("turnKey") or ""), "--title", "有限研究", "--label", "渠道基线"]
     thread_preview = run(thread_args, env)
@@ -86,13 +86,13 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     thread_key = str(thread_created.get("threadKey") or "")
     root_anchor = str(thread_created.get("anchorKey") or "")
 
-    counter_turn, counter_run, counter_unit = create_result(env, "请用net_sales按category生成柱状图", parent_run=str(root_run.get("run_key") or ""), session=session_key, label="品类反例")
+    counter_turn, counter_run, counter_unit = create_result(env, "请将net_sales按category合计并生成柱状图", parent_run=str(root_run.get("run_key") or ""), session=session_key, label="品类反例")
     counter_args = ["exploration-anchor-add", "--thread", thread_key, "--parent-anchor", root_anchor, "--run", str(counter_run.get("run_key") or ""), "--unit", str(counter_unit.get("unitKey") or ""), "--session", session_key, "--turn", str((counter_turn.get("turn") or {}).get("turnKey") or ""), "--label", "品类反例"]
     counter_preview = run(counter_args, env)
     counter_added = confirm(counter_args, counter_preview.get("explorationPlan") or {}, env)
     counter_anchor = str(counter_added.get("anchorKey") or "")
 
-    sensitivity_turn, sensitivity_run, sensitivity_unit = create_result(env, "请用net_sales按shop生成柱状图", parent_run=str(root_run.get("run_key") or ""), session=session_key, label="门店敏感性")
+    sensitivity_turn, sensitivity_run, sensitivity_unit = create_result(env, "请将net_sales按shop合计并生成柱状图", parent_run=str(root_run.get("run_key") or ""), session=session_key, label="门店敏感性")
     sensitivity_args = ["exploration-anchor-add", "--thread", thread_key, "--parent-anchor", root_anchor, "--run", str(sensitivity_run.get("run_key") or ""), "--unit", str(sensitivity_unit.get("unitKey") or ""), "--session", session_key, "--turn", str((sensitivity_turn.get("turn") or {}).get("turnKey") or ""), "--label", "门店敏感性"]
     sensitivity_preview = run(sensitivity_args, env)
     sensitivity_added = confirm(sensitivity_args, sensitivity_preview.get("explorationPlan") or {}, env)
@@ -148,7 +148,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     observed_run = sensitivity_observed.get("researchRun") or {}
     check("counterexample-and-sensitivity-use-current-same-thread-anchors", counter_observed.get("changed") is True and sensitivity_observed.get("changed") is True and observed_run.get("coverage", {}).get("counterexample") == 1 and observed_run.get("coverage", {}).get("sensitivity") == 1 and all(item.get("freshness", {}).get("usableForPlanning") is True for item in observed_run.get("observations") or []) and not forbidden_rows(observed_run), observed_run)
 
-    other_turn, other_run, other_unit = create_result(env, "请用quantity按channel生成柱状图")
+    other_turn, other_run, other_unit = create_result(env, "请将quantity按channel合计并生成柱状图")
     other_args = ["exploration-thread-create", "--run", str(other_run.get("run_key") or ""), "--unit", str(other_unit.get("unitKey") or ""), "--session", str((other_turn.get("session") or {}).get("sessionKey") or ""), "--turn", str((other_turn.get("turn") or {}).get("turnKey") or "")]
     other_preview = run(other_args, env)
     other_created = confirm(other_args, other_preview.get("explorationPlan") or {}, env)

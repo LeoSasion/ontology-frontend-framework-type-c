@@ -21,6 +21,8 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
     : storedPathProof?.hopProofs ?? [];
   const verifiedHops = hopProofs.filter((proof) => proof.proofStatus === "verified").length;
   const sourceTableCount = receipt?.source.tableKeys?.length ?? (receipt?.source.tableKey ? 1 : 0);
+  const resultState = receipt?.resultState ?? receipt?.status ?? "blocked";
+  const coverageComplete = receipt?.selection.executionCoverage?.complete === true;
 
   useEffect(() => {
     if (!run?.run_key) return;
@@ -30,7 +32,7 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
   return (
     <div className="agentTrustAdvanced" data-testid="agent-trust-advanced">
       <div className="agentTrustSummary">
-        <span><strong>{receipt?.status ?? biText("等待", "waiting")}</strong><small>{biText("查询计划", "query plan")}</small></span>
+        <span><strong>{resultState}</strong><small>{biText("结果状态", "result state")}</small></span>
         <span><strong>{result.context?.matchedTermCount ?? 0}</strong><small>{biText("命中术语", "matched terms")}</small></span>
         <span><strong>{result.context?.confirmedQueries?.length ?? 0}</strong><small>{biText("确认问法", "confirmed queries")}</small></span>
         <span><strong>{branchCount}</strong><small>{biText("比较分支", "branches")}</small></span>
@@ -45,6 +47,9 @@ export function AgentTrustAdvancedPanel({ result, canBranch, onAskBranch }: Agen
           <div><dt>{biText("最终粒度", "Final grain")}</dt><dd>{receipt.selection.executionPlan?.finalGrain?.join(" + ") || "-"}</dd></div>
           <div><dt>{biText("路径证明", "Path proof")}</dt><dd>{receipt.source.relationshipPathFingerprint?.slice(0, 12) || "-"}</dd></div>
           <div><dt>{biText("未决项", "Unresolved")}</dt><dd>{receipt.unresolved.length}</dd></div>
+          <div><dt>current sourceRun</dt><dd>{receipt.source.currentSourceRunId?.slice(0, 12) || "-"}</dd></div>
+          <div><dt>{biText("执行覆盖", "Execution coverage")}</dt><dd>{coverageComplete ? biText("完整", "complete") : biText("未完成", "incomplete")}</dd></div>
+          <div><dt>{biText("可发布经营数字", "Business conclusion")}</dt><dd>{receipt.validation.canSupportBusinessConclusion === true ? biText("允许", "allowed") : biText("禁止", "blocked")}</dd></div>
         </dl>
       ) : null}
       <details className="advancedDetails compactAdvanced">

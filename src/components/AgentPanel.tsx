@@ -493,6 +493,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
       {result.answerCard ? (
         <Suspense fallback={null}>
           <AgentAnswerCard
+            analysisUnit={result.analysisUnit}
             answerCard={result.answerCard}
             answerEvidenceSteps={answerEvidenceSteps}
             answerQuery={answerQuery}

@@ -188,7 +188,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-forecast-readiness-") as temp_dir:
         repeated.get("parsed"),
     )
 
-    agent = run_cli(env, "agent-forecast-readiness", ["ask", "检查 value 按 event_date 的预测准备度，预测跨度为3，评估截止为2025-12-01，粒度为月"])
+    agent = run_cli(env, "agent-forecast-readiness", ["ask", "检查 value 按 event_date 合计的预测准备度，预测跨度为3，评估截止为2025-12-01，粒度为月"])
     agent_payload = agent.get("parsed") or {}
     agent_readiness = agent_payload.get("forecastReadiness") or {}
     check(

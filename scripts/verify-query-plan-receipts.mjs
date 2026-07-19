@@ -85,6 +85,8 @@ try {
   checks.push({
     label: "agent-and-action-share-receipt",
     ok: ask.parsed?.queryPlanReceipt?.status === "executed"
+      && ask.parsed?.queryPlanReceipt?.resultState === "executed"
+      && ask.parsed?.queryPlanReceipt?.validation?.canSupportBusinessConclusion === true
       && ask.parsed?.queryPlanReceipt?.actionKey === ask.parsed?.actionDraft?.actionKey
       && ask.parsed?.answerCard?.queryPlanReceipt?.receiptKey === ask.parsed?.queryPlanReceipt?.receiptKey,
   });

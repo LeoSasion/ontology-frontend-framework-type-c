@@ -57,6 +57,8 @@
 - 单值物化快照可经 dry-run 和精确确认建立本地 Metric Monitor；首次运行只建 baseline，后续只比较兼容的 current 快照并记录可重放 Trace，无阈值时不得制造告警，任何运行都不得启用后台调度、通知、Provider 或业务系统写入。
 - 多个已登记 Adapter 可生成只读联邦计划证明；只有实时来源指纹、字段语义、实体键、validated 关系版本、粒度、过滤 allowlist 和预算全部通过才可标记 `provable`。证明不得执行跨源查询、复制业务行、暴露路径/凭据或授予物化与写入权限。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
+- 服装电商可信查询必须遵守 [服装电商可信查询 v1](apparel-commerce-trusted-query.md)：会改变数字的 QueryIntent 槽位必须完整进入执行计划；只有绑定 current workspace/sourceRun、语义与结果指纹的 `executed` Receipt 可以投影经营数字。
+- 文件夹导入的用户确认对象必须是包含来源内容哈希、逻辑表分组、键 authority、跨文件重复和逐表行影响的不可变计划；所有逻辑表原子成功后才能切换 current sourceRun。
 
 工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；历史计划复用由 [确认计划记忆](confirmed-plan-memory.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
 
@@ -67,6 +69,10 @@
 - 创建空看板只创建容器，不注入组件。
 - 已执行查询形成绑定 Receipt 的 Analysis Unit；冻结结果、指纹、形状和验证，不重新猜测口径。
 - Chart Adapter 只选择与 Unit 形状兼容的白名单图表；不兼容时解释性阻断。
+- Agent 的可视化答案只消费同次 current Query Receipt、Analysis Unit 与 Chart Adapter；不得在浏览器重查、重聚合、补零、猜单位或从 Provider 文案抽取数字。
+- 只有 `executed` Receipt、完整执行覆盖、正行数、可信结论门禁以及 Receipt/Unit/Adapter 键和结果指纹全部严格一致时，才可挂载经营数字图表；`draft | blocked | simulation | stale` 必须卸载旧图并显示明确状态，不得保留确定金额、排名、比例或趋势。
+- 兼容结果优先直接投影为指标、比较、排名、趋势、构成或表格；服装 Pareto 仅可把同一结果集中已证明的头部与 80% 边界绘成证据图，并披露显示实体数与完整全集，不能把不完整行冒充完整累计曲线。
+- 图表必须同时提供等价文本或数据表、非仅颜色的图例、键盘可达标记与窄屏无横向溢出；格式化只影响显示，不改变 Receipt 绑定的原始值。
 - 导出只消费已验证 Receipt/Unit，不重新查询或写业务库。
 - 分析分支必须保留父结果、查询、动作和拒绝历史；已验证结果可以经预演和确认形成工作区级 Exploration Thread、不可变 Anchor 与结果板。
 - 线程恢复必须实时复核 Run、Receipt、Unit、Session/Turn 和来源绑定；失效历史仍可查看但不得继续推导，也不得回退到任意“最新”结果。
@@ -117,6 +123,7 @@
 | 探索线程、分析锚点与结果板 | [探索线程与可恢复分析上下文](exploration-threads.md) |
 | 有限研究、不可变计划修订与统一 Trace | [有限 Research Run](finite-research-runs.md) |
 | 预测准备度、物化快照、Metric Monitor 与只读联邦证明 | [本地可信分析后续能力](local-trusted-analytics.md) |
+| 服装电商可信查询、原子导入、实体映射、商品方法与结果五态 | [服装电商可信查询 v1](apparel-commerce-trusted-query.md) |
 | CLI 命令与突变模式 | [BI CLI 合同](bi-cli-contract.md) |
 | 日期证据保留规则 | [验收证据策略](../artifacts/README.md) |
 

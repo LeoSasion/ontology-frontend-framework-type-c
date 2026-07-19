@@ -27,7 +27,7 @@ flowchart TB
   subgraph Application["应用运行时"]
     REG["Parser + Command Registry"]
     ROUTE["领域分发<br/>Control · Analysis · Data · Delivery"]
-    CASES["Application Use Cases（P0）<br/>Ask · Query · Import · Confirm · Deliver"]
+    CASES["Application Use Cases（P0 进行中）<br/>领域边界已落地 · Agent 交互继续拆分"]
     GUARD["Policy / Trust Gates<br/>权限 · 新鲜度 · 工作区 · 预算 · 确认"]
   end
 
@@ -74,12 +74,13 @@ flowchart TB
 
 ## P0：消除运行时结构性风险
 
-### P0-A｜拆出 Application Use Case
+### P0-A｜拆出 Application Use Case（进行中）
 
 - 用户结果：网页、CLI、Job 对同一动作得到完全一致的计划、阻断和回执。
 - 实现边界：把当前组合内核中的 `ask`、语义查询、导入、确认、看板交付拆成显式 Use Case；每个 Use Case 接收类型化 Command，返回统一 Result，不读取进程参数。
 - 失败行为：未知命令、缺失工作区或不满足 Guard 时返回结构化失败，不回退到其他命令或通用聚合。
 - 退出条件：组合内核只负责依赖装配且不超过 800 行；171 条现有命令合同无非预期变化；专项和完整回归通过。
+- 当前批次：组合内核已退化为只做兼容导出的依赖装配面，领域分发器已直接依赖显式 Use Case；后续继续拆分 Agent 交互职责并引入类型化 Command/Result。当前实现事实由 [实现状态](implementation-status.md) 维护。
 
 ### P0-B｜建立长驻 Runtime Host 与单写者队列
 
@@ -94,6 +95,13 @@ flowchart TB
 - 实现边界：导入或确认写入时更新分析副本与 manifest；查询只读已发布版本；SQLite 保存控制面和元数据，DuckDB 保存分析数据，跨库发布由 Unit of Work 记录阶段和恢复点。
 - 失败行为：副本缺失、版本漂移或发布中断时阻断查询并给出可恢复动作，不使用旧副本冒充 current。
 - 退出条件：常规查询路径不存在整表同步；崩溃恢复、schema 变更、删除/重命名、freshness 和双库回滚验证通过，并建立基准数据集性能预算。
+
+### P0-D｜闭合服装电商可信查询
+
+- 用户结果：从一次确认的多文件批次得到 current sourceRun 后，中文筛选、时间、粒度和商品方法只在真实执行计划完整覆盖时返回经营数字。
+- 实现边界：唯一合同见 [服装电商可信查询 v1](apparel-commerce-trusted-query.md)；Core 管 QueryIntent、Import Plan、Binding、Proof、Receipt 与结果状态，Domain Pack 只贡献服装实体候选和方法要求。
+- 失败行为：自动键、计划漂移、非 current sourceRun、未下推筛选/时间、未证明实体映射、非 executed 结果或方法证据不足全部 fail closed。
+- 退出条件：Trusted Execution Gate、Atomic Import Plan、Apparel Entity Mapping Proof、排行/集中度/Pareto 和五态 UI 均通过确定性与客户路径验收。
 
 ## P1：降低前后端耦合与刷新成本
 

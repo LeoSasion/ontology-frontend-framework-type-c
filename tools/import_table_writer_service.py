@@ -15,6 +15,7 @@ from import_policy import (
 )
 from relationship_command_service import relationship_record_payload, relationship_validation_snapshot
 from relationship_tools import build_relationship_preview
+from apparel_entity_mapping_service import build_apparel_entity_mapping_proof
 
 
 def should_create_metric_for_measure(measure: str) -> bool:
@@ -123,6 +124,14 @@ def revalidate_relationships_for_table(
                 quote_identifier=quote_identifier,
                 filters=payload.get("filters") or [],
                 preaggregation=payload.get("preaggregation") or None,
+            )
+            preview["apparelEntityMappingProof"] = build_apparel_entity_mapping_proof(
+                connection,
+                workspace_id=workspace_id,
+                left_table_key=str(left["table_key"]),
+                right_table_key=str(right["table_key"]),
+                mappings=payload["fieldMappings"],
+                relationship_preview=preview,
             )
             validation = relationship_validation_snapshot(preview)
             validation["dataVersions"] = {

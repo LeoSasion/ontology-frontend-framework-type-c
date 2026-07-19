@@ -24,7 +24,7 @@ try {
     run("import", ["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"]),
     run("dashboard", ["business-dashboard", "--op", "create", "--table", "orders", "--name", "Trajectory verification", "--limit", "1", "--yes"]),
   ];
-  const root = run("root-analysis", ["ask", "请用net_sales按channel生成柱状图"]);
+  const root = run("root-analysis", ["ask", "请将net_sales按channel合计并生成柱状图"]);
   checks.push(root);
   const rootRunKey = root.parsed?.analysisRun?.run_key;
   const rootActionKey = root.parsed?.actionDraft?.actionKey;
@@ -46,7 +46,7 @@ try {
   checks.push(confirmedRoot);
   checks.push({ label: "chart-confirmation-confirms-run", ok: confirmedRoot.parsed?.analysisRun?.status === "confirmed" });
 
-  const branch = run("create-branch", ["ask", "--parent-run", rootRunKey, "--branch-label", "分类比较", "请用net_sales按category生成柱状图"]);
+  const branch = run("create-branch", ["ask", "--parent-run", rootRunKey, "--branch-label", "分类比较", "请将net_sales按category合计并生成柱状图"]);
   checks.push(branch);
   const branchRunKey = branch.parsed?.analysisRun?.run_key;
   checks.push({

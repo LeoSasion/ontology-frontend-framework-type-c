@@ -506,7 +506,13 @@ def import_commit_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def preview_import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
-    return preview_import_folder_command_service(args, open_db=open_db, build_import_preview=build_import_preview)
+    return preview_import_folder_command_service(
+        args,
+        open_db=open_db,
+        build_import_preview=build_import_preview,
+        read_table_file=read_table_file,
+        active_workspace_id=active_workspace_id,
+    )
 
 
 def import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
@@ -515,6 +521,8 @@ def import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
         open_db=open_db,
         build_import_preview=build_import_preview,
         execute_import_commit=execute_import_commit,
+        read_table_file=read_table_file,
+        active_workspace_id=active_workspace_id,
     )
 
 

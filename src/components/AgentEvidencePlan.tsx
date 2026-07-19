@@ -124,7 +124,7 @@ export function AgentEvidencePlan({ plan, businessUnderstanding }: { plan: Agent
   const skillBlocked = skills.some((skill) => skillTone(skill.status) === "blocked");
   const isBlocked = blocked > 0 || skillBlocked || ["blocked", "failed"].includes(plan.status.toLowerCase());
   return (
-    <details className={`agentEvidencePlan ${isBlocked ? "blocked" : "ready"}`} data-testid="agent-evidence-plan" open={isBlocked}>
+    <details className={`agentEvidencePlan ${isBlocked ? "blocked" : "ready"}`} data-testid="agent-evidence-plan">
       <summary>
         <span>{biText("证据计划", "Evidence plan")}</span>
         <strong>{completed}/{plan.steps.length} · {statusText(plan.status)}</strong>

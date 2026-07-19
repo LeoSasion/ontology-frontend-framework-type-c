@@ -26,7 +26,7 @@ from workspace_command_service import (
 )
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 14
+CURRENT_SQLITE_SCHEMA_VERSION = 15
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -654,6 +654,17 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           manifest_json TEXT NOT NULL,
           created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS source_run_tables (
+          source_run_id TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          table_key TEXT NOT NULL,
+          data_version INTEGER NOT NULL,
+          row_count INTEGER NOT NULL,
+          created_at TEXT NOT NULL,
+          PRIMARY KEY(source_run_id, table_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_source_run_tables_workspace_run
+          ON source_run_tables(workspace_id, source_run_id);
         CREATE TABLE IF NOT EXISTS workspace_domain_packs (
           workspace_id TEXT NOT NULL,
           pack_id TEXT NOT NULL,

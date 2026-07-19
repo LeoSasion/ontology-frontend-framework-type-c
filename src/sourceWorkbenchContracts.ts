@@ -58,8 +58,8 @@ export type SourceWorkbenchProps = {
   formulaPreview: FormulaPreviewPayload;
   onPreview: (options: ImportOptions) => Promise<ImportPreview>;
   onCommitImport: (options: ImportOptions) => Promise<void>;
-  onPreviewFolderImport: (options: { path: string; limit?: number; recursive?: boolean }) => Promise<FolderImportPlan>;
-  onCommitFolderImport: (options: { path: string; limit?: number; recursive?: boolean; confirm?: boolean }) => Promise<FolderImportPlan>;
+  onPreviewFolderImport: (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string }) => Promise<FolderImportPlan>;
+  onCommitFolderImport: (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => Promise<FolderImportPlan>;
   onImportPolicy: (options: ImportPolicyOptions) => Promise<void>;
   onRemoveImportJob: (options: { jobKey: string; confirm?: boolean }) => Promise<void>;
   onInspectSource: (table: string) => Promise<void>;

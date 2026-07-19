@@ -130,7 +130,7 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `forecast-readiness` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--horizon` |
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |
 | `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--yes` |
-| `import-folder` | `import` | `dry-run-confirm` | `yes` | `no` | `path`, `--limit`, `--no-recursive`, `--yes` |
+| `import-folder` | `import` | `dry-run-confirm` | `yes` | `no` | `path`, `--limit`, `--no-recursive`, `--unique-fields`, `--conflict-rule`, `--expected-plan`, `--yes` |
 | `infer-metrics` | `metric` | `dry-run-confirm` | `yes` | `no` | `--table`, `--yes` |
 | `infer-semantics` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--overwrite-manual`, `--yes` |
 | `inspect-table` | `source` | `read-only` | `no` | `no` | `table` |
@@ -164,7 +164,7 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `preferences` | `settings` | `dry-run-confirm` | `yes` | `no` | `--theme-key`, `--require-delete-name-confirmation`, `--auto-save-dashboard-on-switch`, `--agent-can-manage-generated-assets`, `--agent-can-manage-manual-assets`, `--yes` |
 | `preview-connector` | `connector` | `read-only` | `no` | `no` | `--connector`, `--limit` |
 | `preview-import` | `import` | `evidence-receipt` | `no` | `yes` | `file`, `--table`, `--unique-fields`, `--conflict-rule` |
-| `preview-import-folder` | `import` | `evidence-receipt` | `no` | `yes` | `path`, `--limit`, `--no-recursive` |
+| `preview-import-folder` | `import` | `evidence-receipt` | `no` | `yes` | `path`, `--limit`, `--no-recursive`, `--unique-fields`, `--conflict-rule` |
 | `quality-doctor` | `system` | `read-only` | `no` | `no` | - |
 | `query` | `query` | `evidence-receipt` | `no` | `yes` | `--table`, `--group`, `--measure`, `--agg`, `--limit`, `--request` |
 | `query-metric` | `query` | `read-only` | `no` | `no` | `metric`, `--group`, `--filter`, `--sort`, `--limit` |

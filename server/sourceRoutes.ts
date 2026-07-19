@@ -104,6 +104,8 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     const args = ["preview-import-folder", folderPath];
     if (body.limit) args.push("--limit", String(body.limit));
     if (body.recursive === false) args.push("--no-recursive");
+    if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
+    if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
     const result = await cli(args);
     sendJson(response, 200, result);
     return true;
@@ -170,6 +172,9 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     const args = ["import-folder", folderPath];
     if (body.limit) args.push("--limit", String(body.limit));
     if (body.recursive === false) args.push("--no-recursive");
+    if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
+    if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
+    if (body.expectedPlan) args.push("--expected-plan", String(body.expectedPlan));
     if (body.confirm === true) args.push("--yes");
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : 200, result);

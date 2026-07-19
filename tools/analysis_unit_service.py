@@ -543,7 +543,7 @@ def analysis_units_command(
     open_db: Callable[[], Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
-    with open_db() as connection:
+    with closing(open_db()) as connection:
         workspace_id = active_workspace_id(connection)
         if args.unit:
             unit = get_analysis_unit(connection, workspace_id, args.unit)
@@ -588,7 +588,7 @@ def analysis_unit_verify_command(
     open_db: Callable[[], Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
-    with open_db() as connection:
+    with closing(open_db()) as connection:
         workspace_id = active_workspace_id(connection)
         unit = get_analysis_unit(connection, workspace_id, args.unit)
         if not unit:
@@ -630,7 +630,7 @@ def chart_adapt_command(
     open_db: Callable[[], Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
-    with open_db() as connection:
+    with closing(open_db()) as connection:
         workspace_id = active_workspace_id(connection)
         unit = get_analysis_unit(connection, workspace_id, args.unit)
         if not unit:
@@ -679,7 +679,7 @@ def attach_analysis_unit(
         if token.lower() in request.lower():
             preferred = chart
             break
-    with open_db() as connection:
+    with closing(open_db()) as connection:
         source = receipt.get("source") if isinstance(receipt.get("source"), dict) else {}
         workspace_id = str(source.get("workspaceId") or active_workspace_id(connection))
         unit = create_analysis_unit(

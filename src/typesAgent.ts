@@ -383,6 +383,7 @@ export interface AgentAskResult {
   };
   answerCard?: {
     kind: string;
+    resultState?: "executed" | "draft" | "blocked" | "simulation" | "stale" | string;
     title: { zh: string; en: string };
     summary: { zh: string; en: string };
     confidence: string;
@@ -727,9 +728,12 @@ export interface QueryPlanReceipt {
   schema: "aibi-query-plan-receipt/v1" | string;
   receiptKey: string;
   request: string;
-  status: "executed" | "blocked" | string;
+  status: "executed" | "draft" | "blocked" | "simulation" | "stale" | string;
+  resultState?: "executed" | "draft" | "blocked" | "simulation" | "stale" | string;
   source: {
     workspaceId: string;
+    currentSourceRunId?: string | null;
+    currentSourceRunBinding?: Record<string, unknown>;
     tableKey?: string | null;
     tableKeys?: string[];
     tables?: Array<{
@@ -754,6 +758,8 @@ export interface QueryPlanReceipt {
     semanticPlan?: SemanticQueryPlan | null;
     executionPlan?: SemanticQueryExecutionPlan | null;
     relationshipPathProof?: RelationshipHopProof[] | RelationshipPathProof | null;
+    queryIntent?: Record<string, unknown> | null;
+    executionCoverage?: Record<string, unknown> | null;
   };
   runtime: {
     engine?: string | null;
@@ -762,7 +768,7 @@ export interface QueryPlanReceipt {
     executionPlanHash?: string | null;
     sqlIntent: string;
   };
-  validation: Record<string, boolean>;
+  validation: Record<string, unknown>;
   resultBinding?: {
     resultFingerprint: string;
     rowCount: number;

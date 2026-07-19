@@ -28,6 +28,7 @@
 | [有限 Research Run](finite-research-runs.md) | 有限研究预算、不可变计划修订、反例/敏感性证据与统一追踪 |
 | [本地可信分析后续能力](local-trusted-analytics.md) | Forecast Readiness、物化快照、Metric Monitor 与只读联邦证明的边界和退出条件 |
 | [语义查询合同](semantic-query-planning.md) | 字段消歧、统计粒度、关系路径和执行阻塞 |
+| [服装电商可信查询 v1](apparel-commerce-trusted-query.md) | current 查询、原子多文件导入、服装实体映射、商品方法与五态结果合同 |
 | [通用扩展框架](extensible-domain-framework.md) | Core、Domain Pack、Knowledge Pack、Connector、Provider 与领域单元合同 |
 | [BI CLI 合同](bi-cli-contract.md) | 由实时 CLI 自动生成的命令、参数与突变合同 |
 | [验收证据策略](../artifacts/README.md) | 日期证据的保留条件、禁止内容和当前归档状态 |
@@ -39,6 +40,7 @@
 | 产品是什么、为谁服务 | `PRODUCT.md` |
 | 当前版本必须做什么 | `docs/PRD.md` |
 | 当前已经做到什么 | `docs/implementation-status.md` |
+| 服装电商 current 查询、实体映射与方法如何受控 | `docs/apparel-commerce-trusted-query.md` |
 | 接下来做什么 | `docs/development-roadmap.md` |
 | 用户如何验收 | `docs/product-acceptance-matrix.md` |
 | 助手如何理解业务、选择 Skill | `docs/business-understanding-skills.md` |

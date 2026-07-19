@@ -8,6 +8,7 @@ from typing import Any, Callable
 
 from context_pack_service import workspace_data_fingerprint, workspace_schema_fingerprint
 from domain_pack_service import domain_pack_runtime_context, domain_pack_set_fingerprint
+from trusted_query_service import current_source_run_binding
 
 
 def _receipt_key(workspace_id: str, request_text: str, created_at: str) -> str:
@@ -462,6 +463,15 @@ def current_query_receipt_source_state(
     if not table_keys and source.get("tableKey"):
         table_keys = [str(source["tableKey"])]
     table_keys = list(dict.fromkeys(table_keys))
+    source_run_binding = current_source_run_binding(connection, workspace_id, table_keys)
+    stored_source_run_id = str(source.get("currentSourceRunId") or "")
+    current_source_run_id = str(source_run_binding.get("currentSourceRunId") or "")
+    source_run_bound = bool(stored_source_run_id)
+    source_run_matches = (
+        source_run_bound
+        and stored_source_run_id == current_source_run_id
+        and source_run_binding.get("matchesCurrent") is True
+    )
     entries = [_source_table_entry(connection, workspace_id, table_key) for table_key in table_keys]
     if entries:
         schema_fingerprint = _combined_source_fingerprint(
@@ -538,6 +548,7 @@ def current_query_receipt_source_state(
     )
     source_fingerprint = _fingerprint({
         "workspaceId": workspace_id,
+        "currentSourceRunId": current_source_run_id or None,
         "tableKeys": sorted(table_keys),
         "schemaFingerprint": schema_fingerprint,
         "dataFingerprint": data_fingerprint,
@@ -552,11 +563,16 @@ def current_query_receipt_source_state(
         and schema_fingerprint == str(source.get("schemaFingerprint") or "")
         and data_fingerprint == str(source.get("dataFingerprint") or "")
         and source_fingerprint_matches
+        and source_run_matches
         and all(entry["registered"] for entry in entries)
     )
     blockers: list[str] = []
     if not source_tables_match:
         blockers.append("query-receipt-source-drifted")
+    if not source_run_bound:
+        blockers.append("query-receipt-current-source-run-unbound")
+    elif not source_run_matches:
+        blockers.append("query-receipt-current-source-run-drifted")
     if not relationship_path_matches:
         blockers.append("query-receipt-relationship-path-drifted")
     if not domain_pack_matches:
@@ -570,6 +586,9 @@ def current_query_receipt_source_state(
         "dataFingerprint": data_fingerprint,
         "sourceFingerprint": source_fingerprint,
         "sourceFingerprintMatchesReceipt": source_fingerprint_matches,
+        "currentSourceRunBinding": source_run_binding,
+        "currentSourceRunBound": source_run_bound,
+        "currentSourceRunMatchesReceipt": source_run_matches,
         "workspaceMatchesReceipt": workspace_matches,
         "sourceTablesMatch": source_tables_match,
         "relationshipPath": {
@@ -621,6 +640,10 @@ def create_query_plan_receipt(
     result_rows: list[Any] | None = None,
     now_iso: Callable[[], str],
     workspace_manifest: dict[str, Any] | None = None,
+    query_intent: dict[str, Any] | None = None,
+    execution_coverage: dict[str, Any] | None = None,
+    result_state: str | None = None,
+    source_run_binding: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     created_at = now_iso()
     receipt_key = _receipt_key(workspace_id, request_text, created_at)
@@ -655,6 +678,11 @@ def create_query_plan_receipt(
         execution_plan=execution_plan,
         relationship_path_proof=normalized_relationship_path_proof,
     )
+    if source_run_binding is None:
+        source_run_binding = current_source_run_binding(connection, workspace_id, normalized_source_table_keys)
+    else:
+        source_run_binding = dict(source_run_binding)
+    current_source_run_id = str(source_run_binding.get("currentSourceRunId") or "") or None
     source_entries = [
         _source_table_entry(connection, workspace_id, table_key)
         for table_key in normalized_source_table_keys
@@ -682,6 +710,7 @@ def create_query_plan_receipt(
     )
     source_fingerprint = _fingerprint({
         "workspaceId": workspace_id,
+        "currentSourceRunId": current_source_run_id,
         "tableKeys": sorted(normalized_source_table_keys),
         "schemaFingerprint": schema_fingerprint,
         "dataFingerprint": data_fingerprint,
@@ -736,13 +765,28 @@ def create_query_plan_receipt(
             "projection": "scalar-result-fields-only",
             "snapshotStored": False,
         }
+    normalized_result_state = str(result_state or status or "blocked")
+    normalized_query_intent = dict(query_intent) if isinstance(query_intent, dict) else None
+    normalized_execution_coverage = dict(execution_coverage) if isinstance(execution_coverage, dict) else None
+    coverage_complete = bool(normalized_execution_coverage and normalized_execution_coverage.get("complete") is True)
+    result_row_count = int(result_binding.get("rowCount") or 0) if result_binding else 0
+    can_support_business_conclusion = (
+        normalized_result_state == "executed"
+        and status == "executed"
+        and result_row_count > 0
+        and source_run_binding.get("matchesCurrent") is True
+        and (coverage_complete if normalized_execution_coverage is not None else True)
+    )
     plan = {
         "schema": "aibi-query-plan-receipt/v1",
         "receiptKey": receipt_key,
         "request": request_text,
         "status": status,
+        "resultState": normalized_result_state,
         "source": {
             "workspaceId": workspace_id,
+            "currentSourceRunId": current_source_run_id,
+            "currentSourceRunBinding": source_run_binding,
             "tableKey": primary_source_table_key,
             "tableKeys": normalized_source_table_keys,
             "tables": source_entries,
@@ -762,6 +806,8 @@ def create_query_plan_receipt(
             "semanticPlan": semantic_plan if isinstance(semantic_plan, dict) else None,
             "executionPlan": execution_plan if isinstance(execution_plan, dict) else None,
             "knowledgeRule": knowledge_rule,
+            "queryIntent": normalized_query_intent,
+            "executionCoverage": normalized_execution_coverage,
         },
         "runtime": {
             "engine": runtime.get("engine"),
@@ -775,6 +821,11 @@ def create_query_plan_receipt(
             "sourceReadOnly": True,
             "executed": status == "executed",
             "blocked": status == "blocked",
+            "resultState": normalized_result_state,
+            "currentSourceRunBound": bool(current_source_run_id),
+            "currentSourceRunMatches": source_run_binding.get("matchesCurrent") is True,
+            "executionCoverageComplete": coverage_complete if normalized_execution_coverage is not None else None,
+            "canSupportBusinessConclusion": can_support_business_conclusion,
             "sourceTablesRegistered": all(entry["registered"] for entry in source_entries),
             "relationshipPathProven": relationship_proof_validation["proven"],
             "relationshipPathRequired": relationship_path_required,

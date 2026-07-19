@@ -1,0 +1,486 @@
+.agentAnswerVisualization {
+  --chart-primary: color-mix(in srgb, var(--accent) 88%, #065f5b);
+  --chart-primary-soft: color-mix(in srgb, var(--accent) 12%, var(--bi-surface));
+  --chart-line: #4f46e5;
+  --chart-threshold: #b45309;
+  --chart-grid: color-mix(in srgb, var(--bi-border) 70%, transparent);
+  --chart-category-1: #0f766e;
+  --chart-category-2: #4f46e5;
+  --chart-category-3: #b45309;
+  --chart-category-4: #0369a1;
+  --chart-category-5: #a21caf;
+  --chart-category-6: #4d7c0f;
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  margin: 2px 0;
+  border-block: 1px solid var(--bi-border-soft);
+  padding: 20px 0 16px;
+}
+
+.agentVisualizationHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.agentVisualizationHeader > div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.agentVisualizationEyebrow {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  gap: 7px;
+  color: color-mix(in srgb, var(--accent) 80%, var(--bi-text));
+  font-size: 11px;
+  font-weight: 760;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.agentVisualizationEyebrow i {
+  width: 8px;
+  height: 8px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+  box-shadow: 5px 0 0 -2px var(--bi-surface), 5px 0 0 0 currentColor;
+}
+
+.agentVisualizationHeader h4 {
+  margin: 0;
+  color: var(--bi-text);
+  font-size: clamp(17px, 2vw, 20px);
+  line-height: 1.25;
+}
+
+.agentVisualizationHeader p {
+  max-width: 760px;
+  margin: 0;
+  color: var(--bi-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.agentVisualizationKind {
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--bi-border));
+  border-radius: 999px;
+  background: var(--chart-primary-soft);
+  padding: 6px 10px;
+  color: color-mix(in srgb, var(--accent) 74%, var(--bi-text));
+  font-size: 11px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.agentParetoInsights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 10px;
+  background: var(--bi-border-soft);
+}
+
+.agentParetoInsights div {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  background: var(--bi-surface);
+  padding: 12px 14px;
+}
+
+.agentParetoInsights dt,
+.agentParetoInsights dd {
+  margin: 0;
+}
+
+.agentParetoInsights dt {
+  color: var(--bi-muted);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.agentParetoInsights dd {
+  color: var(--bi-text);
+  font-size: clamp(18px, 2.6vw, 25px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+
+.agentVisualizationPlot {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bi-panel) 74%, var(--bi-surface));
+  padding: 16px;
+}
+
+.agentParetoLegend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 16px;
+  padding: 0 8px 5px;
+  color: var(--bi-muted);
+  font-size: 10px;
+}
+
+.agentParetoLegend span { display: inline-flex; align-items: center; gap: 6px; }
+.agentParetoLegend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; background: var(--chart-primary); }
+.agentParetoLegend i.line { background: var(--chart-line); }
+.agentParetoLegend i.threshold { height: 0; border-top: 2px dashed var(--chart-threshold); background: transparent; }
+.agentParetoLegend i.boundary { height: 10px; border-left: 2px dotted var(--chart-primary); background: transparent; }
+
+.agentChartSvg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.agentChartGrid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  stroke-dasharray: 2 5;
+}
+
+.agentChartZero {
+  stroke: color-mix(in srgb, var(--bi-text) 42%, transparent);
+  stroke-width: 1.2;
+}
+
+.agentChartBarTrack {
+  fill: color-mix(in srgb, var(--bi-border-soft) 60%, transparent);
+}
+
+.agentChartBar {
+  fill: var(--chart-primary);
+}
+
+.agentParetoBar {
+  fill: color-mix(in srgb, var(--chart-primary) 90%, var(--bi-surface));
+}
+
+.agentChartLine,
+.agentParetoLine {
+  fill: none;
+  stroke: var(--chart-line);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.agentChartPointHalo {
+  fill: color-mix(in srgb, var(--chart-line) 13%, transparent);
+}
+
+.agentChartPoint,
+.agentParetoPoint {
+  fill: var(--bi-surface);
+  stroke: var(--chart-line);
+  stroke-width: 3;
+}
+
+.agentParetoThreshold {
+  stroke: var(--chart-threshold);
+  stroke-width: 1.5;
+  stroke-dasharray: 7 5;
+}
+
+.agentParetoThresholdLabel {
+  fill: var(--chart-threshold);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.agentParetoHeadBoundary {
+  stroke: color-mix(in srgb, var(--chart-primary) 70%, transparent);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 5;
+}
+
+.agentChartLabel,
+.agentChartValue,
+.agentChartTick {
+  font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.agentChartLabel {
+  fill: var(--bi-muted);
+  font-size: 11px;
+}
+
+.agentChartValue {
+  fill: var(--bi-text);
+  font-size: 10px;
+  font-weight: 720;
+}
+
+.agentChartTick {
+  fill: var(--bi-muted);
+  font-size: 10px;
+}
+
+.agentAnswerVisualization [data-chart-mark] {
+  outline: none;
+}
+
+.agentAnswerVisualization [data-chart-mark]:focus-visible {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--accent) 78%, transparent));
+}
+
+.agentDonutLayout {
+  display: grid;
+  grid-template-columns: minmax(210px, 0.72fr) minmax(220px, 1fr);
+  align-items: center;
+  max-width: 680px;
+  gap: 28px;
+  margin: 0 auto;
+}
+
+.agentDonutSvg {
+  display: block;
+  width: min(100%, 270px);
+  margin: 0 auto;
+}
+
+.agentDonutSvg path {
+  stroke: var(--bi-surface);
+  stroke-width: 2;
+  outline: none;
+}
+
+.agentDonutSvg path:focus-visible {
+  stroke: var(--bi-text);
+  stroke-width: 3;
+}
+
+.agentDonutCenterLabel {
+  fill: var(--bi-muted);
+  font-size: 11px;
+}
+
+.agentDonutCenterValue {
+  fill: var(--bi-text);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 760;
+}
+
+.agentDonutLegend {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agentDonutLegend li {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  color: var(--bi-muted);
+  font-size: 12px;
+}
+
+.agentDonutLegend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+}
+
+.agentDonutLegend span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agentDonutLegend strong {
+  color: var(--bi-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.agentMetricVisual {
+  display: grid;
+  width: min(100%, 580px);
+  min-height: 190px;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  margin: 0 auto;
+  outline: none;
+  text-align: center;
+}
+
+.agentMetricVisual span,
+.agentMetricVisual small {
+  color: var(--bi-muted);
+}
+
+.agentMetricVisual span {
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.agentMetricVisual strong {
+  color: var(--bi-text);
+  font-size: clamp(34px, 7vw, 56px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 770;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.agentMetricVisual small {
+  font-size: 11px;
+}
+
+.agentVisualizationData {
+  border-top: 1px solid var(--bi-border-soft);
+  padding-top: 10px;
+}
+
+.agentVisualizationData > summary {
+  width: max-content;
+  cursor: pointer;
+  color: color-mix(in srgb, var(--accent) 78%, var(--bi-text));
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.agentVisualizationData[open] > summary {
+  margin-bottom: 10px;
+}
+
+.agentVisualizationTableScroller {
+  max-width: 100%;
+  overflow: auto;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 9px;
+  background: var(--bi-surface);
+}
+
+.agentVisualizationTable {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--bi-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.agentVisualizationTable th,
+.agentVisualizationTable td {
+  border-bottom: 1px solid var(--bi-border-soft);
+  padding: 9px 11px;
+  text-align: left;
+}
+
+.agentVisualizationTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bi-panel);
+  color: var(--bi-muted);
+  font-size: 10px;
+  font-weight: 760;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.agentVisualizationTable td:not(:first-child) {
+  text-align: right;
+}
+
+.agentVisualizationTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.agentVisualizationReceipt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 16px;
+  color: var(--bi-muted);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+}
+
+.agentVisualizationReceipt span:first-child {
+  color: color-mix(in srgb, var(--success) 76%, var(--bi-text));
+  font-family: Inter, "Microsoft YaHei", system-ui, sans-serif;
+  font-weight: 760;
+}
+
+@media (max-width: 720px) {
+  .agentAnswerVisualization {
+    gap: 13px;
+    padding-block: 16px 12px;
+  }
+
+  .agentVisualizationHeader {
+    display: grid;
+    gap: 10px;
+  }
+
+  .agentVisualizationKind {
+    width: max-content;
+  }
+
+  .agentParetoInsights {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .agentVisualizationPlot {
+    overflow: hidden;
+    padding: 12px;
+  }
+
+  .agentChartSvg {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .agentChartLabel { font-size: 24px; }
+  .agentChartValue { font-size: 22px; }
+  .agentChartTick { font-size: 21px; }
+  .agentParetoThresholdLabel { font-size: 22px; }
+  .agentParetoLegend { justify-content: flex-start; gap: 6px 12px; padding-inline: 2px; font-size: 10px; }
+
+  .agentDonutLayout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .agentDonutSvg {
+    width: min(78vw, 250px);
+  }
+
+  .agentVisualizationReceipt {
+    display: grid;
+    gap: 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agentAnswerVisualization *,
+  .agentAnswerVisualization *::before,
+  .agentAnswerVisualization *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}

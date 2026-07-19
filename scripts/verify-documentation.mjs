@@ -16,6 +16,7 @@ const skippedDirectories = new Set([
   "dist",
   "logs",
   "node_modules",
+  "tmp",
 ]);
 
 function normalize(path) {

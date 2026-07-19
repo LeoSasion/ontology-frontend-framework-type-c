@@ -70,6 +70,11 @@ export interface FolderImportPlanItem {
   rowCount: number;
   columnCount: number;
   uniqueFields: string[];
+  fileIdentity?: string;
+  contentHash?: string;
+  keyDecision?: { uniqueFields: string[]; authority: string; quality?: Record<string, unknown> | null };
+  rowImpact?: Record<string, number | string>;
+  pii?: { classification: string; sensitiveFields?: string[]; requiresReview?: boolean };
 }
 
 export interface FolderImportPlanGroup {
@@ -82,10 +87,16 @@ export interface FolderImportPlanGroup {
   modes: string[];
   files: string[];
   willMerge: boolean;
+  keyDecision?: { uniqueFields: string[]; authority: string };
+  crossFileKeyQuality?: Record<string, number | string | string[]>;
+  pii?: { classification: string; requiresReview?: boolean };
+  blockers?: string[];
+  ready?: boolean;
 }
 
 export interface FolderImportPlan {
   ok: boolean;
+  schema?: "aibi-atomic-import-plan/v1" | string;
   dryRun?: boolean;
   requiresConfirmation?: boolean;
   committed?: boolean;
@@ -93,6 +104,13 @@ export interface FolderImportPlan {
   fileCount: number;
   tableCount: number;
   willWrite?: boolean;
+  planFingerprint?: string;
+  parentSourceRunId?: string | null;
+  blockers?: string[];
+  readyToCommit?: boolean;
+  requiresOwnerReview?: boolean;
+  sourceRunId?: string;
+  atomic?: boolean;
   items: FolderImportPlanItem[];
   groups: FolderImportPlanGroup[];
   results?: Array<Record<string, unknown>>;

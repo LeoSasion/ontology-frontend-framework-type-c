@@ -1374,3 +1374,8 @@ th {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.folderImportGroup .folderImportBlocker {
+  color: rgb(220 38 38);
+  white-space: normal;
+}

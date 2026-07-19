@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
-from bi_cli_core import parse_csv_list, slug, source_label
+from atomic_import_plan_service import enrich_atomic_import_plan
+from bi_cli_core import now_iso, parse_csv_list, slug, source_label, unique_key
+from import_table_writer_service import revalidate_relationships_for_table
 
 SUPPORTED_IMPORT_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
 
@@ -91,14 +94,18 @@ def build_folder_import_plan(
     *,
     recursive: bool = True,
     limit: int = 200,
+    unique_fields_value: str | None = None,
+    conflict_rule_value: str | None = None,
     build_import_preview: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str | None], dict[str, Any]],
+    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     files = discover_import_files(path, recursive=recursive, limit=limit)
     groups: dict[str, dict[str, Any]] = {}
     items: list[dict[str, Any]] = []
     planned_tables: set[str] = set()
     for file_path in files:
-        preview = build_import_preview(connection, file_path, None, None, None)
+        preview = build_import_preview(connection, file_path, None, unique_fields_value, conflict_rule_value)
         table_key = str(preview.get("suggestedTableKey") or suggested_import_table_key(file_path))
         display_name = str(preview.get("suggestedDisplayName") or suggested_import_display_name(file_path))
         matched_table = preview.get("matchedTable") if isinstance(preview.get("matchedTable"), dict) else None
@@ -117,6 +124,8 @@ def build_folder_import_plan(
             "columnCount": column_count,
             "uniqueFields": unique_fields,
             "matchedTable": matched_table,
+            "keyAuthority": "owner_confirmed" if parse_csv_list(unique_fields_value) else "auto_candidate",
+            "_preview": preview,
         }
         items.append(item)
         group = groups.setdefault(table_key, {
@@ -143,7 +152,12 @@ def build_folder_import_plan(
             "willMerge": group["fileCount"] > 1 or "merge" in group["modes"],
         })
     normalized_groups.sort(key=lambda item: str(item["displayName"]))
-    return {
+    workspace_id = active_workspace_id(connection)
+    workspace = connection.execute(
+        "SELECT current_source_run_id FROM workspaces WHERE id = ?",
+        (workspace_id,),
+    ).fetchone()
+    base_plan = {
         "ok": True,
         "dryRun": True,
         "requiresConfirmation": False,
@@ -154,6 +168,11 @@ def build_folder_import_plan(
         "groups": normalized_groups,
         "willWrite": False,
     }
+    return enrich_atomic_import_plan(
+        base_plan,
+        read_table_file=read_table_file,
+        current_source_run_id=str(workspace["current_source_run_id"] or "") if workspace else None,
+    )
 
 
 def build_import_preview(
@@ -378,6 +397,8 @@ def preview_import_folder_command(
     *,
     open_db: Callable[[], Any],
     build_import_preview: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str | None], dict[str, Any]],
+    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     with open_db() as connection:
         return build_folder_import_plan(
@@ -385,7 +406,11 @@ def preview_import_folder_command(
             args.path,
             recursive=not getattr(args, "no_recursive", False),
             limit=getattr(args, "limit", 200),
+            unique_fields_value=getattr(args, "unique_fields", None),
+            conflict_rule_value=getattr(args, "conflict_rule", None),
             build_import_preview=build_import_preview,
+            read_table_file=read_table_file,
+            active_workspace_id=active_workspace_id,
         )
 
 
@@ -395,6 +420,8 @@ def import_folder_command(
     open_db: Callable[[], Any],
     build_import_preview: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str | None], dict[str, Any]],
     execute_import_commit: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str, str | None, str | None], dict[str, Any]],
+    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     with open_db() as connection:
         plan = build_folder_import_plan(
@@ -402,20 +429,32 @@ def import_folder_command(
             args.path,
             recursive=not getattr(args, "no_recursive", False),
             limit=getattr(args, "limit", 200),
+            unique_fields_value=getattr(args, "unique_fields", None),
+            conflict_rule_value=getattr(args, "conflict_rule", None),
             build_import_preview=build_import_preview,
+            read_table_file=read_table_file,
+            active_workspace_id=active_workspace_id,
         )
         if not args.yes:
             return {
                 **plan,
                 "requiresConfirmation": True,
-                "recommendedCommand": f"python tools/aibi_cli.py --json import-folder {args.path} --yes",
+                "recommendedCommand": (
+                    f"python tools/aibi_cli.py --json import-folder {args.path} "
+                    f"--expected-plan {plan['planFingerprint']} --yes"
+                ),
             }
+        expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
+        if not expected_plan:
+            raise ValueError("Atomic folder import requires --expected-plan from the latest preview.")
+        if expected_plan != str(plan.get("planFingerprint") or ""):
+            raise ValueError("Folder import plan changed after preview; run preview-import-folder again.")
+        if plan.get("readyToCommit") is not True:
+            raise ValueError(f"Folder import plan is blocked: {', '.join(plan.get('blockers') or ['owner-review-required'])}")
         results = []
         for item in plan["items"]:
-            live_preview = build_import_preview(connection, item["absolutePath"], item["tableKey"], None, None)
-            matched_table = live_preview.get("matchedTable") if isinstance(live_preview.get("matchedTable"), dict) else None
-            mode = "merge" if matched_table else "create"
-            unique_fields = _preview_unique_key(live_preview)
+            mode = str(item.get("mode") or "create")
+            unique_fields = list((item.get("keyDecision") or {}).get("uniqueFields") or [])
             result = execute_import_commit(
                 connection,
                 item["absolutePath"],
@@ -432,7 +471,75 @@ def import_folder_command(
                 "displayName": result.get("displayName"),
                 "rowCount": (result.get("profile") or {}).get("rowCount") if isinstance(result.get("profile"), dict) else None,
                 "writeSummary": result.get("writeSummary"),
+                "dataVersion": result.get("dataVersion"),
+                "sourceRunId": result.get("sourceRunId"),
             })
+        workspace_id = active_workspace_id(connection)
+        batch_source_run_id = unique_key("source_run_batch")
+        table_results: dict[str, dict[str, Any]] = {}
+        for result in results:
+            table_results[str(result.get("tableKey") or "")] = result
+        connection.execute(
+            """
+            INSERT INTO source_runs(
+              id, workspace_id, table_key, name, status, source_file, row_count,
+              column_count, profile_json, evidence_json, created_at
+            ) VALUES(?, ?, '__batch__', ?, 'ready', ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                batch_source_run_id,
+                workspace_id,
+                f"Atomic folder import: {Path(plan['path']).name}",
+                source_label(Path(plan["path"])),
+                sum(int(item.get("rowCount") or 0) for item in plan["items"]),
+                sum(int(group.get("columnCount") or 0) for group in plan["groups"]),
+                json.dumps({
+                    "schema": "aibi-atomic-source-run/v1",
+                    "planFingerprint": plan["planFingerprint"],
+                    "parentSourceRunId": plan.get("parentSourceRunId"),
+                    "tableKeys": sorted(table_results),
+                    "plan": plan,
+                }, ensure_ascii=False),
+                json.dumps([
+                    "atomic-import-plan",
+                    "content-hash-revalidated",
+                    "owner-key-gate",
+                    "all-logical-tables-committed",
+                ], ensure_ascii=False),
+                now_iso(),
+            ),
+        )
+        for table_key, result in table_results.items():
+            connection.execute(
+                """
+                INSERT INTO source_run_tables(
+                  source_run_id, workspace_id, table_key, data_version, row_count, created_at
+                ) VALUES(?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    batch_source_run_id,
+                    workspace_id,
+                    table_key,
+                    int(result.get("dataVersion") or 0),
+                    int((connection.execute(
+                        "SELECT row_count FROM table_registry WHERE workspace_id = ? AND table_key = ?",
+                        (workspace_id, table_key),
+                    ).fetchone() or {"row_count": 0})["row_count"]),
+                    now_iso(),
+                ),
+            )
+        connection.execute(
+            "UPDATE workspaces SET current_source_run_id = ? WHERE id = ?",
+            (batch_source_run_id, workspace_id),
+        )
+        batch_relationship_revalidations = {
+            table_key: revalidate_relationships_for_table(
+                connection,
+                workspace_id=workspace_id,
+                table_key=table_key,
+            )
+            for table_key in table_results
+        }
         connection.commit()
     return {
         "ok": True,
@@ -443,4 +550,8 @@ def import_folder_command(
         "items": plan["items"],
         "groups": plan["groups"],
         "results": results,
+        "sourceRunId": batch_source_run_id,
+        "planFingerprint": plan["planFingerprint"],
+        "atomic": True,
+        "relationshipRevalidations": batch_relationship_revalidations,
     }

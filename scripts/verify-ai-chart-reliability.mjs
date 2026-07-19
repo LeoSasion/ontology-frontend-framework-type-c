@@ -37,7 +37,7 @@ try {
   const firstExplicitBarKey = firstExplicitBarDraft.parsed?.actionDraft?.actionKey ?? "missing-first-explicit-bar";
   results.push(run("first-explicit-bar-actions", ["action-drafts", "--limit", "10"]));
   results.push(run("first-explicit-bar-reject", ["confirm-action", firstExplicitBarKey, "--reject", "--yes"]));
-  const firstChartDraft = run("first-chart-draft", ["ask", "基于 records，先问我最多一个必要问题，然后起草一个仅包含一个图表的看板。优先在折线图、柱状图、指标卡或表格中选择，说明字段、口径和证据，不直接写入。"]);
+  const firstChartDraft = run("first-chart-draft", ["ask", "基于 records，请将 net_sales 按 channel 合计，起草一个仅包含一个柱状图的看板，说明字段、口径和证据，不直接写入。"]);
   results.push(firstChartDraft);
   const firstChartKey = firstChartDraft.parsed?.actionDraft?.actionKey ?? "missing-first-chart-draft";
   results.push(run("first-chart-actions", ["action-drafts", "--limit", "10"]));
@@ -45,7 +45,7 @@ try {
   results.push(run("dashboards-after-first-chart", ["dashboards"]));
   results.push(run("generic-overview", ["ask", "--read-only", "概览当前数据"]));
   results.push(run("ambiguous-chart", ["ask", "创建一个图表"]));
-  results.push(run("explicit-bar", ["ask", "用 records 的 net_sales 按 channel 创建柱状图"]));
+  results.push(run("explicit-bar", ["ask", "用 records 的 net_sales 按 channel 合计并创建柱状图"]));
   results.push(run("explicit-line", ["ask", "用 records 的 net_sales 按 order_date 创建折线图"]));
   results.push(run("unknown-field", ["ask", "用 records 的 imaginary_margin 按 channel 创建柱状图"]));
   results.push(run("missing-dimension", ["ask", "用 records 的 net_sales 创建柱状图"]));

@@ -16,6 +16,7 @@ data/**/*.parquet
 
 # Business data and private exports
 源数据-*/
+3-5月数据/
 exports/
 reports/
 backups/

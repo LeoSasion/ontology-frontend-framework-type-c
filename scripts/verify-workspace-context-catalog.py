@@ -135,6 +135,37 @@ def main() -> None:
                 )
             return payload
 
+        def bind_current_batch(batch_id: str, table_keys: list[str]) -> None:
+            connection = sqlite3.connect(sqlite_path)
+            connection.row_factory = sqlite3.Row
+            try:
+                placeholders = ", ".join("?" for _ in table_keys)
+                rows = connection.execute(
+                    f"SELECT table_key, data_version, row_count FROM table_registry "
+                    f"WHERE workspace_id = 'default' AND table_key IN ({placeholders})",
+                    table_keys,
+                ).fetchall()
+                connection.execute(
+                    "INSERT INTO source_runs(id, workspace_id, table_key, name, status, source_file, "
+                    "row_count, column_count, profile_json, evidence_json, created_at) "
+                    "VALUES(?, 'default', '__batch__', ?, 'ready', 'fixture-batch', ?, 0, '{}', '[]', "
+                    "'2026-07-19T12:00:00Z')",
+                    (batch_id, batch_id, sum(int(row["row_count"] or 0) for row in rows)),
+                )
+                for row in rows:
+                    connection.execute(
+                        "INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, "
+                        "row_count, created_at) VALUES(?, 'default', ?, ?, ?, '2026-07-19T12:00:00Z')",
+                        (batch_id, row["table_key"], int(row["data_version"] or 0), int(row["row_count"] or 0)),
+                    )
+                connection.execute(
+                    "UPDATE workspaces SET current_source_run_id = ? WHERE id = 'default'",
+                    (batch_id,),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
         customers_path = temp_root / "customers.csv"
         orders_path = temp_root / "orders.csv"
         isolated_path = temp_root / "isolated.csv"
@@ -324,6 +355,7 @@ def main() -> None:
         cli(["workspace-select", "default", "--yes"])
 
         cli(["import-commit", str(orders_path), "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"])
+        bind_current_batch("workspace-context-fixture-batch", ["customers", "orders"])
         before_metric = manifest(cli(["workspace-manifest", "--workspace", "default"]))
         cli([
             "add-metric",
@@ -509,11 +541,13 @@ def main() -> None:
             len(bounded_sample_reads) == len(physical_tables),
             {"tableCount": len(physical_tables), "sampleReadCount": len(bounded_sample_reads)},
         )
-        runtime_kernel_source = (ROOT / "tools" / "aibi_runtime" / "kernel.py").read_text(encoding="utf-8")
+        agent_interaction_source = (
+            ROOT / "tools" / "aibi_runtime" / "use_cases" / "agent_interaction.py"
+        ).read_text(encoding="utf-8")
         check(
             "ask-reuses-precomputed-planning-binding-for-receipt",
-            "workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)" in runtime_kernel_source
-            and "workspace_manifest=workspace_manifest_ref" in runtime_kernel_source,
+            "workspace_manifest_ref = workspace_planning_binding(connection, workspace_id)" in agent_interaction_source
+            and "workspace_manifest=workspace_manifest_ref" in agent_interaction_source,
         )
 
         def receipt_state(value: dict[str, Any]) -> dict[str, Any]:

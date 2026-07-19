@@ -27,8 +27,14 @@
       "order_id": ["order_id", "orderid", "订单号", "子订单", "主订单", "交易单号", "订单编号"],
       "refund_id": ["refund_id", "售后单", "退款单", "退货单", "售后编号"],
       "transaction_id": ["流水号", "transaction", "payment_id", "settlement_id", "资金流水"],
-      "sku": ["sku", "商家编码", "商品编码", "规格编码", "货品编号"],
+      "sku": ["sku", "商品编码", "货号", "规格"],
+      "style_spu": ["style_spu", "spu", "款式", "款号", "款式编码", "style_code", "style_no"],
       "product_id": ["商品id", "产品id", "货品id", "product_id", "item_id", "goods_id"],
+      "product_link": ["product_link", "product_url", "item_url", "商品链接", "宝贝链接"],
+      "merchant_sku": ["merchant_sku", "merchant_sku_id", "sku_id", "商家sku", "商家编码", "规格编码", "货品编码"],
+      "color": ["color", "colour", "颜色", "色号", "色系"],
+      "size": ["size", "尺码", "码数", "规格尺码"],
+      "barcode": ["barcode", "条码", "商品条码", "国际条码", "ean", "upc"],
       "customer_id": ["customer", "member", "会员", "客户", "买家", "用户id", "客户id"],
       "supplier": ["supplier", "供应商", "厂家", "供货商"],
       "warehouse": ["warehouse", "仓库", "库房"],
@@ -43,10 +49,10 @@
       "inventory_qty": ["inventory", "库存", "可售", "在库", "结存", "库存数量"]
     },
     "semanticRoles": {
-      "identity": ["order_id", "refund_id", "transaction_id", "sku", "product_id", "customer_id", "supplier", "warehouse"],
+      "identity": ["order_id", "refund_id", "transaction_id", "style_spu", "product_id", "product_link", "merchant_sku", "customer_id", "supplier", "warehouse"],
       "measure": ["paid_gmv", "net_sales", "refund_amount", "cost_amount", "settlement_amount", "inventory_qty"],
       "time": ["paid_at", "refund_at"],
-      "dimension": ["channel", "supplier", "warehouse", "sku", "product_id", "customer_id"]
+      "dimension": ["channel", "supplier", "warehouse", "style_spu", "product_id", "product_link", "merchant_sku", "color", "size", "barcode", "customer_id"]
     },
     "sourceIntelligence": {
       "blockedRequirements": [

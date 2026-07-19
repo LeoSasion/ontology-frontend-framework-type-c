@@ -36,6 +36,35 @@ function run(label, args) {
   return { label, status: result.status, parsed, stdout: result.stdout, stderr: result.stderr };
 }
 
+function bindCurrentBatch(label, batchId, tableKeys) {
+  const script = [
+    "import json, sqlite3, sys",
+    "db = sqlite3.connect(sys.argv[1])",
+    "batch = sys.argv[2]",
+    "keys = sys.argv[3:]",
+    "placeholders = ','.join('?' for _ in keys)",
+    "rows = db.execute(f\"SELECT table_key, data_version, row_count FROM table_registry WHERE workspace_id = 'default' AND table_key IN ({placeholders})\", keys).fetchall()",
+    "db.execute(\"INSERT INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at) VALUES(?, 'default', '__batch__', ?, 'ready', 'fixture-batch', ?, 0, '{}', '[]', '2026-07-19T12:00:00Z')\", (batch, batch, sum(int(row[2] or 0) for row in rows)))",
+    "db.executemany(\"INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, row_count, created_at) VALUES(?, 'default', ?, ?, ?, '2026-07-19T12:00:00Z')\", [(batch, row[0], int(row[1] or 0), int(row[2] or 0)) for row in rows])",
+    "db.execute(\"UPDATE workspaces SET current_source_run_id = ? WHERE id = 'default'\", (batch,))",
+    "db.commit()",
+    "print(json.dumps({'ok': len(rows) == len(keys), 'tableKeys': sorted(row[0] for row in rows)}))",
+  ].join("; ");
+  const result = spawnSync("python", ["-c", script, databaseFile, batchId, ...tableKeys], {
+    cwd: root,
+    encoding: "utf8",
+    env,
+    windowsHide: true,
+  });
+  let parsed = null;
+  try {
+    parsed = JSON.parse(result.stdout.trim());
+  } catch {
+    parsed = null;
+  }
+  return { label, status: result.status, parsed, stdout: result.stdout, stderr: result.stderr };
+}
+
 const results = [];
 try {
   const apiMapping = spawnSync("node", ["--import", "tsx", "-e", "import('./server/modelRoutes.ts').then(({appendRelationshipMappingArgs,appendRelationshipFilterArgs,appendRelationshipPreaggregationArg}) => { const args=[]; const body={fieldMappings:[{leftField:'order_id',rightField:'order_id'},{leftField:'item_id',rightField:'item_id'}],filters:[{phase:'pre',side:'right',field:'refund_amount',operator:'gt',value:'5'}],preaggregation:{side:'right',groupFields:['order_id'],measures:[{field:'refund_amount',aggregation:'sum'}]}}; appendRelationshipMappingArgs(args,body); appendRelationshipFilterArgs(args,body); appendRelationshipPreaggregationArg(args,body); console.log(JSON.stringify({ok:args.filter((item)=>item==='--map-json').length===2&&args.includes('--filter-json')&&args.includes('--preaggregate-json'),args})); })"], { cwd: root, encoding: "utf8", windowsHide: true });
@@ -55,6 +84,7 @@ try {
   results.push(run("legacy-list", ["list-relationships"]));
   results.push(run("import-orders", ["import-commit", ordersFile, "--table", "orders", "--name", "订单", "--mode", "create", "--yes"]));
   results.push(run("import-refunds", ["import-commit", refundsFile, "--table", "refunds", "--name", "退款", "--mode", "create", "--yes"]));
+  results.push(bindCurrentBatch("bind-current-source-run-batch", "composite-relationship-fixture-batch", ["orders", "refunds"]));
   results.push(run("single-preview", ["relationship-preview", "--left-table", "orders", "--right-table", "refunds", "--map", "order_id:order_id"]));
   results.push(run("single-save", ["relationship-save", "--left-table", "orders", "--right-table", "refunds", "--map", "order_id:order_id", "--yes"]));
   results.push(run("single-query-blocked", ["query-relationship", "--relationship", "orders_refunds_order_id_order_id", "--group", "left:channel", "--measure", "right:refund_amount", "--agg", "sum"]));
@@ -109,6 +139,12 @@ try {
         && listedLegacy?.fieldMappings?.length === 1
         && listedLegacy?.fieldMappings?.[0]?.leftField === "id"
         && listedLegacy?.fieldMappings?.[0]?.rightField === "id",
+    },
+    {
+      label: "multi-table-fixture-is-one-current-source-run",
+      ok: byLabel["bind-current-source-run-batch"].status === 0
+        && byLabel["bind-current-source-run-batch"].parsed?.ok === true
+        && byLabel["bind-current-source-run-batch"].parsed?.tableKeys?.join(",") === "orders,refunds",
     },
     {
       label: "single-key-preview-detects-inflation",

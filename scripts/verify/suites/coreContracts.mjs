@@ -646,7 +646,7 @@ export function appendCoreContractChecks(context) {
     {
         label: "dashboard-widget-write-primitive-boundary",
         ok: existsSync(join(root, "tools", "dashboard_widget_operations.py")) &&
-          biCliRuntimeSource.includes("from dashboard_widget_operations import (") &&
+          biCliRuntimeSource.includes("from dashboard_widget_operations import ") &&
           !biCliRuntimeSource.includes("def insert_dashboard_widget(") &&
           dashboardWidgetOperationsSource.includes("def dashboard_widget_key_exists(") &&
           dashboardWidgetOperationsSource.includes("def resolve_dashboard_widget_key(") &&
@@ -736,7 +736,7 @@ export function appendCoreContractChecks(context) {
         ok: existsSync(join(root, "tools", "erp_dashboard_unit_library.py")) &&
           existsSync(join(root, "scripts", "verify-erp-unit-library.mjs")) &&
           packageJson.scripts["verify:erp-units"] === "node scripts/verify-erp-unit-library.mjs" &&
-          biCliRuntimeSource.includes("from erp_dashboard_unit_library import (") &&
+          biCliRuntimeSource.includes("from erp_dashboard_unit_library import ") &&
           biCliRuntimeSource.includes('sub.add_parser("erp-unit-library")') &&
           biCliRuntimeSource.includes('choices=["business", ERP_UNIT_LIBRARY_TEMPLATE_KEY]') &&
           byLabel["cli-enable-erp-domain-pack"].parsed?.enabledDomainPacks?.some((item) => item.packId === "erp-units") &&
