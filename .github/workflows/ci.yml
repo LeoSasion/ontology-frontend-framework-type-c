@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches:
-      - AIBI-C
+      - main
   pull_request:
     branches:
-      - AIBI-C
+      - main
   workflow_dispatch:
 
 jobs:
