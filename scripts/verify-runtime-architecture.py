@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import inspect
 import json
 from pathlib import Path
 import re
@@ -25,7 +26,7 @@ EXPECTED_GROUP_SIZES = {
     "data": 66,
     "delivery": 31,
 }
-EXPECTED_DISPATCH_FINGERPRINT = "3a43e99455a255e722d921758bf26c83b0a77ca15ca2b32e38f237a8d5e5f51e"
+EXPECTED_DISPATCH_FINGERPRINT = "5a38fe957a7da85fb0f73999acf46d01b85849ec9f648e6f1c0d0f2c11714d4b"
 EXPECTED_USE_CASE_MODULES = {
     "agent_interaction.py",
     "analysis.py",
@@ -40,6 +41,19 @@ AGENT_INTERACTION_LINE_BUDGET = 2349
 
 def check(label: str, ok: bool, detail: object = None) -> None:
     checks.append({"label": label, "ok": bool(ok), "detail": None if ok else detail})
+
+
+def stable_ast_dump(node: ast.AST) -> str:
+    options: dict[str, object] = {
+        "annotate_fields": True,
+        "include_attributes": False,
+    }
+    # Python 3.13+ hides empty fields by default; older versions include them.
+    # Force the older, explicit representation so the architecture fingerprint
+    # stays identical between developer machines and the Python 3.12 CI runner.
+    if "show_empty" in inspect.signature(ast.dump).parameters:
+        options["show_empty"] = True
+    return ast.dump(node, **options)
 
 
 entry_path = TOOLS / "aibi_cli.py"
@@ -184,11 +198,7 @@ def dispatcher_inventory(group) -> dict[str, str]:
     inventory: dict[str, str] = {}
     while isinstance(branch, ast.If):
         branch_commands = command_names_from_test(branch.test)
-        body_fingerprint_input = ast.dump(
-            ast.Module(body=branch.body, type_ignores=[]),
-            annotate_fields=True,
-            include_attributes=False,
-        )
+        body_fingerprint_input = stable_ast_dump(ast.Module(body=branch.body, type_ignores=[]))
         for command in branch_commands:
             inventory[command] = body_fingerprint_input
         branch = branch.orelse[0] if len(branch.orelse) == 1 and isinstance(branch.orelse[0], ast.If) else None
