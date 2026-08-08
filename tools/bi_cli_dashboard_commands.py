@@ -23,7 +23,7 @@ from connector_adapter_service import adapter_contracts
 from dashboard_widget_contracts import B_DASHBOARD_FILTER_OPERATORS
 from domain_pack_service import domain_pack_runtime_context
 from evidence_run_store import list_source_intelligence_runs
-from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, duckdb_status, sync_table_to_duckdb
+from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, duckdb_status, replica_table_name, sync_table_to_duckdb
 from relationship_command_service import (
     recommend_relationships_for_connection as recommend_relationships_for_connection_service,
     relation_candidate_fields as relation_candidate_fields_service,
@@ -542,14 +542,18 @@ def build_index_plan(connection: sqlite3.Connection, table: str, field: str, ind
     recommendations = recommend_indexes_for_table(connection, registry, 100)
     recommendation = next((item for item in recommendations if item["field"] == field), None)
     resolved_index_key = slug(index_key or (recommendation or {}).get("indexKey") or f"idx_{physical_table}_{field}")[:62]
+    source_version = f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}"
+    replica_table = replica_table_name(str(physical_table), source_version)
     proposed = {
         "tableKey": registry["table_key"],
         "tableName": registry["display_name"],
         "physicalTable": physical_table,
+        "sourceVersion": source_version,
+        "replicaTable": replica_table,
         "field": field,
         "indexKey": resolved_index_key,
         "engine": "duckdb",
-        "compiledSql": f"CREATE INDEX IF NOT EXISTS {quote_identifier(resolved_index_key)} ON {quote_identifier(physical_table)} ({quote_identifier(field)})",
+        "compiledSql": f"CREATE INDEX IF NOT EXISTS {quote_identifier(resolved_index_key)} ON {quote_identifier(replica_table)} ({quote_identifier(field)})",
         "recommendation": recommendation,
     }
     return proposed, columns
@@ -562,9 +566,22 @@ def execute_index_plan(connection: sqlite3.Connection, proposed: dict[str, Any],
         raise DuckDBUnavailable(str(exc)) from exc
     DUCKDB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(DUCKDB_PATH)) as duck_connection:
-        synced_rows = sync_table_to_duckdb(connection, duck_connection, str(proposed["physicalTable"]), columns)
+        replica = sync_table_to_duckdb(
+            connection,
+            duck_connection,
+            str(proposed["physicalTable"]),
+            columns,
+            source_version=str(proposed["sourceVersion"]),
+        )
         duck_connection.execute(str(proposed["compiledSql"]))
-    return {"ok": True, "confirmed": True, "createdIndex": proposed, "syncedRows": synced_rows}
+    return {
+        "ok": True,
+        "confirmed": True,
+        "createdIndex": proposed,
+        "syncedRows": replica["syncedRows"],
+        "replicaStatus": replica["replicaStatus"],
+        "replicaTable": replica["replicaTable"],
+    }
 
 
 def create_index_command(args: argparse.Namespace) -> dict[str, Any]:

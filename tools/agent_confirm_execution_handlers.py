@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
 import sqlite3
+from pathlib import Path
 from typing import Any, Callable
 
 from agent_action_confirmations import confirm_dry_run_response, confirmed_response, mark_action_confirmed
+from atomic_import_plan_service import bind_single_import_plan
 
 
 def handle_index_create_confirmation(
@@ -91,8 +94,33 @@ def handle_import_commit_confirmation(
     if not file_path:
         raise ValueError("Import action draft is missing filePath")
     preview = build_import_preview(connection, file_path, table_key, unique_fields_value, conflict_rule_value)
+    workspace_id = str(action["workspace_id"])
+    workspace = connection.execute(
+        "SELECT current_source_run_id FROM workspaces WHERE id = ?",
+        (workspace_id,),
+    ).fetchone()
+    bound_preview = bind_single_import_plan(
+        preview,
+        Path(file_path),
+        current_source_run_id=str(workspace["current_source_run_id"] or "") if workspace else None,
+    )
     if not yes:
-        return confirm_dry_run_response(action, payload, importPreview=preview)
+        payload["expectedPlan"] = bound_preview["planFingerprint"]
+        payload["mode"] = str((bound_preview.get("commitOptions") or {}).get("mode") or mode)
+        connection.execute(
+            "UPDATE action_drafts SET payload_json = ? WHERE workspace_id = ? AND action_key = ?",
+            (json.dumps(payload, ensure_ascii=False), workspace_id, action_key),
+        )
+        connection.commit()
+        return confirm_dry_run_response(action, payload, importPreview=bound_preview)
+    expected_plan = str(payload.get("expectedPlan") or "")
+    if not expected_plan:
+        raise ValueError("Import draft must be previewed again before confirmation")
+    if expected_plan != str(bound_preview.get("planFingerprint") or ""):
+        raise ValueError("Import file or workspace version changed after preview; preview the draft again")
+    expected_mode = str((bound_preview.get("commitOptions") or {}).get("mode") or "")
+    if mode != expected_mode:
+        raise ValueError("Import mode changed after preview; create a new preview")
     result = execute_import_commit(connection, file_path, table_key, name, mode, unique_fields_value, conflict_rule_value)
     mark_action_confirmed(connection, action_key, confirmed_at)
     connection.commit()

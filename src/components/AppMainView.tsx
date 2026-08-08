@@ -142,6 +142,8 @@ export function AppMainView({
         status={status}
         workbench={workbench}
         agent={agent}
+        pendingDraftCount={pendingDraftCount}
+        sourceIntelligenceJobs={dataActions.sourceIntelligenceJobs}
         onAsk={handleHomeAsk}
         onSourceIntelligenceRun={handleSourceIntelligenceRun}
         onOpenSection={openSection}

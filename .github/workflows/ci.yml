@@ -52,11 +52,19 @@ jobs:
       - name: Verify server security runtime
         run: npm run verify:security-runtime
 
-      - name: Verify browser smoke paths
-        run: |
-          npm run verify:ui-flow
-          npm run verify:ui-visual
-          npm run verify:ui-empty
+      - name: Verify complete browser paths
+        run: npm run verify:ui
+
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: aibi-c-browser-evidence
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            ${{ runner.temp }}/aibi-ui-*
+            tmp/qa/**
 
       - name: Stop local services
         if: always()

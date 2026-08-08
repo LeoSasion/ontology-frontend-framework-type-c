@@ -1,4 +1,4 @@
-import { useCallback, useRef, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   commitImport,
   commitFolderImport,
@@ -34,6 +34,7 @@ import {
 import type { SourceIntelligenceRunOptions } from "./sourceIntelligenceRunModel";
 import { fetchAnalysisJobs } from "./apiJobs";
 import type { AnalysisJob } from "./typesJobs";
+import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 import type {
   ActionDraft,
   DashboardPayload,
@@ -51,6 +52,7 @@ const loadRelationshipWorkspaceActions = () => import("./relationshipWorkspaceAc
 
 type AppDataActionsOptions = {
   activeWorkspaceId: string;
+  workbench: WorkbenchPayload;
   setActionDrafts: Dispatch<SetStateAction<ActionDraft[]>>;
   setActiveViewKey: Dispatch<SetStateAction<string>>;
   setDashboards: Dispatch<SetStateAction<DashboardPayload>>;
@@ -83,8 +85,21 @@ function jobFailureMessage(job: AnalysisJob) {
   return String(detail || (job.status === "canceled" ? "任务已取消。" : "Source Intelligence 任务未完成。"));
 }
 
+function sameAnalysisJobs(left: AnalysisJob[], right: AnalysisJob[]) {
+  return left.length === right.length && left.every((job, index) => {
+    const candidate = right[index];
+    return candidate
+      && job.jobKey === candidate.jobKey
+      && job.status === candidate.status
+      && job.progress === candidate.progress
+      && job.stage === candidate.stage
+      && job.updatedAt === candidate.updatedAt;
+  });
+}
+
 export function useAppDataActions({
   activeWorkspaceId,
+  workbench,
   setActionDrafts,
   setActiveViewKey,
   setDashboards,
@@ -98,6 +113,10 @@ export function useAppDataActions({
   setWorkbench,
 }: AppDataActionsOptions) {
   const sourceIntelligenceRequestRef = useRef(0);
+  const sourceIntelligenceLaunchingRef = useRef(false);
+  const sourceIntelligenceRecoveryKeyRef = useRef("");
+  const hydratedSourceIntelligenceJobsRef = useRef(new Set<string>());
+  const [sourceIntelligenceJobs, setSourceIntelligenceJobs] = useState<AnalysisJob[]>([]);
   const setSection = useCallback((section: AppSection) => navigateTo({ section }), [navigateTo]);
   const handlePreview = useCallback(async (options: { filePath: string; table?: string; uniqueFields?: string[]; conflictRule?: string }) => {
     const result = await previewImportWithOptions(options);
@@ -106,7 +125,7 @@ export function useAppDataActions({
     return result;
   }, [setPreview, setSection]);
 
-  const handleCommitImport = useCallback(async (options: { filePath: string; table?: string; name?: string; mode?: string; uniqueFields?: string[]; conflictRule?: string; confirm?: boolean }) => {
+  const handleCommitImport = useCallback(async (options: { filePath: string; table?: string; name?: string; mode?: string; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => {
     const result = await commitImport(options);
     const refreshed = await refreshStatusAndWorkbench();
     setLastActionResult(result);
@@ -241,6 +260,7 @@ export function useAppDataActions({
     } catch (error) {
       setLastActionResult(actionErrorResult("query-table", error));
       navigateTo({ section: "views" });
+      throw error;
     }
   }, [navigateTo, setLastActionResult, setTableQuery]);
 
@@ -419,6 +439,7 @@ export function useAppDataActions({
     }
     const requestId = sourceIntelligenceRequestRef.current + 1;
     sourceIntelligenceRequestRef.current = requestId;
+    sourceIntelligenceLaunchingRef.current = true;
     const request = { ...sourceOptions, async: true, inputs, workspaceId: activeWorkspaceId };
     try {
       const accepted = await runSourceIntelligence(request);
@@ -461,6 +482,7 @@ export function useAppDataActions({
       if (sourceIntelligenceRequestRef.current !== requestId || refreshed.status.workspace.id !== result.workspaceId) return result;
       setWorkbench(refreshed.workbench);
       setStatus(refreshed.status);
+      hydratedSourceIntelligenceJobsRef.current.add(job.jobKey);
       if (!stayOnPage) {
         navigateTo({
           section: "dashboards",
@@ -479,8 +501,86 @@ export function useAppDataActions({
       });
       if (!stayOnPage) setSection("sources");
       throw error;
+    } finally {
+      if (sourceIntelligenceRequestRef.current === requestId) sourceIntelligenceLaunchingRef.current = false;
     }
   }, [activeWorkspaceId, navigateTo, setLastActionResult, setSection, setStatus, setWorkbench]);
+
+  useEffect(() => {
+    let disposed = false;
+    let timer = 0;
+    let baselineLoaded = false;
+    hydratedSourceIntelligenceJobsRef.current = new Set();
+    setSourceIntelligenceJobs([]);
+
+    const refreshJobs = async () => {
+      let hasActive = false;
+      try {
+        const payload = await fetchAnalysisJobs({ limit: 20 });
+        if (disposed) return;
+        const jobs = (payload.jobs ?? [])
+          .filter((job) => job.workspaceId === activeWorkspaceId && job.kind === "source-intelligence");
+        setSourceIntelligenceJobs((current) => sameAnalysisJobs(current, jobs) ? current : jobs);
+        hasActive = jobs.some((job) => !TERMINAL_JOB_STATUSES.has(job.status));
+        const succeededJobs = jobs.filter((job) => job.status === "succeeded");
+        if (!baselineLoaded) {
+          succeededJobs.forEach((job) => hydratedSourceIntelligenceJobsRef.current.add(job.jobKey));
+          baselineLoaded = true;
+        } else {
+          const newlyCompletedJobs = succeededJobs.filter((job) => !hydratedSourceIntelligenceJobsRef.current.has(job.jobKey));
+          newlyCompletedJobs.forEach((job) => hydratedSourceIntelligenceJobsRef.current.add(job.jobKey));
+          if (!newlyCompletedJobs.length) return;
+          const refreshed = await refreshStatusAndWorkbench();
+          if (!disposed && refreshed.status.workspace.id === activeWorkspaceId) {
+            setStatus(refreshed.status);
+            setWorkbench(refreshed.workbench);
+          }
+        }
+      } catch {
+        // The workspace surface remains usable if the optional background-job feed is temporarily unavailable.
+      } finally {
+        if (!disposed) timer = window.setTimeout(() => void refreshJobs(), hasActive ? 1500 : 8000);
+      }
+    };
+
+    void refreshJobs();
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeWorkspaceId, setStatus, setWorkbench]);
+
+  useEffect(() => {
+    if (!workbench.tables.length || latestUsableSourceIntelligenceRun(workbench.sourceIntelligenceRuns)) return;
+    if (sourceIntelligenceLaunchingRef.current) return;
+    const inputs = Array.from(new Set(workbench.importJobs
+      .filter((job) => job.status === "success" && job.source_file.trim())
+      .map((job) => job.source_file.trim())));
+    if (!inputs.length) return;
+    const dataVersionKey = workbench.tables
+      .map((table) => `${table.table_key}:${table.data_version ?? table.updated_at ?? table.row_count}`)
+      .sort()
+      .join("|");
+    const recoveryKey = `${activeWorkspaceId}:${inputs.join("\n")}:${dataVersionKey}`;
+    if (sourceIntelligenceRecoveryKeyRef.current === recoveryKey) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        if (sourceIntelligenceLaunchingRef.current || sourceIntelligenceRecoveryKeyRef.current === recoveryKey) return;
+        const payload = await fetchAnalysisJobs({ statuses: ["created", "queued", "running", "cancel_requested"], limit: 20 });
+        const hasActiveJob = (payload.jobs ?? []).some((job) => job.workspaceId === activeWorkspaceId && job.kind === "source-intelligence");
+        sourceIntelligenceRecoveryKeyRef.current = recoveryKey;
+        if (hasActiveJob) return;
+        await handleSourceIntelligenceRun({
+          inputs,
+          label: "Workspace evidence",
+          stayOnPage: true,
+        });
+      })().catch(() => {
+        // handleSourceIntelligenceRun already records the actionable failure for the journey UI.
+      });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [activeWorkspaceId, handleSourceIntelligenceRun, workbench.importJobs, workbench.sourceIntelligenceRuns, workbench.tables]);
 
   const handleSourceDashboardDraft = useCallback(async (options: Parameters<typeof createSourceDashboardDraft>[0]) => {
     const result = await createSourceDashboardDraft(options);
@@ -498,6 +598,7 @@ export function useAppDataActions({
   }, [navigateTo, setActionDrafts, setLastActionResult, setStatus, setWorkbench]);
 
   return {
+    sourceIntelligenceJobs,
     handleAddMetric,
     handleCommitImport,
     handleCommitFolderImport,

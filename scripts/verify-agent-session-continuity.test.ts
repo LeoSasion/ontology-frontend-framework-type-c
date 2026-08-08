@@ -70,6 +70,10 @@ function jsonResponse(payload: unknown) {
   });
 }
 
+function runtimeSessionResponse() {
+  return jsonResponse({ ok: true, token: "t".repeat(64) });
+}
+
 test("normal, branch, and read-only Agent asks continue one durable session without duplicate writes", async () => {
   const originalFetch = globalThis.fetch;
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
@@ -87,6 +91,7 @@ test("normal, branch, and read-only Agent asks continue one durable session with
   });
   globalThis.fetch = (async (input, init) => {
     const path = String(input);
+    if (path === "/api/runtime-session") return runtimeSessionResponse();
     if (path === "/api/actions?limit=12") {
       return jsonResponse({ ok: true, actionDrafts: [] });
     }
@@ -172,6 +177,7 @@ test("a deleted persisted session is cleared and retried once as a fresh session
   });
   globalThis.fetch = (async (input, init) => {
     const path = String(input);
+    if (path === "/api/runtime-session") return runtimeSessionResponse();
     if (path === "/api/actions?limit=12") return jsonResponse({ ok: true, actionDrafts: [] });
     if (path !== "/api/agent/ask") throw new Error(`Unexpected request: ${path}`);
     const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
@@ -200,7 +206,7 @@ test("a deleted persisted session is cleared and retried once as a fresh session
         },
         setDashboards: noop,
         setLastActionResult: (value) => {
-          if (typeof value !== "function") actionErrors.push(value);
+          if (typeof value !== "function" && value !== null) actionErrors.push(value);
         },
         navigateTo: noop,
         setStatus: noop,
@@ -240,6 +246,7 @@ test("disabled browser storage degrades to a non-persistent request without brea
   Object.defineProperty(globalThis, "window", { configurable: true, value: blockedWindow });
   globalThis.fetch = (async (input) => {
     const path = String(input);
+    if (path === "/api/runtime-session") return runtimeSessionResponse();
     if (path === "/api/actions?limit=12") return jsonResponse({ ok: true, actionDrafts: [] });
     if (path === "/api/agent/ask") return jsonResponse(agentResult("session-storage-disabled"));
     throw new Error(`Unexpected request: ${path}`);
@@ -260,7 +267,7 @@ test("disabled browser storage degrades to a non-persistent request without brea
         },
         setDashboards: noop,
         setLastActionResult: (value) => {
-          if (typeof value !== "function") actionErrors.push(value);
+          if (typeof value !== "function" && value !== null) actionErrors.push(value);
         },
         navigateTo: noop,
         setStatus: noop,

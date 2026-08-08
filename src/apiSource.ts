@@ -95,6 +95,7 @@ export function commitImport(options: {
   mode?: string;
   uniqueFields?: string[];
   conflictRule?: string;
+  expectedPlan?: string;
   confirm?: boolean;
 }) {
   return fetchJson<Record<string, unknown>>("/api/import/commit", { ok: false }, {

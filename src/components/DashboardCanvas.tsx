@@ -14,6 +14,7 @@ import { buildProductActivation } from "../productActivationModel";
 import { useDashboardCanvasActions } from "../useDashboardCanvasActions";
 import { useDashboardCanvasState } from "../useDashboardCanvasState";
 import { BiDashboardWidgetKit } from "../dashboardWidgetModules";
+import { ObjectMissingState } from "./ObjectMissingState";
 import {
   DashboardAdvancedWidgetWorkbench,
   DashboardBeginnerEditor,
@@ -48,7 +49,9 @@ type DashboardCanvasProps = {
 
 export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench, activeDashboardKey, onDashboardSelect, onAgentDraft, onAsk, onOpenEvidence, onDashboardOperation, onDashboardFilterOperation, onDashboardModulesSave, onBusinessDashboardOperation, onRelationshipSave, onDashboardWidgetOperation, onOpenBusinessStep }: DashboardCanvasProps) {
   const dashboardPages = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
-  const dashboard = dashboardPages.find((item) => item.dashboard_key === activeDashboardKey) ?? dashboardPages[0] ?? {
+  const requestedDashboard = dashboardPages.find((item) => item.dashboard_key === activeDashboardKey);
+  const requestedDashboardMissing = activeDashboardKey !== "default" && !requestedDashboard;
+  const dashboard = requestedDashboard ?? dashboardPages[0] ?? {
     dashboard_key: "fallback",
     name: biText("未命名看板", "Untitled dashboard"),
     workspace_id: "default",
@@ -215,6 +218,20 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
           title={biText("先接入数据，再生成图表", "Connect data before creating charts")}
         />
       </section>
+    );
+  }
+
+  if (requestedDashboardMissing) {
+    return (
+      <ObjectMissingState
+        badge={biText("看板不可用", "Dashboard unavailable")}
+        detail={biText(`地址中的看板「${activeDashboardKey}」没有被替换成其他看板。请选择一个现有看板，或创建新看板。`, `The dashboard “${activeDashboardKey}” in the URL was not replaced with another board. Choose an existing board or create a new one.`)}
+        testId="dashboard-not-found"
+        title={biText("这个看板不存在或已被删除", "This dashboard is missing or was deleted")}
+      >
+        {dashboardPages[0] ? <button className="primaryButton" onClick={() => onDashboardSelect(dashboardPages[0].dashboard_key)} type="button">{biText("打开现有看板", "Open an existing dashboard")}</button> : null}
+        <button className="secondaryButton" onClick={onAgentDraft} type="button">{biText("创建看板草案", "Create a dashboard draft")}</button>
+      </ObjectMissingState>
     );
   }
 

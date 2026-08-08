@@ -291,7 +291,7 @@
   gap: 4px;
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .trustContextLead,
   .evidenceTrustActions {
     align-items: stretch;

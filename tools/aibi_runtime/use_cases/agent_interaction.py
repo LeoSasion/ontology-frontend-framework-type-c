@@ -1193,7 +1193,6 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
     with closing(open_db()) as connection:
         if connection.in_transaction:
             connection.commit()
-        connection.execute("BEGIN IMMEDIATE")
         workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection))
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
             raise ValueError(f"Unknown workspace: {workspace_id}")
@@ -1456,19 +1455,11 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
                     "dashboardDraft": dashboard_create_draft,
                 }
             )
+        action_label = None
+        action_evidence: list[dict[str, Any]] = []
         if should_create_draft:
             action_label = "生成单图表草案" if single_chart_dashboard_create else agent_action_label(action_kind, wants_dashboard=intents.wants_dashboard)
             action_evidence = agent_action_evidence(action_kind)
-            create_action_draft(
-                connection,
-                action_key=action_key,
-                workspace_id=workspace_id,
-                kind=action_kind,
-                label=action_label,
-                payload=action_payload,
-                evidence=action_evidence,
-                created_at=now_iso(),
-            )
         answer_card = (
             build_agent_answer_card(connection, resolution_prompt, None, None, workspace_id, intent_frame)
             if selected_table is None
@@ -1714,6 +1705,27 @@ def ask_command(args: argparse.Namespace) -> dict[str, Any]:
             receipt_unresolved = merge_receipt_unresolved_with_execution_blockers(
                 receipt_unresolved,
                 semantic_execution.get("executionPlan"),
+            )
+        # Expensive planning and analytical reads complete before the short write
+        # transaction. Revalidate the source binding after acquiring the writer
+        # lock so stale analysis can never be persisted as current evidence.
+        if connection.in_transaction:
+            connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
+        revalidated_source_binding = current_source_run_binding(connection, workspace_id, receipt_source_table_keys)
+        if revalidated_source_binding != receipt_source_binding:
+            connection.rollback()
+            raise RuntimeError("Workspace source version changed during Agent planning; retry the request.")
+        if should_create_draft:
+            create_action_draft(
+                connection,
+                action_key=action_key,
+                workspace_id=workspace_id,
+                kind=action_kind,
+                label=str(action_label or agent_action_label(action_kind, wants_dashboard=intents.wants_dashboard)),
+                payload=action_payload,
+                evidence=action_evidence,
+                created_at=now_iso(),
             )
         query_receipt = create_query_plan_receipt(
             connection,

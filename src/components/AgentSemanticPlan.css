@@ -18,7 +18,7 @@
 }
 
 .agentSemanticPlanSummaryMeta strong {
-  max-width: min(56vw, 660px);
+  max-width: min(56cqi, 660px);
   overflow-wrap: anywhere;
   color: var(--text);
   font-size: 0.82rem;
@@ -209,7 +209,7 @@
   font-size: 0.76rem;
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .agentSemanticPlan > summary {
     align-items: start;
     flex-direction: column;

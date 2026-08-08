@@ -24,6 +24,7 @@ function responseCapture() {
 function jsonRequest(value: Record<string, unknown>) {
   const request = Readable.from([JSON.stringify(value)]) as unknown as IncomingMessage;
   request.method = "POST";
+  request.headers = { "content-type": "application/json" };
   return request;
 }
 

@@ -24,14 +24,65 @@ class AgentPromptIntents:
     dashboard_operation: str
 
 
+def prompt_negates_dashboard_action(
+    prompt: str,
+    *,
+    zh_actions: list[str],
+    en_actions: list[str],
+) -> bool:
+    lower = prompt.lower()
+    zh_action_pattern = "|".join(re.escape(action) for action in zh_actions)
+    en_action_pattern = "|".join(re.escape(action) for action in en_actions)
+    zh_negation = r"(?:不要|无需|不需要|请勿|禁止|别|不可|不得)"
+    en_negation = r"\b(?:do not|don't|without|no need to|must not|never)\b"
+    zh_target = r"(?:看板|仪表盘)"
+    en_target = r"\bdashboards?\b"
+    return (
+        bool(re.search(rf"{zh_negation}.{{0,48}}(?:{zh_action_pattern}).{{0,32}}{zh_target}", prompt))
+        or bool(re.search(rf"{zh_negation}.{{0,32}}{zh_target}.{{0,32}}(?:{zh_action_pattern})", prompt))
+        or bool(re.search(rf"{en_negation}.{{0,64}}\b(?:{en_action_pattern})\b.{{0,48}}{en_target}", lower))
+        or bool(re.search(rf"{en_negation}.{{0,48}}{en_target}.{{0,48}}\b(?:{en_action_pattern})\b", lower))
+    )
+
+
+def prompt_negates_dashboard_mutation(prompt: str) -> bool:
+    return prompt_negates_dashboard_action(
+        prompt,
+        zh_actions=["生成", "创建", "新建", "起草", "搭建", "制作", "修改", "编辑", "更新", "删除", "移除", "重命名", "改名", "复制", "拷贝", "筛选", "过滤"],
+        en_actions=["create", "creating", "draft", "drafting", "generate", "generating", "make", "making", "build", "building", "modify", "modifying", "edit", "editing", "update", "updating", "delete", "deleting", "remove", "removing", "rename", "renaming", "copy", "copying", "duplicate", "duplicating", "filter", "filtering"],
+    )
+
+
+def prompt_mentions_dashboard_read(prompt: str) -> bool:
+    lower = prompt.lower()
+    return (
+        bool(re.search(r"(?:查看|打开|浏览|展示|列出|进入).{0,32}(?:看板|仪表盘)", prompt))
+        or bool(re.search(r"(?:看板|仪表盘).{0,24}(?:查看|打开|浏览|展示|列表)", prompt))
+        or bool(re.search(r"\b(?:view|open|show|list|browse)\b.{0,48}\bdashboards?\b", lower))
+        or bool(re.search(r"\bdashboards?\b.{0,48}\b(?:view|open|show|list|browse)\b", lower))
+    )
+
+
 def dashboard_operation_from_prompt(prompt: str) -> str:
     lower = prompt.lower()
     mentions_dashboard = any(token in prompt for token in ["看板", "仪表盘"]) or "dashboard" in lower
-    if mentions_dashboard and (any(token in prompt for token in ["删除", "移除"]) or any(token in lower for token in ["delete", "remove"])):
+    if (
+        mentions_dashboard
+        and not prompt_negates_dashboard_action(prompt, zh_actions=["删除", "移除"], en_actions=["delete", "remove"])
+        and (any(token in prompt for token in ["删除", "移除"]) or any(token in lower for token in ["delete", "remove"]))
+    ):
         return "delete"
-    if mentions_dashboard and (any(token in prompt for token in ["重命名", "改名"]) or "rename" in lower):
+    if (
+        mentions_dashboard
+        and not prompt_negates_dashboard_action(prompt, zh_actions=["重命名", "改名"], en_actions=["rename"])
+        and (any(token in prompt for token in ["重命名", "改名"]) or "rename" in lower)
+    ):
         return "rename"
-    if mentions_dashboard and (any(token in prompt for token in ["复制", "拷贝"]) or any(token in lower for token in ["copy", "duplicate"])):
+    if (
+        mentions_dashboard
+        and not prompt_negates_dashboard_action(prompt, zh_actions=["复制", "拷贝"], en_actions=["copy", "duplicate"])
+        and (any(token in prompt for token in ["复制", "拷贝"]) or any(token in lower for token in ["copy", "duplicate"]))
+    ):
         return "copy"
     return ""
 
@@ -59,6 +110,12 @@ def prompt_mentions_dashboard_create(prompt: str) -> bool:
     has_dashboard = any(token in prompt for token in ["看板", "仪表盘"]) or "dashboard" in lower
     if not has_dashboard:
         return False
+    if prompt_negates_dashboard_action(
+        prompt,
+        zh_actions=["生成", "创建", "新建", "起草", "搭建", "制作"],
+        en_actions=["create", "creating", "draft", "drafting", "generate", "generating", "make", "making", "build", "building"],
+    ):
+        return False
     if any(token in prompt for token in ["看板组件", "仪表盘组件"]) or "dashboard widget" in lower:
         return False
     zh_create = bool(re.search(r"(生成|创建|新建|起草|搭建|制作).{0,20}(看板|仪表盘)", prompt)) or bool(
@@ -70,6 +127,8 @@ def prompt_mentions_dashboard_create(prompt: str) -> bool:
 
 def prompt_mentions_dashboard_filter(prompt: str) -> bool:
     lower = prompt.lower()
+    if prompt_negates_dashboard_action(prompt, zh_actions=["筛选", "过滤", "限定", "只看"], en_actions=["filter"]):
+        return False
     if any(token in prompt for token in ["筛选器", "切片器"]) or any(token in lower for token in ["slicer", "filter control"]):
         return False
     has_filter = any(token in prompt for token in ["筛选", "过滤", "限定", "只看"]) or any(token in lower for token in ["filter", "where", "only show"])
@@ -89,7 +148,11 @@ def prompt_mentions_view_save(prompt: str) -> bool:
 
 def resolve_agent_prompt_intents(prompt: str) -> AgentPromptIntents:
     lower = prompt.lower()
-    wants_dashboard = any(token in prompt for token in ["看板", "仪表盘"]) or "dashboard" in lower
+    mentions_dashboard = any(token in prompt for token in ["看板", "仪表盘"]) or "dashboard" in lower
+    wants_dashboard = mentions_dashboard and (
+        not prompt_negates_dashboard_mutation(prompt)
+        or prompt_mentions_dashboard_read(prompt)
+    )
     wants_dashboard_create = prompt_mentions_dashboard_create(prompt)
     wants_import = any(token in prompt for token in ["导入", "上传"]) or "import" in lower
     wants_relationship = any(token in prompt for token in ["关联", "关系"]) or "join" in lower

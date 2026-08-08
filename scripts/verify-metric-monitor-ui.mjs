@@ -52,8 +52,8 @@ const checks = [
   {
     label: "monitor-layout-is-responsive-without-fixed-width",
     ok: css.includes("repeat(auto-fit")
-      && css.includes("@media (max-width: 1100px)")
-      && css.includes("@media (max-width: 680px)")
+      && css.includes("@container viewport-stage (max-width: 1100px)")
+      && css.includes("@container viewport-stage (max-width: 680px)")
       && !/(?:^|[;{]\s*)width:\s*\d+px/m.test(css),
   },
 ];

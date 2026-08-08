@@ -68,6 +68,15 @@ export function SourceWorkbenchRelationshipPanel({
   const relationshipOverlapKeys = numberValue(relationshipPreviewMetrics.overlapKeys ?? matchingRelationshipRecommendation?.previewMetrics?.overlapKeys);
   const relationshipAlreadySaved = relationships.some((relationship) => relationshipRecordKey(relationship) === relationshipFormKey);
   const relationshipBusy = Boolean(busy?.startsWith("relationship"));
+  const relationshipIdentityComplete = Boolean(
+    tables.length >= 2
+    && relationshipForm.leftTable
+    && relationshipForm.rightTable
+    && relationshipForm.leftTable !== relationshipForm.rightTable
+    && relationshipForm.leftField
+    && relationshipForm.rightField,
+  );
+  const relationshipControlsDisabled = relationshipBusy || !relationshipIdentityComplete;
   const relationshipBusyText = relationshipBusy
     ? busy?.includes("dry")
       ? biText("正在预演保存业务连接", "Previewing the relationship save")
@@ -106,18 +115,25 @@ export function SourceWorkbenchRelationshipPanel({
         <div className="tileHeader">
           <h3><Bilingual zh="保存业务连接" en="Save business link" /></h3>
           <div className="buttonRow tight">
-            <button className="miniButton" data-testid="relationship-preview-button" disabled={relationshipBusy} onClick={() => runBusy("relationship-preview", () => onRelationshipPreview(relationshipForm))} type="button">
+            <button className="miniButton" data-testid="relationship-preview-button" disabled={relationshipControlsDisabled} onClick={() => runBusy("relationship-preview", () => onRelationshipPreview(relationshipForm))} type="button">
               {biText("预览", "Preview")}
             </button>
-            <button className="miniButton" data-testid="relationship-dry-run-button" disabled={relationshipBusy} onClick={() => runBusy("relationship-dry", () => onRelationshipSave({ ...relationshipForm, confirm: false }))} type="button">
+            <button className="miniButton" data-testid="relationship-dry-run-button" disabled={relationshipControlsDisabled} onClick={() => runBusy("relationship-dry", () => onRelationshipSave({ ...relationshipForm, confirm: false }))} type="button">
               {biText("预演保存", "Preview save")}
             </button>
-            <button className="primaryButton compactAction" data-testid="relationship-confirm-button" disabled={relationshipBusy} onClick={() => runBusy("relationship-save", () => onRelationshipSave({ ...relationshipForm, confirm: true }))} type="button">
+            <button className="primaryButton compactAction" data-testid="relationship-confirm-button" disabled={relationshipControlsDisabled} onClick={() => runBusy("relationship-save", () => onRelationshipSave({ ...relationshipForm, confirm: true }))} type="button">
               {biText("确认保存", "Confirm save")}
             </button>
           </div>
         </div>
         {relationshipBusyText ? <span aria-live="polite" className="quietText" role="status">{relationshipBusyText}</span> : null}
+        {!relationshipIdentityComplete ? (
+          <p className="emptyFilterHint" data-testid="relationship-modeling-unavailable" role="status">
+            {tables.length < 2
+              ? biText("至少接入两张数据表后，才能建立业务连接和配置连接安全策略。", "Connect at least two data tables before creating a business link or configuring its safety policy.")
+              : biText("请先为左右数据表选择有效的连接字段。", "Choose valid link fields for both data tables first.")}
+          </p>
+        ) : null}
         <details className="advancedDetails compactAdvanced relationshipTechnicalDetails" data-testid="relationship-technical-details">
           <summary>{biText("选择连接字段", "Choose link fields")}</summary>
           <div className="formGrid">
@@ -148,7 +164,7 @@ export function SourceWorkbenchRelationshipPanel({
           </div>
         </details>
         <Suspense fallback={null}>
-          <RelationshipSafetyControls disabled={relationshipBusy} relationshipForm={relationshipForm} rightFields={rightFields} setRelationshipForm={setRelationshipForm} />
+          <RelationshipSafetyControls disabled={relationshipControlsDisabled} relationshipForm={relationshipForm} rightFields={rightFields} setRelationshipForm={setRelationshipForm} />
         </Suspense>
         <div className="policyStrip">
           <div><strong>{metricValue(relationshipPreview.relationshipPreview.metrics, "overlapKeys")}</strong><span>{biText("可连接键", "linkable keys")}</span></div>

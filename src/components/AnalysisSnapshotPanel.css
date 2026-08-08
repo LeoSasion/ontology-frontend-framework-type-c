@@ -133,7 +133,7 @@
   margin: 0;
 }
 
-@media (max-width: 860px) {
+@container viewport-stage (max-width: 860px) {
   .analysisSnapshotLead {
     grid-template-columns: 1fr 1fr;
   }
@@ -143,7 +143,7 @@
   }
 }
 
-@media (max-width: 620px) {
+@container viewport-stage (max-width: 620px) {
   .analysisSnapshotLead {
     grid-template-columns: 1fr;
   }

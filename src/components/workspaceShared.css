@@ -88,7 +88,7 @@
 
 .moduleLoadingPanel h2 {
   color: var(--text);
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
   line-height: 1.2;
 }
 
@@ -224,7 +224,7 @@
   width: 58%;
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .moduleLoadingPanel {
     align-content: start;
     padding: 14px;
@@ -290,7 +290,15 @@
 
 .dashboardLoadingHeader h2 {
   margin-top: 8px;
-  font-size: 22px;
+  font-size: var(--ui-font-emphasis);
+}
+
+@media (pointer: coarse) {
+  .statusPill,
+  .languageToggle,
+  .languageOption {
+    min-height: 44px;
+  }
 }
 
 .dashboardLoadingHeader p {
@@ -462,7 +470,7 @@
   margin: 24px;
 }
 
-@media (max-width: 960px) {
+@container viewport-stage (max-width: 960px) {
   .productActivationSteps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -477,7 +485,7 @@
   }
 }
 
-@media (max-width: 560px) {
+@container viewport-stage (max-width: 560px) {
   .productActivationSteps,
   .productActivationFactGrid {
     grid-template-columns: minmax(0, 1fr);
@@ -612,4 +620,29 @@ textarea:focus {
   border-color: var(--accent);
   outline: 2px solid rgb(23 116 91 / 16%);
   outline-offset: 0;
+}
+.objectMissingState {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  min-height: min(520px, 70cqh);
+  gap: 12px;
+  padding: var(--ui-space-page-block) var(--ui-space-page-inline);
+}
+
+.objectMissingState h2,
+.objectMissingState p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.objectMissingState h2 {
+  font-size: var(--ui-font-section-title);
+}
+
+.objectMissingState p {
+  max-width: 68ch;
+  color: var(--muted);
+  font-size: var(--ui-font-body);
+  line-height: 1.6;
 }

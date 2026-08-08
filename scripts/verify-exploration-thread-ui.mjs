@@ -96,7 +96,7 @@ const checks = [
   {
     label: "responsive-board-has-no-overflow-prone-fixed-width",
     ok: styles.includes("repeat(auto-fit, minmax(min(100%, 220px), 1fr))")
-      && styles.includes("@media (max-width: 640px)")
+      && styles.includes("@container viewport-stage (max-width: 640px)")
       && styles.includes("grid-template-columns: minmax(0, 1fr)")
       && !/\.exploration[^{}]*\{[^{}]*width:\s*\d{3,}px/s.test(styles),
   },
@@ -130,7 +130,7 @@ const checks = [
   {
     label: "finite-research-layout-is-responsive-without-fixed-width",
     ok: researchStyles.includes("repeat(auto-fit, minmax(min(100%, 240px), 1fr))")
-      && researchStyles.includes("@media (max-width: 640px)")
+      && researchStyles.includes("@container viewport-stage (max-width: 640px)")
       && !/\.research[^{}]*\{[^{}]*width:\s*\d{3,}px/s.test(researchStyles),
   },
 ];

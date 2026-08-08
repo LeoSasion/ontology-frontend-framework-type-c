@@ -47,7 +47,7 @@ const checks = [
   },
   {
     label: "panel-has-narrow-screen-layout",
-    ok: css.includes("@media (max-width: 720px)")
+    ok: css.includes("@container viewport-stage (max-width: 720px)")
       && css.includes("grid-template-columns: repeat(auto-fit")
       && css.includes("grid-column: 1 / -1"),
   },

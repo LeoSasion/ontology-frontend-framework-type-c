@@ -11,6 +11,7 @@ export type ImportOptions = {
   mode?: string;
   uniqueFields?: string[];
   conflictRule?: string;
+  expectedPlan?: string;
   confirm?: boolean;
 };
 

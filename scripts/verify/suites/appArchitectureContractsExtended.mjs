@@ -52,6 +52,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     globalStylesSource,
     hasCssRule,
     homeOverviewSource,
+    workspaceJourneyModelSource,
     implementationStatusSource,
     join,
     metricRepairModelSource,
@@ -125,7 +126,11 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     {
         label: "frontend-home-four-action-import-proof",
         ok: (homeOverviewSource.match(/data-testid="workspace-primary-task"/g) ?? []).length === 1 &&
-          homeOverviewSource.includes("const currentStep = !hasData ? 0 : !hasCurrentEvidence ? 1 : hasPendingDraft ? 3 : 2") &&
+          homeOverviewSource.includes("const journey = buildWorkspaceJourney(") &&
+          homeOverviewSource.includes("const state = journey.stepStates[index]") &&
+          workspaceJourneyModelSource.includes('if (!hasData) phase = "connect"') &&
+          workspaceJourneyModelSource.includes('else if (!hasCurrentEvidence) phase = "understand"') &&
+          workspaceJourneyModelSource.includes('else if (hasPendingDraft) phase = "confirm"') &&
           homeOverviewSource.includes('className="workspaceTaskEmpty"') &&
           homeOverviewSource.includes('className="workspaceQuestionTask"') &&
           homeOverviewSource.includes("async function generateEvidence()") &&
@@ -140,14 +145,18 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-no-data-onboarding-ux-boundary",
-        ok: homeOverviewSource.includes("const hasData = status.counts.tables > 0 || workbench.tables.length > 0") &&
-          homeOverviewSource.includes("{!hasData ? (") &&
+        ok: workspaceJourneyModelSource.includes("const hasData = status.counts.tables > 0 || workbench.tables.length > 0") &&
+          workspaceJourneyModelSource.includes("inputRoots: sourceIntelligenceInputs(workbench)") &&
+          homeOverviewSource.includes("{!journey.hasData ? (") &&
           homeOverviewSource.includes("先接入一份真实数据") &&
           homeOverviewSource.includes("系统会先预检，不会直接写入") &&
           homeOverviewSource.includes('onClick={() => onOpenSection("sources")}') &&
-          homeOverviewSource.includes(") : !hasCurrentEvidence ? (") &&
-          homeOverviewSource.includes("生成证据摘要，再开始提问") &&
+          homeOverviewSource.includes(") : !journey.hasCurrentEvidence ? (") &&
+          homeOverviewSource.includes("系统正在理解数据，完成后即可提问") &&
+          homeOverviewSource.includes("导入确认后自动检查，无需再配置一遍") &&
+          homeOverviewSource.includes("journey.activeJob ? null : (") &&
           homeOverviewSource.includes('disabled={busy === "profile"}') &&
+          appDataActionsSource.includes("sourceIntelligenceJobs") &&
           workspaceFlowModelSource.includes("export function buildWorkspaceFlow") &&
           workspaceFlowModelSource.includes("export function resolveSectionForFlow") &&
           appSource.includes("const workspaceFlow = useMemo(() => buildWorkspaceFlow") &&
@@ -462,8 +471,9 @@ export function appendAppArchitectureContractExtendedChecks(context) {
       },
     {
         label: "frontend-home-draft-state-requires-confirmation",
-        ok: homeOverviewSource.includes("const hasPendingDraft = agent.requiresConfirmation === true || (status.counts.actionDrafts ?? 0) > 0") &&
-          homeOverviewSource.includes(") : hasPendingDraft ? (") &&
+        ok: workspaceJourneyModelSource.includes("const hasPendingDraft = agent.requiresConfirmation === true") &&
+          workspaceJourneyModelSource.includes("options.pendingDraftCount ?? status.counts.actionDrafts ?? 0") &&
+          homeOverviewSource.includes(") : journey.hasPendingDraft ? (") &&
           homeOverviewSource.includes('data-testid="workspace-review-draft"') &&
           homeOverviewSource.includes("核对等待确认的修改") &&
           homeOverviewSource.indexOf('data-testid="workspace-review-draft"') < homeOverviewSource.indexOf('data-testid="workspace-question-form"') &&
@@ -474,8 +484,8 @@ export function appendAppArchitectureContractExtendedChecks(context) {
         ok: !homeOverviewSource.includes("const [dashboardPlan, setDashboardPlan]") &&
           !homeOverviewSource.includes("runDashboardTemplate") &&
           !homeOverviewSource.includes("runBusinessDashboardOperation") &&
-          homeOverviewSource.includes("const hasDashboard = status.counts.dashboards > 0") &&
-          homeOverviewSource.includes('{hasDashboard && hasCurrentEvidence ? <button data-testid="workspace-open-board"') &&
+          workspaceJourneyModelSource.includes("const hasDashboard = status.counts.dashboards > 0") &&
+          homeOverviewSource.includes('{journey.hasDashboard && journey.hasCurrentEvidence ? <button data-testid="workspace-open-board"') &&
           homeOverviewSource.includes('onClick={() => onOpenSection("dashboards")}') &&
           homeOverviewSource.includes("打开最近看板"),
       },

@@ -56,7 +56,7 @@
 
 .productActivationState strong {
   color: var(--bi-text);
-  font-size: 22px;
+  font-size: var(--ui-font-emphasis);
   line-height: 1;
 }
 
@@ -254,4 +254,3 @@
     display: none;
   }
 }
-

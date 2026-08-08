@@ -477,7 +477,7 @@
 
 .fieldSemanticCard strong {
   color: var(--text);
-  font-size: 22px;
+  font-size: var(--ui-font-emphasis);
   line-height: 1;
 }
 

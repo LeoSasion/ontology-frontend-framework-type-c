@@ -206,7 +206,7 @@
   padding: 3px 6px;
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .dashboardGrid {
     --dashboard-lead-column: minmax(0, 1fr);
     --dashboard-grid-gap: 10px;
@@ -956,7 +956,7 @@
   display: block;
   margin-top: 18px;
   color: var(--bi-text);
-  font-size: 34px;
+  font-size: var(--ui-font-metric);
   font-weight: 780;
   line-height: 1.05;
   overflow-wrap: anywhere;

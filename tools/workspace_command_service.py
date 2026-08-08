@@ -232,10 +232,46 @@ def drop_duckdb_tables(duckdb_path: Path | None, physical_tables: list[str]) -> 
     if not duckdb_path.exists():
         return dropped
     with duckdb.connect(str(duckdb_path)) as duck_connection:
-        for table_name in physical_tables:
-            duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(table_name)}")
-            dropped.append(table_name)
-    return dropped
+        manifest_exists = bool(duck_connection.execute(
+            "SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = '__aibi_replica_manifest'"
+        ).fetchone())
+        duck_connection.execute("BEGIN TRANSACTION")
+        try:
+            for table_name in physical_tables:
+                replica_tables = [
+                    str(row[0])
+                    for row in (
+                        duck_connection.execute(
+                            "SELECT replica_table FROM __aibi_replica_manifest WHERE logical_table = ?",
+                            [table_name],
+                        ).fetchall()
+                        if manifest_exists
+                        else []
+                    )
+                ]
+                relation = duck_connection.execute(
+                    "SELECT table_type FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?",
+                    [table_name],
+                ).fetchone()
+                if relation and str(relation[0]) == "VIEW":
+                    duck_connection.execute(f"DROP VIEW {quote_identifier(table_name)}")
+                    dropped.append(table_name)
+                elif relation:
+                    duck_connection.execute(f"DROP TABLE {quote_identifier(table_name)}")
+                    dropped.append(table_name)
+                if manifest_exists:
+                    duck_connection.execute(
+                        "DELETE FROM __aibi_replica_manifest WHERE logical_table = ?",
+                        [table_name],
+                    )
+                for replica_table in replica_tables:
+                    duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(replica_table)}")
+                    dropped.append(replica_table)
+            duck_connection.execute("COMMIT")
+        except Exception:
+            duck_connection.execute("ROLLBACK")
+            raise
+    return list(dict.fromkeys(dropped))
 
 
 def workspace_delete_command(

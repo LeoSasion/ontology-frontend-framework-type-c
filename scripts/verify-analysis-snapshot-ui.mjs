@@ -49,8 +49,8 @@ const checks = [
   {
     label: "snapshot-layout-is-responsive-without-fixed-width",
     ok: css.includes("repeat(auto-fit")
-      && css.includes("@media (max-width: 860px)")
-      && css.includes("@media (max-width: 620px)")
+      && css.includes("@container viewport-stage (max-width: 860px)")
+      && css.includes("@container viewport-stage (max-width: 620px)")
       && !/(?:^|[;{]\s*)width:\s*\d+px/m.test(css),
   },
 ];

@@ -54,6 +54,7 @@ export function appendAppArchitectureContractChecks(context) {
     globalStylesSource,
     hasCssRule,
     homeOverviewSource,
+    workspaceJourneyModelSource,
     implementationStatusSource,
     join,
     metricRepairModelSource,
@@ -316,6 +317,7 @@ export function appendAppArchitectureContractChecks(context) {
           appSource.includes('from "./appLazyModules"') &&
           appLazyModulesSource.includes('import { lazyWithRetry } from "./lazyWithRetry"') &&
           appLazyModulesSource.includes('const loadAppMainView = () => import("./components/AppMainView")') &&
+          appLazyModulesSource.includes('const loadSidebar = () => import("./components/Sidebar")') &&
           appLazyModulesSource.includes('const loadTopBar = () => import("./components/TopBar")') &&
           appLazyModulesSource.includes('const loadAgentPanel = () => import("./components/AgentPanel")') &&
           appLazyModulesSource.includes('const loadDashboardCanvas = () => import("./components/DashboardCanvas")') &&
@@ -326,6 +328,7 @@ export function appendAppArchitectureContractChecks(context) {
           appLazyModulesSource.includes('const loadViewWorkspace = () => import("./components/ViewWorkspace")') &&
           appLazyModulesSource.includes("export const AgentPanel = lazyWithRetry(loadAgentPanel)") &&
           appLazyModulesSource.includes("export const AppMainView = lazyWithRetry(loadAppMainView)") &&
+          appLazyModulesSource.includes("export const Sidebar = lazyWithRetry(loadSidebar)") &&
           appLazyModulesSource.includes("export const TopBar = lazyWithRetry(loadTopBar)") &&
           appLazyModulesSource.includes("export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas)") &&
           appLazyModulesSource.includes("export const EvidenceView = lazyWithRetry(loadEvidenceView)") &&
@@ -334,10 +337,10 @@ export function appendAppArchitectureContractChecks(context) {
           appLazyModulesSource.includes("export const SourceWorkbench = lazyWithRetry(loadSourceWorkbench)") &&
           appLazyModulesSource.includes("export const ViewWorkspace = lazyWithRetry(loadViewWorkspace)") &&
           appLazyModulesSource.includes("export const sectionPreloaders: Record<AppSection") &&
-          appLazyModulesSource.includes("export const allSectionPreloaders") &&
-          appLazyModulesSource.includes("export const topBarPreloader = loadTopBar") &&
-          appLazyModulesSource.includes("export function scheduleIdlePreload") &&
-          appLazyModulesSource.includes("requestIdleCallback") &&
+          !appLazyModulesSource.includes("allSectionPreloaders") &&
+          !appLazyModulesSource.includes("topBarPreloader") &&
+          !appLazyModulesSource.includes("scheduleIdlePreload") &&
+          !appLazyModulesSource.includes("requestIdleCallback") &&
           agentPanelSource.includes('import "./agentEvidenceWorkspace.css"') &&
           evidenceViewSource.includes('import "./agentEvidenceWorkspace.css"') &&
           agentEvidenceStylesSource.includes(".agentComposer {") &&
@@ -356,10 +359,11 @@ export function appendAppArchitectureContractChecks(context) {
           hasCssRule(globalStylesSource, ".taskEvidenceRow summary", "cursor: pointer;") &&
           appLazyModulesSource.includes("export function ModuleLoadingPanel") &&
           appSource.includes("preloadModules(sectionPreloaders[section])") &&
-          appSource.includes("preloadModules([...allSectionPreloaders, topBarPreloader])") &&
+          !appSource.includes("allSectionPreloaders") &&
+          !appSource.includes("topBarPreloader") &&
           appSource.includes('setLoadState("ready")') &&
           appSource.includes("data-load-state={loadState}") &&
-          appLazyModulesSource.includes('import { getAppSection } from "./appSections"') &&
+          appLazyModulesSource.includes('import { getAppSection, type AppSection } from "./appSections"') &&
           appLazyModulesSource.includes('function sectionText(section: AppSection, language: "zh" | "en", field: "loading" | "loadingDetail")') &&
           !appSource.includes("lazy(loadAgentPanel)") &&
           !appSource.includes("function ModuleLoadingPanel") &&
@@ -371,6 +375,7 @@ export function appendAppArchitectureContractChecks(context) {
           !appSource.includes('import { SettingsPanel } from "./components/SettingsPanel"') &&
           !appSource.includes('import { SourceWorkbench } from "./components/SourceWorkbench"') &&
           !appSource.includes('import { ViewWorkspace } from "./components/ViewWorkspace"') &&
+          !appSource.includes('import { Sidebar') &&
           appLazyModulesSource.includes("function ModuleLoadingPanel") &&
           appLazyModulesSource.includes('data-testid="lazy-section-loading"') &&
           appLazyModulesSource.includes("const loadingFlow: AppSection[]") &&
@@ -519,14 +524,15 @@ export function appendAppArchitectureContractChecks(context) {
         label: "frontend-home-overview-model-boundary",
         ok: !homeOverviewSource.includes('from "../homeOverviewModel"') &&
           homeOverviewSource.includes("const questionStarters = [") &&
-          homeOverviewSource.includes("const hasData =") &&
-          homeOverviewSource.includes("const latestUsableRun = latestUsableSourceIntelligenceRun(sourceIntelligenceRuns)") &&
-          homeOverviewSource.includes("const hasCurrentEvidence = Boolean(latestUsableRun)") &&
-          homeOverviewSource.includes("const hasPendingDraft =") &&
-          homeOverviewSource.includes("const currentStep =") &&
-          homeOverviewSource.includes("const workflowSteps = useMemo(() => [") &&
+          homeOverviewSource.includes('from "../workspaceJourneyModel"') &&
+          homeOverviewSource.includes("const journey = buildWorkspaceJourney(") &&
+          homeOverviewSource.includes("const workflowSteps = [") &&
           homeOverviewSource.includes("async function submitQuestion") &&
           homeOverviewSource.includes("async function generateEvidence") &&
+          workspaceJourneyModelSource.includes("export function buildWorkspaceJourney") &&
+          workspaceJourneyModelSource.includes('export type WorkspaceJourneyPhase = "connect" | "understand" | "ask" | "review" | "confirm"') &&
+          workspaceJourneyModelSource.includes("const hasCurrentEvidence = Boolean(latestUsableRun)") &&
+          workspaceJourneyModelSource.includes('export type WorkspaceResultState = "none" | "ready" | "blocked"') &&
           !homeOverviewSource.includes("buildHomeReadiness") &&
           !homeOverviewSource.includes("buildHomeGuideSteps") &&
           !homeOverviewSource.includes("sourceDashboardCandidate"),
@@ -565,13 +571,14 @@ export function appendAppArchitectureContractChecks(context) {
           !serverIndexSource.includes("function pushDashboardWidgetStyleArgs(") &&
           !serverIndexSource.includes("function numberValue(") &&
           serverRuntimeSource.includes("export function sendJson(") &&
-          serverRuntimeSource.includes("function enrichedErrorBody(") &&
-          serverRuntimeSource.includes("buildActionRecovery(action, error)") &&
-          serverRuntimeSource.includes("response.end(JSON.stringify(enrichedErrorBody(body), null, 2))") &&
+          serverRuntimeSource.includes('import { RuntimeHostCapacityError, RuntimeHostDeadlineError, RuntimeHostPool') &&
+          serverRuntimeSource.includes("const runtimeHosts = new Map<string, RuntimeHostPool>()") &&
+          serverRuntimeSource.includes("return await runtimeHost(root).run(args, runtimeTrace.getStore()") &&
+          !serverRuntimeSource.includes('tools/aibi_cli.py') &&
           serverIndexSource.includes("function actionForApiPath(url: URL)") &&
           serverIndexSource.includes("action: url.pathname.startsWith(\"/api/\") ? actionForApiPath(url) : \"static\"") &&
           serverRuntimeSource.includes("export function readBody(") &&
-          serverRuntimeSource.includes("export function runCli(") &&
+          serverRuntimeSource.includes("export async function runCli(") &&
           serverRuntimeSource.includes("export function pushDashboardWidgetStyleArgs(") &&
           !serverRuntimeSource.includes("readBCostMonitorValidation"),
       },
@@ -579,14 +586,17 @@ export function appendAppArchitectureContractChecks(context) {
         label: "server-static-boundary",
         ok: existsSync(join(root, "server", "staticServer.ts")) &&
           serverIndexSource.includes('import { handleStatic } from "./staticServer"') &&
-          serverIndexSource.includes("await handleStatic(response, url.pathname, root)") &&
+          serverIndexSource.includes("await handleStatic(request, response, url.pathname, root)") &&
           !serverIndexSource.includes("readFile(path)") &&
           !serverIndexSource.includes("extname(path)") &&
           serverStaticSource.includes("export async function handleStatic(") &&
-          serverStaticSource.includes('join(root, "dist")') &&
-          serverStaticSource.includes('join(dist, "index.html")') &&
+          serverStaticSource.includes('resolve(root, "dist")') &&
+          serverStaticSource.includes('resolve(dist, "index.html")') &&
           serverStaticSource.includes("readFile(path)") &&
-          serverStaticSource.includes("extname(path)"),
+          serverStaticSource.includes("extname(path)") &&
+          serverStaticSource.includes('"if-none-match"') &&
+          serverStaticSource.includes('"content-encoding"') &&
+          serverStaticSource.includes("immutable"),
       },
     {
         label: "server-dashboard-routes-boundary",

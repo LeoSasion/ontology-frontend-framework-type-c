@@ -99,6 +99,54 @@
         }
       })();
     </script>
+    <script>
+      (function () {
+        var shortSideFloor = 720;
+        var pendingFrame = 0;
+        function applyViewportFloor() {
+          var root = document.documentElement;
+          var width = Math.max(1, window.innerWidth);
+          var height = Math.max(1, window.innerHeight);
+          var reportedDevicePixelRatio = Number(window.devicePixelRatio);
+          var devicePixelRatio = Number.isFinite(reportedDevicePixelRatio) && reportedDevicePixelRatio > 0
+            ? reportedDevicePixelRatio
+            : 1;
+          var resolutionWidth = width * devicePixelRatio;
+          var resolutionHeight = height * devicePixelRatio;
+          var portrait = height >= width;
+          var baselineWidth = portrait ? 720 : 1280;
+          var baselineHeight = portrait ? 1280 : 720;
+          var scaled = Math.min(resolutionWidth, resolutionHeight) < shortSideFloor;
+          var scale = scaled ? Math.min(width / baselineWidth, height / baselineHeight) : 1;
+          var logicalWidth = scaled ? baselineWidth : width;
+          var logicalHeight = scaled ? baselineHeight : height;
+          var left = scaled ? (width - logicalWidth * scale) / 2 : 0;
+          var top = scaled ? (height - logicalHeight * scale) / 2 : 0;
+          root.dataset.viewportMode = scaled ? "scaled" : "responsive";
+          root.dataset.viewportOrientation = portrait ? "portrait" : "landscape";
+          root.dataset.viewportScale = scale.toFixed(6);
+          root.dataset.logicalWidth = logicalWidth.toFixed(2);
+          root.dataset.logicalHeight = logicalHeight.toFixed(2);
+          root.dataset.baselineWidth = String(baselineWidth);
+          root.dataset.baselineHeight = String(baselineHeight);
+          root.dataset.viewportDevicePixelRatio = devicePixelRatio.toFixed(3);
+          root.dataset.viewportResolutionWidth = resolutionWidth.toFixed(2);
+          root.dataset.viewportResolutionHeight = resolutionHeight.toFixed(2);
+          root.style.setProperty("--viewport-scale", String(scale));
+          root.style.setProperty("--viewport-logical-width", logicalWidth + "px");
+          root.style.setProperty("--viewport-logical-height", logicalHeight + "px");
+          root.style.setProperty("--viewport-left", left + "px");
+          root.style.setProperty("--viewport-top", top + "px");
+        }
+        function scheduleViewportFloor() {
+          window.cancelAnimationFrame(pendingFrame);
+          pendingFrame = window.requestAnimationFrame(applyViewportFloor);
+        }
+        applyViewportFloor();
+        window.addEventListener("resize", scheduleViewportFloor);
+        if (window.visualViewport) window.visualViewport.addEventListener("resize", scheduleViewportFloor);
+      })();
+    </script>
     <style>
       html[data-theme-mode="dark"],
       html[data-theme-mode="dark"] body {
@@ -108,7 +156,11 @@
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div class="viewportScaleFrame" data-testid="viewport-scale-frame">
+      <div class="viewportScaleSurface" data-testid="viewport-scale-surface">
+        <div id="root"></div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

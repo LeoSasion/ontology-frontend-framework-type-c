@@ -291,20 +291,41 @@ try {
       const selects = panel?.querySelectorAll("select") ?? [];
       const filterField = selects[0];
       const preaggregationMeasure = selects[2];
+      const unavailable = document.querySelector('[data-testid="relationship-modeling-unavailable"]');
+      const available = filterField instanceof HTMLSelectElement
+        && preaggregationMeasure instanceof HTMLSelectElement
+        && !filterField.disabled
+        && !preaggregationMeasure.disabled;
       const setFirstBusinessOption = (select) => {
         if (!(select instanceof HTMLSelectElement) || select.options.length < 2) return false;
         select.value = select.options[1].value;
         select.dispatchEvent(new Event("change", { bubbles: true }));
         return true;
       };
-      return { filterChanged: setFirstBusinessOption(filterField), preaggregationChanged: setFirstBusinessOption(preaggregationMeasure) };
+      return {
+        available,
+        unavailable: Boolean(unavailable),
+        filterChanged: available && setFirstBusinessOption(filterField),
+        preaggregationChanged: available && setFirstBusinessOption(preaggregationMeasure),
+      };
     });
     const relationshipSafetyApplied = await waitFor(browser.client, () => {
       const panel = document.querySelector('[data-testid="relationship-safety-controls"]');
       const selects = panel?.querySelectorAll("select") ?? [];
       const input = panel?.querySelector("input");
+      const unavailable = document.querySelector('[data-testid="relationship-modeling-unavailable"]');
+      const unavailableState = Boolean(
+        unavailable
+        && selects[0] instanceof HTMLSelectElement
+        && selects[0].disabled
+        && selects[2] instanceof HTMLSelectElement
+        && selects[2].disabled,
+      );
+      const editableState = Boolean(input && !input.disabled && selects[3] instanceof HTMLSelectElement && !selects[3].disabled);
       return {
-        ok: Boolean(input && !input.disabled && selects[3] instanceof HTMLSelectElement && !selects[3].disabled),
+        ok: unavailableState || editableState,
+        unavailable: unavailableState,
+        editable: editableState,
         filterValue: selects[0] instanceof HTMLSelectElement ? selects[0].value : "",
         measureValue: selects[2] instanceof HTMLSelectElement ? selects[2].value : "",
       };
@@ -313,7 +334,15 @@ try {
       check("ui-source-expert-controls-open", expertClick.ok && relationshipSafetyReady.ok, { expertClick, relationshipSafetyReady }),
       check("ui-relationship-safety-controls-lazy-load", relationshipSafetyReady.ok && !relationshipSafetyReady.loading, relationshipSafetyReady),
       check("ui-relationship-safety-controls-interactive", relationshipSafetyOpen.ok && relationshipSafetyState.open && relationshipSafetyState.selectCount >= 4 && relationshipSafetyState.inputCount >= 1, relationshipSafetyState),
-      check("ui-relationship-safety-policy-editable", relationshipSafetyEdit.filterChanged && relationshipSafetyEdit.preaggregationChanged && relationshipSafetyApplied.ok, { relationshipSafetyEdit, relationshipSafetyApplied }),
+      check(
+        "ui-relationship-safety-policy-editable",
+        relationshipSafetyApplied.ok && (
+          relationshipSafetyEdit.available
+            ? relationshipSafetyEdit.filterChanged && relationshipSafetyEdit.preaggregationChanged && relationshipSafetyApplied.editable
+            : relationshipSafetyEdit.unavailable && relationshipSafetyApplied.unavailable
+        ),
+        { relationshipSafetyEdit, relationshipSafetyApplied },
+      ),
     );
     steps.push({ section: "sources-relationship-safety", state: relationshipSafetyState });
 

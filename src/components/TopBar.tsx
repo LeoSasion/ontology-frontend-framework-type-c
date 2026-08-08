@@ -13,9 +13,10 @@ type TopBarProps = {
   apiMode: "loading" | "live" | "fallback";
   pendingDraftCount: number;
   onOpenAgent: () => void;
+  onRetryService: () => void;
 };
 
-export function TopBar({ activeSection, status, flow, apiMode, pendingDraftCount, onOpenAgent }: TopBarProps) {
+export function TopBar({ activeSection, status, flow, apiMode, pendingDraftCount, onOpenAgent, onRetryService }: TopBarProps) {
   const sectionMeta = getAppSection(activeSection);
   const readiness = buildProductReadiness(status, {
     hasData: flow.hasData,
@@ -34,9 +35,9 @@ export function TopBar({ activeSection, status, flow, apiMode, pendingDraftCount
   return (
     <div className="topBarStack">
       <header className="topBar">
-        <div className="topBarTitle">
+        <div className={`topBarTitle${activeSection === "home" ? " homeTopBarTitle" : ""}`}>
           <span><Bilingual zh={sectionMeta.zh} en={sectionMeta.en} /></span>
-          <h1><Bilingual {...sectionMeta.headline} /></h1>
+          {activeSection === "home" ? null : <h1><Bilingual {...sectionMeta.headline} /></h1>}
         </div>
         <div className="topBarMeta">
           {pendingDraftCount > 0 ? (
@@ -45,15 +46,20 @@ export function TopBar({ activeSection, status, flow, apiMode, pendingDraftCount
               <span>{biText(`${pendingDraftCount} 个修改待确认`, `${pendingDraftCount} changes to review`)}</span>
             </button>
           ) : null}
-          <div className="serviceState" title={apiMode === "live" ? readiness.label : diagnosticTitle}>
-            <span className={`dot ${apiMode === "loading" ? "warn" : readiness.tone}`} />
+          <div
+            aria-label={apiMode === "live" ? readiness.label : diagnosticTitle}
+            className="serviceState"
+            role="status"
+            title={apiMode === "live" ? readiness.label : diagnosticTitle}
+          >
+            <span aria-hidden="true" className={`dot ${apiMode === "loading" ? "warn" : readiness.tone}`} />
             <span>{apiMode === "live" ? readiness.label : diagnosticTitle}</span>
           </div>
           <LanguageToggle />
         </div>
       </header>
       {showServiceDiagnostics ? (
-        <section className={`serviceDiagnostics ${apiMode}`} data-testid="service-diagnostics" aria-label={biText("本地服务诊断", "Local service diagnostics")}>
+        <section className={`serviceDiagnostics ${apiMode}`} data-testid="service-diagnostics" aria-label={biText("本地服务诊断", "Local service diagnostics")} aria-live="polite">
           <div className="serviceDiagnosticsLead">
             <span className="serviceDiagnosticsIcon"><Icon name={apiMode === "loading" ? "query" : "lock"} /></span>
             <div>
@@ -61,6 +67,7 @@ export function TopBar({ activeSection, status, flow, apiMode, pendingDraftCount
               <p>{diagnosticDetail}</p>
             </div>
           </div>
+          {apiMode === "fallback" ? <button className="secondaryButton" data-testid="service-retry" onClick={onRetryService} type="button">{biText("重新连接", "Reconnect")}</button> : null}
           <details className="serviceDiagnosticsTechnical" data-testid="service-diagnostics-technical">
             <summary>{biText("启动命令和端口", "Startup commands and ports")}</summary>
             <div className="serviceDiagnosticsCommands" data-testid="service-diagnostics-commands">

@@ -1,8 +1,8 @@
-import { getAppSection } from "./appSections";
-import type { AppSection } from "./components/Sidebar";
+import { getAppSection, type AppSection } from "./appSections";
 import { lazyWithRetry } from "./lazyWithRetry";
 
 const loadAppMainView = () => import("./components/AppMainView").then((module) => ({ default: module.AppMainView }));
+const loadSidebar = () => import("./components/Sidebar").then((module) => ({ default: module.Sidebar }));
 const loadTopBar = () => import("./components/TopBar").then((module) => ({ default: module.TopBar }));
 const loadAgentPanel = () => import("./components/AgentPanel").then((module) => ({ default: module.AgentPanel }));
 const loadDashboardCanvas = () => import("./components/DashboardCanvas").then((module) => ({ default: module.DashboardCanvas }));
@@ -13,6 +13,7 @@ const loadSourceWorkbench = () => import("./components/SourceWorkbench").then((m
 const loadViewWorkspace = () => import("./components/ViewWorkspace").then((module) => ({ default: module.ViewWorkspace }));
 
 export const AppMainView = lazyWithRetry(loadAppMainView);
+export const Sidebar = lazyWithRetry(loadSidebar);
 export const TopBar = lazyWithRetry(loadTopBar);
 export const AgentPanel = lazyWithRetry(loadAgentPanel);
 export const DashboardCanvas = lazyWithRetry(loadDashboardCanvas);
@@ -32,24 +33,8 @@ export const sectionPreloaders: Record<AppSection, Array<() => Promise<unknown>>
   settings: [loadSettingsPanel],
 };
 
-export const allSectionPreloaders = Array.from(new Set(Object.values(sectionPreloaders).flat()));
-export const topBarPreloader = loadTopBar;
-
 export function preloadModules(loaders: Array<() => Promise<unknown>>) {
   void Promise.allSettled(loaders.map((loader) => loader()));
-}
-
-export function scheduleIdlePreload(callback: () => void) {
-  const browserWindow = window as Window & {
-    requestIdleCallback?: (handler: () => void, options?: { timeout: number }) => number;
-    cancelIdleCallback?: (handle: number) => void;
-  };
-  if (browserWindow.requestIdleCallback) {
-    const handle = browserWindow.requestIdleCallback(callback, { timeout: 2500 });
-    return () => browserWindow.cancelIdleCallback?.(handle);
-  }
-  const handle = window.setTimeout(callback, 900);
-  return () => window.clearTimeout(handle);
 }
 
 function sectionText(section: AppSection, language: "zh" | "en", field: "loading" | "loadingDetail") {

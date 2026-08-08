@@ -19,7 +19,7 @@ check("correction-forms-propose-instead-of-direct-context-writes", panel.include
 check("api-exposes-propose-list-and-review", api.includes("getSemanticPatches") && api.includes("proposeSemanticPatch") && api.includes("reviewSemanticPatch") && routes.includes('"/api/semantic-patches"') && routes.includes('"/api/semantic-patches/propose"') && routes.includes('"/api/semantic-patches/review"'));
 check("server-only-active-workspace-boundary", !routes.match(/semantic-patches[\s\S]{0,250}workspaceId/) && routes.includes('"--adapter", "user-correction-v1"'));
 check("typed-proposal-contract-includes-freshness-and-review", types.includes("export type SemanticPatchProposal") && types.includes("usableForReview") && types.includes("storedStatus") && types.includes("review:"));
-check("responsive-review-layout-is-present", styles.includes(".semanticReviewInbox") && styles.includes(".semanticDiff") && styles.includes("@media (max-width: 760px)"));
+check("responsive-review-layout-is-present", styles.includes(".semanticReviewInbox") && styles.includes(".semanticDiff") && styles.includes("@container viewport-stage (max-width: 760px)"));
 
 const failed = checks.filter((item) => !item.ok);
 console.log(JSON.stringify({ ok: failed.length === 0, schema: "aibi-semantic-review-ui-verify/v1", checks, failedChecks: failed }, null, 2));

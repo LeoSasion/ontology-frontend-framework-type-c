@@ -1,12 +1,12 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Sidebar, type AppSection } from "./components/Sidebar";
+import type { AppSection } from "./appSections";
 import { useLanguage } from "./components/Bilingual";
 import { emptyAgentResult, emptyDashboardPayload, emptyFormulaPreview, emptyImportPreview, emptyQueryResult, emptyTableQuery, emptyWorkbenchPayload, emptyWorkspaceStatus } from "./emptyWorkspaceData";
 import { applyThemePalette, getUserPreferences, hasStoredThemeSnapshot, resolveThemePalette } from "./theme";
 import { businessSectionForStep, type BusinessPathStepKey } from "./businessPathModel";
 import { actionErrorResult, connectingStatus, preferredLandingSection, type ApiMode, type LoadState } from "./appWorkspaceModel";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
-import { AppMainView, ModuleLoadingPanel, TopBar, allSectionPreloaders, preloadModules, scheduleIdlePreload, sectionPreloaders, topBarPreloader } from "./appLazyModules";
+import { AppMainView, ModuleLoadingPanel, Sidebar, TopBar, preloadModules, sectionPreloaders } from "./appLazyModules";
 import { useAppAgentActions } from "./useAppAgentActions";
 import { useAppDataActions } from "./useAppDataActions";
 import { useAppDashboardActions } from "./useAppDashboardActions";
@@ -26,6 +26,7 @@ import {
   type AppNavigationContext,
   type AppNavigationTarget,
 } from "./appNavigationModel";
+import { getAppSection } from "./appSections";
 
 export default function App() {
   const { resolvedLanguage } = useLanguage();
@@ -34,6 +35,8 @@ export default function App() {
   const initialNavigation = initialNavigationRef.current;
   const [section, setSection] = useState<AppSection>(initialNavigation.section);
   const explicitInitialSectionRef = useRef(new URLSearchParams(window.location.search).has("section"));
+  const previousSectionRef = useRef<AppSection>(initialNavigation.section);
+  const contentRef = useRef<HTMLElement | null>(null);
   const autoLandingAppliedRef = useRef(false);
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [status, setStatus] = useState<WorkspaceStatus>(emptyWorkspaceStatus);
@@ -75,8 +78,8 @@ export default function App() {
       setTableQuery(emptyTableQuery);
       setWorkbench(surface.workbench);
       setDashboards(surface.dashboards);
-      setActiveDashboardKey((current) => surface.dashboards.dashboards.some((dashboard) => dashboard.dashboard_key === current) ? current : surface.dashboards.dashboards[0]?.dashboard_key ?? "default");
-      setActiveViewKey((current) => surface.workbench.savedViews.some((view) => view.view_key === current) ? current : surface.workbench.savedViews[0]?.view_key ?? "");
+      setActiveDashboardKey((current) => current === "default" ? surface.dashboards.dashboards[0]?.dashboard_key ?? "default" : current);
+      setActiveViewKey((current) => current || (surface.workbench.savedViews[0]?.view_key ?? ""));
       setActionDrafts(surface.actionDrafts);
       setAgent(emptyAgentResult);
       if (!explicitInitialSectionRef.current && !autoLandingAppliedRef.current) {
@@ -85,6 +88,13 @@ export default function App() {
       }
     } catch (error) {
       setLastActionResult(actionErrorResult("initial-load", error));
+      setStatus({
+        ...emptyWorkspaceStatus,
+        health: {
+          ok: false,
+          notes: [error instanceof Error ? error.message : String(error)],
+        },
+      });
     }
     setLoadState("ready");
   }, []);
@@ -96,10 +106,6 @@ export default function App() {
   useEffect(() => {
     preloadModules(sectionPreloaders[section]);
   }, [section]);
-
-  useEffect(() => scheduleIdlePreload(() => {
-    preloadModules([...allSectionPreloaders, topBarPreloader]);
-  }), []);
 
   useEffect(() => {
     if (!status.database && hasStoredThemeSnapshot()) {
@@ -191,8 +197,18 @@ export default function App() {
     }
   }, [loadState, section, workspaceFlow]);
 
+  useEffect(() => {
+    const meta = getAppSection(section);
+    document.title = `${resolvedLanguage === "zh" ? meta.zh : meta.en} · AIBI-C`;
+    if (previousSectionRef.current !== section) {
+      previousSectionRef.current = section;
+      window.requestAnimationFrame(() => contentRef.current?.focus({ preventScroll: true }));
+    }
+  }, [resolvedLanguage, section]);
+
   const dataActions = useAppDataActions({
     activeWorkspaceId: status.workspace.id,
+    workbench,
     setActionDrafts,
     setActiveViewKey,
     setDashboards,
@@ -255,24 +271,28 @@ export default function App() {
       data-load-state={loadState}
       lang={resolvedLanguage === "zh" ? "zh-CN" : "en"}
     >
-      <Sidebar
-        activeSection={section}
-        actionDrafts={actionDrafts}
-        onSectionChange={openSection}
-        onWorkspaceCreate={workspaceActions.handleWorkspaceCreate}
-        onWorkspaceDelete={workspaceActions.handleWorkspaceDelete}
-        onWorkspaceRename={workspaceActions.handleWorkspaceRename}
-        onWorkspaceSelect={workspaceActions.handleWorkspaceSelect}
-        status={displayStatus}
-        flow={workspaceFlow}
-      />
-      <main className="contentShell">
+      <a className="skipLink" href="#main-content">{resolvedLanguage === "zh" ? "跳到主要内容" : "Skip to main content"}</a>
+      <Suspense fallback={<aside className="workspaceSidebar" aria-hidden="true" />}>
+        <Sidebar
+          activeSection={section}
+          actionDrafts={actionDrafts}
+          onSectionChange={openSection}
+          onWorkspaceCreate={workspaceActions.handleWorkspaceCreate}
+          onWorkspaceDelete={workspaceActions.handleWorkspaceDelete}
+          onWorkspaceRename={workspaceActions.handleWorkspaceRename}
+          onWorkspaceSelect={workspaceActions.handleWorkspaceSelect}
+          status={displayStatus}
+          flow={workspaceFlow}
+        />
+      </Suspense>
+      <main className="contentShell" id="main-content" ref={contentRef} tabIndex={-1}>
         <Suspense fallback={null}>
           <TopBar
             activeSection={section}
             apiMode={apiMode}
             flow={workspaceFlow}
             onOpenAgent={() => openSection("agent")}
+            onRetryService={() => void refresh()}
             pendingDraftCount={pendingDraftCount}
             status={displayStatus}
           />

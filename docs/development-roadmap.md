@@ -79,8 +79,8 @@ flowchart TB
 - 用户结果：网页、CLI、Job 对同一动作得到完全一致的计划、阻断和回执。
 - 实现边界：把当前组合内核中的 `ask`、语义查询、导入、确认、看板交付拆成显式 Use Case；每个 Use Case 接收类型化 Command，返回统一 Result，不读取进程参数。
 - 失败行为：未知命令、缺失工作区或不满足 Guard 时返回结构化失败，不回退到其他命令或通用聚合。
-- 退出条件：组合内核只负责依赖装配且不超过 800 行；171 条现有命令合同无非预期变化；专项和完整回归通过。
-- 当前批次：组合内核已退化为只做兼容导出的依赖装配面，领域分发器已直接依赖显式 Use Case；后续继续拆分 Agent 交互职责并引入类型化 Command/Result。当前实现事实由 [实现状态](implementation-status.md) 维护。
+- 退出条件：组合内核只负责依赖装配；Agent Interaction 拆成 Prompt Resolution、Read Snapshot、Answer Composition、Action Confirmation 等可独立测试的 Use Case，单个应用服务不再持有跨分析阶段的写事务；171 条现有命令合同无非预期变化；专项和完整回归通过。
+- 当前批次：组合内核已退化为 12 行兼容导出面，原“800 行以内”目标已经完成；后续热点是拆分 Agent Interaction、缩短写事务并引入类型化 Command/Result。当前实现事实由 [实现状态](implementation-status.md) 维护。
 
 ### P0-B｜建立长驻 Runtime Host 与单写者队列
 
@@ -102,6 +102,20 @@ flowchart TB
 - 实现边界：唯一合同见 [服装电商可信查询 v1](apparel-commerce-trusted-query.md)；Core 管 QueryIntent、Import Plan、Binding、Proof、Receipt 与结果状态，Domain Pack 只贡献服装实体候选和方法要求。
 - 失败行为：自动键、计划漂移、非 current sourceRun、未下推筛选/时间、未证明实体映射、非 executed 结果或方法证据不足全部 fail closed。
 - 退出条件：Trusted Execution Gate、Atomic Import Plan、Apparel Entity Mapping Proof、排行/集中度/Pareto 和五态 UI 均通过确定性与客户路径验收。
+
+### P0-E｜收紧一次写入与本地调用者边界
+
+- 用户结果：网络抖动、代理失效、重复点击或恶意网页都不能造成重复写入；失败能看到原始原因并安全重试。
+- 实现边界：mutation 只发送到一个确定端点，使用版本化 Command Envelope、稳定幂等键、同源/loopback caller 校验、JSON Content-Type 和启动期能力令牌；Capability Contract 在 handler 前执行。
+- 失败行为：响应丢失返回可查询的幂等回执；Origin、Host、令牌、能力或 envelope 不匹配时在任何业务调用前拒绝，数据库与文件零变化。
+- 退出条件：响应丢失、双击、跨站 POST、过期 Session、Host 欺骗和 Capability 越权故障注入均通过，且每个 mutation 的 handler 调用次数最多一次。
+
+### P0-F｜消除前端数字与对象静默回退
+
+- 用户结果：缺失对象、关系查询失败和软 API 失败不会显示另一个对象、旧结果或成功提示；用户始终知道当前状态和恢复动作。
+- 实现边界：对象、查询和 mutation 使用类型化 `idle | loading | ready | error | stale` 状态；URL 对象不存在时进入恢复空态，关系组件只消费自身 Query Receipt，失败信息靠近触发位置。
+- 失败行为：任何非 current、未绑定或 `ok: false` 结果都卸载业务数字并保留用户输入；确认操作条不得遮挡待核对内容。
+- 退出条件：刷新/前进/后退/删除对象、关系查询失败、过期 Session、低高度窗口和键盘路径均通过真实浏览器回归，错误数字、静默成功与内容遮挡为零。
 
 ## P1：降低前后端耦合与刷新成本
 

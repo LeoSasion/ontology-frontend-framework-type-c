@@ -28,6 +28,51 @@ def file_content_hash(path: Path) -> str:
     return digest.hexdigest()
 
 
+def bind_single_import_plan(
+    preview: dict[str, Any],
+    path: Path,
+    *,
+    current_source_run_id: str | None,
+) -> dict[str, Any]:
+    """Bind a single-file preview to the exact bytes and workspace parent version."""
+    resolved_path = path.resolve()
+    merge_preview = preview.get("mergePolicyPreview") if isinstance(preview.get("mergePolicyPreview"), dict) else {}
+    matched_table = preview.get("matchedTable") if isinstance(preview.get("matchedTable"), dict) else None
+    commit_options = {
+        "table": str((matched_table or {}).get("table_key") or preview.get("suggestedTableKey") or ""),
+        "name": str((matched_table or {}).get("display_name") or preview.get("suggestedDisplayName") or ""),
+        "mode": "merge" if matched_table else "create",
+        "uniqueFields": list(merge_preview.get("uniqueFields") or []),
+        "conflictRule": str(merge_preview.get("conflictRule") or "overwrite"),
+    }
+    fingerprint_material = {
+        "schema": ATOMIC_IMPORT_PLAN_SCHEMA,
+        "kind": "single-file",
+        "file": resolved_path.as_posix(),
+        "contentHash": file_content_hash(resolved_path),
+        "parentSourceRunId": current_source_run_id,
+        "commitOptions": commit_options,
+        "schemaDecision": [
+            {
+                "field": field.get("field"),
+                "role": field.get("role"),
+                "inferredType": field.get("inferredType"),
+            }
+            for field in (preview.get("profile") or {}).get("fields") or []
+            if isinstance(field, dict)
+        ],
+        "rowImpact": merge_preview.get("mergePlan"),
+    }
+    return {
+        **preview,
+        "schema": ATOMIC_IMPORT_PLAN_SCHEMA,
+        "contentHash": fingerprint_material["contentHash"],
+        "parentSourceRunId": current_source_run_id,
+        "commitOptions": commit_options,
+        "planFingerprint": _canonical_fingerprint(fingerprint_material),
+    }
+
+
 def _source_identity(path: Path, root: Path) -> str:
     try:
         return path.relative_to(root).as_posix()

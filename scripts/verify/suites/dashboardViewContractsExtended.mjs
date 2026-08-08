@@ -441,8 +441,8 @@ export function appendDashboardViewContractExtendedChecks(context) {
           viewWorkspaceSource.includes("runSaveCurrentSearch") &&
           viewWorkspaceSource.includes("runCopyView") &&
           viewWorkspaceSource.includes("runDeleteView") &&
-          viewWorkspaceSource.includes('data-testid="view-operation-receipt"') &&
-          viewWorkspaceSource.includes('data-testid="view-operation-technical-details"') &&
+          viewWorkspaceSource.includes('testId="view-operation-receipt"') &&
+          viewWorkspaceSource.includes('technicalTestId="view-operation-technical-details"') &&
           viewWorkspaceSource.includes("View scope and paging") &&
           viewWorkspaceSource.includes("视图已切换并刷新") &&
           viewWorkspaceSource.includes("当前搜索已保存到视图") &&

@@ -13,6 +13,8 @@ import {
 } from "../viewWorkspaceModel";
 import { Bilingual, biText, translateName } from "./Bilingual";
 import { Icon } from "./Icons";
+import { ObjectMissingState } from "./ObjectMissingState";
+import { OperationReceipt } from "./OperationReceipt";
 import { ViewSavedListPanel } from "./ViewSavedListPanel";
 
 const loadViewDashboardBridgePanel = () => import("./ViewDashboardBridgePanel").then((module) => ({ default: module.ViewDashboardBridgePanel }));
@@ -58,7 +60,8 @@ type ViewWorkspaceProps = {
 export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectView, onRunTableQuery, onSaveView, onCopyView, onDeleteView, onOpenEvidence, onOpenSources, onAsk }: ViewWorkspaceProps) {
   const savedViews = Array.isArray(workbench.savedViews) ? workbench.savedViews : [];
   const tables = Array.isArray(workbench.tables) ? workbench.tables : [];
-  const activeView = savedViews.find((view) => view.view_key === activeViewKey) ?? savedViews[0];
+  const activeView = savedViews.find((view) => view.view_key === activeViewKey) ?? (!activeViewKey ? savedViews[0] : undefined);
+  const requestedViewMissing = Boolean(activeViewKey) && !activeView;
   const table = tables.find((item) => item.table_key === activeView?.table_key) ?? tables[0];
   const query = tableQuery?.tableQuery ?? {
     mode: "detail",
@@ -115,6 +118,15 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
     setBusy(label);
     try {
       await action();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setViewOperationReceipt({
+        title: biText("操作没有完成", "Operation did not finish"),
+        detail: message,
+        nextStep: biText("当前视图和搜索已保留。请检查口径或服务状态后重试。", "The current view and search are preserved. Check the scope or service, then retry."),
+        technical: `action=${label}; error=${message}`,
+        tone: "warn",
+      });
     } finally {
       setBusy(null);
     }
@@ -277,6 +289,20 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
     );
   }
 
+  if (requestedViewMissing) {
+    return (
+      <ObjectMissingState
+        badge={biText("视图不可用", "View unavailable")}
+        detail={biText(`地址中的视图「${activeViewKey}」没有被替换成其他视图。请选择一个现有视图，或回到数据页创建新视图。`, `The view “${activeViewKey}” in the URL was not replaced with another view. Choose an existing view or return to Data to create one.`)}
+        testId="view-not-found"
+        title={biText("这个明细视图不存在或已被删除", "This detail view is missing or was deleted")}
+      >
+        {savedViews[0] ? <button className="primaryButton" onClick={() => onSelectView(savedViews[0].view_key)} type="button">{biText("打开现有视图", "Open an existing view")}</button> : null}
+        <button className="secondaryButton" onClick={onOpenSources} type="button">{biText("返回数据页", "Return to Data")}</button>
+      </ObjectMissingState>
+    );
+  }
+
   return (
     <section className="mainPanel viewMainPanel" aria-labelledby="view-workbench-title">
       <div className="panelHeader">
@@ -350,17 +376,15 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
             <div><strong>{viewReadinessLabel}</strong><span>{biText("看板来源", "dashboard source")}</span></div>
           </div>
           {viewOperationReceipt ? (
-            <div className={`viewOperationReceipt ${viewOperationReceipt.tone}`} data-testid="view-operation-receipt">
-              <div>
-                <strong>{viewOperationReceipt.title}</strong>
-                <span>{viewOperationReceipt.detail}</span>
-                <small>{viewOperationReceipt.nextStep}</small>
-              </div>
-              <details data-testid="view-operation-technical-details">
-                <summary>{biText("查看视图口径和分页", "View scope and paging")}</summary>
-                <span>{viewOperationReceipt.technical}</span>
-              </details>
-            </div>
+            <OperationReceipt
+              className="viewOperationReceipt"
+              receipt={viewOperationReceipt}
+              role={viewOperationReceipt.tone === "warn" ? "alert" : "status"}
+              summary={biText("查看视图口径和分页", "View scope and paging")}
+              technical={<span>{viewOperationReceipt.technical}</span>}
+              technicalTestId="view-operation-technical-details"
+              testId="view-operation-receipt"
+            />
           ) : null}
           <details className="advancedDetails compactAdvanced viewQueryTechnical" data-testid="view-query-diagnostics">
             <summary>{biText("查看分页、执行引擎和查询口径", "View paging, runtime, and query scope")}</summary>

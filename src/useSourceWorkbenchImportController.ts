@@ -36,13 +36,25 @@ export function useSourceWorkbenchImportController({
   const [uniqueFields, setUniqueFields] = useState("");
   const [conflictRule, setConflictRule] = useState("overwrite");
   const [folderImportPlan, setFolderImportPlan] = useState<Awaited<ReturnType<typeof onPreviewFolderImport>> | null>(null);
+  const [singleImportBinding, setSingleImportBinding] = useState<{ filePath: string; planFingerprint: string } | null>(null);
   const [importOperationReceipt, setImportOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
   const activeImportPolicy = importPolicies.find((policy) => policy.table_key === targetTable);
   const previewReadable = Boolean(preview.ok && preview.profile.rowCount > 0 && preview.profile.columnCount > 0);
   const previewSummary = buildImportPreviewSummary({ preview, previewReadable, targetName });
+  const previewCommitOptions = preview.commitOptions;
+  const normalizedUniqueFields = uniqueFields.split(",").map((field) => field.trim()).filter(Boolean);
+  const singleImportPlanReady = Boolean(
+    singleImportBinding?.planFingerprint
+    && singleImportBinding.filePath === filePath.trim()
+    && previewCommitOptions
+    && targetTable.trim() === previewCommitOptions.table
+    && importMode === previewCommitOptions.mode
+    && conflictRule === previewCommitOptions.conflictRule
+    && normalizedUniqueFields.join("\u0000") === previewCommitOptions.uniqueFields.join("\u0000"),
+  );
 
   function importOptions(confirm = false) {
-    return buildImportOptions({
+    const options = buildImportOptions({
       filePath,
       targetTable,
       targetName,
@@ -51,10 +63,17 @@ export function useSourceWorkbenchImportController({
       conflictRule,
       confirm,
     });
+    return {
+      ...options,
+      expectedPlan: confirm && singleImportBinding?.filePath === filePath.trim()
+        ? singleImportBinding.planFingerprint
+        : undefined,
+    };
   }
 
   async function runImportPreviewAction() {
     const result = await onPreview(importOptions(false));
+    setSingleImportBinding(result.planFingerprint ? { filePath: filePath.trim(), planFingerprint: result.planFingerprint } : null);
     setFolderImportPlan(null);
     let receiptTargetTable = targetTable;
     let receiptImportMode = importMode;
@@ -118,6 +137,7 @@ export function useSourceWorkbenchImportController({
       conflictRule,
     });
     setFolderImportPlan(result);
+    setSingleImportBinding(null);
     const firstGroup = result.groups[0];
     if (firstGroup) {
       setTargetTable(firstGroup.tableKey);
@@ -187,6 +207,7 @@ export function useSourceWorkbenchImportController({
     ...previewSummary,
     importOperationReceipt,
     folderImportPlan,
+    singleImportPlanReady,
     setFilePath,
     setTargetTable,
     setTargetName,

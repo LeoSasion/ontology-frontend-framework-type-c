@@ -4,7 +4,7 @@
   grid-column: 1 / -1;
   padding: 0.9rem;
   border: 1px solid color-mix(in srgb, var(--line) 82%, var(--accent) 18%);
-  border-radius: 0.85rem;
+  border-radius: var(--bi-radius);
   background: color-mix(in srgb, var(--panel) 94%, var(--accent) 6%);
 }
 
@@ -31,12 +31,20 @@
 .forecastReadinessStatus {
   align-items: center;
   padding: 0.65rem 0.75rem;
-  border-radius: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--bi-radius);
   background: var(--bi-surface);
 }
 
-.forecastReadinessStatus.ready { border-left: 3px solid var(--success); }
-.forecastReadinessStatus.blocked { border-left: 3px solid var(--warning); }
+.forecastReadinessStatus.ready {
+  border-color: color-mix(in srgb, var(--success) 38%, var(--line));
+  background: color-mix(in srgb, var(--success-soft) 72%, var(--bi-surface));
+}
+
+.forecastReadinessStatus.blocked {
+  border-color: color-mix(in srgb, var(--warning) 38%, var(--line));
+  background: color-mix(in srgb, var(--warning-soft) 72%, var(--bi-surface));
+}
 
 .forecastReadinessGates {
   display: grid;
@@ -50,16 +58,23 @@
   min-width: 0;
   padding: 0.65rem;
   border: 1px solid var(--line);
-  border-radius: 0.65rem;
+  border-radius: var(--bi-radius);
 }
 
-.forecastReadinessGates article.passed { border-top: 3px solid var(--success); }
-.forecastReadinessGates article.blocked { border-top: 3px solid var(--warning); }
+.forecastReadinessGates article.passed {
+  border-color: color-mix(in srgb, var(--success) 34%, var(--line));
+  background: color-mix(in srgb, var(--success-soft) 54%, var(--surface));
+}
+
+.forecastReadinessGates article.blocked {
+  border-color: color-mix(in srgb, var(--warning) 34%, var(--line));
+  background: color-mix(in srgb, var(--warning-soft) 54%, var(--surface));
+}
 .forecastReadinessGates em { overflow-wrap: anywhere; font-style: normal; color: var(--warning-strong); }
 .forecastReadinessBoundary,
 .forecastReadinessMessage { margin: 0; }
 
-@media (max-width: 720px) {
+@container viewport-stage (max-width: 720px) {
   .forecastReadinessLead { align-items: stretch; }
   .forecastReadinessLead label { width: 100%; }
   .forecastReadinessLead button { width: 100%; }

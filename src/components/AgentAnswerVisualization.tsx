@@ -1,4 +1,4 @@
-import { useId, useMemo } from "react";
+import { useId, useMemo, useState, type KeyboardEvent } from "react";
 import type { AnalysisUnit, ChartAdapter, QueryPlanReceipt } from "../typesAgent";
 import { useLanguage } from "./Bilingual";
 import {
@@ -41,6 +41,25 @@ function truncateLabel(value: string, length = 12) {
   return value.length > length ? `${value.slice(0, length - 1)}…` : value;
 }
 
+function useChartKeyboard(points: AgentVisualizationPoint[], language: "zh" | "en", chartName: string) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const boundedIndex = Math.min(activeIndex, Math.max(0, points.length - 1));
+  const activePoint = points[boundedIndex];
+  const onKeyDown = (event: KeyboardEvent<SVGSVGElement>) => {
+    if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key) || !points.length) return;
+    event.preventDefault();
+    if (event.key === "Home") setActiveIndex(0);
+    else if (event.key === "End") setActiveIndex(points.length - 1);
+    else {
+      const delta = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+      setActiveIndex((current) => (current + delta + points.length) % points.length);
+    }
+  };
+  const instruction = language === "zh" ? "使用方向键浏览数据点" : "Use arrow keys to browse data points";
+  const active = activePoint ? `${activePoint.label}: ${formatNumber(activePoint.value)}` : language === "zh" ? "没有数据" : "No data";
+  return { activeIndex: boundedIndex, ariaLabel: `${chartName}。${instruction}。${active}`, onKeyDown };
+}
+
 function chartText(kind: AgentVisualizationModel["kind"], isPartialPareto: boolean, language: "zh" | "en") {
   const copy = {
     metric: ["关键指标", "Key metric"],
@@ -62,6 +81,7 @@ function BarChart({ model, language }: { model: AgentVisualizationModel; languag
 }
 
 function HorizontalBarChart({ points, language }: { points: AgentVisualizationPoint[]; language: "zh" | "en" }) {
+  const keyboard = useChartKeyboard(points, language, language === "zh" ? `横向条形图，共 ${points.length} 个实体` : `Horizontal bar chart with ${points.length} entities`);
   const width = 760;
   const left = 142;
   const right = 80;
@@ -76,7 +96,7 @@ function HorizontalBarChart({ points, language }: { points: AgentVisualizationPo
   const x = (value: number) => left + ((value - minimum) / span) * plotWidth;
   const zero = x(0);
   return (
-    <svg aria-label={language === "zh" ? `横向条形图，共 ${points.length} 个实体` : `Horizontal bar chart with ${points.length} entities`} className="agentChartSvg agentBarHorizontal" role="group" viewBox={`0 0 ${width} ${height}`}>
+    <svg aria-label={keyboard.ariaLabel} className="agentChartSvg agentBarHorizontal" onKeyDown={keyboard.onKeyDown} role="group" tabIndex={0} viewBox={`0 0 ${width} ${height}`}>
       <line className="agentChartZero" x1={zero} x2={zero} y1={8} y2={height - 8} />
       {points.map((point, index) => {
         const end = x(point.value);
@@ -84,7 +104,7 @@ function HorizontalBarChart({ points, language }: { points: AgentVisualizationPo
         const barWidth = Math.max(2, Math.abs(end - zero));
         const y = top + index * rowHeight + 7;
         return (
-          <g aria-label={`${point.rank ? `${language === "zh" ? "第" : "Rank "}${point.rank}${language === "zh" ? "名，" : ", "}` : ""}${point.label}: ${formatNumber(point.value)}`} data-chart-mark="bar" key={`${point.label}-${index}`} role="img" tabIndex={0}>
+          <g aria-label={`${point.rank ? `${language === "zh" ? "第" : "Rank "}${point.rank}${language === "zh" ? "名，" : ", "}` : ""}${point.label}: ${formatNumber(point.value)}`} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="bar" key={`${point.label}-${index}`} role="img">
             <text className="agentChartLabel" textAnchor="end" x={left - 12} y={y + 13}>{point.rank ? `${point.rank}. ` : ""}{truncateLabel(point.label, 16)}</text>
             <rect className="agentChartBarTrack" height={18} rx={4} width={plotWidth} x={left} y={y} />
             <rect className="agentChartBar" height={18} rx={4} width={barWidth} x={barX} y={y} />
@@ -98,6 +118,7 @@ function HorizontalBarChart({ points, language }: { points: AgentVisualizationPo
 }
 
 function VerticalBarChart({ points, language }: { points: AgentVisualizationPoint[]; language: "zh" | "en" }) {
+  const keyboard = useChartKeyboard(points, language, language === "zh" ? `柱状图，共 ${points.length} 个分类` : `Bar chart with ${points.length} categories`);
   const width = 760;
   const height = 330;
   const left = 56;
@@ -116,7 +137,7 @@ function VerticalBarChart({ points, language }: { points: AgentVisualizationPoin
   const barWidth = Math.min(54, slot * 0.62);
   const ticks = Array.from({ length: 5 }, (_, index) => minimum + (span * index) / 4).reverse();
   return (
-    <svg aria-label={language === "zh" ? `柱状图，共 ${points.length} 个分类` : `Bar chart with ${points.length} categories`} className="agentChartSvg" role="group" viewBox={`0 0 ${width} ${height}`}>
+    <svg aria-label={keyboard.ariaLabel} className="agentChartSvg" onKeyDown={keyboard.onKeyDown} role="group" tabIndex={0} viewBox={`0 0 ${width} ${height}`}>
       {ticks.map((tick) => (
         <g key={tick}>
           <line className="agentChartGrid" x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} />
@@ -130,7 +151,7 @@ function VerticalBarChart({ points, language }: { points: AgentVisualizationPoin
         const rectY = Math.min(zero, valueY);
         const barHeight = Math.max(2, Math.abs(valueY - zero));
         return (
-          <g aria-label={`${point.label}: ${formatNumber(point.value)}`} data-chart-mark="bar" key={`${point.label}-${index}`} role="img" tabIndex={0}>
+          <g aria-label={`${point.label}: ${formatNumber(point.value)}`} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="bar" key={`${point.label}-${index}`} role="img">
             <rect className="agentChartBar" height={barHeight} rx={5} width={barWidth} x={center - barWidth / 2} y={rectY} />
             <text className="agentChartValue" textAnchor="middle" x={center} y={point.value >= 0 ? rectY - 8 : rectY + barHeight + 16}>{formatNumber(point.value, true)}</text>
             <text className="agentChartLabel" textAnchor="middle" x={center} y={height - 27}>{truncateLabel(point.label, 10)}</text>
@@ -143,6 +164,7 @@ function VerticalBarChart({ points, language }: { points: AgentVisualizationPoin
 }
 
 function LineChart({ points, language }: { points: AgentVisualizationPoint[]; language: "zh" | "en" }) {
+  const keyboard = useChartKeyboard(points, language, language === "zh" ? `折线图，共 ${points.length} 个时间点` : `Line chart with ${points.length} time points`);
   const width = 760;
   const height = 330;
   const left = 58;
@@ -163,7 +185,7 @@ function LineChart({ points, language }: { points: AgentVisualizationPoint[]; la
   const ticks = Array.from({ length: 5 }, (_, index) => minimum + ((maximum - minimum) * index) / 4).reverse();
   const labelIndexes = new Set([0, Math.floor((points.length - 1) / 2), points.length - 1]);
   return (
-    <svg aria-label={language === "zh" ? `折线图，共 ${points.length} 个时间点` : `Line chart with ${points.length} time points`} className="agentChartSvg" role="group" viewBox={`0 0 ${width} ${height}`}>
+    <svg aria-label={keyboard.ariaLabel} className="agentChartSvg" onKeyDown={keyboard.onKeyDown} role="group" tabIndex={0} viewBox={`0 0 ${width} ${height}`}>
       {ticks.map((tick) => (
         <g key={tick}>
           <line className="agentChartGrid" x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} />
@@ -172,9 +194,8 @@ function LineChart({ points, language }: { points: AgentVisualizationPoint[]; la
       ))}
       <path className="agentChartLine" d={path} />
       {points.map((point, index) => {
-        const exposesInteractivePoint = points.length <= 20;
         return (
-        <g aria-hidden={exposesInteractivePoint ? undefined : true} aria-label={exposesInteractivePoint ? `${point.label}: ${formatNumber(point.value)}` : undefined} data-chart-mark="point" key={`${point.label}-${index}`} role={exposesInteractivePoint ? "img" : undefined} tabIndex={exposesInteractivePoint ? 0 : undefined}>
+        <g aria-label={`${point.label}: ${formatNumber(point.value)}`} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="point" key={`${point.label}-${index}`} role="img">
           <circle className="agentChartPointHalo" cx={x(index)} cy={y(point.value)} r={9} />
           <circle className="agentChartPoint" cx={x(index)} cy={y(point.value)} r={4.5} />
           {labelIndexes.has(index) ? <text className="agentChartLabel" textAnchor={index === 0 ? "start" : index === points.length - 1 ? "end" : "middle"} x={x(index)} y={height - 23}>{truncateLabel(point.label, 14)}</text> : null}
@@ -199,6 +220,7 @@ function arcPath(start: number, end: number) {
 }
 
 function PieChart({ points, language }: { points: AgentVisualizationPoint[]; language: "zh" | "en" }) {
+  const keyboard = useChartKeyboard(points, language, language === "zh" ? `环形图，共 ${points.length} 个分类` : `Donut chart with ${points.length} categories`);
   const total = points.reduce((sum, point) => sum + point.value, 0);
   let cursor = -Math.PI / 2;
   const slices = points.map((point, index) => {
@@ -208,9 +230,9 @@ function PieChart({ points, language }: { points: AgentVisualizationPoint[]; lan
   });
   return (
     <div className="agentDonutLayout">
-      <svg aria-label={language === "zh" ? `环形图，共 ${points.length} 个分类` : `Donut chart with ${points.length} categories`} className="agentDonutSvg" role="group" viewBox="0 0 240 240">
+      <svg aria-label={keyboard.ariaLabel} className="agentDonutSvg" onKeyDown={keyboard.onKeyDown} role="group" tabIndex={0} viewBox="0 0 240 240">
         {slices.map(({ point, index, start, end, share }) => (
-          <path aria-label={`${point.label}: ${formatNumber(point.value)}, ${formatPercent(share)}`} d={arcPath(start, end)} data-chart-mark="slice" fill={categoryColors[index % categoryColors.length]} key={`${point.label}-${index}`} role="img" tabIndex={0}>
+          <path aria-label={`${point.label}: ${formatNumber(point.value)}, ${formatPercent(share)}`} d={arcPath(start, end)} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="slice" fill={categoryColors[index % categoryColors.length]} key={`${point.label}-${index}`} role="img">
             <title>{point.label}: {formatNumber(point.value)} ({formatPercent(share)})</title>
           </path>
         ))}
@@ -232,6 +254,7 @@ function PieChart({ points, language }: { points: AgentVisualizationPoint[]; lan
 
 function ParetoChart({ model, language }: { model: AgentVisualizationModel; language: "zh" | "en" }) {
   const points = model.points;
+  const keyboard = useChartKeyboard(points, language, language === "zh" ? `Pareto 边界证据图，显示 ${points.length} 个实体` : `Pareto boundary proof with ${points.length} entities`);
   const width = 760;
   const height = 350;
   const left = 58;
@@ -251,7 +274,7 @@ function ParetoChart({ model, language }: { model: AgentVisualizationModel; lang
   const topBoundary = model.evidence.actualEntityCount ?? Math.ceil(model.populationEntityCount * requestedHeadPercent);
   const boundaryX = topBoundary > 0 && topBoundary <= points.length ? left + slot * topBoundary : null;
   return (
-    <svg aria-label={language === "zh" ? `Pareto 边界证据图，显示 ${points.length} 个实体，完整全集 ${model.populationEntityCount} 个实体` : `Pareto boundary proof showing ${points.length} of ${model.populationEntityCount} entities`} className="agentChartSvg" role="group" viewBox={`0 0 ${width} ${height}`}>
+    <svg aria-label={`${keyboard.ariaLabel}。${language === "zh" ? `完整全集 ${model.populationEntityCount} 个实体` : `Full population ${model.populationEntityCount} entities`}`} className="agentChartSvg" onKeyDown={keyboard.onKeyDown} role="group" tabIndex={0} viewBox={`0 0 ${width} ${height}`}>
       {[0, 0.25, 0.5, 0.75, 1].map((tick) => (
         <g key={tick}>
           <line className="agentChartGrid" x1={left} x2={width - right} y1={percentY(tick)} y2={percentY(tick)} />
@@ -264,7 +287,7 @@ function ParetoChart({ model, language }: { model: AgentVisualizationModel; lang
       {points.map((point, index) => {
         const barY = valueY(point.value);
         return (
-          <g aria-label={`${point.rank ? `${language === "zh" ? "第" : "Rank "}${point.rank}${language === "zh" ? "名，" : ", "}` : ""}${point.label}: ${formatNumber(point.value)}, ${language === "zh" ? "累计贡献" : "cumulative contribution"} ${formatPercent(point.cumulativeContribution ?? 0)}`} data-chart-mark="pareto-bar" key={`${point.label}-${index}`} role="img" tabIndex={0}>
+          <g aria-label={`${point.rank ? `${language === "zh" ? "第" : "Rank "}${point.rank}${language === "zh" ? "名，" : ", "}` : ""}${point.label}: ${formatNumber(point.value)}, ${language === "zh" ? "累计贡献" : "cumulative contribution"} ${formatPercent(point.cumulativeContribution ?? 0)}`} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="pareto-bar" key={`${point.label}-${index}`} role="img">
             <rect className="agentChartBar agentParetoBar" height={height - bottom - barY} rx={5} width={barWidth} x={centerX(index) - barWidth / 2} y={barY} />
             <text className="agentChartValue" textAnchor="middle" x={centerX(index)} y={barY - 8}>{formatNumber(point.value, true)}</text>
             <text className="agentChartLabel" textAnchor="middle" x={centerX(index)} y={height - 29}>{truncateLabel(point.label, 10)}</text>
@@ -274,7 +297,7 @@ function ParetoChart({ model, language }: { model: AgentVisualizationModel; lang
       })}
       <path className="agentParetoLine" d={path} />
       {points.map((point, index) => (
-        <circle aria-label={`${point.label} ${language === "zh" ? "累计贡献" : "cumulative contribution"} ${formatPercent(point.cumulativeContribution ?? 0)}`} className="agentParetoPoint" cx={centerX(index)} cy={percentY(point.cumulativeContribution ?? 0)} data-chart-mark="pareto-point" key={`${point.label}-point-${index}`} r={5} role="img" tabIndex={0}>
+        <circle aria-label={`${point.label} ${language === "zh" ? "累计贡献" : "cumulative contribution"} ${formatPercent(point.cumulativeContribution ?? 0)}`} className="agentParetoPoint" cx={centerX(index)} cy={percentY(point.cumulativeContribution ?? 0)} data-active={keyboard.activeIndex === index || undefined} data-chart-mark="pareto-point" key={`${point.label}-point-${index}`} r={5} role="img">
           <title>{point.label}: {formatPercent(point.cumulativeContribution ?? 0)}</title>
         </circle>
       ))}

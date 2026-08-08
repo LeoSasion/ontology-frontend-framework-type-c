@@ -168,6 +168,7 @@ def _safe_answer_aggregate(
             aggregation=aggregation,
             limit=limit,
             filters=filters,
+            source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
         )
         fallback_reason = None
     except DuckDBUnavailable as exc:

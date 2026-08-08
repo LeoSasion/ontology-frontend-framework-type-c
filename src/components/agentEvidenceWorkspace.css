@@ -121,7 +121,7 @@
 .agentAnswerLead h3 {
   margin: 3px 0 6px;
   color: var(--bi-text);
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
   line-height: 1.2;
 }
 
@@ -136,7 +136,7 @@
 .agentAnswerMetrics strong {
   margin-top: 5px;
   color: var(--bi-text);
-  font-size: 22px;
+  font-size: var(--ui-font-emphasis);
   line-height: 1.1;
 }
 
@@ -160,7 +160,7 @@
 .agentVisualizationGuard strong { color: var(--bi-text); font-size: 13px; }
 .agentVisualizationGuard small { line-height: 1.45; }
 
-@media (max-width: 620px) {
+@container viewport-stage (max-width: 620px) {
   .agentAnswerCard { gap: 14px; margin: 12px 10px 0; border-radius: 12px; padding: 14px; }
   .agentAnswerLead { display: grid; gap: 10px; }
 }
@@ -196,7 +196,7 @@
   text-align: left;
 }
 
-@media (max-width: 720px) {
+@container viewport-stage (max-width: 720px) {
   .agentClarificationChoices {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -353,7 +353,7 @@
 .agentTrustedResultState.stale,
 .trustedState.stale { border-color: rgb(148 163 184 / 55%); background: rgb(148 163 184 / 10%); }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .agentTrustedResultState { align-items: stretch; flex-direction: column; }
   .agentTrustedResultState dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -370,6 +370,42 @@
     justify-self: start;
     max-width: 100%;
     white-space: normal;
+  }
+}
+
+.agentRequestError {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 14px 20px 0;
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 38%, var(--line));
+  border-radius: var(--bi-radius);
+  background: var(--danger-soft);
+  color: var(--danger-strong);
+}
+
+.agentRequestError > div {
+  display: grid;
+  gap: 5px;
+}
+
+.agentRequestError span,
+.agentRequestError code {
+  overflow-wrap: anywhere;
+  font-size: var(--ui-font-compact);
+  line-height: 1.5;
+}
+
+.agentRequestError details summary {
+  cursor: pointer;
+  font-size: var(--ui-font-label);
+}
+
+@container viewport-stage (max-width: 720px) {
+  .agentRequestError {
+    flex-direction: column;
+    margin-inline: 10px;
   }
 }
 
@@ -479,7 +515,7 @@
 
 .evidenceBusinessMetrics strong {
   color: var(--bi-text);
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
   line-height: 1.1;
 }
 
@@ -884,7 +920,7 @@
   color: var(--danger);
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .agentAnalysisUnitStrip {
     flex-direction: column;
   }

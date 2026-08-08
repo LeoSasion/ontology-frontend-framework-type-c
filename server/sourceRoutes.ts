@@ -51,41 +51,6 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     return true;
   }
 
-  if (url.pathname === "/api/sources" && request.method === "GET") {
-    const result = await cli(["list-tables"]);
-    sendJson(response, 200, result);
-    return true;
-  }
-
-  if (url.pathname === "/api/sources/inspect" && request.method === "GET") {
-    const table = url.searchParams.get("table") ?? "";
-    if (!table) {
-      sendJson(response, 400, { ok: false, action: "source", error: "table is required" });
-      return true;
-    }
-    const result = await cli(["inspect-table", table]);
-    sendJson(response, result.ok === false ? 404 : 200, result);
-    return true;
-  }
-
-  if (url.pathname === "/api/sources/rename" && request.method === "POST") {
-    const body = await readBody(request);
-    const args = ["rename-source", String(body.source ?? ""), "--name", String(body.name ?? "")];
-    if (body.confirm === true) args.push("--yes");
-    const result = await cli(args);
-    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
-    return true;
-  }
-
-  if (url.pathname === "/api/sources/delete" && request.method === "POST") {
-    const body = await readBody(request);
-    const args = ["delete-source", String(body.source ?? "")];
-    if (body.confirm === true) args.push("--yes");
-    const result = await cli(args);
-    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
-    return true;
-  }
-
   if (url.pathname === "/api/import/preview" && request.method === "POST") {
     const body = await readBody(request);
     const filePath = String(body.filePath ?? "");
@@ -160,9 +125,15 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     if (body.mode) args.push("--mode", String(body.mode));
     if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
     if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
-    if (body.confirm === true) args.push("--yes");
+    if (body.confirm === true) {
+      if (!body.expectedPlan) {
+        sendJson(response, 409, { ok: false, action: "import-commit", code: "IMPORT_PLAN_REQUIRED", error: "Run the file preview again before confirming this import." });
+        return true;
+      }
+      args.push("--expected-plan", String(body.expectedPlan), "--require-plan", "--yes");
+    }
     const result = await cli(args);
-    sendJson(response, result.requiresConfirmation ? 202 : 200, result);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
     return true;
   }
 

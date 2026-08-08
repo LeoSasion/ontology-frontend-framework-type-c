@@ -129,7 +129,7 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `field-update` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--field`, `--role`, `--usage`, `--confidence`, `--yes` |
 | `forecast-readiness` | `analysis` | `read-only` | `no` | `no` | `--unit`, `--horizon` |
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |
-| `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--yes` |
+| `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--expected-plan`, `--require-plan`, `...` |
 | `import-folder` | `import` | `dry-run-confirm` | `yes` | `no` | `path`, `--limit`, `--no-recursive`, `--unique-fields`, `--conflict-rule`, `--expected-plan`, `--yes` |
 | `infer-metrics` | `metric` | `dry-run-confirm` | `yes` | `no` | `--table`, `--yes` |
 | `infer-semantics` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--overwrite-manual`, `--yes` |

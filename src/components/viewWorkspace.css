@@ -29,7 +29,7 @@
 
 .viewEmptyState > strong {
   color: var(--bi-text);
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
 }
 
 .viewEmptyState > span {
@@ -48,14 +48,14 @@
 }
 
 .viewListPanel {
-  height: calc(100vh - 230px);
+  height: calc(100cqh - 230px);
   overflow: hidden;
 }
 
 .viewList {
   display: grid;
   gap: 8px;
-  max-height: calc(100vh - 300px);
+  max-height: calc(100cqh - 300px);
   overflow: auto;
   margin-top: 12px;
 }
@@ -77,7 +77,7 @@
   display: grid;
   grid-template-rows: auto auto auto auto minmax(300px, 1fr) auto auto;
   gap: 12px;
-  height: calc(100vh - 230px);
+  height: calc(100cqh - 230px);
 }
 
 .viewToolbar {
@@ -204,7 +204,7 @@
   }
 
   .viewQueryPanel {
-    min-height: min(640px, calc(100vh - 260px));
+    min-height: min(640px, calc(100cqh - 260px));
   }
 }
 

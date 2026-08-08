@@ -333,7 +333,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 960px) {
+@container viewport-stage (max-width: 960px) {
   .agentUnderstandingOverview,
   .agentUnderstandingMethod,
   .agentEvidencePlanSkills {
@@ -345,7 +345,7 @@
   }
 }
 
-@media (max-width: 560px) {
+@container viewport-stage (max-width: 560px) {
   .agentUnderstandingSlots li {
     grid-template-columns: minmax(0, 1fr);
   }

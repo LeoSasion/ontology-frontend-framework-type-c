@@ -742,6 +742,8 @@ def build_parser() -> argparse.ArgumentParser:
     commit.add_argument("--mode", default="create", choices=["create", "merge", "replace"])
     commit.add_argument("--unique-fields")
     commit.add_argument("--conflict-rule", choices=["overwrite", "fill-empty", "skip-existing"])
+    commit.add_argument("--expected-plan")
+    commit.add_argument("--require-plan", action="store_true", help=argparse.SUPPRESS)
     commit.add_argument("--yes", action="store_true")
 
     preview_folder = sub.add_parser("preview-import-folder")

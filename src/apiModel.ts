@@ -110,10 +110,11 @@ export function queryRelationship(options: {
   limit?: number;
   sortBy?: string;
   sortDirection?: string;
-}) {
+}, signal?: AbortSignal) {
   return fetchJsonStrict<QueryResult>("/api/relationships/query", {
     method: "POST",
     body: JSON.stringify(options),
+    signal,
   });
 }
 

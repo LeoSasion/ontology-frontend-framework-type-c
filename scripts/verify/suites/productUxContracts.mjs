@@ -87,9 +87,9 @@ export function appendProductUxContractChecks(context) {
       },
     {
         label: "responsive-shell-uses-current-two-column-layout",
-        ok: appChromeStylesSource.includes("@media (max-width: 980px)") &&
+        ok: appChromeStylesSource.includes("@container viewport-stage (max-width: 980px)") &&
           appChromeStylesSource.includes("grid-template-columns: 212px minmax(0, 1fr)") &&
-          appChromeStylesSource.includes("@media (max-width: 720px)") &&
+          appChromeStylesSource.includes("@container viewport-stage (max-width: 720px)") &&
           appChromeStylesSource.includes("grid-template-columns: minmax(0, 1fr)") &&
           appChromeStylesSource.includes(".workspaceSidebar"),
       },
@@ -125,7 +125,7 @@ export function appendProductUxContractChecks(context) {
           !appEntrySource.includes("onExpandInspector") &&
           !appLazyModulesSource.includes("loadInspectorPanel") &&
           !appLazyModulesSource.includes("inspectorPreloader") &&
-          appEntrySource.includes('<main className="contentShell">') &&
+          appEntrySource.includes('<main className="contentShell" id="main-content" ref={contentRef} tabIndex={-1}>') &&
           appEntrySource.includes("<AppMainView"),
       },
     {

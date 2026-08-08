@@ -10,11 +10,15 @@ const checks = [];
 let browserIssues = [];
 
 const run = await withTemporaryWorkspace("codex_connector_adapter", async ({ temporaryWorkspaceId }) => {
-  await postJson("/api/import/commit", {
-    filePath: resolve("validation-inputs/orders.csv"),
+  const importPath = resolve("validation-inputs/orders.csv");
+  const importPreview = await postJson("/api/import/preview", {
+    filePath: importPath,
     table: "orders",
-    name: "订单表",
-    mode: "create",
+  });
+  await postJson("/api/import/commit", {
+    filePath: importPath,
+    ...importPreview.commitOptions,
+    expectedPlan: importPreview.planFingerprint,
     confirm: true,
   });
   const saved = await postJson("/api/connectors", {

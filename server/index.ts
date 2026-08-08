@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,7 +11,22 @@ import { handleJobApi } from "./jobRoutes";
 import { handleDashboardApi } from "./dashboardRoutes";
 import { handleModelApi } from "./modelRoutes";
 import { handleQueryApi } from "./queryRoutes";
-import { InvalidJsonBodyError, RequestBodyTooLargeError, runCli, sendJson } from "./serverRuntime";
+import {
+  InvalidJsonBodyError,
+  RequestBodyTooLargeError,
+  RuntimeCommandLimitError,
+  RuntimeHostCapacityError,
+  RuntimeHostUnavailableError,
+  UnsupportedMediaTypeError,
+  readBody,
+  runtimeHostHealth,
+  runCli,
+  sendJson,
+  shutdownRuntimeHosts,
+  withJsonResponseCapture,
+  withRuntimeRequestTrace,
+  type JsonValue,
+} from "./serverRuntime";
 import { handleSourceApi } from "./sourceRoutes";
 import { handleSettingsApi } from "./settingsRoutes";
 import { handleStatic } from "./staticServer";
@@ -59,6 +74,15 @@ const loopbackHosts = new Set(["127.0.0.1", "::1", "localhost"]);
 if (!loopbackHosts.has(host)) {
   throw new Error("AIBI-C is local-first and only accepts a loopback AIBI_API_HOST in this release");
 }
+const runtimeToken = randomBytes(32).toString("base64url");
+const configuredCorsOrigin = String(process.env.AIBI_CORS_ORIGIN ?? "").trim();
+const allowedBrowserOrigins = new Set([
+  `http://127.0.0.1:8686`,
+  `http://localhost:8686`,
+  `http://127.0.0.1:${port}`,
+  `http://localhost:${port}`,
+  ...(configuredCorsOrigin ? [configuredCorsOrigin] : []),
+]);
 const cli = (args: string[]) => runCli(root, args);
 
 // A read through the deterministic CLI is the startup compatibility gate.
@@ -66,6 +90,186 @@ const cli = (args: string[]) => runCli(root, args);
 await cli(["status"]);
 await cli(["job-recover", "--all", "--yes"]);
 const jobRuntime = new DurableJobRuntime(root, cli);
+
+type IdempotencyEntry = {
+  fingerprint: string;
+  method: string;
+  path: string;
+  completedAt: number;
+  response: { status: number; body: JsonValue } | null;
+  wait: Promise<void>;
+  complete: () => void;
+};
+
+const idempotencyEntries = new Map<string, IdempotencyEntry>();
+const IDEMPOTENCY_TTL_MS = 15 * 60_000;
+const IDEMPOTENCY_MAX_ENTRIES = 500;
+
+function expireIdempotencyEntries() {
+  const expiresBefore = Date.now() - IDEMPOTENCY_TTL_MS;
+  for (const [key, entry] of idempotencyEntries) {
+    if (entry.response && entry.completedAt < expiresBefore) idempotencyEntries.delete(key);
+  }
+}
+
+function reclaimCompletedIdempotencyEntries() {
+  for (const [key, entry] of idempotencyEntries) {
+    if (idempotencyEntries.size < IDEMPOTENCY_MAX_ENTRIES) break;
+    if (entry.response) idempotencyEntries.delete(key);
+  }
+}
+
+function canonicalJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, canonicalJson(item)]),
+    );
+  }
+  return value;
+}
+
+function mutationFingerprint(method: string, url: URL, body: Record<string, unknown>) {
+  const query = [...url.searchParams.entries()]
+    .sort(([leftKey, leftValue], [rightKey, rightValue]) => (
+      leftKey.localeCompare(rightKey) || leftValue.localeCompare(rightValue)
+    ));
+  return createHash("sha256")
+    .update(JSON.stringify({ method, path: url.pathname, query, body: canonicalJson(body) }))
+    .digest("hex");
+}
+
+function isMutationMethod(method: string) {
+  return ["POST", "PUT", "PATCH", "DELETE"].includes(method);
+}
+
+function loopbackRemoteAddress(request: IncomingMessage) {
+  const address = String(request.socket.remoteAddress ?? "").toLowerCase();
+  return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
+}
+
+function loopbackHostHeader(request: IncomingMessage) {
+  const value = String(request.headers.host ?? "").trim().toLowerCase();
+  if (!value) return false;
+  try {
+    const parsed = new URL(`http://${value}`);
+    return loopbackHosts.has(parsed.hostname.replace(/^\[|\]$/g, ""));
+  } catch {
+    return false;
+  }
+}
+
+function equalRuntimeToken(candidate: string) {
+  const expected = Buffer.from(runtimeToken);
+  const received = Buffer.from(candidate);
+  return expected.byteLength === received.byteLength && timingSafeEqual(expected, received);
+}
+
+function apiBoundaryFailure(request: IncomingMessage) {
+  if (!loopbackRemoteAddress(request) || !loopbackHostHeader(request)) {
+    return { status: 403, errorCode: "caller-not-loopback", error: "Local API accepts loopback callers only" };
+  }
+  const origin = String(request.headers.origin ?? "").trim();
+  if (origin && !allowedBrowserOrigins.has(origin)) {
+    return { status: 403, errorCode: "origin-not-allowed", error: "Browser origin is not allowed" };
+  }
+  if (String(request.headers["sec-fetch-site"] ?? "").toLowerCase() === "cross-site") {
+    return { status: 403, errorCode: "cross-site-request", error: "Cross-site API requests are forbidden" };
+  }
+  if (!isMutationMethod(String(request.method ?? "GET").toUpperCase())) return null;
+  const contentType = String(request.headers["content-type"] ?? "").toLowerCase();
+  if (!contentType.startsWith("application/json")) {
+    return { status: 415, errorCode: "json-content-type-required", error: "Mutation requests must use application/json" };
+  }
+  if (origin) {
+    if (request.headers["x-requested-with"] !== "aibi-web" || request.headers["x-aibi-envelope-version"] !== "aibi-command/v1") {
+      return { status: 403, errorCode: "browser-command-envelope-required", error: "Browser mutation is missing the local command envelope" };
+    }
+    if (!equalRuntimeToken(String(request.headers["x-aibi-runtime-token"] ?? ""))) {
+      return { status: 403, errorCode: "runtime-token-invalid", error: "Local runtime session is missing or expired" };
+    }
+  }
+  return null;
+}
+
+async function handleIdempotentMutation(
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: URL,
+  task: () => Promise<void>,
+) {
+  const method = String(request.method ?? "GET").toUpperCase();
+  if (!isMutationMethod(method)) {
+    await task();
+    return;
+  }
+  const key = String(request.headers["x-idempotency-key"] ?? "").trim();
+  const browserMutation = Boolean(request.headers.origin || request.headers["x-requested-with"]);
+  if (!key) {
+    if (browserMutation) {
+      sendJson(response, 400, { ok: false, action: actionForApiPath(url), errorCode: "idempotency-key-required", error: "Browser mutation requires x-idempotency-key" });
+      return;
+    }
+    await task();
+    return;
+  }
+  if (!/^[A-Za-z0-9._:-]{8,160}$/.test(key)) {
+    sendJson(response, 400, { ok: false, action: actionForApiPath(url), errorCode: "idempotency-key-invalid", error: "Invalid x-idempotency-key" });
+    return;
+  }
+  const fingerprint = mutationFingerprint(method, url, await readBody(request));
+  expireIdempotencyEntries();
+  const existing = idempotencyEntries.get(key);
+  if (existing) {
+    if (existing.method !== method || existing.path !== url.pathname || existing.fingerprint !== fingerprint) {
+      sendJson(response, 409, { ok: false, action: actionForApiPath(url), errorCode: "idempotency-key-conflict", error: "Idempotency key was already used for another operation" });
+      return;
+    }
+    await existing.wait;
+    if (!existing.response) {
+      sendJson(response, 503, { ok: false, action: actionForApiPath(url), errorCode: "idempotency-result-unavailable", error: "Original operation did not produce a replayable response" });
+      return;
+    }
+    response.setHeader("x-idempotency-replayed", "true");
+    sendJson(response, existing.response.status, existing.response.body);
+    return;
+  }
+  reclaimCompletedIdempotencyEntries();
+  if (idempotencyEntries.size >= IDEMPOTENCY_MAX_ENTRIES) {
+    sendJson(response, 429, {
+      ok: false,
+      action: actionForApiPath(url),
+      errorCode: "idempotency-capacity-reached",
+      error: "Too many mutation requests are still in progress; retry after one completes",
+    });
+    return;
+  }
+  let complete = () => {};
+  const entry: IdempotencyEntry = {
+    fingerprint,
+    method,
+    path: url.pathname,
+    completedAt: 0,
+    response: null,
+    wait: new Promise<void>((resolveWait) => { complete = resolveWait; }),
+    complete: () => complete(),
+  };
+  idempotencyEntries.set(key, entry);
+  try {
+    await withJsonResponseCapture((status, body) => {
+      entry.response = { status, body };
+      entry.completedAt = Date.now();
+      entry.complete();
+    }, task);
+  } finally {
+    if (!entry.response) {
+      idempotencyEntries.delete(key);
+      entry.complete();
+    }
+  }
+}
 
 function actionForApiPath(url: URL) {
   if (url.pathname.includes("query-table")) return "query-table";
@@ -87,7 +291,24 @@ function actionForApiPath(url: URL) {
 
 async function handleApi(request: IncomingMessage, response: ServerResponse, url: URL) {
   if (request.method === "OPTIONS") {
-    sendJson(response, 200, { ok: true });
+    const boundaryFailure = apiBoundaryFailure(request);
+    sendJson(response, boundaryFailure?.status ?? 200, boundaryFailure ? { ok: false, action: "preflight", ...boundaryFailure } : { ok: true });
+    return;
+  }
+
+  if (url.pathname === "/api/live" && request.method === "GET") {
+    sendJson(response, 200, { ok: true, schema: "aibi-live/v1" });
+    return;
+  }
+
+  if (url.pathname === "/api/ready" && request.method === "GET") {
+    const runtime = runtimeHostHealth(root);
+    sendJson(response, runtime.ok ? 200 : 503, { ok: runtime.ok, schema: "aibi-ready/v1", runtime });
+    return;
+  }
+
+  if (url.pathname === "/api/runtime-session" && request.method === "GET") {
+    sendJson(response, 200, { ok: true, schema: "aibi-runtime-session/v1", token: runtimeToken });
     return;
   }
 
@@ -171,15 +392,33 @@ const server = createServer(async (request, response) => {
   });
   try {
     if (url.pathname.startsWith("/api/")) {
-      await handleApi(request, response, url);
+      const boundaryFailure = apiBoundaryFailure(request);
+      if (boundaryFailure) {
+        sendJson(response, boundaryFailure.status, { ok: false, action: actionForApiPath(url), ...boundaryFailure });
+        return;
+      }
+      await withRuntimeRequestTrace(requestId, () => handleIdempotentMutation(request, response, url, () => handleApi(request, response, url)));
       return;
     }
-    await handleStatic(response, url.pathname, root);
+    await handleStatic(request, response, url.pathname, root);
   } catch (error) {
-    const status = error instanceof RequestBodyTooLargeError ? 413 : error instanceof InvalidJsonBodyError ? 400 : 500;
+    const status = error instanceof RequestBodyTooLargeError
+      ? 413
+      : error instanceof InvalidJsonBodyError
+        ? 400
+        : error instanceof UnsupportedMediaTypeError
+          ? 415
+      : error instanceof RuntimeCommandLimitError
+            ? 504
+            : error instanceof RuntimeHostCapacityError
+              ? 429
+              : error instanceof RuntimeHostUnavailableError
+                ? 503
+            : 500;
     sendJson(response, status, {
       ok: false,
       action: url.pathname.startsWith("/api/") ? actionForApiPath(url) : "static",
+      errorCode: error instanceof RuntimeCommandLimitError ? "runtime-command-limit" : undefined,
       error: error instanceof Error ? error.message : String(error),
     });
   }
@@ -193,6 +432,7 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.once(signal, () => {
     void (async () => {
       await jobRuntime.shutdown();
+      await shutdownRuntimeHosts();
       server.close(() => process.exit(0));
     })();
   });

@@ -58,7 +58,7 @@
 - 多个已登记 Adapter 可生成只读联邦计划证明；只有实时来源指纹、字段语义、实体键、validated 关系版本、粒度、过滤 allowlist 和预算全部通过才可标记 `provable`。证明不得执行跨源查询、复制业务行、暴露路径/凭据或授予物化与写入权限。
 - 查询只接受白名单参数并返回 Query Plan Receipt，不接受任意 SQL。
 - 服装电商可信查询必须遵守 [服装电商可信查询 v1](apparel-commerce-trusted-query.md)：会改变数字的 QueryIntent 槽位必须完整进入执行计划；只有绑定 current workspace/sourceRun、语义与结果指纹的 `executed` Receipt 可以投影经营数字。
-- 文件夹导入的用户确认对象必须是包含来源内容哈希、逻辑表分组、键 authority、跨文件重复和逐表行影响的不可变计划；所有逻辑表原子成功后才能切换 current sourceRun。
+- 文件与文件夹导入的用户确认对象必须是包含来源内容哈希、逻辑表分组、键 authority、跨文件重复、父数据版本和逐表行影响的不可变计划；确认提交必须复核同一计划指纹，任何来源、路径、schema、键或父版本漂移都以冲突阻断且零写入；所有逻辑表原子成功后才能切换 current sourceRun。
 
 工作区上下文、候选/确认、PII 与规划指纹由 [工作区上下文目录](workspace-context-catalog.md) 维护；知识源和审核流程由 [语义补丁与审核收件箱](semantic-review-inbox.md) 维护；历史计划复用由 [确认计划记忆](confirmed-plan-memory.md) 维护；执行细节由 [语义查询合同](semantic-query-planning.md) 维护。
 
@@ -103,7 +103,9 @@
 - 长任务使用工作区隔离 Durable Job，公开状态、阶段、单调进度、事件、结果、错误和证据。
 - 取消必须预演并确认，只作用于 AIBI-C 登记 worker；重启中断形成可审计终态。
 - Agent、API、CLI 和 Job 复用同一 Capability Contract；越权资源在执行前阻断。
-- API 与 UI 只监听回环地址；请求体有上限，CORS 只允许显式来源。
+- API 与 UI 只监听回环地址；请求体有上限，CORS 只允许显式来源；所有 mutation 还必须验证 loopback Host、同源或显式允许的 Origin、JSON Content-Type 和启动期能力令牌。
+- mutation 使用版本化 Command Envelope、稳定幂等键和一次发送语义；代理或传输失败不得把同一写操作自动重放到另一地址，响应丢失后的重试必须返回原始执行回执。
+- 业务失败使用非 2xx HTTP 状态和稳定错误码；前端不得把 `ok: false`、缺失对象、过期 Session 或关系查询失败显示为成功、空工作区或其他对象的结果。
 - SQLite 与 DuckDB 使用显式 schema 版本；迁移先验证隔离副本，确认前创建恢复点，失败时恢复双库。
 - 备份不包含 `.env`、源文件、业务导出或凭据。
 

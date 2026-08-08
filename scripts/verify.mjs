@@ -336,16 +336,22 @@ const verifyDashboardModulesFilters = JSON.stringify([
   { id: "verify_bulk_filter", field: "channel", operator: "equals", value: "Douyin", enabled: true },
 ]);
 
-const repositoryFiles = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
+const repositoryInventory = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
   cwd: root,
   encoding: "utf8",
   windowsHide: true,
-}).stdout.split(/\r?\n/).filter(Boolean);
+});
+const repositoryFiles = String(repositoryInventory.stdout ?? "").split(/\r?\n/).filter(Boolean);
 const fileViolations = repositoryFiles.filter((file) => forbiddenPatterns.some((pattern) => pattern.test(file)));
 const checks = [
   {
+    label: "repository-inventory-readable",
+    ok: repositoryInventory.status === 0,
+    detail: repositoryInventory.error?.message ?? String(repositoryInventory.stderr ?? ""),
+  },
+  {
     label: "data-policy-no-real-business-files",
-    ok: fileViolations.length === 0,
+    ok: repositoryInventory.status === 0 && fileViolations.length === 0,
     violations: fileViolations,
   },
   run("cli-status", "python", ["tools/aibi_cli.py", "--json", "status"]),

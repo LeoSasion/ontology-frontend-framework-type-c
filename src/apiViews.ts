@@ -33,10 +33,11 @@ export function runTableQuery(options: {
   groupFields?: string[];
   measure?: string;
   aggregation?: string;
-}) {
+}, signal?: AbortSignal) {
   return fetchJsonStrict<TableQueryPayload>("/api/query-table", {
     method: "POST",
     body: JSON.stringify(options),
+    signal,
   });
 }
 

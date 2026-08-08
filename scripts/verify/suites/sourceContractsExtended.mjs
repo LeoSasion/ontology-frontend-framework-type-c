@@ -60,6 +60,7 @@ export function appendSourceContractExtendedChecks(context) {
     run,
     serverDashboardRoutesSource,
     serverSourceRoutesSource,
+    serverWorkspaceRoutesSource,
     sourceCoverageAllRuns,
     sourceCoverageRuns,
     sourceIntelligenceRunModelSource,
@@ -130,7 +131,10 @@ export function appendSourceContractExtendedChecks(context) {
           byLabel["cli-create-index-dry-run"].parsed?.proposed?.engine === "duckdb" &&
           byLabel["cli-create-index-confirm"].parsed?.confirmed === true &&
           byLabel["cli-create-index-confirm"].parsed?.createdIndex?.field === "channel" &&
-          byLabel["cli-create-index-confirm"].parsed?.syncedRows >= 1,
+          byLabel["cli-create-index-confirm"].parsed?.createdIndex?.replicaTable?.startsWith("__aibi_replica_") &&
+          Number.isInteger(byLabel["cli-create-index-confirm"].parsed?.syncedRows) &&
+          byLabel["cli-create-index-confirm"].parsed?.syncedRows >= 0 &&
+          ["current", "published"].includes(byLabel["cli-create-index-confirm"].parsed?.replicaStatus),
       },
     {
         label: "frontend-widget-filter-routing",
@@ -294,16 +298,16 @@ export function appendSourceContractExtendedChecks(context) {
           sourceWorkbenchImportControllerSource.includes("runImportPreviewAction") &&
           sourceWorkbenchImportControllerSource.includes("runImportCommitAction") &&
           sourceWorkbenchImportControllerSource.includes("runImportPolicyAction") &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-receipt"') &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-technical-details"') &&
+          sourceWorkbenchImportPanelSource.includes('testId="import-operation-receipt"') &&
+          sourceWorkbenchImportPanelSource.includes('technicalTestId="import-operation-technical-details"') &&
           sourceWorkbenchImportPanelSource.includes("确认后才写入工作区") &&
           sourceWorkbenchImportPanelSource.includes("当前只做检查，不写入") &&
           sourceWorkbenchImportPanelSource.includes("View import policy and receipt") &&
           sourceWorkbenchConnectorControllerSource.includes("runConnectorSaveAction") &&
           sourceWorkbenchConnectorControllerSource.includes("runConnectorSyncAction") &&
           sourceWorkbenchConnectorControllerSource.includes("runConnectorRemoveAction") &&
-          sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-receipt"') &&
-          sourceWorkbenchConnectorPanelSource.includes('data-testid="connector-operation-technical-details"') &&
+          sourceWorkbenchConnectorPanelSource.includes('testId="connector-operation-receipt"') &&
+          sourceWorkbenchConnectorPanelSource.includes('technicalTestId="connector-operation-technical-details"') &&
           sourceWorkbenchConnectorPanelSource.includes("同步前先由只读 Adapter 检查来源") &&
           !sourceWorkbenchSource.includes("Dry-run rename") &&
           !sourceWorkbenchSource.includes("Dry-run move") &&
@@ -361,8 +365,8 @@ export function appendSourceContractExtendedChecks(context) {
           sourceWorkbenchDataManagementPanelSource.includes("sourceRuns.flatMap") &&
           sourceWorkbenchDataManagementPanelSource.includes("selectManagedSource(event.target.value)") &&
           sourceWorkbenchDataManagementPanelSource.includes("onDeleteSource({ source: selectedManagedSourceKey, confirm: true })") &&
-          serverSourceRoutesSource.includes('url.pathname === "/api/sources/delete"') &&
-          serverSourceRoutesSource.includes('url.pathname === "/api/sources/rename"') &&
+          serverWorkspaceRoutesSource.includes('url.pathname === "/api/sources/delete"') &&
+          serverWorkspaceRoutesSource.includes('url.pathname === "/api/sources/rename"') &&
           stylesSource.includes(".sourceLifecyclePanel") &&
           stylesSource.includes(".sourceDangerZone"),
       },

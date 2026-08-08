@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { queryRelationship, runTableQuery } from "../api";
+import { queryRelationship } from "../api";
+import { subscribeTableQuery } from "../dashboardWidgetQueryRuntime";
 import {
   type BiDashboardDatum,
   type BiDashboardFilterRule,
@@ -33,6 +34,7 @@ export function BiDashboardWidgetCard({
   onSlicerChange,
 }: BiDashboardWidgetCardProps) {
   const [relationshipQuery, setRelationshipQuery] = useState<QueryResult | null>(null);
+  const [relationshipQueryState, setRelationshipQueryState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [widgetQuery, setWidgetQuery] = useState<QueryResult | null>(null);
   const [widgetQueryState, setWidgetQueryState] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const slicerField = widget.dimension || "label";
@@ -65,9 +67,12 @@ export function BiDashboardWidgetCard({
   useEffect(() => {
     if (widget.dataMode !== "relationship" || !widget.relationship) {
       setRelationshipQuery(null);
+      setRelationshipQueryState("idle");
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
+    setRelationshipQuery(null);
+    setRelationshipQueryState("loading");
     const group = widget.relationship.groupFields[0];
     const measure = widget.relationship.measure;
     const filters = [...filtersForWidget, ...widget.filters].map((filter) => ({
@@ -88,11 +93,15 @@ export function BiDashboardWidgetCard({
       limit: widget.topN,
       sortBy: widget.sortBy,
       sortDirection: widget.sortDirection,
-    }).then((result) => {
-      if (!cancelled) setRelationshipQuery(result);
+    }, controller.signal).then((result) => {
+      if (controller.signal.aborted) return;
+      setRelationshipQuery(result.ok ? result : null);
+      setRelationshipQueryState(result.ok ? "ready" : "error");
+    }).catch((error) => {
+      if (!controller.signal.aborted && (!(error instanceof Error) || error.name !== "AbortError")) setRelationshipQueryState("error");
     });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [filtersForWidget, widget]);
 
@@ -102,26 +111,30 @@ export function BiDashboardWidgetCard({
       setWidgetQueryState("idle");
       return;
     }
-    let cancelled = false;
     setWidgetQueryState("loading");
     setWidgetQuery(null);
-    void runTableQuery(widgetQueryRequest).then((result) => {
-      if (cancelled) return;
+    let active = true;
+    const subscription = subscribeTableQuery(widgetQueryRequest);
+    void subscription.promise.then((result) => {
+      if (!active) return;
       setWidgetQuery(tableQueryToQueryResult(result, widget));
       setWidgetQueryState(result.ok ? "ready" : "error");
-    }).catch(() => {
-      if (!cancelled) setWidgetQueryState("error");
+    }).catch((error) => {
+      if (!(error instanceof Error) || error.name !== "AbortError") setWidgetQueryState("error");
     });
     return () => {
-      cancelled = true;
+      active = false;
+      subscription.release();
     };
   }, [widget, widgetQueryRequest]);
 
-  const sourceQuery = widget.dataMode === "relationship" && relationshipQuery?.ok
-    ? relationshipQuery
+  const sourceQuery = widget.dataMode === "relationship"
+    ? relationshipQuery ?? emptyWidgetQuery(widget)
     : widgetQueryRequest
       ? widgetQuery ?? emptyWidgetQuery(widget)
       : query;
+  const dedicatedQueryState = widget.dataMode === "relationship" ? relationshipQueryState : widgetQueryState;
+  const requiresDedicatedQuery = widget.dataMode === "relationship" || Boolean(widgetQueryRequest);
   const renderWidget = widgetQueryRequest ? { ...widget, filters: [] } : widget;
   const rows = aggregateWidgetRows(renderWidget, sourceQuery, widget.dataMode === "relationship" || widgetQueryRequest ? [] : filtersForWidget);
   const className = `bWidgetCard ${widget.type}-widget`;
@@ -131,8 +144,8 @@ export function BiDashboardWidgetCard({
   return (
     <section className={className} data-testid={`b-widget-${widget.type}`}>
       <WidgetHeader onDrillDown={() => onDrillDown(widget)} onOpenEvidence={() => onOpenEvidence(widget)} widget={widget} />
-      {widgetQueryRequest && widgetQueryState !== "ready" ? (
-        <WidgetDataState state={widgetQueryState} />
+      {requiresDedicatedQuery && dedicatedQueryState !== "ready" ? (
+        <WidgetDataState state={dedicatedQueryState} />
       ) : (
         <>
           {widget.type === "metric" ? <MetricWidget dashboardFilters={widget.dataMode === "relationship" || widgetQueryRequest ? [] : filtersForWidget} query={sourceQuery} widget={renderWidget} /> : null}

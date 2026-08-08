@@ -51,7 +51,7 @@ export function createVerifyRuntime({ prefix = "aibi-hybrid-verify-", ignoredDir
       },
       windowsHide: true,
     });
-    const stdout = result.stdout.trim();
+    const stdout = String(result.stdout ?? "").trim();
     let parsed = null;
     try {
       parsed = stdout ? JSON.parse(stdout) : null;
@@ -64,7 +64,7 @@ export function createVerifyRuntime({ prefix = "aibi-hybrid-verify-", ignoredDir
       status: result.status,
       parsed,
       stdout,
-      stderr: result.stderr.trim(),
+      stderr: String(result.stderr ?? result.error?.message ?? "").trim(),
     };
   }
 

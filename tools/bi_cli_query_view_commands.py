@@ -43,6 +43,7 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
                 measure=args.measure,
                 aggregation=args.agg,
                 limit=args.limit,
+                source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
             )
             fallback_reason = None
         except DuckDBUnavailable as exc:

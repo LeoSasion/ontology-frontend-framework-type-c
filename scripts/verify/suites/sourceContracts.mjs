@@ -216,7 +216,8 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           !sourceWorkbenchHeaderSource.includes("SOURCE_INTELLIGENCE_A_TESTDATA_COMMAND") &&
           !sourceWorkbenchHeaderSource.includes("aTestdata0305SourceIntelligenceOptions()") &&
-          sourceWorkbenchImportPanelSource.includes('data-testid="import-operation-receipt" role="status"') &&
+          sourceWorkbenchImportPanelSource.includes('testId="import-operation-receipt"') &&
+          sourceWorkbenchImportPanelSource.includes('role="status"') &&
           sourceWorkbenchImportPanelSource.includes("导入去重规则") &&
           sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
           !sourceWorkbenchSource.includes('data-testid="source-expert-details"') &&
@@ -265,9 +266,9 @@ export function appendSourceContractChecks(context) {
           homeOverviewSource.includes('data-testid="workspace-primary-task"') &&
           homeOverviewSource.includes('aria-label={biText("可信分析流程", "Trusted analysis flow")}') &&
           homeOverviewSource.includes('label: biText("接入数据", "Connect data")') &&
-          homeOverviewSource.includes('label: biText("准备证据", "Prepare evidence")') &&
+          homeOverviewSource.includes('label: biText("系统理解", "System understanding")') &&
           homeOverviewSource.includes('label: biText("提出问题", "Ask a question")') &&
-          homeOverviewSource.includes('label: biText("核对结果", "Review result")') &&
+          homeOverviewSource.includes('label: biText("核对与确认", "Review and confirm")') &&
           !homeOverviewSource.includes("<HomeActionDock") &&
           !homeOverviewSource.includes("<HomeOperatingSummaryPanel") &&
           sourceWorkbenchHeaderSource.includes("接入并准备数据") &&
@@ -362,7 +363,7 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-safety"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
-          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm"}') &&
+          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm" || !singleImportPlanReady}') &&
           !sourceWorkbenchActionPanelSource.includes("不可读或未预检时不能确认导入") &&
           sourceWorkbenchSource.includes("{hasData ? (") &&
           !sourceWorkbenchSource.includes("hasData && sourceProfileComplete ? (") &&

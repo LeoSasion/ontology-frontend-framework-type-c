@@ -130,6 +130,9 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
   const activeHasWriteDraft = Boolean(currentDraft) || result.requiresConfirmation;
   const activeBoundaryBlocked = !currentDraft && blockedDashboardWrite;
   const activeActionResult = activeActionKey && resultActionKey(lastActionResult) === activeActionKey ? lastActionResult : null;
+  const requestFailure = lastActionResult?.ok === false && !activeActionResult ? lastActionResult : null;
+  const requestFailureMessage = requestFailure ? String(requestFailure.error ?? biText("分析没有完成", "Analysis did not finish")) : "";
+  const requestFailureNext = requestFailure ? String(requestFailure.next ?? biText("请保留当前问题并重试。", "Keep the current question and retry.")) : "";
   const canBranchAnalysis = Boolean(result.analysisRun?.run_key) && (
     result.analysisRun?.status === "confirmed"
     || result.analysisRun?.status === "executed"
@@ -489,6 +492,22 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
         setPromptTouched={setPromptTouched}
         submit={submit}
       />
+
+      {requestFailure ? (
+        <div className="agentRequestError" data-testid="agent-request-error" role="alert">
+          <div>
+            <strong>{biText("本次分析没有完成", "This analysis did not finish")}</strong>
+            <span>{requestFailureNext}</span>
+            <details>
+              <summary>{biText("查看错误原文", "View technical error")}</summary>
+              <code>{requestFailureMessage}</code>
+            </details>
+          </div>
+          <button className="secondaryButton" disabled={isAsking || !prompt.trim()} onClick={() => void submit()} type="button">
+            {isAsking ? biText("正在重试…", "Retrying…") : biText("重试当前问题", "Retry question")}
+          </button>
+        </div>
+      ) : null}
 
       {result.answerCard ? (
         <Suspense fallback={null}>

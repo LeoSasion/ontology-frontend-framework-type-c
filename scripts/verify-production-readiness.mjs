@@ -26,7 +26,15 @@ const checks = [
   check("loopback-ui-default", packageJson.scripts?.["dev:ui"] === "vite" && viteConfig.includes('host: "127.0.0.1"') && packageJson.scripts?.preview?.includes("--host 127.0.0.1"), "Development and preview UI bind only to loopback."),
   check("cors-not-wildcard", !serverRuntime.includes('"access-control-allow-origin": "*"') && serverRuntime.includes("AIBI_CORS_ORIGIN"), "Cross-origin access is disabled unless one explicit origin is configured."),
   check("request-size-limit", serverRuntime.includes("configuredMaxRequestBodyBytes") && serverRuntime.includes("bodyBytes > maxRequestBodyBytes"), "JSON request bodies have a bounded size and read configuration after local .env loading."),
-  check("request-errors-are-specific", serverRuntime.includes("RequestBodyTooLargeError") && serverRuntime.includes("InvalidJsonBodyError") && serverIndex.includes("status = error instanceof RequestBodyTooLargeError ? 413"), "Oversized and invalid JSON requests return specific client errors."),
+  check("request-errors-are-specific", serverRuntime.includes("RequestBodyTooLargeError")
+    && serverRuntime.includes("InvalidJsonBodyError")
+    && serverRuntime.includes("UnsupportedMediaTypeError")
+    && serverIndex.includes("error instanceof RequestBodyTooLargeError")
+    && serverIndex.includes("error instanceof InvalidJsonBodyError")
+    && serverIndex.includes("error instanceof UnsupportedMediaTypeError")
+    && serverIndex.includes("? 413")
+    && serverIndex.includes("? 400")
+    && serverIndex.includes("? 415"), "Oversized, invalid, and unsupported JSON requests return specific client errors."),
   check("request-trace-and-security-headers", serverIndex.includes('response.setHeader("x-request-id"') && serverIndex.includes('response.setHeader("x-content-type-options", "nosniff")') && serverIndex.includes('response.setHeader("x-frame-options", "DENY")'), "Responses expose a request ID and defensive browser headers."),
   check("safe-env-example", envExample.includes("AIBI_API_HOST=127.0.0.1") && envExample.includes("AIBI_MAX_BODY_BYTES=1048576") && envExample.includes("AIBI_CORS_ORIGIN="), "Documented defaults preserve the local-only boundary."),
   check("local-env-untracked", /^\.env$/m.test(gitignore) || /^\.env\*/m.test(gitignore), "Local secrets stay outside Git."),
@@ -34,7 +42,11 @@ const checks = [
   check("data-backup-manifest", backupScript.includes('schema: "aibi-local-backup/v1"') && snapshotScript.includes("sha256") && snapshotScript.includes("loadLocalEnv") && backupScript.includes("assertLocalServiceStopped"), "Local database backup reads the active local configuration, requires stopped services, and writes checksums."),
   check("data-restore-guard", restoreScript.includes('args.has("--confirm")') && restoreScript.includes("verifyManifestFiles") && restoreScript.includes("createSafetyBackup"), "Restore previews by default, verifies checksums, and preserves current files before writing."),
   check("schema-migration-guard", migrationScript.includes('args.has("--confirm")') && migrationScript.includes("createSafetyBackup") && migrationScript.includes("originalUnchanged") && schemaSource.includes("CURRENT_SQLITE_SCHEMA_VERSION") && schemaSource.includes("assert_duckdb_schema_compatible"), "Schema upgrades preview on isolated copies, preserve a restore point, and block incompatible SQLite or DuckDB versions."),
-  check("ci-browser-smoke", workflow.includes("Verify browser smoke paths") && workflow.includes("npm run verify:ui-visual") && workflow.includes("npm run verify:ui-empty") && workflow.includes("if: always()"), "CI exercises rendered empty and responsive flows and always stops services."),
+  check("ci-browser-smoke", workflow.includes("Verify complete browser paths")
+    && workflow.includes("npm run verify:ui")
+    && workflow.includes("Upload browser evidence")
+    && workflow.includes("Stop local services")
+    && workflow.includes("if: always()"), "CI exercises the complete rendered browser suite, uploads evidence, and always stops services."),
   check("ci-runtime-security", workflow.includes("Verify server security runtime") && workflow.includes("npm run verify:security-runtime"), "CI validates runtime security headers, CORS, and request limits."),
   check("ci-production-gate", packageJson.scripts?.["verify:ci"]?.includes("npm run verify:production"), "Production readiness is part of the CI command."),
 ];

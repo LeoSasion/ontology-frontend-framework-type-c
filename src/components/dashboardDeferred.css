@@ -73,10 +73,10 @@
   align-items: center;
   gap: 7px;
   max-width: 360px;
-  border: 1px solid rgb(22 120 97 / 28%);
+  border: 1px solid color-mix(in srgb, var(--accent) 32%, var(--bi-border));
   border-radius: 999px;
-  background: rgb(234 247 243 / 90%);
-  color: #17453b;
+  background: color-mix(in srgb, var(--accent) 10%, var(--bi-surface));
+  color: var(--bi-text);
   padding: 6px 8px 6px 12px;
   font-size: 12px;
   line-height: 1;
@@ -176,7 +176,7 @@
 
 .beginnerEditorSteps strong {
   color: var(--bi-text);
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
   line-height: 1.05;
 }
 

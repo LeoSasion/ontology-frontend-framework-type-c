@@ -694,19 +694,17 @@
 }
 
 .agentPrimaryApproval {
-  position: sticky;
-  z-index: 6;
-  bottom: 0;
+  position: relative;
   margin: 14px 20px 0;
   padding-bottom: 12px;
 }
 
 .agentApprovalPanel {
   border-color: color-mix(in srgb, var(--bi-accent) 38%, var(--bi-border)) !important;
-  box-shadow: 0 -10px 24px rgb(15 23 42 / 9%);
+  box-shadow: 0 4px 8px rgb(15 23 42 / 8%);
 }
 
-@media (max-width: 720px) {
+@container viewport-stage (max-width: 720px) {
   .agentPrimaryApproval {
     margin-inline: 10px;
   }

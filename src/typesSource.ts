@@ -59,6 +59,16 @@ export interface ImportPreview {
     willWrite: boolean;
   };
   sourcePipelineContract: SourcePipelineContract;
+  contentHash?: string;
+  parentSourceRunId?: string | null;
+  planFingerprint?: string;
+  commitOptions?: {
+    table: string;
+    name: string;
+    mode: string;
+    uniqueFields: string[];
+    conflictRule: string;
+  };
 }
 
 export interface FolderImportPlanItem {

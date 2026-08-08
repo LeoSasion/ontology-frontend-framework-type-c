@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from agent_clarification_service import build_agent_clarification  # noqa: E402
 from agent_intent_service import build_business_intent_frame  # noqa: E402
+from agent_prompt_resolution import resolve_agent_prompt_intents  # noqa: E402
 from analytical_skill_service import builtin_analytical_skills  # noqa: E402
 from business_understanding_service import (  # noqa: E402
     apply_business_understanding_to_intent,
@@ -57,6 +58,38 @@ lexical_boundary_failures = [
 check("ranking-prefix-does-not-confuse-current-data", not lexical_boundary_failures, lexical_boundary_failures)
 check("provider-independent", all(frame["resolution"]["providerRequired"] is False for _, frame in generated))
 check("no-silent-disambiguation", all(frame["resolution"]["silentDisambiguation"] is False for _, frame in generated))
+negative_dashboard_cases = [
+    "请计算核心指标，不要创建或修改看板。",
+    "只读分析；请勿删除仪表盘。",
+    "Analyze the metric without creating or editing a dashboard.",
+]
+negative_dashboard_failures = [
+    {
+        "prompt": prompt,
+        "intents": resolve_agent_prompt_intents(prompt).__dict__,
+    }
+    for prompt in negative_dashboard_cases
+    if (
+        resolve_agent_prompt_intents(prompt).wants_dashboard
+        or resolve_agent_prompt_intents(prompt).wants_dashboard_create
+        or resolve_agent_prompt_intents(prompt).dashboard_operation
+    )
+]
+check("negated-dashboard-mutations-never-create-drafts", not negative_dashboard_failures, negative_dashboard_failures)
+positive_dashboard_intents = resolve_agent_prompt_intents("请创建一个月度销售看板")
+read_dashboard_intents = resolve_agent_prompt_intents("不要修改，只查看现有销售看板")
+check(
+    "positive-and-read-only-dashboard-intents-remain-distinct",
+    positive_dashboard_intents.wants_dashboard_create
+    and positive_dashboard_intents.wants_dashboard
+    and read_dashboard_intents.wants_dashboard
+    and not read_dashboard_intents.wants_dashboard_create
+    and not read_dashboard_intents.dashboard_operation,
+    {
+        "positive": positive_dashboard_intents.__dict__,
+        "readOnly": read_dashboard_intents.__dict__,
+    },
+)
 forecast_parameters = build_business_intent_frame(
     "检查 value 按 event_date 合计的预测准备度，预测跨度为3，评估截止为2025-12-01，粒度为月",
     semantic_plan={},

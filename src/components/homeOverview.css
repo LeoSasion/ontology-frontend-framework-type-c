@@ -9,9 +9,9 @@
 .workspaceHomeIntro {
   display: flex;
   justify-content: space-between;
-  gap: 32px;
+  gap: clamp(18px, 2.5cqi, 32px);
   align-items: flex-end;
-  padding: 32px 36px 24px;
+  padding: var(--ui-space-page-block) var(--ui-space-page-inline) var(--ui-space-section-block);
   border-bottom: 1px solid var(--line);
 }
 
@@ -19,15 +19,15 @@
   display: block;
   margin-bottom: 8px;
   color: var(--accent-strong);
-  font-size: 12px;
+  font-size: var(--ui-font-label);
   font-weight: 700;
 }
 
-.workspaceHomeIntro h2 {
+.workspaceHomeIntro h1 {
   max-width: 720px;
   margin: 0;
   color: var(--text);
-  font-size: 30px;
+  font-size: var(--ui-font-page-title);
   line-height: 1.15;
   letter-spacing: -0.025em;
 }
@@ -36,14 +36,14 @@
   max-width: 680px;
   margin: 10px 0 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--ui-font-body);
   line-height: 1.55;
 }
 
 .workspaceFacts {
   display: flex;
   flex: 0 0 auto;
-  gap: 24px;
+  gap: clamp(14px, 2cqi, 24px);
   margin: 0;
 }
 
@@ -53,22 +53,23 @@
 
 .workspaceFacts dt {
   color: var(--soft);
-  font-size: 11px;
+  font-size: var(--ui-font-label);
 }
 
 .workspaceFacts dd {
   margin: 4px 0 0;
   color: var(--text);
-  font-size: 20px;
+  font-size: var(--ui-font-summary);
   font-weight: 750;
   line-height: 1;
 }
 
 .workspaceJourney {
+  --journey-marker-size: clamp(30px, calc(27px + 0.8cqi), 34px);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   margin: 0;
-  padding: 20px 36px;
+  padding: var(--ui-space-section-block) var(--ui-space-page-inline);
   border-bottom: 1px solid var(--line);
   list-style: none;
 }
@@ -80,9 +81,9 @@
 
 .workspaceJourney li:not(:last-child)::after {
   position: absolute;
-  top: 17px;
+  top: calc(var(--journey-marker-size) / 2);
   right: 12px;
-  left: 44px;
+  left: calc(var(--journey-marker-size) + 10px);
   height: 1px;
   background: var(--line);
   content: "";
@@ -98,7 +99,7 @@
   width: 100%;
   min-width: 0;
   display: flex;
-  gap: 10px;
+  gap: clamp(7px, 1.2cqi, 10px);
   align-items: flex-start;
   border: 0;
   background: transparent;
@@ -114,15 +115,15 @@
 
 .journeyMarker {
   display: grid;
-  flex: 0 0 34px;
+  flex: 0 0 var(--journey-marker-size);
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--journey-marker-size);
+  height: var(--journey-marker-size);
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   background: var(--surface);
   color: var(--soft);
-  font-size: 12px;
+  font-size: var(--ui-font-compact);
   font-weight: 800;
 }
 
@@ -154,21 +155,21 @@
 
 .workspaceJourney strong {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--ui-font-compact);
   line-height: 1.25;
 }
 
 .workspaceJourney small {
   overflow: hidden;
   color: var(--soft);
-  font-size: 11px;
+  font-size: var(--ui-font-label);
   line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .workspacePrimaryTask {
-  margin: 28px 36px 0;
+  margin: clamp(20px, 2.4cqi, 28px) var(--ui-space-page-inline) 0;
   border: 1px solid var(--line-strong);
   border-radius: 10px;
   background: var(--surface);
@@ -177,9 +178,9 @@
 .workspaceTaskEmpty {
   display: grid;
   grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 16px;
+  gap: clamp(12px, 1.8cqi, 16px);
   align-items: center;
-  padding: 26px;
+  padding: var(--ui-space-card);
 }
 
 .workspaceTaskIcon {
@@ -202,7 +203,7 @@
 .workspaceQuestionLead h3 {
   margin: 0;
   color: var(--text);
-  font-size: 17px;
+  font-size: var(--ui-font-card-title);
   line-height: 1.3;
 }
 
@@ -211,7 +212,7 @@
   max-width: 720px;
   margin: 6px 0 0;
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--ui-font-body);
   line-height: 1.5;
 }
 
@@ -220,7 +221,7 @@
 }
 
 .workspaceQuestionTask {
-  padding: 26px;
+  padding: var(--ui-space-card);
 }
 
 .workspaceQuestionLead {
@@ -232,7 +233,7 @@
 .workspaceQuestionForm {
   display: grid;
   gap: 8px;
-  margin-top: 22px;
+  margin-top: clamp(16px, 2.5cqi, 22px);
 }
 
 .workspaceQuestionForm > label {
@@ -257,6 +258,7 @@
   background: var(--surface-2);
   color: var(--text);
   padding: 12px 14px;
+  font-size: var(--ui-font-body);
   line-height: 1.5;
   transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
@@ -301,75 +303,7 @@
   color: var(--accent-strong);
 }
 
-.workspaceSecondaryActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  padding: 18px 36px 32px;
-}
-
-.workspaceSecondaryActions > button,
-.workspaceSecondaryActions > details > summary,
-.workspaceSecondaryActions > details > div button {
-  min-height: 36px;
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-  border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--surface);
-  color: var(--muted);
-  padding: 0 11px;
-  font-size: 12px;
-}
-
-.workspaceSecondaryActions > button:hover,
-.workspaceSecondaryActions > details > summary:hover {
-  border-color: var(--accent);
-  color: var(--accent-strong);
-}
-
-.workspaceSecondaryActions svg {
-  width: 15px;
-  height: 15px;
-}
-
-.workspaceSecondaryActions details {
-  position: relative;
-}
-
-.workspaceSecondaryActions summary {
-  cursor: pointer;
-  list-style: none;
-}
-
-.workspaceSecondaryActions summary::-webkit-details-marker {
-  display: none;
-}
-
-.workspaceSecondaryActions details > div {
-  position: absolute;
-  z-index: 4;
-  top: calc(100% + 6px);
-  right: 0;
-  min-width: 170px;
-  display: grid;
-  gap: 4px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: var(--shadow);
-  padding: 6px;
-}
-
-.workspaceSecondaryActions details > div button {
-  width: 100%;
-  justify-content: flex-start;
-  border-color: transparent;
-}
-
-@media (max-width: 900px) {
+@container main-panel (max-width: 760px) {
   .workspaceHomeIntro {
     align-items: flex-start;
     flex-direction: column;
@@ -385,22 +319,7 @@
   }
 }
 
-@media (max-width: 640px) {
-  .workspaceHomeIntro,
-  .workspaceJourney,
-  .workspaceSecondaryActions {
-    padding-right: 18px;
-    padding-left: 18px;
-  }
-
-  .workspaceHomeIntro {
-    padding-top: 22px;
-  }
-
-  .workspaceHomeIntro h2 {
-    font-size: 24px;
-  }
-
+@container main-panel (max-width: 640px) {
   .workspaceFacts {
     width: 100%;
     justify-content: space-between;
@@ -408,16 +327,12 @@
   }
 
   .workspaceJourney {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .workspaceJourney li::after {
-    display: none;
+    gap: 12px 0;
   }
 
   .workspacePrimaryTask {
-    margin-right: 18px;
-    margin-left: 18px;
+    margin-right: var(--ui-space-page-inline);
+    margin-left: var(--ui-space-page-inline);
   }
 
   .workspaceTaskEmpty {
@@ -435,5 +350,26 @@
 
   .workspaceQuestionForm .primaryButton {
     min-height: 42px;
+  }
+}
+
+
+@container viewport-stage (max-height: 820px) and (min-width: 721px) {
+  .workspaceHome {
+    --ui-space-page-block: 18px;
+    --ui-space-section-block: 14px;
+    --ui-space-card: 18px;
+  }
+
+  .workspaceHomeIntro p {
+    margin-top: 6px;
+  }
+
+  .workspaceJourney {
+    row-gap: 12px;
+  }
+
+  .workspacePrimaryTask {
+    margin-top: 16px;
   }
 }

@@ -10,6 +10,7 @@ import { confirmedActionNavigationTarget } from "./agentActionNavigationModel";
 import type { AppSection } from "./components/Sidebar";
 import type { AppNavigationTarget } from "./appNavigationModel";
 import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
+import { ApiPayloadError } from "./apiClient";
 
 type AppAgentActionsOptions = {
   activeWorkspaceId: string;
@@ -55,13 +56,17 @@ export function useAppAgentActions({
   const requestWithSessionRecovery = (request: (sessionKey?: string) => Promise<AgentAskResult>) => {
     const sessionKey = activeSessionKey() || undefined;
     return request(sessionKey).catch((error) => {
-      if (!sessionKey || !String(error).includes("Unknown Agent Session")) throw error;
+      const payloadCode = error instanceof ApiPayloadError ? String(error.payload.errorCode ?? error.payload.code ?? "") : "";
+      const unknownSession = payloadCode === "unknown-agent-session"
+        || (error instanceof Error ? error.message : String(error)).toLowerCase().includes("unknown agent session");
+      if (!sessionKey || !unknownSession) throw error;
       rememberSession("");
       return request();
     });
   };
   const handleAsk = useCallback(async (prompt: string) => {
     const requestId = ++requestRef.current;
+    setLastActionResult(null);
     try {
       const nextAgent = await requestWithSessionRecovery((sessionKey) => askAgent(prompt, { workspaceId: activeWorkspaceId, sessionKey }));
       if (requestRef.current !== requestId || nextAgent.workspaceId !== activeWorkspaceId) return null;
@@ -118,9 +123,8 @@ export function useAppAgentActions({
   }, [activeWorkspaceId, setActionDrafts, setAgent, setLastActionResult]);
 
   const handleHomeAsk = useCallback(async (prompt: string) => {
-    await handleAsk(prompt);
-    navigateTo({ section: "agent" });
-  }, [handleAsk, navigateTo]);
+    return handleAsk(prompt);
+  }, [handleAsk]);
 
   const handleDraftDashboard = useCallback(async () => {
     await handleAsk("帮我基于当前 Source Intelligence 生成一个可确认的分析看板草案");

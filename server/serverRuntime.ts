@@ -1,57 +1,66 @@
-import { spawn } from "node:child_process";
+import { AsyncLocalStorage } from "node:async_hooks";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { buildActionRecovery } from "../src/actionRecoveryModel";
+import { RuntimeHostCapacityError, RuntimeHostDeadlineError, RuntimeHostPool, RuntimeHostUnavailableError } from "./runtimeHost";
 
 export type JsonValue = Record<string, unknown> | Array<unknown> | string | number | boolean | null;
 
 export class RequestBodyTooLargeError extends Error {}
 export class InvalidJsonBodyError extends Error {}
+export class UnsupportedMediaTypeError extends Error {}
+export class RuntimeCommandLimitError extends Error {}
+export { RuntimeHostCapacityError, RuntimeHostUnavailableError };
+
+type JsonResponseCapture = (status: number, body: JsonValue) => void;
+const responseCapture = new AsyncLocalStorage<JsonResponseCapture>();
+const runtimeTrace = new AsyncLocalStorage<string>();
+const parsedRequestBodies = new WeakMap<IncomingMessage, Promise<Record<string, unknown>>>();
+
+export function withJsonResponseCapture<T>(capture: JsonResponseCapture, task: () => Promise<T>) {
+  return responseCapture.run(capture, task);
+}
+
+export function withRuntimeRequestTrace<T>(traceId: string, task: () => Promise<T>) {
+  return runtimeTrace.run(traceId, task);
+}
 
 function configuredMaxRequestBodyBytes() {
   const value = Number(process.env.AIBI_MAX_BODY_BYTES ?? 1_048_576);
   return Number.isInteger(value) && value >= 16_384 && value <= 10_485_760 ? value : 1_048_576;
 }
 
-function enrichedErrorBody(body: JsonValue): JsonValue {
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return body;
-  }
-  if (body.ok !== false || body.recovery) {
-    return body;
-  }
-  const action = typeof body.action === "string" && body.action
-    ? body.action
-    : typeof body.command === "string" && body.command
-      ? body.command
-      : "api";
-  const error = typeof body.error === "string" && body.error ? body.error : "Local API action failed";
-  const recovery = buildActionRecovery(action, error);
-  return {
-    ...body,
-    action,
-    category: body.category ?? recovery.category,
-    targetSection: body.targetSection ?? recovery.targetSection,
-    safeState: body.safeState ?? recovery.safeState.zh,
-    evidence: Array.isArray(body.evidence) ? body.evidence : recovery.evidence,
-    next: typeof body.next === "string" && body.next ? body.next : recovery.next.zh,
-    recovery,
-  };
-}
-
 export function sendJson(response: ServerResponse, status: number, body: JsonValue) {
+  const failedPayload = body !== null
+    && typeof body === "object"
+    && !Array.isArray(body)
+    && body.ok === false;
+  const explicitError = failedPayload
+    && (Object.prototype.hasOwnProperty.call(body, "error") || Object.prototype.hasOwnProperty.call(body, "errorCode"));
+  const effectiveStatus = status >= 200
+    && status < 300
+    && explicitError
+    ? 409
+    : status;
   const allowedCorsOrigin = String(process.env.AIBI_CORS_ORIGIN ?? "").trim();
   const headers: Record<string, string> = {
     "content-type": "application/json; charset=utf-8",
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    "access-control-allow-headers": "content-type",
+    "access-control-allow-headers": "content-type,x-request-id,x-requested-with,x-aibi-envelope-version,x-aibi-runtime-token,x-idempotency-key",
     "cache-control": "no-store",
   };
   if (allowedCorsOrigin) headers["access-control-allow-origin"] = allowedCorsOrigin;
-  response.writeHead(status, headers);
-  response.end(JSON.stringify(enrichedErrorBody(body), null, 2));
+  responseCapture.getStore()?.(effectiveStatus, body);
+  response.writeHead(effectiveStatus, headers);
+  response.end(JSON.stringify(body, null, 2));
 }
 export function readBody(request: IncomingMessage): Promise<Record<string, unknown>> {
-  return new Promise((resolveBody, reject) => {
+  const cached = parsedRequestBodies.get(request);
+  if (cached) return cached;
+  const pending = new Promise<Record<string, unknown>>((resolveBody, reject) => {
+    const contentType = String(request.headers["content-type"] ?? "").toLowerCase();
+    if (!contentType.startsWith("application/json")) {
+      reject(new UnsupportedMediaTypeError("Mutation requests must use application/json"));
+      return;
+    }
     const maxRequestBodyBytes = configuredMaxRequestBodyBytes();
     const chunks: Buffer[] = [];
     let bodyBytes = 0;
@@ -89,39 +98,37 @@ export function readBody(request: IncomingMessage): Promise<Record<string, unkno
       reject(error);
     });
   });
+  parsedRequestBodies.set(request, pending);
+  return pending;
 }
 
-export function runCli(root: string, args: string[]): Promise<Record<string, unknown>> {
-  return new Promise((resolveCli, reject) => {
-    const child = spawn("python", ["tools/aibi_cli.py", "--json", ...args], {
-      cwd: root,
-      env: {
-        ...process.env,
-        PYTHONIOENCODING: "utf-8",
-      },
-      stdio: ["ignore", "pipe", "pipe"],
-      windowsHide: true,
-    });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-    child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const text = Buffer.concat(stdout).toString("utf8");
-      const err = Buffer.concat(stderr).toString("utf8");
-      try {
-        const parsed = JSON.parse(text);
-        if (code === 0 || typeof parsed === "object") {
-          resolveCli(parsed as Record<string, unknown>);
-          return;
-        }
-      } catch {
-        // Fall through to structured error.
-      }
-      reject(new Error(err || text || `CLI exited with ${code}`));
-    });
-  });
+const runtimeHosts = new Map<string, RuntimeHostPool>();
+
+function runtimeHost(root: string) {
+  let host = runtimeHosts.get(root);
+  if (!host) {
+    host = new RuntimeHostPool(root);
+    runtimeHosts.set(root, host);
+  }
+  return host;
+}
+
+export async function runCli(root: string, args: string[]): Promise<Record<string, unknown>> {
+  try {
+    return await runtimeHost(root).run(args, runtimeTrace.getStore() ?? "");
+  } catch (error) {
+    if (error instanceof RuntimeHostDeadlineError) throw new RuntimeCommandLimitError(error.message);
+    throw error;
+  }
+}
+
+export function runtimeHostHealth(root: string) {
+  return runtimeHost(root).health();
+}
+
+export async function shutdownRuntimeHosts() {
+  await Promise.all([...runtimeHosts.values()].map((host) => host.shutdown()));
+  runtimeHosts.clear();
 }
 
 export function pushDashboardWidgetStyleArgs(args: string[], body: Record<string, unknown>) {

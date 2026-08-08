@@ -4,14 +4,14 @@
 
 当前发布版本为 v0.3.0，是 single-user and local-only 的通用可信分析工作台。新工作区为空且不启用领域包；本地确定性运行时拥有数据与写入边界，可选 Provider 仅解释。当前交付状态以本文件、当前提交和 `npm run preflight` 为准；已被当前回归覆盖的旧版日期回执不再保留。
 
-“工作区”只显示当前必要任务：无数据时接入来源，有数据无证据时生成摘要，有证据时发起分析，有草案时核对确认。高级工具和设置按需展开。
+“工作区”只显示当前必要任务：无数据时接入来源；导入确认后由应用级 Journey Runtime 自动运行或恢复 Source Intelligence；证据可用后发起分析；已有结果时核对结论与回执；有草案时核对确认。高级工具和设置按需展开。
 
 ## 能力状态
 
 | 能力 | 级别 | 当前边界 |
 | --- | --- | --- |
-| 工作区与导航 | 稳定 | 工作区隔离；对象级 URL 可恢复；简化主导航和状态驱动首页已落地 |
-| 导入与画像 | 稳定 | CSV/XLSX/XLSM、文件与文件夹统一预检；文件夹提交使用规范化 Import Plan fingerprint、owner-confirmed unique key、逐文件/逻辑表行数与单事务写入，全部成功后才原子切换 current sourceRun；旧 XLS 仅画像读取 |
+| 工作区与导航 | 稳定 | 工作区隔离；对象级 URL 可恢复；统一 Journey 模型把接入、自动理解、提问、结果核对和写入确认映射为一个主任务，刷新后从持久 Run、Job 和当前 Agent 结果恢复 |
+| 导入与画像 | 稳定 | CSV/XLSX/XLSM、文件与文件夹统一预检；单文件与文件夹提交都绑定规范化 Import Plan fingerprint，文件夹另要求 owner-confirmed unique key；逐文件/逻辑表行数与单事务写入全部成功后才原子切换 current sourceRun；旧 XLS 仅画像读取 |
 | 工作区上下文目录 | 首版已接入 | Workspace Manifest、Runtime Catalog 与 Business Field Profile 从当前工作区只读派生，并通过 CLI/API 供证据页、数据工作台和 Agent 使用；候选与手工确认分离，敏感字段只公开风险和统计，规划绑定覆盖数据、画像、语义、关系、Context、Pack 与 Skill 指纹 |
 | Connector Adapter | 稳定受控 | 本地表格、allowlist HTTP JSON 与 allowlist SQLite table 支持有界预览、计划和确认导入 |
 | 语义与关系 | 稳定受控 | 一至三跳全局线性覆盖、INNER 反向遍历、跨跳筛选/预聚合、组合字段消歧、复合键、版本失效、根到事实可达性、NULL 语义和放大阻断进入 Receipt；等价根表、同表异键或未穷尽的高密度路径搜索必须由用户显式选择 |
@@ -25,7 +25,7 @@
 | Confirmed Plan Memory 与混合召回 | 稳定初版 | 成功动作先生成候选，显式提升后才形成证据绑定计划记忆；lexical、字符 n-gram、结构化计划和 freshness 联合排序并生成 Recall Receipt；召回仅提供候选，不改变 Semantic Plan，漂移后同步 stale |
 | 探索线程与结果板 | 稳定初版 | 已执行或已确认结果可经预演和确认建立不可变 Anchor，并按 Analysis Run 父链追加分支；结果板只保存业务字段、形状与图表摘要，不复制结果行；Run、Receipt、Unit、Turn 或来源漂移后保留历史但阻断续算，不回退旧结果 |
 | 有限 Research Run 与统一追踪 | 稳定初版 | current Anchor 可经预演和确认建立固定预算的研究账本；计划修订只追加不可变版本，Observation 仅采纳同线程 current Anchor，且旧修订证据不计入当前覆盖；结论区分 supported、challenged、mixed、inconclusive，统一 Trace 可重放且不复制业务结果行 |
-| Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
+| Durable Job 与 Workflow | 稳定受控 | 状态机、事件、取消、异常对账、Capability Contract、Workflow Stage 与 Context Budget 已闭环；应用级 Source Intelligence 轮询在刷新后重新挂接当前工作区任务，完成后重新水合 status/workbench，并以输入和数据版本阻止重复自动运行；固定 11 个 Operator、Orchestrator 唯一提交权、四个只读角色视图、确定性事件序列和 Join 指纹/证据校验可用；互不依赖的只读节点可并行，写入节点保持串行 |
 | Analysis Unit 与图表适配 | 稳定初版 | 六类 Unit 绑定结果指纹；Chart Adapter 只选择兼容白名单图表；Agent 对 current `executed` Receipt、完整覆盖、正行数和 Receipt/Unit/Adapter 键与指纹做严格门禁后，惰性投影指标、比较/排名、趋势、构成、表格和 Pareto 边界证据；非执行五态卸载经营图形，全部读取与适配入口继续复核多源、关系、版本和 Pack 当前性 |
 | Forecast Readiness | 稳定初版 | current 趋势或异常 Unit 可按明确 horizon 执行来源、样本、节奏、稳定性、泄漏、假设和可解释性七门禁；CLI/API/Agent/UI 同源，blocked 仍是成功诊断，响应固定不生成预测、不调用 Provider、不返回业务行 |
 | 物化分析快照 | 稳定初版 | current Receipt/Unit 可经精确预演确认冻结最多 500 行；refresh/replace 追加不可变子快照，delete 擦除内容并保留 lineage tombstone；公开 CLI/API/UI 不返回冻结行，stale/missing 历史不用于规划且不回退旧快照 |
@@ -34,9 +34,9 @@
 | 分析导出 | 稳定初版 | 当前且已验证的 Receipt/Unit 可导出确定性 ZIP、XLSX、Markdown、脱敏快照与哈希；漂移对象在导出前阻断 |
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
-| 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v15、DuckDB schema v1；`source_run_tables` 记录原子 sourceRun 的完整逻辑表成员，Agent Session、Turn、事件、Context Snapshot、Skill、Runtime Profile、Knowledge Source、Semantic Patch、Confirmed Plan Memory、Recall Receipt、Plan Quality Scorecard、Exploration Thread、有限 Research Run、Analysis Snapshot 与 Metric Monitor 已版本化；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
-| 响应式 Web | 稳定 | 桌面和窄屏保留主导航、工作区切换、高级工具与设置；不提供原生移动客户端 |
+| 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；证据制品按内容哈希寻址并复核完整性，stale 记录不用于当前规划 |
+| 本地运维 | 稳定 | SQLite schema v15、DuckDB schema v1；长驻 Runtime Host 固定一个写者与两个读者，提供有界队列、命令截止时间和健康状态；DuckDB 分析副本按来源版本发布、由 manifest 和逻辑视图原子切换，工作区清理同步移除视图、版本表和 manifest；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
+| 响应式 Web | 稳定 | 横向 1280×720、竖向 720×1280 及以上按可用空间响应式排版与缩放字体；短边低于 720 时冻结基准布局并整体缩放，保留主导航、工作区切换、高级工具与设置；请求失败显示明确错误且不回退陈旧业务结果；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
 
@@ -66,16 +66,17 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 | 路径 | 责任 |
 | --- | --- |
 | `src/` | 页面、可见工作流、派生状态、类型化客户端和对象路由 |
-| `server/` | 本地 HTTP、安全边界和 CLI 编排 |
+| `server/` | 本地 HTTP、安全边界、幂等突变入口、Trace、静态资源缓存/压缩和长驻 Runtime Host 编排 |
 | `domain-packs/` | AIBI-C 自有可选领域 Manifest；不得承载 Core 默认行为 |
 | `analytical-skills/` | AIBI-C 内置中性分析方法 Manifest；只组合登记能力，不承载业务口径或执行代码 |
 | `knowledge/` | 版本化只读知识资产；只有已启用 Pack 才能引用 |
 | `tools/aibi_cli.py` | 公共 CLI 薄适配器；只负责进入统一运行时，不承载命令实现 |
 | `tools/aibi_runtime/` | CLI parser、命令注册表、Control/Analysis/Data/Delivery 四个领域分发器、统一生命周期与显式 Application Use Cases；`kernel.py` 只保留兼容组合出口 |
+| `tools/aibi_runtime_host.py` | 长驻 CLI 进程协议；一次装载命令目录，通过逐行 JSON envelope 服务 Runtime Host，不承载 HTTP 或业务授权 |
 | `tools/*.py` | 确定性 BI、语义、关系、证据、Job、导出、扩展和基础设施服务 |
 | `scripts/` | 构建、迁移、浏览器、发布、安全与回归门禁 |
 
-Web 生产入口固定为 `src/main.tsx` 和 `server/index.ts`，自动化与诊断入口固定为 `tools/aibi_cli.py`。P0-A 首批拆分已把原 2816 行组合内核缩为 12 行兼容组合面，运行时调用者直接依赖 `use_cases/` 下的 Control、Analysis、Data、Delivery、Lifecycle 与 Agent Interaction 边界；其中 Agent Interaction 仍有 2106 行，是下一批继续拆分 Prompt Resolution、Answer Composition 与 Action Confirmation 的主要对象，类型化 Command/Result 也尚未完成。组件依赖、CLI 注册完整性和文件清单由代码与自动化维护，不在 Markdown 复制；`npm run verify:architecture` 会阻断入口不可达的 TypeScript、JavaScript 与 CSS 源码，也会阻断旧 CLI 路径回流、parser/registry 不一致、Use Case 清单漂移、领域依赖倒退和组合内核重新膨胀。
+Web 生产入口固定为 `src/main.tsx` 和 `server/index.ts`，自动化与诊断入口固定为 `tools/aibi_cli.py`。P0-A 首批拆分已把原 2816 行组合内核缩为 12 行兼容组合面，运行时调用者直接依赖 `use_cases/` 下的 Control、Analysis、Data、Delivery、Lifecycle 与 Agent Interaction 边界；其中 Agent Interaction 仍有 2106 行，是下一批继续拆分 Prompt Resolution、Answer Composition 与 Action Confirmation 的主要对象，类型化 Command/Result 也尚未完成。HTTP API 只接受 loopback Host/Origin，本地会话令牌约束突变请求，幂等键防止重试重复写入；非成功状态保留为非 2xx，并携带可关联 Trace。组件依赖、CLI 注册完整性和文件清单由代码与自动化维护，不在 Markdown 复制；`npm run verify:architecture` 会阻断入口不可达的 TypeScript、JavaScript 与 CSS 源码，也会阻断旧 CLI 路径回流、parser/registry 不一致、Use Case 清单漂移、领域依赖倒退和组合内核重新膨胀。
 
 ## 验证入口
 

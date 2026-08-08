@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 export const apiBaseUrl = process.env.AIBI_API_BASE_URL ?? "http://127.0.0.1:8787";
 
 export function sleep(ms) {
@@ -15,11 +17,14 @@ export async function fetchJson(path, options = {}) {
         const detail = payload?.error
           ?? (Array.isArray(payload?.blockers) && payload.blockers.length ? payload.blockers.join(", ") : null)
           ?? JSON.stringify(payload);
-        throw new Error(`${path}: ${detail} (${response.status} ${response.statusText})`);
+        const error = new Error(`${path}: ${detail} (${response.status} ${response.statusText})`);
+        error.httpStatus = response.status;
+        throw error;
       }
       return payload;
     } catch (error) {
       lastError = error;
+      if (Number(error?.httpStatus ?? 0) > 0 && Number(error.httpStatus) < 500) throw error;
       if (attempt < attempts - 1) await sleep(250 * (attempt + 1));
     }
   }
@@ -29,7 +34,10 @@ export async function fetchJson(path, options = {}) {
 export async function postJson(path, body) {
   return fetchJson(path, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      "x-idempotency-key": `ui-verify-${randomUUID()}`,
+    },
     body: JSON.stringify(body),
   });
 }

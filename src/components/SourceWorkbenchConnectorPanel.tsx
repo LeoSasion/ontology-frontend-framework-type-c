@@ -1,6 +1,7 @@
 import type { ConnectorAdapterContract, DataConnectorConfig, ImportJob } from "../types";
 import type { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { Bilingual, biText } from "./Bilingual";
+import { OperationReceipt } from "./OperationReceipt";
 
 type SourceWorkbenchConnectorPanelProps = ReturnType<typeof useSourceWorkbenchConnectorController> & {
   showAdvanced: boolean;
@@ -165,17 +166,13 @@ export function SourceWorkbenchConnectorPanel({
           </button>
         </div>
         {connectorOperationReceipt ? (
-          <div className={`operationReceipt ${connectorOperationReceipt.tone}`} data-testid="connector-operation-receipt">
-            <div>
-              <strong>{connectorOperationReceipt.title}</strong>
-              <span>{connectorOperationReceipt.detail}</span>
-              <small>{connectorOperationReceipt.nextStep}</small>
-            </div>
-            <details data-testid="connector-operation-technical-details">
-              <summary>{biText("查看连接回执", "View connection receipt")}</summary>
-              <span>{connectorOperationReceipt.technical}</span>
-            </details>
-          </div>
+          <OperationReceipt
+            receipt={connectorOperationReceipt}
+            summary={biText("查看连接回执", "View connection receipt")}
+            technical={<span>{connectorOperationReceipt.technical}</span>}
+            technicalTestId="connector-operation-technical-details"
+            testId="connector-operation-receipt"
+          />
         ) : null}
         <ul className="metricList connectorList">
           {connectors.slice(0, 6).map((connector) => (

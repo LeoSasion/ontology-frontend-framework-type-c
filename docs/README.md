@@ -9,6 +9,7 @@
 | [仓库执行约束](../AGENTS.md) | 仓库身份、AIBI 系列隔离和操作边界 |
 | [根说明](../README.md) | 安装、启动、验证和恢复入口 |
 | [产品定位](../PRODUCT.md) | 用户、价值、原则、边界和非目标 |
+| [设计系统](../DESIGN.md) | 现有视觉令牌、排版、布局、组件与响应式约束 |
 | [产品需求](PRD.md) | 当前版本必须满足的用户结果与发布条件 |
 | [产品体验标准](product-ux-standard.md) | 页面职责、渐进展示、路由、确认和删除交互 |
 | [产品验收矩阵](product-acceptance-matrix.md) | 用户可观察的稳定行为与验收信号 |
@@ -38,6 +39,7 @@
 | 问题 | 维护位置 |
 | --- | --- |
 | 产品是什么、为谁服务 | `PRODUCT.md` |
+| 产品如何保持统一视觉与交互语言 | `DESIGN.md` |
 | 当前版本必须做什么 | `docs/PRD.md` |
 | 当前已经做到什么 | `docs/implementation-status.md` |
 | 服装电商 current 查询、实体映射与方法如何受控 | `docs/apparel-commerce-trusted-query.md` |

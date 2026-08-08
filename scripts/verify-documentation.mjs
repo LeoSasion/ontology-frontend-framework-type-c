@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const skippedDirectories = new Set([
   ".git",
+  ".impeccable",
   "backups",
   "data",
   "dist",
@@ -158,9 +159,16 @@ for (const retiredReference of [
 }
 
 const cliResult = spawnSync(
-  "python",
+  process.env.PYTHON ?? "python",
   [resolve(root, "tools", "aibi_cli.py"), "--json", "cli-contract", "--format", "markdown"],
-  { cwd: root, encoding: "utf8", windowsHide: true },
+  {
+    cwd: root,
+    encoding: "utf8",
+    env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    maxBuffer: 4 * 1_048_576,
+    timeout: 120_000,
+    windowsHide: true,
+  },
 );
 let liveCommandCount = null;
 let generatedCliContract = null;
@@ -178,7 +186,7 @@ check(
   cliResult.status === 0 &&
     Number.isInteger(liveCommandCount) &&
     generatedCliContract === cliContractDoc,
-  `live=${liveCommandCount}; exactMarkdownMatch=${generatedCliContract === cliContractDoc}; status=${cliResult.status}`,
+  `live=${liveCommandCount}; exactMarkdownMatch=${generatedCliContract === cliContractDoc}; status=${cliResult.status}; signal=${cliResult.signal ?? "none"}; error=${cliResult.error?.message ?? "none"}; stderr=${String(cliResult.stderr ?? "").slice(0, 400)}`,
 );
 
 const result = {

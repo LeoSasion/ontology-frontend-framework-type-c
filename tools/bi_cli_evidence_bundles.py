@@ -3,7 +3,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import time
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +46,16 @@ def _default_bundle_dir(command: str, bundle_key: str) -> Path:
     return base / slug(command) / bundle_key
 
 
+def _sha256_file(path: Path) -> str | None:
+    if not path.is_file():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        while chunk := stream.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
 def artifact_ref(label: str, path: str | Path, *, kind: str = "file", role: str = "evidence") -> dict[str, Any]:
     artifact_path = Path(path)
     return {
@@ -56,6 +65,7 @@ def artifact_ref(label: str, path: str | Path, *, kind: str = "file", role: str 
         "path": str(artifact_path),
         "exists": artifact_path.exists(),
         "sizeBytes": artifact_path.stat().st_size if artifact_path.exists() and artifact_path.is_file() else None,
+        "sha256": _sha256_file(artifact_path),
     }
 
 
@@ -70,31 +80,37 @@ def write_evidence_bundle(
     artifacts: list[dict[str, Any]] | None = None,
     bundle_dir: str | Path | None = None,
 ) -> dict[str, Any]:
+    bounded_summary = _bounded(summary, max_chars=20_000)
+    bounded_payload = _bounded(payload)
+    artifact_items = list(artifacts or [])
     fingerprint_source = {
+        "schema": EVIDENCE_BUNDLE_SCHEMA,
         "command": command,
         "workspaceId": workspace_id,
         "title": title,
         "status": status,
-        "summary": _bounded(summary, max_chars=20_000),
-        "timeNs": time.time_ns(),
+        "summary": bounded_summary,
+        "payload": bounded_payload,
+        "artifacts": artifact_items,
     }
-    fingerprint = hashlib.sha1(json.dumps(fingerprint_source, ensure_ascii=False, sort_keys=True).encode("utf-8")).hexdigest()[:12]
-    bundle_key = f"{slug(command)}-{fingerprint}"
+    content_address = hashlib.sha256(
+        json.dumps(fingerprint_source, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    bundle_key = f"{slug(command)}-{content_address[:24]}"
     root = Path(bundle_dir) if bundle_dir else _default_bundle_dir(command, bundle_key)
     artifacts_dir = root / "artifacts"
     artifacts_dir.mkdir(parents=True, exist_ok=True)
 
     payload_path = artifacts_dir / "payload.json"
-    bounded_payload = _bounded(payload)
     payload_path.write_text(json.dumps(bounded_payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    artifact_items = list(artifacts or [])
     artifact_items.append(artifact_ref("bounded-payload", payload_path, kind="json", role="bounded-command-payload"))
 
     generated_at = now_iso()
     summary_payload = {
         "schema": EVIDENCE_BUNDLE_SCHEMA,
         "bundleKey": bundle_key,
+        "contentAddress": f"sha256:{content_address}",
         "title": title,
         "status": status,
         "command": command,
@@ -108,6 +124,7 @@ def write_evidence_bundle(
     manifest_payload = {
         "schema": EVIDENCE_BUNDLE_SCHEMA,
         "bundleKey": bundle_key,
+        "contentAddress": f"sha256:{content_address}",
         "title": title,
         "status": status,
         "command": command,
@@ -123,6 +140,7 @@ def write_evidence_bundle(
     return {
         "schema": EVIDENCE_BUNDLE_SCHEMA,
         "bundleKey": bundle_key,
+        "contentAddress": f"sha256:{content_address}",
         "bundleDir": str(root),
         "manifestPath": str(manifest_path),
         "summaryPath": str(summary_path),

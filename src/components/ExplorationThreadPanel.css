@@ -158,7 +158,7 @@
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 640px) {
+@container viewport-stage (max-width: 640px) {
   .explorationThreadLead,
   .explorationConfirm {
     align-items: stretch;

@@ -20,7 +20,7 @@
   --line-strong: #b9c6d6;
   --text: #172033;
   --muted: #5f6b7b;
-  --soft: #7c8797;
+  --soft: #667386;
   --accent: #0e7490;
   --accent-strong: #155e75;
   --accent-soft: #e7f6f8;
@@ -64,10 +64,54 @@
   --bi-red: #b42318;
   --bi-radius: 8px;
   --bi-shadow-color: #0f172a;
+  /* Fluid type and spacing scales keep dense workspaces proportional without
+     shrinking readable text or interactive hit areas below their safe floor. */
+  --ui-font-caption: clamp(10px, calc(9.5px + 0.1cqi), 11px);
+  --ui-font-label: clamp(11px, calc(10px + 0.14cqi), 12px);
+  --ui-font-compact: clamp(12px, calc(11px + 0.16cqi), 13px);
+  --ui-font-body: clamp(13px, calc(12px + 0.18cqi), 14px);
+  --ui-font-card-title: clamp(15px, calc(14px + 0.3cqi), 17px);
+  --ui-font-section-title: clamp(16px, calc(14px + 0.45cqi), 20px);
+  --ui-font-page-title: clamp(22px, calc(18px + 1cqi), 30px);
+  --ui-font-summary: clamp(18px, calc(16px + 0.45cqi), 20px);
+  --ui-font-emphasis: clamp(18px, calc(16px + 0.58cqi), 22px);
+  --ui-font-metric: clamp(24px, calc(18px + 1.2cqi), 34px);
+  --ui-space-shell-block: clamp(12px, calc(2px + 2cqi), 20px);
+  --ui-space-shell-inline: clamp(14px, calc(4px + 2.2cqi), 24px);
+  --ui-space-page-inline: clamp(18px, 3cqi, 36px);
+  --ui-space-page-block: clamp(22px, 2.7cqi, 32px);
+  --ui-space-section-block: clamp(16px, 1.8cqi, 24px);
+  --ui-space-card: clamp(18px, 2.2cqi, 26px);
+  /* Compatibility tokens used by the Agent evidence surfaces. */
+  --text-xs: var(--ui-font-label);
+  --text-sm: var(--ui-font-compact);
+  --text-body: var(--ui-font-body);
+  --text-card-title: var(--ui-font-card-title);
+  --text-section-title: var(--ui-font-section-title);
+  --text-page-title: var(--ui-font-page-title);
+  --text-metric: var(--ui-font-metric);
+  --text-primary: var(--text);
+  --text-secondary: var(--muted);
+  --border-subtle: var(--border-soft);
+  --warning-text: var(--warning-strong);
+  --space-1: clamp(3px, 0.45cqi, 4px);
+  --space-2: clamp(6px, 0.85cqi, 8px);
+  --space-3: clamp(9px, 1.25cqi, 12px);
+  --space-4: clamp(12px, 1.7cqi, 16px);
+  --radius-md: 8px;
 }
 
 * {
   box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
 }
 
 body {
@@ -96,6 +140,30 @@ button:disabled {
   opacity: 0.68;
 }
 
+.viewportScaleFrame {
+  position: relative;
+  width: 100%;
+  height: 100dvh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.viewportScaleSurface {
+  width: 100%;
+  height: 100%;
+  container: viewport-stage / size;
+  transform-origin: 0 0;
+}
+
+html[data-viewport-mode="scaled"] .viewportScaleSurface {
+  position: absolute;
+  top: var(--viewport-top);
+  left: var(--viewport-left);
+  width: var(--viewport-logical-width);
+  height: var(--viewport-logical-height);
+  transform: scale(var(--viewport-scale));
+}
+
 [aria-busy="true"] button:disabled,
 button[data-loading="true"]:disabled {
   cursor: progress;
@@ -104,7 +172,7 @@ button[data-loading="true"]:disabled {
 .appShell {
   display: grid;
   width: 100%;
-  height: 100dvh;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -113,7 +181,7 @@ button[data-loading="true"]:disabled {
 }
 
 .appFallback {
-  min-height: 100vh;
+  min-height: 100%;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -127,7 +195,7 @@ button[data-loading="true"]:disabled {
 .fallbackPanel h1 {
   margin: 0;
   color: var(--text);
-  font-size: 24px;
+  font-size: var(--ui-font-page-title);
   line-height: 1.18;
 }
 
@@ -284,7 +352,7 @@ span.widgetCountBadge {
   align-items: flex-start;
 }
 
-@media (max-width: 760px) {
+@container viewport-stage (max-width: 760px) {
   .topBar {
     flex-direction: column;
     gap: 10px;
@@ -317,13 +385,13 @@ span.widgetCountBadge {
 }
 
 .topBar h1 {
-  font-size: 24px;
+  font-size: var(--ui-font-page-title);
   line-height: 1.16;
   text-wrap: balance;
 }
 
 .workbenchTopBar .topBar h1 {
-  font-size: 20px;
+  font-size: var(--ui-font-section-title);
   line-height: 1.18;
 }
 

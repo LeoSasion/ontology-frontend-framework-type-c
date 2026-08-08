@@ -2,6 +2,7 @@ import type { useSourceWorkbenchImportController } from "../useSourceWorkbenchIm
 import { countText } from "../sourceWorkbenchModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
+import { OperationReceipt } from "./OperationReceipt";
 
 type SourceWorkbenchImportPanelProps = ReturnType<typeof useSourceWorkbenchImportController> & {
   busy: string | null;
@@ -29,6 +30,7 @@ export function SourceWorkbenchImportPanel({
   importKeyHealthy,
   importOperationReceipt,
   folderImportPlan,
+  singleImportPlanReady,
   setFilePath,
   setTargetTable,
   setTargetName,
@@ -153,18 +155,17 @@ export function SourceWorkbenchImportPanel({
         </div>
       </details>
       {importOperationReceipt ? (
-        <div aria-live="polite" className={`operationReceipt ${importOperationReceipt.tone}`} data-testid="import-operation-receipt" role="status">
-          <div>
-            <strong>{importOperationReceipt.title}</strong>
-            <span>{importOperationReceipt.detail}</span>
-            <small>{importOperationReceipt.nextStep}</small>
-          </div>
-          <details data-testid="import-operation-technical-details">
-            <summary>{biText("查看导入策略和回执", "View import policy and receipt")}</summary>
+        <OperationReceipt
+          receipt={importOperationReceipt}
+          role="status"
+          summary={biText("查看导入策略和回执", "View import policy and receipt")}
+          technical={<>
             <span>{biText("策略", "Policy")}: {preview.mergePolicyPreview.uniqueFields.join(", ") || biText("自动", "auto")} · {preview.mergePolicyPreview.conflictRule}</span>
             <span>{importOperationReceipt.technical}</span>
-          </details>
-        </div>
+          </>}
+          technicalTestId="import-operation-technical-details"
+          testId="import-operation-receipt"
+        />
       ) : null}
       {folderImportPlan && folderImportPlan.fileCount > 0 ? (
         <div className="folderImportPlan" data-testid="folder-import-plan">
@@ -240,13 +241,18 @@ export function SourceWorkbenchImportPanel({
               <button
                 className="primaryButton compactAction"
                 data-testid="import-confirmation-confirm"
-                disabled={busy === "import-confirm"}
+                disabled={busy === "import-confirm" || !singleImportPlanReady}
                 onClick={() => runBusy("import-confirm", () => runImportCommitAction(true))}
                 type="button"
               >
                 <Icon name="lock" />
                 <Bilingual zh="确认导入" en="Confirm import" />
               </button>
+              {!singleImportPlanReady ? (
+                <span className="folderImportBlocker" role="status">
+                  {biText("来源或导入规则已变化，请重新检查来源。", "The source or import rules changed. Check the source again.")}
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="policyStrip">

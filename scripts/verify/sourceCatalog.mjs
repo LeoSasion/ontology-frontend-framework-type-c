@@ -89,6 +89,7 @@ const textSourceFiles = {
   viewWorkspaceModelSource: ["src", "viewWorkspaceModel.ts"],
   homeOverviewSource: ["src", "components", "HomeOverview.tsx"],
   homeOverviewStylesSource: ["src", "components", "homeOverview.css"],
+  workspaceJourneyModelSource: ["src", "workspaceJourneyModel.ts"],
   productActivationPanelSource: ["src", "components", "ProductActivationPanel.tsx"],
   productActivationStylesSource: ["src", "components", "productActivationPanel.css"],
   safeValueSource: ["src", "safeValue.ts"],

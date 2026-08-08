@@ -171,11 +171,15 @@ let bootstrap = null;
 
 try {
   const run = await withTemporaryWorkspace("v", async ({ temporaryWorkspaceId }) => {
-    const imported = await postJson("/api/import/commit", {
-      filePath: join(process.cwd(), "validation-inputs", "orders.csv"),
+    const importPath = join(process.cwd(), "validation-inputs", "orders.csv");
+    const importPreview = await postJson("/api/import/preview", {
+      filePath: importPath,
       table: "visual_records",
-      name: "Visual Records",
-      mode: "create",
+    });
+    const imported = await postJson("/api/import/commit", {
+      filePath: importPath,
+      ...importPreview.commitOptions,
+      expectedPlan: importPreview.planFingerprint,
       confirm: true,
     });
     const savedView = await postJson("/api/views/save", {

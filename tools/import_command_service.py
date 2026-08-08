@@ -8,7 +8,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Callable
 
-from atomic_import_plan_service import enrich_atomic_import_plan
+from atomic_import_plan_service import bind_single_import_plan, enrich_atomic_import_plan
 from bi_cli_core import now_iso, parse_csv_list, slug, source_label, unique_key
 from import_table_writer_service import revalidate_relationships_for_table
 
@@ -27,6 +27,18 @@ DATE_SUFFIX_PATTERNS = [
     re.compile(r"^(?:\d{1,2}|[一二三四五六七八九十]+)月[\s._-]*", re.IGNORECASE),
     re.compile(r"^(?:jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)[\s._-]*", re.IGNORECASE),
 ]
+
+
+def _current_source_run_id(connection: sqlite3.Connection) -> str | None:
+    active = connection.execute(
+        "SELECT value FROM system_flags WHERE key = 'active_workspace_id'"
+    ).fetchone()
+    workspace_id = str(active["value"] or "default") if active else "default"
+    workspace = connection.execute(
+        "SELECT current_source_run_id FROM workspaces WHERE id = ?",
+        (workspace_id,),
+    ).fetchone()
+    return str(workspace["current_source_run_id"] or "") if workspace else None
 
 
 def _trim_name_separators(value: str) -> str:
@@ -328,7 +340,12 @@ def preview_import_command(
     build_import_preview: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str | None], dict[str, Any]],
 ) -> dict[str, Any]:
     with open_db() as connection:
-        return build_import_preview(connection, args.file, args.table, getattr(args, "unique_fields", None), getattr(args, "conflict_rule", None))
+        preview = build_import_preview(connection, args.file, args.table, getattr(args, "unique_fields", None), getattr(args, "conflict_rule", None))
+        return bind_single_import_plan(
+            preview,
+            Path(args.file),
+            current_source_run_id=_current_source_run_id(connection),
+        )
 
 
 def execute_import_commit(
@@ -382,14 +399,31 @@ def import_commit_command(
     execute_import_commit: Callable[[sqlite3.Connection, str | Path, str | None, str | None, str, str | None, str | None], dict[str, Any]],
 ) -> dict[str, Any]:
     with open_db() as connection:
+        preview = build_import_preview(connection, args.file, args.table, args.unique_fields, args.conflict_rule)
+        bound_plan = bind_single_import_plan(
+            preview,
+            Path(args.file),
+            current_source_run_id=_current_source_run_id(connection),
+        )
         if not args.yes:
-            preview = build_import_preview(connection, args.file, args.table, args.unique_fields, args.conflict_rule)
-            preview["requiresConfirmation"] = True
-            preview["recommendedCommand"] = f"python tools/aibi_cli.py --json import-commit {args.file} --mode {args.mode} --yes"
-            return preview
+            bound_plan["requiresConfirmation"] = True
+            recommended_mode = str((bound_plan.get("commitOptions") or {}).get("mode") or args.mode)
+            bound_plan["recommendedCommand"] = (
+                f"python tools/aibi_cli.py --json import-commit {args.file} --mode {recommended_mode} "
+                f"--expected-plan {bound_plan['planFingerprint']} --yes"
+            )
+            return bound_plan
+        expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
+        if getattr(args, "require_plan", False) and not expected_plan:
+            raise ValueError("Single-file import requires the plan fingerprint from the latest preview.")
+        if expected_plan and expected_plan != str(bound_plan.get("planFingerprint") or ""):
+            raise ValueError("Single-file import plan changed after preview; run preview-import again.")
+        expected_mode = str((bound_plan.get("commitOptions") or {}).get("mode") or "")
+        if expected_plan and str(args.mode or "") != expected_mode:
+            raise ValueError(f"Import mode changed after preview; re-run preview-import for mode {args.mode}.")
         result = execute_import_commit(connection, args.file, args.table, args.name, args.mode, args.unique_fields, args.conflict_rule)
         connection.commit()
-    return {"ok": True, "committed": True, "result": result}
+    return {"ok": True, "committed": True, "planFingerprint": bound_plan["planFingerprint"], "result": result}
 
 
 def preview_import_folder_command(
