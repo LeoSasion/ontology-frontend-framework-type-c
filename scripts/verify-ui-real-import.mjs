@@ -66,7 +66,7 @@ function realFlowState() {
   const isVisible = (testId) => visible(get(testId));
   const disabled = (testId) => Boolean(get(testId)?.disabled);
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
-  const seededSamplePattern = /样例订单|示例订单|demo|test|fallback source|临时看板|mock data|lorem/i;
+  const seededSamplePattern = /样例订单|示例订单|\b(?:demo|test)\b|fallback source|临时看板|mock data|lorem/i;
   return {
     title: document.title,
     url: location.href,
@@ -581,7 +581,15 @@ try {
           };
           const narrowLongText = Array.from(document.querySelectorAll("button,strong,span,p,small"))
             .filter(visible)
-            .filter((element) => (element.textContent || "").trim().length > 6 && element.getBoundingClientRect().width < 48)
+            .filter((element) => {
+              const text = (element.textContent || "").trim();
+              const rect = element.getBoundingClientRect();
+              const style = getComputedStyle(element);
+              const fontSize = Number.parseFloat(style.fontSize) || 16;
+              const lineHeight = Number.parseFloat(style.lineHeight) || fontSize * 1.2;
+              const verticalWriting = !String(style.writingMode || "horizontal-tb").startsWith("horizontal");
+              return text.length > 6 && rect.width < 48 && (verticalWriting || rect.height > lineHeight * 1.5);
+            })
             .map((element) => (element.textContent || "").trim().slice(0, 40));
           const confirmCount = Array.from(document.querySelectorAll('[data-testid^="agent-current-draft-confirm"], [data-testid^="agent-draft-confirm-"]')).filter(visible).length;
           return {

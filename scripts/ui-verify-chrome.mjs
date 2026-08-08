@@ -215,6 +215,9 @@ async function launchChromeAttempt(chromePath) {
     await client.send("Page.enable");
     await client.send("Runtime.enable");
     await client.send("Log.enable").catch(() => {});
+    await client.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: 'window.localStorage.setItem("aibiHybrid.languageMode", "en");',
+    });
     return {
       chromePath,
       chromeName: basename(chromePath),

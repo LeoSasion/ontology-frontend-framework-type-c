@@ -196,9 +196,6 @@ try {
     try {
       browser = await launchChrome();
       browserInfo = { chromePath: browser.chromePath, chromeName: browser.chromeName };
-      await browser.client.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: 'window.localStorage.setItem("aibiHybrid.languageMode", "en");',
-      });
       for (const viewport of viewports) {
         await setViewport(browser.client, viewport);
         await navigate(browser.client, url);

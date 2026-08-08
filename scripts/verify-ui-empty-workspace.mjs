@@ -52,7 +52,7 @@ function emptyWorkspaceState() {
   const importPathInput = importPanel?.querySelector('input[placeholder]') ?? null;
   const advancedSummary = importPanel?.querySelector("details > summary") ?? null;
   const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
-  const seededSamplePattern = /样例订单|示例订单|demo|test|fallback source|临时看板|mock data|lorem|orders|refunds/i;
+  const seededSamplePattern = /样例订单|示例订单|\b(?:demo|test)\b|fallback source|临时看板|mock data|lorem|orders|refunds/i;
   return {
     title: document.title,
     url: location.href,
