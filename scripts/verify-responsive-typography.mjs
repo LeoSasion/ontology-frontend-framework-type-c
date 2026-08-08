@@ -224,7 +224,7 @@ function typographyMetrics() {
 
 async function waitForHomeReady(client, workspaceId, timeoutMs = 25000) {
   return waitFor(client, (expectedWorkspaceId) => {
-    const selectedWorkspace = document.querySelector('select[aria-label="选择工作区"]')?.value || "";
+    const selectedWorkspace = document.querySelector("#workspace-switcher")?.value || "";
     const hasServiceDiagnostics = Boolean(document.querySelector('[data-testid="service-diagnostics"]'));
     const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel"));
     const hasHome = Boolean(document.querySelector(".workspaceHome"));
