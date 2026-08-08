@@ -357,7 +357,7 @@ export async function getAppReadyState(client, sectionTestId) {
       hasErrorBoundary,
       hasFrameworkOverlay,
       hasServiceDiagnostics,
-      workspace: document.querySelector('select[aria-label="选择工作区"]')?.value || "",
+      workspace: document.querySelector("#workspace-switcher")?.value || "",
     };
   }, sectionTestId);
 }
@@ -383,7 +383,7 @@ export async function waitForAppReady(client, sectionTestId, timeoutMs = 20000) 
       hasErrorBoundary,
       hasFrameworkOverlay,
       hasServiceDiagnostics,
-      workspace: document.querySelector('select[aria-label="选择工作区"]')?.value || "",
+      workspace: document.querySelector("#workspace-switcher")?.value || "",
     };
   }, sectionTestId, { timeoutMs, intervalMs: 250 });
 }

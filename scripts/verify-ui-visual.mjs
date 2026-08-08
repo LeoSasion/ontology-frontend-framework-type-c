@@ -134,7 +134,7 @@ function visualMetrics() {
 async function waitForVisualReady(client, workspaceId, timeoutMs = 25000) {
   return waitFor(client, (expectedWorkspaceId) => {
     const text = document.body?.innerText || "";
-    const selectedWorkspace = document.querySelector('select[aria-label="选择工作区"]')?.value || "";
+    const selectedWorkspace = document.querySelector("#workspace-switcher")?.value || "";
     const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
     const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
     const hasServiceDiagnostics = Boolean(document.querySelector('[data-testid="service-diagnostics"]'));

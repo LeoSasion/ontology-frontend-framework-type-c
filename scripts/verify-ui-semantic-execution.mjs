@@ -140,7 +140,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
       const hasComposer = Boolean(document.querySelector('[data-testid="agent-prompt-composer"]'));
       const hasErrorBoundary = Boolean(document.querySelector(".appFallback, .fallbackPanel")) || text.includes("界面需要恢复");
       const hasFrameworkOverlay = Boolean(document.querySelector("vite-error-overlay, .vite-error-overlay"));
-      const workspace = document.querySelector('select[aria-label="选择工作区"]')?.value ?? "";
+      const workspace = document.querySelector("#workspace-switcher")?.value ?? "";
       return {
         ok: hasShell && hasComposer && workspace === expectedWorkspace && !hasErrorBoundary && !hasFrameworkOverlay,
         title: document.title,
@@ -203,7 +203,7 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     await setViewport(browser.client, { width: 390, height: 844 });
     await browser.client.send("Page.reload", { ignoreCache: true });
     const refreshed = await waitFor(browser.client, (expectedWorkspace) => {
-      const workspace = document.querySelector('select[aria-label="选择工作区"]')?.value ?? "";
+      const workspace = document.querySelector("#workspace-switcher")?.value ?? "";
       return {
         ok: Boolean(document.querySelector(".appShell") && document.querySelector('[data-testid="agent-prompt-composer"]')) && workspace === expectedWorkspace,
         workspace,
