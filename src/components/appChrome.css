@@ -596,8 +596,23 @@ html[data-theme-mode="dark"] {
     padding: 14px;
   }
 
+  .topBar {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .topBar > div,
+  .topBarMeta {
+    width: 100%;
+  }
+
   .topBarMeta .serviceState {
     padding-inline: 8px;
+  }
+
+  .topBarMeta {
+    flex-wrap: wrap;
   }
 }
 
