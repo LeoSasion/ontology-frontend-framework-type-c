@@ -160,5 +160,12 @@ try {
       new Promise((resolveTimeout) => setTimeout(resolveTimeout, 5_000)),
     ]);
   }
-  if (tempRoot) rmSync(tempRoot, { recursive: true, force: true });
+  if (tempRoot) {
+    rmSync(tempRoot, {
+      recursive: true,
+      force: true,
+      maxRetries: 10,
+      retryDelay: 200,
+    });
+  }
 }
