@@ -11,6 +11,7 @@ import {
   type WorkbenchOperationReceipt,
 } from "./sourceWorkbenchReceiptModel";
 import { startImportCompletionRefresh } from "./importCompletionRefresh";
+import { startImportJobPolling } from "./importJobPolling";
 import { biText } from "./components/Bilingual";
 
 type ImportControllerOptions = Pick<
@@ -158,15 +159,15 @@ export function useSourceWorkbenchImportController({
       }
       return;
     }
-    let disposed = false;
-    let timer = 0;
-    let attempt = 0;
-    const poll = () => {
-      void onFetchImportJob(job.jobKey).then((latest) => {
-        if (disposed || workspaceRef.current !== workspaceId || latest.workspaceId !== workspaceId) return;
+    return startImportJobPolling({
+      fetch: () => onFetchImportJob(job.jobKey),
+      isTerminal: (latest) => ["succeeded", "failed", "canceled", "needs_attention"].includes(latest.status),
+      onUpdate: (latest) => {
+        if (workspaceRef.current !== workspaceId || latest.workspaceId !== workspaceId) return;
         setActiveImportJob(latest);
-      }).catch((error) => {
-        if (disposed || workspaceRef.current !== workspaceId) return;
+      },
+      onRetry: (error) => {
+        if (workspaceRef.current !== workspaceId) return;
         setImportOperationReceipt({
           tone: "warn",
           title: biText("暂时无法读取导入进度", "Import progress is temporarily unavailable"),
@@ -174,15 +175,12 @@ export function useSourceWorkbenchImportController({
           nextStep: biText("任务会在后台继续；稍后重新打开数据源页。", "The job continues in the background; reopen Sources shortly."),
           technical: `job=${job.jobKey}`,
         });
-        attempt += 1;
-        timer = window.setTimeout(poll, Math.min(5_000, 600 * (2 ** Math.min(attempt, 3))));
-      });
-    };
-    timer = window.setTimeout(poll, 1200);
-    return () => {
-      disposed = true;
-      window.clearTimeout(timer);
-    };
+      },
+      schedule: (task, delayMs) => {
+        const timer = window.setTimeout(task, delayMs);
+        return () => window.clearTimeout(timer);
+      },
+    });
   }, [activeImportJob?.jobKey, activeImportJob?.status, activeImportJob?.updatedAt, onFetchImportJob, workspaceId]);
 
   function requestKey() {

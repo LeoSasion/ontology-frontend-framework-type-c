@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { startImportCompletionRefresh } from "../src/importCompletionRefresh";
+import { startImportJobPolling } from "../src/importJobPolling";
 
 type ScheduledTask = {
   canceled: boolean;
@@ -101,4 +102,38 @@ test("canceling an in-flight successful refresh suppresses stale completion", as
   resolveRefresh();
   await settle();
   assert.equal(completed, 0);
+});
+
+test("durable import polling continues when consecutive successful reads are unchanged", async () => {
+  const scheduled: ScheduledTask[] = [];
+  const updates: string[] = [];
+  const jobs = [
+    { status: "running", updatedAt: "same" },
+    { status: "running", updatedAt: "same" },
+    { status: "succeeded", updatedAt: "done" },
+  ];
+  const runNext = async () => {
+    const scheduledTask = scheduled.shift();
+    assert.ok(scheduledTask);
+    scheduledTask.task();
+    await settle();
+  };
+
+  const cancel = startImportJobPolling({
+    fetch: async () => jobs.shift() ?? { status: "succeeded", updatedAt: "done" },
+    isTerminal: (job) => job.status === "succeeded",
+    onUpdate: (job) => updates.push(`${job.status}:${job.updatedAt}`),
+    onRetry: () => assert.fail("successful polling must not enter retry handling"),
+    schedule: fakeScheduler(scheduled),
+  });
+
+  assert.equal(scheduled[0]?.delayMs, 1_200);
+  await runNext();
+  assert.equal(scheduled[0]?.delayMs, 1_200);
+  await runNext();
+  assert.equal(scheduled[0]?.delayMs, 1_200);
+  await runNext();
+  assert.deepEqual(updates, ["running:same", "running:same", "succeeded:done"]);
+  assert.equal(scheduled.length, 0);
+  cancel();
 });
