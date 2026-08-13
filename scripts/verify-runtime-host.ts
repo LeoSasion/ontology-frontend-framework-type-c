@@ -13,12 +13,14 @@ const previous = {
   db: process.env.AIBI_HYBRID_DB_PATH,
   duck: process.env.AIBI_HYBRID_DUCKDB_PATH,
   evidence: process.env.AIBI_EVIDENCE_BUNDLE_ROOT,
+  recovery: process.env.AIBI_WORKSPACE_RECOVERY_ROOT,
   fixtureLog: process.env.AIBI_RUNTIME_FIXTURE_LOG,
   fixtureBlocked: process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED,
 };
 process.env.AIBI_HYBRID_DB_PATH = join(temp, "runtime.sqlite");
 process.env.AIBI_HYBRID_DUCKDB_PATH = join(temp, "runtime.duckdb");
 process.env.AIBI_EVIDENCE_BUNDLE_ROOT = join(temp, "evidence");
+process.env.AIBI_WORKSPACE_RECOVERY_ROOT = join(temp, "workspace-recovery");
 const fixtureLog = join(temp, "runtime-host-fixture.ndjson");
 process.env.AIBI_RUNTIME_FIXTURE_LOG = fixtureLog;
 
@@ -44,6 +46,27 @@ async function waitForQueue(pool: RuntimeHostPool, expected: number) {
   return false;
 }
 
+function commandDiagnostic(result: Record<string, unknown>) {
+  const envelope = result.envelope && typeof result.envelope === "object"
+    ? result.envelope as Record<string, unknown>
+    : {};
+  const workflowStage = result.workflowStage && typeof result.workflowStage === "object"
+    ? result.workflowStage as Record<string, unknown>
+    : {};
+  const rawError = String(result.error ?? workflowStage.error ?? "");
+  return {
+    ok: result.ok,
+    command: result.command,
+    errorCode: result.errorCode ?? null,
+    error: rawError
+      .replaceAll(temp, "<temp>")
+      .replace(/[A-Za-z]:\\[^\s,"']+/g, "<path>")
+      .slice(0, 500) || null,
+    mutationMode: envelope.mutationMode ?? null,
+    workflowStatus: workflowStage.status ?? null,
+  };
+}
+
 try {
   await host.start();
   const [status, capabilities] = await Promise.all([
@@ -51,7 +74,16 @@ try {
     host.run(["cli-capabilities"]),
   ]);
   const health = host.health();
-  checks.push({ label: "runtime-host-serves-real-commands", ok: status.ok === true && capabilities.ok === true });
+  const realCommandsOk = status.ok === true && capabilities.ok === true;
+  checks.push({
+    label: "runtime-host-serves-real-commands",
+    ok: realCommandsOk,
+    detail: realCommandsOk ? undefined : {
+      status: commandDiagnostic(status),
+      capabilities: commandDiagnostic(capabilities),
+      health,
+    },
+  });
   checks.push({
     label: "runtime-host-loads-one-writer-and-two-readers-once",
     ok: health.ok === true
@@ -192,6 +224,8 @@ try {
   process.env.AIBI_HYBRID_DB_PATH = previous.db;
   process.env.AIBI_HYBRID_DUCKDB_PATH = previous.duck;
   process.env.AIBI_EVIDENCE_BUNDLE_ROOT = previous.evidence;
+  if (previous.recovery === undefined) delete process.env.AIBI_WORKSPACE_RECOVERY_ROOT;
+  else process.env.AIBI_WORKSPACE_RECOVERY_ROOT = previous.recovery;
   if (previous.fixtureLog === undefined) delete process.env.AIBI_RUNTIME_FIXTURE_LOG;
   else process.env.AIBI_RUNTIME_FIXTURE_LOG = previous.fixtureLog;
   if (previous.fixtureBlocked === undefined) delete process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED;
