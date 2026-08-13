@@ -1,6 +1,12 @@
 param(
   [int]$ApiPort = 0,
   [int]$UiPort = 8686,
+  [ValidateRange(1, 20)]
+  [int]$Attempts = 5,
+  [ValidateRange(1, 30)]
+  [int]$RequestTimeoutSeconds = 5,
+  [ValidateRange(0, 10000)]
+  [int]$RetryDelayMilliseconds = 750,
   [switch]$Json
 )
 
@@ -67,6 +73,7 @@ $api = [pscustomobject]@{
   statusCode = $null
   service = $null
   error = $null
+  attempts = 0
 }
 
 $ui = [pscustomobject]@{
@@ -75,28 +82,46 @@ $ui = [pscustomobject]@{
   statusCode = $null
   title = $null
   error = $null
+  attempts = 0
 }
 
-try {
-  $apiResponse = Invoke-WebRequest -Uri $apiUrl -TimeoutSec 3 -UseBasicParsing
-  $api.statusCode = [int]$apiResponse.StatusCode
-  $payload = $apiResponse.Content | ConvertFrom-Json
-  $api.service = $payload.service
-  $api.ok = ($payload.ok -eq $true -and $payload.service -eq "aibi-hybrid-api")
-} catch {
-  $api.error = $_.Exception.Message
-}
-
-try {
-  $uiResponse = Invoke-WebRequest -Uri $uiUrl -TimeoutSec 3 -UseBasicParsing
-  $ui.statusCode = [int]$uiResponse.StatusCode
-  $titleMatch = [regex]::Match($uiResponse.Content, "<title>(.*?)</title>", "IgnoreCase")
-  if ($titleMatch.Success) {
-    $ui.title = $titleMatch.Groups[1].Value
+for ($attempt = 1; $attempt -le $Attempts; $attempt += 1) {
+  if (-not $api.ok) {
+    $api.attempts += 1
+    $api.error = $null
+    try {
+      $apiResponse = Invoke-WebRequest -Uri $apiUrl -TimeoutSec $RequestTimeoutSeconds -UseBasicParsing
+      $api.statusCode = [int]$apiResponse.StatusCode
+      $payload = $apiResponse.Content | ConvertFrom-Json
+      $api.service = $payload.service
+      $api.ok = ($payload.ok -eq $true -and $payload.service -eq "aibi-hybrid-api")
+    } catch {
+      $api.error = $_.Exception.Message
+    }
   }
-  $ui.ok = ($uiResponse.StatusCode -ge 200 -and $uiResponse.StatusCode -lt 400 -and $uiResponse.Content.Contains("<title>AIBI-C</title>"))
-} catch {
-  $ui.error = $_.Exception.Message
+
+  if (-not $ui.ok) {
+    $ui.attempts += 1
+    $ui.error = $null
+    try {
+      $uiResponse = Invoke-WebRequest -Uri $uiUrl -TimeoutSec $RequestTimeoutSeconds -UseBasicParsing
+      $ui.statusCode = [int]$uiResponse.StatusCode
+      $titleMatch = [regex]::Match($uiResponse.Content, "<title>(.*?)</title>", "IgnoreCase")
+      if ($titleMatch.Success) {
+        $ui.title = $titleMatch.Groups[1].Value
+      }
+      $ui.ok = ($uiResponse.StatusCode -ge 200 -and $uiResponse.StatusCode -lt 400 -and $uiResponse.Content.Contains("<title>AIBI-C</title>"))
+    } catch {
+      $ui.error = $_.Exception.Message
+    }
+  }
+
+  if ($api.ok -and $ui.ok) {
+    break
+  }
+  if ($attempt -lt $Attempts -and $RetryDelayMilliseconds -gt 0) {
+    Start-Sleep -Milliseconds $RetryDelayMilliseconds
+  }
 }
 
 $result = [pscustomobject]@{

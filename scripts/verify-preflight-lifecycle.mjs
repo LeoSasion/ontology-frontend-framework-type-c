@@ -87,7 +87,9 @@ assert.deepEqual(leavesOwnedServicesOnSuccessByDefault.receipt.services, {
 
 const preflightSource = readFileSync(new URL("./preflight.mjs", import.meta.url), "utf8");
 const startLocalSource = readFileSync(new URL("./start-local.ps1", import.meta.url), "utf8");
+const localHealthSource = readFileSync(new URL("./local-health.ps1", import.meta.url), "utf8");
 const stopLocalSource = readFileSync(new URL("./stop-local.ps1", import.meta.url), "utf8");
+const ciWorkflowSource = readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
 const packageJson = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 assert.match(preflightSource, /runPreflightLifecycle\(\{/);
 assert.match(preflightSource, /inspectLocalServices/);
@@ -96,6 +98,11 @@ assert.match(packageJson.scripts.verify, /verify:preflight-lifecycle/);
 assert.match(startLocalSource, /aibi-local-launcher\/v1/);
 assert.match(startLocalSource, /--aibi-local-owner=\$ownerToken/);
 assert.match(startLocalSource, /Stop-Process -Id \$process\.Id -Force -ErrorAction SilentlyContinue/);
+assert.match(startLocalSource, /-Attempts 1/);
+assert.match(localHealthSource, /\[int\]\$Attempts = 5/);
+assert.match(localHealthSource, /for \(\$attempt = 1; \$attempt -le \$Attempts; \$attempt \+= 1\)/);
+assert.match(localHealthSource, /-TimeoutSec \$RequestTimeoutSeconds/);
+assert.match(ciWorkflowSource, /timeout-minutes:\s+60/);
 assert.match(stopLocalSource, /\$launcherOwned = \$launcherCommand\.Contains\(\$ownerMarker\)/);
 assert.match(stopLocalSource, /repositoryRoot/);
 assert.match(stopLocalSource, /if \(\$launcher -and \$launcherOwned\)/);
@@ -166,6 +173,8 @@ console.log(JSON.stringify({
     "partial or incompatible pre-existing listeners are never modified",
     "unknown ownership blocks lifecycle mutation",
     "launcher PID cleanup requires a repository-scoped ownership token",
+    "standalone health checks retry transient API or UI timeouts within a bounded budget",
+    "the CI job budget retains headroom for post-verify service and browser gates",
     `legacy PID compatibility is safe: ${legacyPidBehavior}`,
     "successful default preflight retains its services",
     "real preflight entrypoint delegates to the tested lifecycle without eager process exit",

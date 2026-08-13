@@ -20,7 +20,13 @@ if (-not (Test-Path -LiteralPath $logDir)) {
 
 function Get-LocalHealth {
   try {
-    $output = & $healthScript -ApiPort $ApiPort -UiPort $UiPort -Json 2>$null
+    $output = & $healthScript `
+      -ApiPort $ApiPort `
+      -UiPort $UiPort `
+      -Attempts 1 `
+      -RequestTimeoutSeconds 3 `
+      -RetryDelayMilliseconds 0 `
+      -Json 2>$null
     if (-not $output) {
       return $null
     }
