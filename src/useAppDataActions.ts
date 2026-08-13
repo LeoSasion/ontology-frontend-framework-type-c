@@ -180,7 +180,9 @@ export function useAppDataActions({
     requireActiveImportJob(job, "complete-import-job");
     if (job.status !== "succeeded") return;
     const refreshed = await refreshStatusAndWorkbench();
-    if (refreshed.status.workspace.id !== activeWorkspaceId) return;
+    if (refreshed.status.workspace.id !== activeWorkspaceId) {
+      throw new Error("The refreshed import surface belongs to another workspace.");
+    }
     setLastActionResult({ ok: true, action: "import-job-completed", job });
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);

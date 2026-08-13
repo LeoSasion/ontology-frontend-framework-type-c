@@ -10,6 +10,7 @@ import {
   buildImportPreviewReceipt,
   type WorkbenchOperationReceipt,
 } from "./sourceWorkbenchReceiptModel";
+import { startImportCompletionRefresh } from "./importCompletionRefresh";
 import { biText } from "./components/Bilingual";
 
 type ImportControllerOptions = Pick<
@@ -49,6 +50,8 @@ export function useSourceWorkbenchImportController({
   const [importOperationReceipt, setImportOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
   const [activeImportJob, setActiveImportJob] = useState<AnalysisJob | null>(null);
   const completedJobKeysRef = useRef(new Set<string>());
+  const importJobCompletedRef = useRef(onImportJobCompleted);
+  importJobCompletedRef.current = onImportJobCompleted;
   const importRequestRef = useRef<{ fingerprint: string; requestKey: string } | null>(null);
   const createInFlightRef = useRef<Promise<AnalysisJob> | null>(null);
   const workspaceRef = useRef(workspaceId);
@@ -124,15 +127,33 @@ export function useSourceWorkbenchImportController({
     if (!job || job.workspaceId !== workspaceId) return;
     if (["succeeded", "failed", "canceled", "needs_attention"].includes(job.status)) {
       if (job.status === "succeeded" && !completedJobKeysRef.current.has(job.jobKey)) {
-        completedJobKeysRef.current.add(job.jobKey);
-        void onImportJobCompleted(job).catch((error) => {
-          setImportOperationReceipt({
-            tone: "warn",
-            title: biText("导入已完成，界面刷新失败", "Import completed; refresh failed"),
-            detail: error instanceof Error ? error.message : String(error),
-            nextStep: biText("重新打开数据源页即可读取已提交结果。", "Reopen Sources to load the committed result."),
-            technical: `job=${job.jobKey}`,
-          });
+        return startImportCompletionRefresh({
+          complete: () => importJobCompletedRef.current(job),
+          onCompleted: () => {
+            if (workspaceRef.current !== workspaceId) return;
+            completedJobKeysRef.current.add(job.jobKey);
+            setImportOperationReceipt({
+              tone: "ok",
+              title: biText("导入完成，界面已更新", "Import completed; interface updated"),
+              detail: biText("工作区中的数据表与字段已经重新载入。", "Workspace tables and fields have been reloaded."),
+              nextStep: biText("继续生成证据摘要或开始分析。", "Continue by preparing evidence or starting analysis."),
+              technical: `job=${job.jobKey}`,
+            });
+          },
+          onRetry: (error, attempt, delayMs) => {
+            if (workspaceRef.current !== workspaceId) return;
+            setImportOperationReceipt({
+              tone: "warn",
+              title: biText("导入已完成，正在重试界面刷新", "Import completed; retrying interface refresh"),
+              detail: error instanceof Error ? error.message : String(error),
+              nextStep: biText("无需重复导入；界面会自动读取已提交结果。", "Do not import again; the interface will automatically reload the committed result."),
+              technical: `job=${job.jobKey}; retry=${attempt}; delayMs=${delayMs}`,
+            });
+          },
+          schedule: (task, delayMs) => {
+            const timer = window.setTimeout(task, delayMs);
+            return () => window.clearTimeout(timer);
+          },
         });
       }
       return;
@@ -162,7 +183,7 @@ export function useSourceWorkbenchImportController({
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [activeImportJob?.jobKey, activeImportJob?.status, activeImportJob?.updatedAt, onFetchImportJob, onImportJobCompleted, workspaceId]);
+  }, [activeImportJob?.jobKey, activeImportJob?.status, activeImportJob?.updatedAt, onFetchImportJob, workspaceId]);
 
   function requestKey() {
     return globalThis.crypto?.randomUUID
