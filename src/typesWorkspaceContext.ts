@@ -98,7 +98,13 @@ export interface RuntimeCatalogSummary {
   domainPacks: { available: Array<{ packId: string }>; enabled: Array<{ packId: string }>; fingerprint: string };
   analyticalSkills: { available: Array<{ skillId: string }>; enabled: Array<{ skillId: string }>; fingerprint: string };
   agentRuntime: { selectedProfileId: string; businessSemanticAuthority: string; providerCanWrite: false };
-  queryRuntime: { engine: string; available: boolean; fallbackEngine: string | null };
+  queryRuntime: {
+    engine: string;
+    available: boolean;
+    fallbackEngine: null;
+    queryAvailability: "current" | "blocked";
+    reasonCode: string | null;
+  };
   capabilities: Array<{ capabilityId: string; command: string; domain: string; mutationMode: string }>;
   guardrails: {
     candidateCanAuthorizeJoin: false;

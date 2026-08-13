@@ -33,12 +33,14 @@ import { MetricSemanticRepairActions } from "./MetricSemanticRepairActions";
 const EvidenceTrustActions = lazyWithRetry(() => import("./EvidenceTrustActions"));
 const EvidenceNumberExplainerPanel = lazyWithRetry(() => import("./EvidenceNumberExplainerPanel").then((module) => ({ default: module.EvidenceNumberExplainerPanel })));
 const EvidenceWorkspaceManifestPanel = lazyWithRetry(() => import("./EvidenceWorkspaceManifestPanel"));
+const EvidenceReviewedPublicationsPanel = lazyWithRetry(() => import("./EvidenceReviewedPublicationsPanel"));
 
 type EvidenceViewProps = {
   agent: AgentAskResult;
   focus?: EvidenceFocus | null;
   lastActionResult?: Record<string, unknown> | null;
   pendingDraftCount?: number;
+  workspaceId: string;
   workbench: WorkbenchPayload;
   onSetSemantic: (options: { table: string; field: string; role: string; tags?: string[]; usage?: string[]; confidence?: number; note?: string; confirm?: boolean; stayOnPage?: boolean }) => Promise<Record<string, unknown>>;
   onSourceIntelligenceRun: (options?: SourceIntelligenceRunOptions) => Promise<Record<string, unknown> | void>;
@@ -47,7 +49,7 @@ type EvidenceViewProps = {
   onOpenDashboard: (dashboardKey?: string) => void;
 };
 
-export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount, workbench, onSetSemantic, onSourceIntelligenceRun, onOpenBusinessStep, onOpenAgent, onOpenDashboard }: EvidenceViewProps) {
+export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount, workspaceId, workbench, onSetSemantic, onSourceIntelligenceRun, onOpenBusinessStep, onOpenAgent, onOpenDashboard }: EvidenceViewProps) {
   const [showWorkspaceManifest, setShowWorkspaceManifest] = useState(false);
   const runs = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
   const activeRun = sourceRunFromFocus(focus, runs);
@@ -81,6 +83,12 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
         <button className="primaryButton" data-testid="evidence-open-sources" onClick={() => onOpenBusinessStep("data")} type="button">
           {biText("接入数据", "Connect data")}
         </button>
+        <details className="progressiveDetails evidenceProgressiveDetails" data-testid="evidence-reviewed-publications-empty-details" onToggle={(event) => setShowWorkspaceManifest(event.currentTarget.open)}>
+          <summary>{biText("查看既有审核制品", "View existing reviewed publications")}</summary>
+          <div className="progressiveDetailsBody evidenceProgressiveGrid">
+            {showWorkspaceManifest ? <Suspense fallback={null}><EvidenceReviewedPublicationsPanel workspaceId={workspaceId} /></Suspense> : null}
+          </div>
+        </details>
       </section>
     );
   }
@@ -270,6 +278,7 @@ export function EvidenceView({ agent, focus, lastActionResult, pendingDraftCount
           <summary>{biText("查看回执、动作边界和原始合同", "View receipts, action boundaries, and raw contracts")}</summary>
           <div className="progressiveDetailsBody evidenceProgressiveGrid">
             {showWorkspaceManifest ? <Suspense fallback={null}><EvidenceWorkspaceManifestPanel /></Suspense> : null}
+            {showWorkspaceManifest ? <Suspense fallback={null}><EvidenceReviewedPublicationsPanel workspaceId={workspaceId} /></Suspense> : null}
             <article data-testid="evidence-source-intelligence-summary">
               <h3><Bilingual zh="证据摘要回执" en="Evidence summary receipt" /></h3>
               {activeRun ? (

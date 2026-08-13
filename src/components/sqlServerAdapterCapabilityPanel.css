@@ -1,0 +1,112 @@
+.sqlServerCapability {
+  container-type: inline-size;
+  display: grid;
+  gap: var(--space-4, 1rem);
+  min-width: 0;
+}
+.sqlServerCapability__header {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3, 0.75rem);
+  justify-content: space-between;
+}
+
+.sqlServerCapability__header h3 {
+  margin: 0.2rem 0 0;
+}
+
+.sqlServerCapability__notice {
+  border-inline-start: 3px solid var(--color-warning, #9b6b16);
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+}
+
+.sqlServerCapability__facts {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  margin: 0;
+}
+
+.sqlServerCapability__facts div {
+  min-width: 0;
+}
+
+.sqlServerCapability__facts dt {
+  color: var(--text-secondary, currentColor);
+  font-size: 0.82em;
+}
+
+.sqlServerCapability__facts dd {
+  font-weight: 650;
+  margin: 0.2rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.sqlServerCapability__pipeline {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sqlServerCapability__pipeline li {
+  align-items: center;
+  color: var(--text-secondary, currentColor);
+  display: flex;
+  font-size: 0.78em;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.sqlServerCapability__pipeline li span {
+  background: color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 50%;
+  flex: 0 0 0.55rem;
+  height: 0.55rem;
+}
+
+.sqlServerCapability__pipeline li[data-state="done"] {
+  color: var(--color-success, #24734b);
+}
+
+.sqlServerCapability__pipeline li[data-state="current"] {
+  color: var(--text-primary, currentColor);
+  font-weight: 700;
+}
+
+.sqlServerCapability__actions {
+  align-items: stretch;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+}
+
+.sqlServerCapability__journal {
+  align-items: center;
+  border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
+  border-radius: var(--radius-md, 0.7rem);
+  display: flex;
+  gap: 0.65rem;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0.7rem 0.8rem;
+}
+
+.sqlServerCapability__journal[data-state="done"] {
+  border-color: color-mix(in srgb, var(--color-success, #24734b) 42%, transparent);
+}
+
+@container (max-width: 34rem) {
+  .sqlServerCapability .buttonRow {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sqlServerCapability__pipeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

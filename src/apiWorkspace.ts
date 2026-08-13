@@ -34,10 +34,15 @@ export function selectWorkspace(workspaceId: string, confirm = true) {
   });
 }
 
-export function deleteWorkspace(workspaceId: string, confirm = false) {
+export function deleteWorkspace(
+  workspaceId: string,
+  confirm = false,
+  requestKey = "",
+  expectedPlan = "",
+) {
   return fetchJson<Record<string, unknown>>("/api/workspaces", { ok: false }, {
     method: "POST",
-    body: JSON.stringify({ op: "delete", workspaceId, confirm }),
+    body: JSON.stringify({ op: "delete", workspaceId, confirm, requestKey, expectedPlan }),
   });
 }
 

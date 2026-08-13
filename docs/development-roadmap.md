@@ -1,6 +1,6 @@
 # AIBI-C 未来开发队列
 
-本文件是跨产品未交付工作队列。当前能力见 [实现状态](implementation-status.md)，稳定需求见 [PRD](PRD.md)，业务理解专题的合同、Skills、验收与细分顺序见 [业务理解与分析 Skills](business-understanding-skills.md)。
+本文件是跨产品未交付工作队列。当前能力见 [实现状态](implementation-status.md)，稳定需求见 [PRD](PRD.md)，业务理解专题的合同、Skills、验收与细分顺序见 [业务理解与分析 Skills](business-understanding-skills.md)。持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的当前执行批次统一见 [可信能力吸收开发规格](trusted-capability-absorption.md)。
 
 ## 不变的主流程
 
@@ -20,7 +20,7 @@ flowchart TB
   subgraph Boundary["本地进程边界"]
     API["Node API Gateway :8787<br/>输入校验 · 下载流 · Provider 边界"]
     SSE["SSE 事件通道（P1）"]
-    HOST["AIBI Runtime Host（P0）<br/>长驻进程 · 写入串行化 · Job 调度"]
+    HOST["AIBI Runtime Host<br/>长驻进程 · 写入串行化 · Job 调度"]
     CLI["tools/aibi_cli.py<br/>薄适配器 · 自动化 · 诊断"]
   end
 
@@ -41,7 +41,7 @@ flowchart TB
   subgraph Infrastructure["基础设施"]
     REPO["Repository + Unit of Work（P0）"]
     SQLITE[("SQLite 控制面")]
-    DUCK[("DuckDB 分析面<br/>版本化权威副本（P0）")]
+    DUCK[("DuckDB 分析面<br/>版本化权威副本")]
     CAS[("Evidence Artifact Store<br/>内容寻址与保留策略（P1）")]
     PROVIDER["可选 Provider<br/>只解释有界证据"]
   end
@@ -64,13 +64,13 @@ flowchart TB
   classDef p0 fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
   classDef p1 fill:#ffedd5,stroke:#ea580c,color:#7c2d12;
   classDef p2 fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
-  class CLI,REG,ROUTE,API,UI,GUARD,SEM,PLAN,EVIDENCE,SQLITE,PROVIDER shipped;
-  class HOST,CASES,REPO,DUCK p0;
+  class CLI,REG,ROUTE,API,UI,HOST,GUARD,SEM,PLAN,EVIDENCE,SQLITE,DUCK,PROVIDER shipped;
+  class CASES,REPO p0;
   class CACHE,SSE,CAS p1;
   class EXT p2;
 ```
 
-在 P0 Runtime Host 落地前，Node API 与 CLI 仍各自启动 CLI 流程并直接进入 Registry；迁移完成后，两者只保留协议适配职责，业务行为仍由同一组 Use Case 和 Guard 决定。
+Node API 已通过长驻 Runtime Host 进入统一 Registry，独立 CLI 仍以薄适配器进入同一运行时；两者只保留协议适配职责，业务行为由同一组 Use Case 和 Guard 决定。持久 Import Job、来源激活 Journal、工作区恢复、审核 Ledger、SQL Server 只读快照激活、决策框架与安全降级召回已移入 [实现状态](implementation-status.md)。
 
 ## P0：消除运行时结构性风险
 
@@ -79,22 +79,8 @@ flowchart TB
 - 用户结果：网页、CLI、Job 对同一动作得到完全一致的计划、阻断和回执。
 - 实现边界：把当前组合内核中的 `ask`、语义查询、导入、确认、看板交付拆成显式 Use Case；每个 Use Case 接收类型化 Command，返回统一 Result，不读取进程参数。
 - 失败行为：未知命令、缺失工作区或不满足 Guard 时返回结构化失败，不回退到其他命令或通用聚合。
-- 退出条件：组合内核只负责依赖装配；Agent Interaction 拆成 Prompt Resolution、Read Snapshot、Answer Composition、Action Confirmation 等可独立测试的 Use Case，单个应用服务不再持有跨分析阶段的写事务；171 条现有命令合同无非预期变化；专项和完整回归通过。
+- 退出条件：组合内核只负责依赖装配；Agent Interaction 拆成 Prompt Resolution、Read Snapshot、Answer Composition、Action Confirmation 等可独立测试的 Use Case，单个应用服务不再持有跨分析阶段的写事务；当前登记命令合同无非预期变化；专项和完整回归通过。
 - 当前批次：组合内核已退化为 12 行兼容导出面，原“800 行以内”目标已经完成；后续热点是拆分 Agent Interaction、缩短写事务并引入类型化 Command/Result。当前实现事实由 [实现状态](implementation-status.md) 维护。
-
-### P0-B｜建立长驻 Runtime Host 与单写者队列
-
-- 用户结果：连续提问、后台 Job 和大文件操作不再为每次请求重复启动 Python，互相竞争写锁时仍能得到可预测状态。
-- 实现边界：仅监听 loopback 的长驻 Python Host；Node 与 CLI 使用版本化 Command Envelope、request id、workspace id 和 deadline；所有写入经单写者队列，互不依赖的只读任务仍可并行。
-- 失败行为：Host 不可用、超时或 envelope 版本不兼容时明确失败；禁止静默退回另一数据库或另起无约束写进程。
-- 退出条件：生产 API 不再按请求 `spawn` CLI；中断恢复、重复请求幂等、写锁竞争、Job 取消与优雅退出均有确定性验证。
-
-### P0-C｜把 DuckDB 改为版本化分析副本
-
-- 用户结果：大表查询不再每次把 SQLite 物理表整表复制到 DuckDB；同一 Receipt 可证明读取的确切数据版本。
-- 实现边界：导入或确认写入时更新分析副本与 manifest；查询只读已发布版本；SQLite 保存控制面和元数据，DuckDB 保存分析数据，跨库发布由 Unit of Work 记录阶段和恢复点。
-- 失败行为：副本缺失、版本漂移或发布中断时阻断查询并给出可恢复动作，不使用旧副本冒充 current。
-- 退出条件：常规查询路径不存在整表同步；崩溃恢复、schema 变更、删除/重命名、freshness 和双库回滚验证通过，并建立基准数据集性能预算。
 
 ### P0-D｜闭合服装电商可信查询
 

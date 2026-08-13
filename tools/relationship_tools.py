@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from typing import Any, Callable
 
+from query_runtime import cursor_rows
+
 
 QuoteIdentifier = Callable[[str], str]
 
@@ -24,7 +26,7 @@ def relationship_key(row: dict[str, Any], mappings: list[dict[str, str]], side: 
 
 def rows_for_table(connection: Any, table_name: str, columns: list[str], quote_identifier: QuoteIdentifier) -> list[dict[str, Any]]:
     select_sql = ", ".join(quote_identifier(column) for column in columns)
-    return [dict(row) for row in connection.execute(f"SELECT {select_sql} FROM {quote_identifier(table_name)}")]
+    return cursor_rows(connection.execute(f"SELECT {select_sql} FROM {quote_identifier(table_name)}"))
 
 
 def key_stats(rows: list[dict[str, Any]], mappings: list[dict[str, str]], side: str) -> dict[str, Any]:
@@ -545,15 +547,9 @@ def build_relation_condition_sql(mappings: list[dict[str, str]], quote_identifie
     )
 
 
-def sqlite_row_to_dict(row: Any) -> dict[str, Any]:
-    if hasattr(row, "keys"):
-        return {key: "" if row[key] is None else row[key] for key in row.keys()}
-    return dict(row)
-
-
-def relationship_query_row_to_dict(row: Any, metric_name: str) -> dict[str, Any]:
-    payload = sqlite_row_to_dict(row)
-    if hasattr(row, "keys") and metric_name in row.keys():
+def relationship_query_row_to_dict(row: dict[str, Any], metric_name: str) -> dict[str, Any]:
+    payload = {key: "" if value is None else value for key, value in row.items()}
+    if metric_name in row:
         # Dimensions retain their legacy empty-string display contract, while
         # aggregate NULL must remain distinguishable from a verified zero.
         payload[metric_name] = row[metric_name]
@@ -711,7 +707,8 @@ def build_relationship_query(
         f"ON {condition_sql}"
         f"{where_sql}{group_sql}{order_sql} LIMIT ?"
     )
-    rows = connection.execute(sql, (*left_pre_params, *right_pre_params, *filter_params, safe_limit)).fetchall()
+    query_params = (*left_pre_params, *right_pre_params, *filter_params, safe_limit)
+    rows = cursor_rows(connection.execute(sql, query_params))
     columns = [item["outputName"] for item in normalized_groups] + [metric_name]
     return {
         "leftTable": left_table_name,
@@ -733,6 +730,8 @@ def build_relationship_query(
         "metricName": metric_name,
         "columns": columns,
         "rows": [relationship_query_row_to_dict(row, metric_name) for row in rows],
+        "compiledSql": sql,
+        "_compiledParams": list(query_params),
         "sqlShape": {
             "leftTable": left_table_name,
             "rightTable": right_table_name,

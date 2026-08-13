@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ImportPolicy } from "./types";
 import type { SourceWorkbenchProps } from "./sourceWorkbenchContracts";
+import type { AnalysisJob } from "./typesJobs";
 import { buildImportOptions, buildImportPolicyOptions } from "./sourceWorkbenchCommandModel";
 import { buildImportPreviewSummary } from "./sourceWorkbenchModel";
 import {
-  buildImportCommitReceipt,
+  buildDurableImportQueuedReceipt,
   buildImportPolicyReceipt,
   buildImportPreviewReceipt,
   type WorkbenchOperationReceipt,
@@ -13,8 +14,11 @@ import { biText } from "./components/Bilingual";
 
 type ImportControllerOptions = Pick<
   SourceWorkbenchProps,
-  "preview" | "onPreview" | "onCommitImport" | "onPreviewFolderImport" | "onCommitFolderImport" | "onImportPolicy"
+  "preview" | "onPreview" | "onPreviewFolderImport" | "onImportPolicy"
+  | "onCreateImportJob" | "onFetchImportJob" | "onCancelImportJob" | "onResumeImportJob" | "onImportJobCompleted"
+  | "onListImportJobs"
 > & {
+  workspaceId: string;
   importPolicies: ImportPolicy[];
   onCommittedInputs?: (inputs: string[]) => Promise<void>;
 };
@@ -23,10 +27,15 @@ export function useSourceWorkbenchImportController({
   preview,
   importPolicies,
   onPreview,
-  onCommitImport,
   onPreviewFolderImport,
-  onCommitFolderImport,
   onImportPolicy,
+  onCreateImportJob,
+  onFetchImportJob,
+  onListImportJobs,
+  onCancelImportJob,
+  onResumeImportJob,
+  onImportJobCompleted,
+  workspaceId,
   onCommittedInputs,
 }: ImportControllerOptions) {
   const [filePath, setFilePath] = useState("");
@@ -38,6 +47,12 @@ export function useSourceWorkbenchImportController({
   const [folderImportPlan, setFolderImportPlan] = useState<Awaited<ReturnType<typeof onPreviewFolderImport>> | null>(null);
   const [singleImportBinding, setSingleImportBinding] = useState<{ filePath: string; planFingerprint: string } | null>(null);
   const [importOperationReceipt, setImportOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
+  const [activeImportJob, setActiveImportJob] = useState<AnalysisJob | null>(null);
+  const completedJobKeysRef = useRef(new Set<string>());
+  const importRequestRef = useRef<{ fingerprint: string; requestKey: string } | null>(null);
+  const createInFlightRef = useRef<Promise<AnalysisJob> | null>(null);
+  const workspaceRef = useRef(workspaceId);
+  workspaceRef.current = workspaceId;
   const activeImportPolicy = importPolicies.find((policy) => policy.table_key === targetTable);
   const previewReadable = Boolean(preview.ok && preview.profile.rowCount > 0 && preview.profile.columnCount > 0);
   const previewSummary = buildImportPreviewSummary({ preview, previewReadable, targetName });
@@ -52,6 +67,124 @@ export function useSourceWorkbenchImportController({
     && conflictRule === previewCommitOptions.conflictRule
     && normalizedUniqueFields.join("\u0000") === previewCommitOptions.uniqueFields.join("\u0000"),
   );
+  const importJobActive = Boolean(activeImportJob && !["succeeded", "failed", "canceled", "needs_attention"].includes(activeImportJob.status));
+
+  useEffect(() => {
+    setActiveImportJob(null);
+    completedJobKeysRef.current = new Set();
+    importRequestRef.current = null;
+    createInFlightRef.current = null;
+    const storageKey = `aibi-c:import-job:${workspaceId}`;
+    let persistedJobKey = "";
+    try {
+      persistedJobKey = window.localStorage.getItem(storageKey) ?? "";
+    } catch {
+      // Private browsing/storage policy must not prevent durable server reattachment.
+    }
+    let disposed = false;
+    let timer = 0;
+    let attempt = 0;
+    const reattach = () => {
+      const selectJob = (jobs: AnalysisJob[]) => (
+        jobs.find((job) => !["canceled", "succeeded", "failed"].includes(job.status)) ?? jobs[0] ?? null
+      );
+      const discover = persistedJobKey
+        ? onFetchImportJob(persistedJobKey).catch(() => onListImportJobs().then(selectJob))
+        : onListImportJobs().then(selectJob);
+      void discover.then((job) => {
+        if (!job) return;
+        if (disposed || workspaceRef.current !== workspaceId || job.workspaceId !== workspaceId) return;
+        setActiveImportJob(job);
+      }).catch(() => {
+        if (disposed || workspaceRef.current !== workspaceId) return;
+        attempt += 1;
+        timer = window.setTimeout(reattach, Math.min(5_000, 500 * (2 ** Math.min(attempt, 3))));
+      });
+    };
+    reattach();
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [onFetchImportJob, onListImportJobs, workspaceId]);
+
+  useEffect(() => {
+    const storageKey = `aibi-c:import-job:${workspaceId}`;
+    if (activeImportJob?.workspaceId === workspaceId) {
+      try {
+        window.localStorage.setItem(storageKey, activeImportJob.jobKey);
+      } catch {
+        // Server-side history remains authoritative when local storage is unavailable.
+      }
+    }
+  }, [activeImportJob?.jobKey, activeImportJob?.workspaceId, workspaceId]);
+
+  useEffect(() => {
+    const job = activeImportJob;
+    if (!job || job.workspaceId !== workspaceId) return;
+    if (["succeeded", "failed", "canceled", "needs_attention"].includes(job.status)) {
+      if (job.status === "succeeded" && !completedJobKeysRef.current.has(job.jobKey)) {
+        completedJobKeysRef.current.add(job.jobKey);
+        void onImportJobCompleted(job).catch((error) => {
+          setImportOperationReceipt({
+            tone: "warn",
+            title: biText("导入已完成，界面刷新失败", "Import completed; refresh failed"),
+            detail: error instanceof Error ? error.message : String(error),
+            nextStep: biText("重新打开数据源页即可读取已提交结果。", "Reopen Sources to load the committed result."),
+            technical: `job=${job.jobKey}`,
+          });
+        });
+      }
+      return;
+    }
+    let disposed = false;
+    let timer = 0;
+    let attempt = 0;
+    const poll = () => {
+      void onFetchImportJob(job.jobKey).then((latest) => {
+        if (disposed || workspaceRef.current !== workspaceId || latest.workspaceId !== workspaceId) return;
+        setActiveImportJob(latest);
+      }).catch((error) => {
+        if (disposed || workspaceRef.current !== workspaceId) return;
+        setImportOperationReceipt({
+          tone: "warn",
+          title: biText("暂时无法读取导入进度", "Import progress is temporarily unavailable"),
+          detail: error instanceof Error ? error.message : String(error),
+          nextStep: biText("任务会在后台继续；稍后重新打开数据源页。", "The job continues in the background; reopen Sources shortly."),
+          technical: `job=${job.jobKey}`,
+        });
+        attempt += 1;
+        timer = window.setTimeout(poll, Math.min(5_000, 600 * (2 ** Math.min(attempt, 3))));
+      });
+    };
+    timer = window.setTimeout(poll, 1200);
+    return () => {
+      disposed = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeImportJob?.jobKey, activeImportJob?.status, activeImportJob?.updatedAt, onFetchImportJob, onImportJobCompleted, workspaceId]);
+
+  function requestKey() {
+    return globalThis.crypto?.randomUUID
+      ? `import:${globalThis.crypto.randomUUID()}`
+      : `import:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  }
+
+  function stableRequestKey(fingerprint: string) {
+    if (importRequestRef.current?.fingerprint !== fingerprint) {
+      importRequestRef.current = { fingerprint, requestKey: requestKey() };
+    }
+    return importRequestRef.current.requestKey;
+  }
+
+  function createImportJobOnce(input: Parameters<typeof onCreateImportJob>[0]) {
+    if (!createInFlightRef.current) {
+      createInFlightRef.current = onCreateImportJob(input).finally(() => {
+        createInFlightRef.current = null;
+      });
+    }
+    return createInFlightRef.current;
+  }
 
   function importOptions(confirm = false) {
     const options = buildImportOptions({
@@ -73,6 +206,7 @@ export function useSourceWorkbenchImportController({
 
   async function runImportPreviewAction() {
     const result = await onPreview(importOptions(false));
+    importRequestRef.current = null;
     setSingleImportBinding(result.planFingerprint ? { filePath: filePath.trim(), planFingerprint: result.planFingerprint } : null);
     setFolderImportPlan(null);
     let receiptTargetTable = targetTable;
@@ -112,19 +246,33 @@ export function useSourceWorkbenchImportController({
   }
 
   async function runImportCommitAction(confirm: boolean) {
-    await onCommitImport(importOptions(confirm));
+    if (!confirm) {
+      await runImportPreviewAction();
+      return;
+    }
+    if (!singleImportBinding?.planFingerprint) throw new Error(biText("请先重新检查来源。", "Check the source again first."));
+    const options = importOptions(true);
+    const requestFingerprint = `single:${workspaceId}:${singleImportBinding.planFingerprint}:${options.filePath}:${options.table}:${options.mode}:${(options.uniqueFields ?? []).join("\u0000")}:${options.conflictRule}`;
+    const job = await createImportJobOnce({
+      requestKey: stableRequestKey(requestFingerprint),
+      expectedPlan: singleImportBinding.planFingerprint,
+      importKind: "single",
+      path: options.filePath,
+      table: options.table,
+      name: options.name,
+      mode: options.mode,
+      uniqueFields: options.uniqueFields,
+      conflictRule: options.conflictRule,
+    });
+    if (job.workspaceId !== workspaceId) throw new Error(biText("导入任务与当前工作区不一致。", "Import job does not match the active workspace."));
+    setActiveImportJob(job);
+    importRequestRef.current = null;
     setFolderImportPlan(null);
-    setImportOperationReceipt(buildImportCommitReceipt({
-      confirm,
-      preview,
-      matchedTableName: previewSummary.matchedTableName,
-      targetTable,
-      importInsertRows: previewSummary.importInsertRows,
-      importUpdateRows: previewSummary.importUpdateRows,
-      importSkipRows: previewSummary.importSkipRows,
-      importAfterRows: previewSummary.importAfterRows,
+    setImportOperationReceipt(buildDurableImportQueuedReceipt({
+      jobKey: job.jobKey,
+      planFingerprint: singleImportBinding.planFingerprint,
+      importKind: "single",
     }));
-    if (confirm && filePath.trim()) await onCommittedInputs?.([filePath.trim()]);
   }
 
   async function runFolderImportPreviewAction() {
@@ -136,6 +284,7 @@ export function useSourceWorkbenchImportController({
       uniqueFields: selectedUniqueFields,
       conflictRule,
     });
+    importRequestRef.current = null;
     setFolderImportPlan(result);
     setSingleImportBinding(null);
     const firstGroup = result.groups[0];
@@ -163,30 +312,43 @@ export function useSourceWorkbenchImportController({
   }
 
   async function runFolderImportCommitAction(confirm: boolean) {
-    const result = await onCommitFolderImport({
-      path: filePath,
-      limit: 200,
-      recursive: true,
-      uniqueFields: uniqueFields.split(",").map((field) => field.trim()).filter(Boolean),
-      conflictRule,
-      expectedPlan: folderImportPlan?.planFingerprint,
-      confirm,
-    });
-    setFolderImportPlan(result);
-    setImportOperationReceipt({
-      tone: result.committed ? "ok" : "warn",
-      title: result.committed
-        ? biText("文件夹导入已完成", "Folder import completed")
-        : biText("文件夹导入待确认", "Folder import needs confirmation"),
-      detail: biText(`已处理 ${result.fileCount} 个文件，归并为 ${result.tableCount} 张业务表。`, `${result.fileCount} files grouped into ${result.tableCount} business tables.`),
-      nextStep: result.committed
-        ? biText("下一步可以让 Agent 生成单图或看板草案。", "Next, ask Agent to create a chart or dashboard draft.")
-        : biText("确认后才会写入工作区。", "Confirm before writing to the workspace."),
-      technical: result.sourceRunId
-        ? `sourceRun=${result.sourceRunId}; plan=${result.planFingerprint ?? "-"}`
-        : [...(result.blockers ?? []), result.planFingerprint ? `plan=${result.planFingerprint}` : ""].filter(Boolean).join("; ") || result.path,
-    });
-    if (confirm && result.committed && filePath.trim()) await onCommittedInputs?.([filePath.trim()]);
+    if (confirm) {
+      if (!folderImportPlan?.planFingerprint) throw new Error(biText("请先重新检查文件夹。", "Check the folder again first."));
+      const folderUniqueFields = uniqueFields.split(",").map((field) => field.trim()).filter(Boolean);
+      const requestFingerprint = `folder:${workspaceId}:${folderImportPlan.planFingerprint}:${filePath.trim()}:${folderUniqueFields.join("\u0000")}:${conflictRule}`;
+      const job = await createImportJobOnce({
+        requestKey: stableRequestKey(requestFingerprint),
+        expectedPlan: folderImportPlan.planFingerprint,
+        importKind: "folder",
+        path: filePath,
+        uniqueFields: folderUniqueFields,
+        conflictRule,
+        recursive: true,
+        limit: 200,
+      });
+      if (job.workspaceId !== workspaceId) throw new Error(biText("导入任务与当前工作区不一致。", "Import job does not match the active workspace."));
+      setActiveImportJob(job);
+      importRequestRef.current = null;
+      setImportOperationReceipt(buildDurableImportQueuedReceipt({
+        jobKey: job.jobKey,
+        planFingerprint: folderImportPlan.planFingerprint,
+        importKind: "folder",
+        fileCount: folderImportPlan.fileCount,
+        tableCount: folderImportPlan.tableCount,
+      }));
+      return;
+    }
+    await runFolderImportPreviewAction();
+  }
+
+  async function cancelActiveImportJob(job: AnalysisJob) {
+    const latest = await onCancelImportJob(job);
+    if (latest.workspaceId === workspaceId) setActiveImportJob(latest);
+  }
+
+  async function resumeActiveImportJob(job: AnalysisJob) {
+    const latest = await onResumeImportJob(job);
+    if (latest.workspaceId === workspaceId) setActiveImportJob(latest);
   }
 
   async function runImportPolicyAction(confirm: boolean) {
@@ -208,6 +370,8 @@ export function useSourceWorkbenchImportController({
     importOperationReceipt,
     folderImportPlan,
     singleImportPlanReady,
+    activeImportJob,
+    importJobActive,
     setFilePath,
     setTargetTable,
     setTargetName,
@@ -218,6 +382,8 @@ export function useSourceWorkbenchImportController({
     runImportCommitAction,
     runFolderImportPreviewAction,
     runFolderImportCommitAction,
+    cancelActiveImportJob,
+    resumeActiveImportJob,
     runImportPolicyAction,
   };
 }

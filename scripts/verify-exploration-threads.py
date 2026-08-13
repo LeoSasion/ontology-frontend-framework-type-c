@@ -58,16 +58,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(db_path),
         "AIBI_HYBRID_DUCKDB_PATH": str(temp / "analytics.duckdb"),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp / "workspace-recovery"),
         "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp / "evidence"),
         "PYTHONIOENCODING": "utf-8",
     }
 
     initialized = run(["status"], env)
     imported = run(["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"], env)
-    check("schema-v15-initializes", initialized.get("ok") is True and imported.get("committed") is True)
+    check("schema-v16-initializes", initialized.get("ok") is True and imported.get("committed") is True)
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-    check("exploration-schema-is-versioned", version == 15, version)
+    check("exploration-schema-is-versioned", version == 16, version)
 
     root = run(["agent-turn-run", "--read-only", "请将net_sales按channel合计并生成柱状图"], env)
     root_answer = answer(root)
@@ -264,7 +265,18 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-exploration-threads-") as temp_d
     isolated_plan = isolated_preview.get("explorationPlan") or {}
     isolated_created = run([*isolated_create_args, "--yes", "--expected-plan", str(isolated_plan.get("planFingerprint") or "")], env)
     run(["workspace-select", "default", "--yes"], env)
-    deleted_isolated = run(["workspace-delete", isolated_id, "--yes"], env)
+    delete_request_key = "exploration-thread-isolated-workspace-delete"
+    delete_preview = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+    ], env)
+    delete_plan = delete_preview.get("deletePlan") or {}
+    deleted_isolated = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str(delete_plan.get("planFingerprint") or ""),
+        "--yes",
+    ], env)
     with closing(sqlite3.connect(db_path)) as connection:
         residual_counts = {
             table: int(connection.execute(f"SELECT COUNT(*) FROM {table} WHERE workspace_id = ?", (isolated_id,)).fetchone()[0])

@@ -43,6 +43,8 @@ export interface QueryRuntimeStatus {
   available: boolean;
   database: string;
   fallbackEngine?: string | null;
+  queryAvailability: "current" | "blocked";
+  reasonCode?: string | null;
   error?: string | null;
 }
 

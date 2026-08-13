@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
-  commitImport,
-  commitFolderImport,
   copyView,
   createSourceDashboardDraft,
   deleteSource,
@@ -33,6 +31,14 @@ import {
 } from "./appRefreshModel";
 import type { SourceIntelligenceRunOptions } from "./sourceIntelligenceRunModel";
 import { fetchAnalysisJobs } from "./apiJobs";
+import {
+  cancelImportJob,
+  createImportJob,
+  fetchImportJob,
+  listImportJobs,
+  resumeImportJob,
+  type CreateImportJobOptions,
+} from "./apiImportJobs";
 import type { AnalysisJob } from "./typesJobs";
 import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 import type {
@@ -125,33 +131,73 @@ export function useAppDataActions({
     return result;
   }, [setPreview, setSection]);
 
-  const handleCommitImport = useCallback(async (options: { filePath: string; table?: string; name?: string; mode?: string; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => {
-    const result = await commitImport(options);
-    const refreshed = await refreshStatusAndWorkbench();
-    setLastActionResult(result);
-    setStatus(refreshed.status);
-    setWorkbench(refreshed.workbench);
-    navigateTo({
-      section: "sources",
-      tableKey: resultString(result, "tableKey", "table_key") ?? options.table ?? refreshed.workbench.tables[0]?.table_key,
-    });
-  }, [navigateTo, setLastActionResult, setStatus, setWorkbench]);
-
   const handlePreviewFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string }) => {
     const result = await previewFolderImport(options);
     setSection("sources");
     return result;
   }, [setSection]);
 
-  const handleCommitFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => {
-    const result = await commitFolderImport(options);
+  const requireActiveImportJob = useCallback((job: AnalysisJob | undefined, action: string) => {
+    if (!job) throw new Error(`${action}: import job payload is missing`);
+    if (job.workspaceId !== activeWorkspaceId) throw new Error(`${action}: import job belongs to another workspace`);
+    return job;
+  }, [activeWorkspaceId]);
+
+  const handleCreateImportJob = useCallback(async (options: CreateImportJobOptions) => {
+    const payload = await createImportJob(options);
+    const job = requireActiveImportJob(payload.job, "create-import-job");
+    setLastActionResult(payload as unknown as Record<string, unknown>);
+    return job;
+  }, [requireActiveImportJob, setLastActionResult]);
+
+  const handleFetchImportJob = useCallback(async (jobKey: string) => {
+    const payload = await fetchImportJob(jobKey);
+    return requireActiveImportJob(payload.job, "fetch-import-job");
+  }, [requireActiveImportJob]);
+
+  const handleListImportJobs = useCallback(async () => {
+    const payload = await listImportJobs(20);
+    return (payload.jobs ?? []).filter((job) => job.workspaceId === activeWorkspaceId && job.kind === "import");
+  }, [activeWorkspaceId]);
+
+  const handleCancelImportJob = useCallback(async (job: AnalysisJob) => {
+    requireActiveImportJob(job, "cancel-import-job");
+    const payload = await cancelImportJob(job.jobKey);
+    const latest = requireActiveImportJob(payload.job, "cancel-import-job");
+    setLastActionResult(payload as unknown as Record<string, unknown>);
+    return latest;
+  }, [requireActiveImportJob, setLastActionResult]);
+
+  const handleResumeImportJob = useCallback(async (job: AnalysisJob) => {
+    requireActiveImportJob(job, "resume-import-job");
+    const payload = await resumeImportJob(job.jobKey);
+    const latest = requireActiveImportJob(payload.job, "resume-import-job");
+    setLastActionResult(payload as unknown as Record<string, unknown>);
+    return latest;
+  }, [requireActiveImportJob, setLastActionResult]);
+
+  const handleImportJobCompleted = useCallback(async (job: AnalysisJob) => {
+    requireActiveImportJob(job, "complete-import-job");
+    if (job.status !== "succeeded") return;
     const refreshed = await refreshStatusAndWorkbench();
-    setLastActionResult(result as unknown as Record<string, unknown>);
+    if (refreshed.status.workspace.id !== activeWorkspaceId) return;
+    setLastActionResult({ ok: true, action: "import-job-completed", job });
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
-    navigateTo({ section: "sources", tableKey: result.groups[0]?.tableKey ?? refreshed.workbench.tables[0]?.table_key });
-    return result;
-  }, [navigateTo, setLastActionResult, setStatus, setWorkbench]);
+    navigateTo({ section: "sources", tableKey: refreshed.workbench.tables[0]?.table_key });
+  }, [activeWorkspaceId, navigateTo, requireActiveImportJob, setLastActionResult, setStatus, setWorkbench]);
+
+  const handleWorkspaceRecoveryInvalidated = useCallback((keys: string[]) => {
+    const requested = new Set(keys);
+    if (!requested.has("workspace-status") && !requested.has("workbench")) return;
+    void refreshStatusAndWorkbench().then((refreshed) => {
+      if (refreshed.status.workspace.id !== activeWorkspaceId) return;
+      if (requested.has("workspace-status")) setStatus(refreshed.status);
+      if (requested.has("workbench")) setWorkbench(refreshed.workbench);
+    }).catch((error) => {
+      setLastActionResult(actionErrorResult("workspace-recovery-refresh", error));
+    });
+  }, [activeWorkspaceId, setLastActionResult, setStatus, setWorkbench]);
 
   const handleImportPolicy = useCallback(async (options: { table: string; uniqueFields: string[]; conflictRule?: string; confirm?: boolean }) => {
     const result = await setImportPolicy(options);
@@ -600,8 +646,13 @@ export function useAppDataActions({
   return {
     sourceIntelligenceJobs,
     handleAddMetric,
-    handleCommitImport,
-    handleCommitFolderImport,
+    handleCreateImportJob,
+    handleFetchImportJob,
+    handleListImportJobs,
+    handleCancelImportJob,
+    handleResumeImportJob,
+    handleImportJobCompleted,
+    handleWorkspaceRecoveryInvalidated,
     handleCopyView,
     handleDashboardRelationshipSave,
     handleDeleteFormula,

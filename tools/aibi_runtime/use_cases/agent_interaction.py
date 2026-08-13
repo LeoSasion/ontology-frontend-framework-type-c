@@ -61,6 +61,7 @@ from semantic_context_router import build_semantic_context_bundle
 from agent_clarification_service import build_agent_clarification
 from agent_recommended_commands import build_agent_recommended_commands
 from bi_cli_core import (
+    DUCKDB_PATH,
     ROOT,
     now_iso,
     quote_identifier,
@@ -68,6 +69,7 @@ from bi_cli_core import (
     slug,
     unique_key,
 )
+from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 from context_pack_service import contextualized_prompt, matched_context
 from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
 from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
@@ -866,9 +868,10 @@ def dashboard_filter_value_from_prompt(connection: sqlite3.Connection, dashboard
     dashboard, _layout, _filters, _fields = dashboard_filters_snapshot(connection, dashboard_key)
     registry = registry_for_table(connection, str(dashboard["default_table_key"] or ""))
     if registry:
-        rows = connection.execute(
-            f"SELECT DISTINCT {quote_identifier(field)} AS value FROM {quote_identifier(registry['physical_table'])} WHERE {quote_identifier(field)} IS NOT NULL LIMIT 50"
-        ).fetchall()
+        with open_validated_duckdb_query(DUCKDB_PATH, [replica_expectation(registry)]) as analysis_connection:
+            rows = cursor_rows(analysis_connection.execute(
+                f"SELECT DISTINCT {quote_identifier(field)} AS value FROM {quote_identifier(registry['physical_table'])} WHERE {quote_identifier(field)} IS NOT NULL LIMIT 50"
+            ))
         normalized_prompt = normalize_match_text(prompt)
         for row in rows:
             value = str(row["value"])

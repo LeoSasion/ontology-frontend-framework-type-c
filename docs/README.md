@@ -15,6 +15,7 @@
 | [产品验收矩阵](product-acceptance-matrix.md) | 用户可观察的稳定行为与验收信号 |
 | [实现状态](implementation-status.md) | 当前能力、限制、架构归属和验证入口 |
 | [未来开发队列](development-roadmap.md) | 尚未交付事项、优先级和退出条件 |
+| [可信能力吸收开发规格](trusted-capability-absorption.md) | 持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的本批执行合同 |
 
 ## 技术合同与证据
 
@@ -44,6 +45,7 @@
 | 当前已经做到什么 | `docs/implementation-status.md` |
 | 服装电商 current 查询、实体映射与方法如何受控 | `docs/apparel-commerce-trusted-query.md` |
 | 接下来做什么 | `docs/development-roadmap.md` |
+| 本批跨模块可信能力如何开发和验收 | `docs/trusted-capability-absorption.md` |
 | 用户如何验收 | `docs/product-acceptance-matrix.md` |
 | 助手如何理解业务、选择 Skill | `docs/business-understanding-skills.md` |
 | 工作区对象、字段画像与规划指纹如何派生 | `docs/workspace-context-catalog.md` |

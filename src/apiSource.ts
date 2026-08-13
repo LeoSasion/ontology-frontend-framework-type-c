@@ -78,27 +78,11 @@ export function listImportJobs(options: {
   if (options.search) params.set("search", options.search);
   if (options.limit) params.set("limit", String(options.limit));
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return fetchJson<Record<string, unknown>>(`/api/import/jobs${suffix}`, { ok: false });
+  return fetchJson<Record<string, unknown>>(`/api/import/executions${suffix}`, { ok: false });
 }
 
 export function removeImportJob(options: { jobKey: string; confirm?: boolean }) {
   return fetchJson<Record<string, unknown>>("/api/import/jobs/remove", { ok: false }, {
-    method: "POST",
-    body: JSON.stringify(options),
-  });
-}
-
-export function commitImport(options: {
-  filePath: string;
-  table?: string;
-  name?: string;
-  mode?: string;
-  uniqueFields?: string[];
-  conflictRule?: string;
-  expectedPlan?: string;
-  confirm?: boolean;
-}) {
-  return fetchJson<Record<string, unknown>>("/api/import/commit", { ok: false }, {
     method: "POST",
     body: JSON.stringify(options),
   });
@@ -112,21 +96,6 @@ export function previewFolderImport(options: {
   conflictRule?: string;
 }) {
   return fetchJson<FolderImportPlan>("/api/import/folder/preview", emptyFolderImportPlan, {
-    method: "POST",
-    body: JSON.stringify(options),
-  }).then((result) => normalizeFolderImportPlan(result, options.path));
-}
-
-export function commitFolderImport(options: {
-  path: string;
-  limit?: number;
-  recursive?: boolean;
-  uniqueFields?: string[];
-  conflictRule?: string;
-  expectedPlan?: string;
-  confirm?: boolean;
-}) {
-  return fetchJson<FolderImportPlan>("/api/import/folder/commit", emptyFolderImportPlan, {
     method: "POST",
     body: JSON.stringify(options),
   }).then((result) => normalizeFolderImportPlan(result, options.path));

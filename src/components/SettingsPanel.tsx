@@ -6,10 +6,12 @@ import { Bilingual } from "./Bilingual";
 import { SettingsConfigPortabilityPanel } from "./SettingsConfigPortabilityPanel";
 import { SettingsSandboxBoundaryPanel } from "./SettingsSandboxBoundaryPanel";
 import { SettingsThemePreferencePanel, ThemeSwatches } from "./SettingsThemePreferencePanel";
+import { loadSettingsWorkspaceRecoveryPanel } from "./workspaceRecoveryLoader";
 
 const TrustContextSettingsPanel = lazy(() => import("./TrustContextSettingsPanel"));
 const SettingsDomainPackPanel = lazy(() => import("./SettingsDomainPackPanel").then((module) => ({ default: module.SettingsDomainPackPanel })));
 const SettingsAgentRuntimeProfilePanel = lazy(() => import("./SettingsAgentRuntimeProfilePanel"));
+const SettingsWorkspaceRecoveryPanel = lazy(loadSettingsWorkspaceRecoveryPanel);
 
 type SettingsPanelProps = {
   workbench: WorkbenchPayload;
@@ -20,9 +22,10 @@ type SettingsPanelProps = {
   onExportConfig: () => Promise<Record<string, unknown>>;
   onApplyConfig: (options: { input: string; confirm?: boolean }) => Promise<Record<string, unknown>>;
   onSetDomainPack: (options: { packId: string; state: "enabled" | "disabled"; workspaceId?: string; confirm?: boolean }) => Promise<Record<string, unknown>>;
+  onWorkspaceRecoveryInvalidated?: (keys: string[]) => void;
 };
 
-export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThemePalette, onValidateConfig, onExportConfig, onApplyConfig, onSetDomainPack }: SettingsPanelProps) {
+export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThemePalette, onValidateConfig, onExportConfig, onApplyConfig, onSetDomainPack, onWorkspaceRecoveryInvalidated }: SettingsPanelProps) {
   const preferences = useMemo(() => getUserPreferences(workbench), [workbench]);
   const palettes = useMemo(() => Array.isArray(workbench.themePalettes) ? workbench.themePalettes.filter((theme) => theme.enabled) : [], [workbench.themePalettes]);
   const activeTheme = useMemo(() => resolveThemePalette(workbench, preferences), [preferences, workbench]);
@@ -31,6 +34,7 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
   const [configInput, setConfigInput] = useState("");
   const [configResult, setConfigResult] = useState<Record<string, unknown> | null>(null);
   const [domainPackResult, setDomainPackResult] = useState<Record<string, unknown> | null>(null);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   useEffect(() => {
     setDraftPreferences(preferences);
@@ -184,6 +188,26 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
               onRunConfigAction={runConfigAction}
               onValidateConfig={onValidateConfig}
             />
+          </div>
+        </details>
+
+        <details
+          className="progressiveDetails settingsProgressiveDetails"
+          data-testid="settings-workspace-recovery-details"
+          onToggle={(event) => {
+            if (event.currentTarget.open) setRecoveryOpen(true);
+          }}
+        >
+          <summary><Bilingual zh="工作区恢复" en="Workspace recovery" /></summary>
+          <div className="progressiveDetailsBody single">
+            {recoveryOpen ? (
+              <Suspense fallback={<div className="settingsLoading"><Bilingual zh="正在加载恢复状态…" en="Loading recovery status…" /></div>}>
+                <SettingsWorkspaceRecoveryPanel
+                  workspaceId={status.workspace.id}
+                  onInvalidated={onWorkspaceRecoveryInvalidated}
+                />
+              </Suspense>
+            ) : null}
           </div>
         </details>
       </div>

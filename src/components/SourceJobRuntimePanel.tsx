@@ -24,7 +24,10 @@ export function SourceJobRuntimePanel() {
   const [jobs, setJobs] = useState<AnalysisJob[]>([]);
   const [error, setError] = useState("");
   const [canceling, setCanceling] = useState("");
-  const sourceJobs = useMemo(() => jobs.filter((job) => job.kind === "source-intelligence").slice(0, 5), [jobs]);
+  const sourceJobs = useMemo(
+    () => jobs.filter((job) => ["source-intelligence", "import"].includes(job.kind)).slice(0, 8),
+    [jobs],
+  );
   const hasActive = sourceJobs.some((job) => ACTIVE_STATUSES.has(job.status));
 
   const refresh = useCallback(async () => {
@@ -63,7 +66,7 @@ export function SourceJobRuntimePanel() {
   return (
     <article className="workbenchPanel sourceJobRuntime" data-testid="source-job-runtime">
       <div className="tileHeader">
-        <h3><Bilingual zh="后台分析任务" en="Background analysis jobs" /></h3>
+        <h3><Bilingual zh="导入与后台分析任务" en="Import and analysis jobs" /></h3>
         <span>{hasActive ? biText("运行中", "Active") : biText("最近记录", "Recent")}</span>
       </div>
       {error ? <p className="sourceJobError">{error}</p> : null}

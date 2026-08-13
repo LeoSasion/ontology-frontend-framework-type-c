@@ -376,9 +376,15 @@ def delete_formula_command(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
-def build_formula_metric_query(connection: sqlite3.Connection, row: sqlite3.Row, args: argparse.Namespace) -> dict[str, Any]:
+def build_formula_metric_query(
+    connection: sqlite3.Connection,
+    analysis_connection: Any,
+    row: sqlite3.Row,
+    args: argparse.Namespace,
+) -> dict[str, Any]:
     return build_formula_metric_query_service(
         connection,
+        analysis_connection,
         row,
         args,
         table_columns=table_columns,
@@ -548,4 +554,4 @@ def dashboard_operation_command(args: argparse.Namespace) -> dict[str, Any]:
         connection.commit()
     return {"ok": True, "confirmed": True, "operation": args.op, **result}
 
-
+

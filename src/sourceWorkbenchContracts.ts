@@ -3,6 +3,8 @@ import type { BusinessPathStepKey } from "./businessPathModel";
 import type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 import type { ConnectorOptions, ImportOptions, ImportPolicyOptions, MetricMutationOptions, SourceIntelligenceRunOptions } from "./sourceWorkbenchCommandModel";
 import type { NavigationOperationOptions } from "./sourceWorkbenchDraftModel";
+import type { CreateImportJobOptions } from "./apiImportJobs";
+import type { AnalysisJob } from "./typesJobs";
 
 export type { RelationshipSaveOptions } from "./dashboardCanvasContracts";
 
@@ -57,9 +59,13 @@ export type SourceWorkbenchProps = {
   workbench: WorkbenchPayload;
   formulaPreview: FormulaPreviewPayload;
   onPreview: (options: ImportOptions) => Promise<ImportPreview>;
-  onCommitImport: (options: ImportOptions) => Promise<void>;
   onPreviewFolderImport: (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string }) => Promise<FolderImportPlan>;
-  onCommitFolderImport: (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string; expectedPlan?: string; confirm?: boolean }) => Promise<FolderImportPlan>;
+  onCreateImportJob: (options: CreateImportJobOptions) => Promise<AnalysisJob>;
+  onFetchImportJob: (jobKey: string) => Promise<AnalysisJob>;
+  onListImportJobs: () => Promise<AnalysisJob[]>;
+  onCancelImportJob: (job: AnalysisJob) => Promise<AnalysisJob>;
+  onResumeImportJob: (job: AnalysisJob) => Promise<AnalysisJob>;
+  onImportJobCompleted: (job: AnalysisJob) => Promise<void>;
   onImportPolicy: (options: ImportPolicyOptions) => Promise<void>;
   onRemoveImportJob: (options: { jobKey: string; confirm?: boolean }) => Promise<void>;
   onInspectSource: (table: string) => Promise<void>;

@@ -97,8 +97,8 @@ export function appendProductUxContractChecks(context) {
         label: "deferred-ui-recovers-without-global-page-failure",
         ok: appLazyModulesSource.includes("lazyWithRetry") &&
           sourceWorkbenchDeferredModulesSource.includes("lazyWithRetry") &&
-          !sourceWorkbenchDeferredModulesSource.includes("loadDataEntryPanel") &&
-          sourceWorkbenchViewSource.includes('import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel"'),
+          sourceWorkbenchDeferredModulesSource.includes('import("./components/SourceWorkbenchDataEntryPanel")') &&
+          sourceWorkbenchViewSource.includes("SourceWorkbenchDataEntryPanel,"),
       },
     {
         label: "frontend-inspector-selected-context",

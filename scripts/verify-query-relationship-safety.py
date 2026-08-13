@@ -336,17 +336,19 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-direct-relationship-") as temp_d
     import bi_cli_relationship_formula_commands as relationship_commands  # noqa: E402
 
     original_builder = relationship_commands.build_relationship_query
-    builder_saw_transaction = False
-    competing_writer_blocked = False
+    builder_saw_validated_replica = False
+    competing_writer_started = False
 
-    def transaction_probe(connection: sqlite3.Connection, *args: Any, **kwargs: Any) -> dict[str, Any]:
-        global builder_saw_transaction, competing_writer_blocked
-        builder_saw_transaction = connection.in_transaction
+    def transaction_probe(connection: Any, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        global builder_saw_validated_replica, competing_writer_started
+        builder_saw_validated_replica = bool(getattr(connection, "replicas", []))
         competing = sqlite3.connect(database, timeout=0)
         try:
             competing.execute("BEGIN IMMEDIATE")
-        except sqlite3.OperationalError as error:
-            competing_writer_blocked = "locked" in str(error).casefold()
+            competing_writer_started = True
+            competing.rollback()
+        except sqlite3.OperationalError:
+            competing_writer_started = False
         finally:
             competing.close()
         return original_builder(connection, *args, **kwargs)
@@ -370,11 +372,14 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-direct-relationship-") as temp_d
     finally:
         relationship_commands.build_relationship_query = original_builder
     check(
-        "validation-column-discovery-and-query-share-immediate-transaction",
-        builder_saw_transaction and competing_writer_blocked and payload.get("ok") is True,
+        "relationship-query-uses-validated-replica-without-sqlite-writer-lock",
+        builder_saw_validated_replica
+        and competing_writer_started
+        and payload.get("ok") is True
+        and payload.get("query", {}).get("runtime", {}).get("engine") == "duckdb",
         {
-            "builderSawTransaction": builder_saw_transaction,
-            "competingWriterBlocked": competing_writer_blocked,
+            "builderSawValidatedReplica": builder_saw_validated_replica,
+            "competingWriterStarted": competing_writer_started,
             "payload": payload,
         },
     )

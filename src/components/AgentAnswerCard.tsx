@@ -11,6 +11,7 @@ const AgentEvidencePlan = lazy(() => import("./AgentEvidencePlan").then((module)
 const ForecastReadinessPanel = lazy(() => import("./ForecastReadinessPanel").then((module) => ({ default: module.ForecastReadinessPanel })));
 const AnalysisSnapshotPanel = lazy(() => import("./AnalysisSnapshotPanel").then((module) => ({ default: module.AnalysisSnapshotPanel })));
 const AgentAnswerVisualization = lazy(() => import("./AgentAnswerVisualization"));
+const DecisionFrameworkEntry = lazy(() => import("./DecisionFrameworkEntry").then((module) => ({ default: module.DecisionFrameworkEntry })));
 
 type AgentAnswerCardProps = {
   answerCard: NonNullable<AgentAskResult["answerCard"]>;
@@ -634,6 +635,11 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
             </Suspense>
           ) : null}
         </div>
+      ) : null}
+      {canSupportConclusion && analysisUnitKey ? (
+        <Suspense fallback={null}>
+          <DecisionFrameworkEntry unitKey={analysisUnitKey} />
+        </Suspense>
       ) : null}
       <div className="agentAnswerEvidenceRoute" data-testid="agent-answer-evidence-route">
         <div className="agentAnswerEvidenceRouteLead">

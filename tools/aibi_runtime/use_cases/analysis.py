@@ -20,6 +20,23 @@ from confirmed_query_service import (
     recall_receipts_command,
 )
 from evidence_export_service import export_evidence_command
+from reviewed_evidence_commands import (
+    evidence_retrieval_evaluate_command,
+    evidence_retrieval_receipts_command,
+    evidence_retrieval_status_command,
+    reviewed_publication_deprecate_command,
+    reviewed_publication_export_command,
+    reviewed_publication_plan_command,
+    reviewed_publication_publish_command,
+    reviewed_publications_command,
+)
+from decision_framework_service import (
+    decision_framework_create_command,
+    decision_framework_export_command,
+    decision_framework_publish_command,
+    decision_framework_save_command,
+    decision_frameworks_command,
+)
 from exploration_thread_service import (
     exploration_anchor_add_command,
     exploration_board_set_command,

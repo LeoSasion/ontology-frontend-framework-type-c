@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
+from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
 
 
 checks: list[dict[str, object]] = []
@@ -124,21 +125,23 @@ with tempfile.TemporaryDirectory(prefix="query-", dir=TEST_TMP_ROOT) as temp_dir
     from apparel_analytics_service import execute_apparel_method
 
     registry = connection.execute("SELECT * FROM table_registry WHERE workspace_id = 'default' AND table_key = 'orders'").fetchone()
-    ranking_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=ranking_intent)
+    query_duckdb_path = Path(temp_dir) / "trusted.duckdb"
+    publish_sqlite_fixture_to_duckdb(connection, query_duckdb_path)
+    ranking_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=ranking_intent, duckdb_path=query_duckdb_path)
     check("ranking-executes-with-stable-key-and-tie-rule", bool(ranking_result and ranking_result["executed"] and ranking_result["rows"][0]["businessKey"] and ranking_result["evidence"]["tieRule"]), ranking_result)
     check("filter-and-time-are-pushed-to-sql", "channel" in ranking_result["runtime"]["compiledSql"] and "paid_at" in ranking_result["runtime"]["compiledSql"], ranking_result["runtime"])
 
     concentration_intent = typed_intent(connection, "sales_amount 合计按 style_spu 前20%集中度")
-    concentration_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=concentration_intent)
+    concentration_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=concentration_intent, duckdb_path=query_duckdb_path)
     check("top-percent-is-not-top-n", concentration_intent["limit"]["percent"] == 0.2 and concentration_intent["limit"]["count"] is None, concentration_intent["limit"])
     check("concentration-uses-complete-positive-population", bool(concentration_result and concentration_result["runtime"]["populationComplete"] and concentration_result["evidence"]["positivePopulationTotal"] > 0), concentration_result)
 
     pareto_intent = typed_intent(connection, "sales_amount 合计按 style_spu 做 Pareto 二八分析")
-    pareto_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=pareto_intent)
+    pareto_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=pareto_intent, duckdb_path=query_duckdb_path)
     check("pareto-answers-both-required-questions", bool(pareto_result and "headContribution" in pareto_result["evidence"] and "entityPercentToReach80" in pareto_result["evidence"]), pareto_result)
 
     decile_intent = typed_intent(connection, "sales_amount 合计按 style_spu 做十分位")
-    decile_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=decile_intent)
+    decile_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=decile_intent, duckdb_path=query_duckdb_path)
     check("decile-executes-only-with-sufficient-population", bool(decile_result and decile_result["executed"] and decile_result["evidence"]["populationEntityCount"] >= 10), decile_result)
 
     ambiguous = typed_intent(connection, "sales_amount 按 style_spu 排行")
@@ -315,6 +318,8 @@ with tempfile.TemporaryDirectory(prefix="proof-", dir=TEST_TMP_ROOT) as temp_dir
     for table_key in ("orders", "inventory"):
         proof_connection.execute("INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, row_count, created_at) VALUES('proof-batch', 'default', ?, 1, 2, '2026-07-19')", (table_key,))
     proof_connection.execute("UPDATE workspaces SET current_source_run_id = 'proof-batch' WHERE id = 'default'")
+    proof_duckdb_path = Path(temp_dir) / "proof.duckdb"
+    publish_sqlite_fixture_to_duckdb(proof_connection, proof_duckdb_path)
     relationship_preview = build_relationship_preview(
         proof_connection,
         "proof_orders",
@@ -333,6 +338,7 @@ with tempfile.TemporaryDirectory(prefix="proof-", dir=TEST_TMP_ROOT) as temp_dir
         right_table_key="inventory",
         mappings=[{"leftField": "style_spu", "rightField": "style_spu"}],
         relationship_preview=relationship_preview,
+        duckdb_path=proof_duckdb_path,
     )
     check("apparel-mapping-proof-validates-values-grain-time-scope-and-source-run", proof["status"] == "validated" and proof["cardinality"] == "one-to-one" and proof["proofFingerprint"], proof)
     check("generic-sku-is-explicitly-ambiguous", classify_apparel_field("SKU")["ambiguous"] is True, classify_apparel_field("SKU"))

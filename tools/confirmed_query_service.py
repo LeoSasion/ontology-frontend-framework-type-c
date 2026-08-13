@@ -734,7 +734,23 @@ def recall_confirmed_plans(
                 timestamp,
             ),
         )
-    return {"candidates": returned, "receipt": receipt_payload}
+    retrieval = retrieve_confirmed_evidence(
+        connection,
+        workspace_id=workspace_id,
+        prompt=prompt,
+        explicit_table_key=explicit_table_key,
+        semantic_plan=semantic_plan,
+        planning_binding_fingerprint=planning_binding_fingerprint,
+        now_iso=now_iso,
+        permission_filter=lambda _candidate: True,
+        persist_receipt=persist_receipt,
+        limit=limit,
+    )
+    return {
+        "candidates": returned,
+        "receipt": receipt_payload,
+        "evidenceRetrievalReceipt": retrieval["receipt"],
+    }
 
 
 def recall_confirmed_queries(
@@ -770,3 +786,4 @@ def recall_confirmed_queries(
             "matchChannels": memory["matchChannels"],
         })
     return candidates
+from evidence_retrieval_service import retrieve_confirmed_evidence

@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { captureScreenshot, check, click, evaluate, finishReceipt, launchChrome, navigate, setViewport, waitFor } from "./ui-verify-chrome.mjs";
-import { apiBaseUrl, fetchJson, postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
+import { apiBaseUrl, fetchJson, postJson, runDurableImport, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-semantic-execution-"));
@@ -34,12 +34,12 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
   if (importPlan.readyToCommit !== true || !importPlan.planFingerprint) {
     throw new Error(`Semantic fixture atomic import is blocked: ${JSON.stringify(importPlan.blockers ?? [])}`);
   }
-  const atomicImport = await postJson("/api/import/folder/commit", {
+  const atomicImport = await runDurableImport({
+    importKind: "folder",
     path: screenshotDir,
     recursive: false,
     limit: 20,
     expectedPlan: importPlan.planFingerprint,
-    confirm: true,
   });
   const regionSitesSaved = await postJson("/api/relationships/save", {
     workspaceId: temporaryWorkspaceId,
@@ -114,9 +114,10 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
   const exportCreated = existsSync(exportPath);
   rmSync(exportPath, { force: true });
   const directValues = new Map((directQuery.rows ?? []).map((row) => [String(row.label), Number(row.value)]));
+  const atomicImportResult = atomicImport.job?.result ?? {};
   const pathCandidates = pathClarification.semanticPlan?.joinPlan?.targets?.flatMap((target) => target.pathCandidates ?? []) ?? [];
   checks.push(
-    check("semantic-ui-fixture-shares-one-current-source-run", atomicImport.atomic === true && atomicImport.committed === true && atomicImport.tableCount === 4 && Boolean(atomicImport.sourceRunId), { atomicImport }),
+    check("semantic-ui-fixture-shares-one-current-source-run", atomicImport.job?.status === "succeeded" && atomicImportResult.committed === true && atomicImportResult.tableCount === 4 && Boolean(atomicImportResult.sourceRunId), { atomicImport }),
     check("semantic-ui-fixture-relationships-validated", [regionSitesSaved, siteAssetsSaved, assetObservationsSaved, ownerObservationsSaved].every((saved) => saved.saved?.workspace_id === temporaryWorkspaceId && saved.saved?.validation?.status === "validated"), { regionSites: regionSitesSaved.saved, siteAssets: siteAssetsSaved.saved, assetObservations: assetObservationsSaved.saved, ownerObservations: ownerObservationsSaved.saved }),
     check("semantic-ui-api-requires-explicit-path-for-equal-safe-routes", pathClarification.semanticPlan?.status === "needs-clarification" && (pathClarification.executionPlan == null || pathClarification.executionPlan?.status === "blocked") && pathClarification.queryPlanReceipt?.status === "blocked" && pathCandidates.length === 2 && pathCandidates.every((candidate) => candidate.hops?.length === 3), { semanticPlan: pathClarification.semanticPlan, executionPlan: pathClarification.executionPlan, receiptStatus: pathClarification.queryPlanReceipt?.status, pathCandidateCount: pathCandidates.length }),
     check("semantic-ui-api-executes-three-hop", apiAnswer.answerCard?.kind === "semantic-relationship-analysis" && apiAnswer.semanticPlan?.joinPlan?.targets?.some((target) => target.selectedPathReason === "explicit-relationship-path") && apiAnswer.executionPlan?.status === "ready" && apiAnswer.executionPlan?.relationships?.map((relationship) => relationship.relationKey).join(",") === selectedRelationKeys.join(",") && apiAnswer.executionPlan?.relationshipPathProof?.hopProofs?.length === 3 && apiAnswer.queryPlanReceipt?.status === "executed" && apiAnswer.queryPlanReceipt?.source?.tableKeys?.join(",") === "regions,sites,assets,observations", { answerKind: apiAnswer.answerCard?.kind, semanticPlan: apiAnswer.semanticPlan, executionPlan: apiAnswer.executionPlan, receiptSource: apiAnswer.queryPlanReceipt?.source }),
@@ -188,7 +189,15 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
     checks.push(
       check("semantic-ui-agent-question-submitted", filled && submitted.ok, { filled, submitted }),
       check("semantic-ui-execution-plan-rendered", rendered.ok && /计划哈希|Plan hash/.test(visibleState.execution) && /最终粒度|Final grain/.test(visibleState.execution) && visibleState.pathHopCount === 3 && /regions/.test(visibleState.path) && /observations/.test(visibleState.path), visibleState),
-      check("semantic-ui-business-answer-rendered", /受控跨表分析|Controlled cross-table analysis/.test(visibleState.answer) && /执行引擎: sqlite|Engine: sqlite/.test(visibleState.answer) && !visibleState.answer.includes("[object Object]") && !visibleState.hasError, visibleState),
+      check(
+        "semantic-ui-business-answer-rendered",
+        /受控跨表分析|Controlled cross-table analysis/.test(visibleState.answer)
+          && /执行引擎:\s*duckdb|Engine:\s*duckdb/i.test(visibleState.answer)
+          && !/执行引擎:\s*sqlite|Engine:\s*sqlite/i.test(visibleState.answer)
+          && !visibleState.answer.includes("[object Object]")
+          && !visibleState.hasError,
+        visibleState,
+      ),
       check("semantic-ui-analysis-unit-rationale-visible", /可复算分析单元|Recomputable analysis unit/.test(visibleState.unit) && /比较|comparison/.test(visibleState.unit) && /柱状图|bar chart/.test(visibleState.unit), visibleState),
       check("semantic-ui-analysis-export-action-visible", /导出 Excel \+ 报告|Export Excel \+ report/.test(visibleState.exportButton), visibleState),
     );

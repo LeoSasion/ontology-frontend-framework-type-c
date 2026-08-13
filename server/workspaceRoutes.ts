@@ -64,6 +64,20 @@ export async function handleWorkspaceApi({ cli, port, request, response, url }: 
       : op === "delete"
         ? ["workspace-delete", String(body.workspaceId ?? body.workspace ?? "")]
         : ["workspace-create", "--name", String(body.name ?? "New Workspace")];
+    if (op === "delete") {
+      const requestKey = String(body.requestKey ?? "").trim();
+      const expectedPlan = String(body.expectedPlan ?? "").trim();
+      if (body.confirm === true && (!requestKey || !expectedPlan)) {
+        sendJson(response, 400, {
+          ok: false,
+          code: "WORKSPACE_DELETE_CONFIRMATION_REQUIRED",
+          error: "Confirmed workspace deletion requires the preview requestKey and exact plan fingerprint.",
+        });
+        return true;
+      }
+      if (requestKey) args.push("--request-key", requestKey);
+      if (expectedPlan) args.push("--expected-plan", expectedPlan);
+    }
     if (body.confirm === true) args.push("--yes");
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : 200, result);

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
+from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterator, Mapping, Sequence
 
 
 SAFE_AGGREGATIONS = {"count", "count-distinct", "sum", "avg", "min", "max"}
@@ -20,18 +23,124 @@ def duckdb_status(database_path: Path) -> dict[str, Any]:
     try:
         import duckdb  # type: ignore  # noqa: F401
 
-        available = True
-        error = None
-    except Exception as exc:  # pragma: no cover - depends on local Python env
-        available = False
-        error = str(exc)
+        dependency_available = True
+    except Exception:  # pragma: no cover - depends on local Python env
+        dependency_available = False
+    database_available = database_path.is_file()
+    available = dependency_available and database_available
+    reason_code = None
+    if not dependency_available:
+        reason_code = "duckdb-unavailable"
+    elif not database_available:
+        reason_code = "replica-database-missing"
     return {
         "engine": "duckdb",
         "available": available,
-        "database": str(database_path),
-        "fallbackEngine": None if available else "sqlite",
-        "error": error,
+        "database": "analysis-replica",
+        "fallbackEngine": None,
+        "queryAvailability": "current" if available else "blocked",
+        "reasonCode": reason_code,
+        "error": reason_code,
     }
+
+
+@dataclass(frozen=True)
+class ReplicaExpectation:
+    logical_table: str
+    source_version: str
+    row_count: int
+
+
+def replica_source_version(registry: Mapping[str, Any]) -> str:
+    return (
+        f"{registry['workspace_id']}:{registry['table_key']}:"
+        f"{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}"
+    )
+
+
+def replica_expectation(registry: Mapping[str, Any]) -> ReplicaExpectation:
+    return ReplicaExpectation(
+        logical_table=str(registry["physical_table"]),
+        source_version=replica_source_version(registry),
+        row_count=int(registry["row_count"] or 0),
+    )
+
+
+class ValidatedDuckDBQuery:
+    """A read-only DuckDB connection whose requested replicas were fully validated."""
+
+    def __init__(self, connection: Any, replicas: Sequence[dict[str, Any]]):
+        self.connection = connection
+        self.replicas = [dict(item) for item in replicas]
+
+    def execute(self, sql: str, params: Sequence[Any] | None = None) -> Any:
+        try:
+            return self.connection.execute(sql, list(params or []))
+        except Exception as exc:
+            raise QueryRuntimeError("replica-query-failed") from exc
+
+    def __getattr__(self, name: str) -> Any:
+        # Query compilers accept a DB-API-like object; keep the wrapper visible
+        # while forwarding read-only cursor metadata such as fetchone/fetchall.
+        return getattr(self.connection, name)
+
+    def rows(self, sql: str, params: Sequence[Any] | None = None) -> list[dict[str, Any]]:
+        return cursor_rows(self.execute(sql, params))
+
+    def runtime(self, *, compiled_sql: str, params: Sequence[Any] | None = None) -> dict[str, Any]:
+        safe_params = list(params or [])
+        return {
+            "engine": "duckdb",
+            "database": "analysis-replica",
+            "queryAvailability": "current",
+            "reasonCode": None,
+            "compiledSql": compiled_sql,
+            "parameterCount": len(safe_params),
+            "parameterFingerprint": hashlib.sha256(
+                json.dumps(safe_params, ensure_ascii=False, default=str, separators=(",", ":")).encode("utf-8")
+            ).hexdigest(),
+            "replicas": [dict(item) for item in self.replicas],
+        }
+
+
+@contextmanager
+def open_validated_duckdb_query(
+    duckdb_path: Path,
+    expectations: Sequence[ReplicaExpectation],
+) -> Iterator[ValidatedDuckDBQuery]:
+    """Open one read-only reader and fail closed unless every binding is current."""
+    try:
+        import duckdb  # type: ignore
+    except Exception as exc:  # pragma: no cover - depends on local Python env
+        raise DuckDBUnavailable("duckdb-unavailable") from exc
+    if not duckdb_path.is_file():
+        raise QueryRuntimeError("replica-database-missing")
+    if not expectations:
+        raise QueryRuntimeError("replica-expectations-required")
+    try:
+        duck_connection = duckdb.connect(str(duckdb_path), read_only=True)
+    except Exception as exc:
+        raise QueryRuntimeError("replica-database-open-failed") from exc
+    try:
+        try:
+            replicas = [
+                validate_replica_binding(
+                    duck_connection,
+                    logical_table=item.logical_table,
+                    expected_source_version=item.source_version,
+                    expected_row_count=item.row_count,
+                )
+                for item in expectations
+            ]
+        except QueryRuntimeError:
+            raise
+        except Exception as exc:
+            raise QueryRuntimeError("replica-validation-failed") from exc
+        # Consumer exceptions describe compile/business safety failures and must
+        # retain their own stable semantics; only reader open/validation is wrapped.
+        yield ValidatedDuckDBQuery(duck_connection, replicas)
+    finally:
+        duck_connection.close()
 
 
 def quote_identifier(name: str) -> str:
@@ -42,45 +151,40 @@ def numeric_sql(expression: str) -> str:
     return f"TRY_CAST(NULLIF(REPLACE(TRIM(CAST({expression} AS VARCHAR)), ',', ''), '') AS DOUBLE)"
 
 
-def sql_literal(value: Any) -> str:
-    return "'" + str(value).replace("'", "''") + "'"
-
-
-def compile_filter_sql(filters: list[dict[str, Any]] | None, *, dialect: str) -> str:
+def compile_filter_sql(filters: list[dict[str, Any]] | None, *, dialect: str) -> tuple[str, list[Any]]:
+    if dialect != "duckdb":
+        raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
     clauses: list[str] = []
+    params: list[Any] = []
     for item in filters or []:
         field = quote_identifier(str(item.get("field") or ""))
         operator = str(item.get("operator") or "")
-        value = sql_literal(item.get("value"))
+        value = item.get("value")
         if not field or field == '""':
             raise QueryRuntimeError("Filter field is required")
         if operator == "equals":
-            clauses.append(f"CAST({field} AS VARCHAR) = {value}")
+            clauses.append(f"CAST({field} AS VARCHAR) = ?")
+            params.append(str(value))
         elif operator == "not-equals":
-            clauses.append(f"CAST({field} AS VARCHAR) <> {value}")
+            clauses.append(f"CAST({field} AS VARCHAR) <> ?")
+            params.append(str(value))
         elif operator == "contains":
-            clauses.append(f"CAST({field} AS VARCHAR) LIKE '%' || {value} || '%'")
+            clauses.append(f"CAST({field} AS VARCHAR) LIKE '%' || ? || '%'")
+            params.append(str(value))
         elif operator == "not-contains":
-            clauses.append(f"CAST({field} AS VARCHAR) NOT LIKE '%' || {value} || '%'")
+            clauses.append(f"CAST({field} AS VARCHAR) NOT LIKE '%' || ? || '%'")
+            params.append(str(value))
         elif operator in {"gt", "gte", "lt", "lte"}:
             comparison = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[operator]
-            if dialect == "duckdb":
-                clauses.append(f"{numeric_sql(field)} {comparison} TRY_CAST({value} AS DOUBLE)")
-            elif dialect == "sqlite":
-                clauses.append(f"CAST(NULLIF(REPLACE({field}, ',', ''), '') AS REAL) {comparison} CAST({value} AS REAL)")
-            else:
-                raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
+            clauses.append(f"{numeric_sql(field)} {comparison} TRY_CAST(? AS DOUBLE)")
+            params.append(value)
         elif operator in {"date-gte", "date-lt"}:
             comparison = ">=" if operator == "date-gte" else "<"
-            if dialect == "duckdb":
-                clauses.append(f"TRY_CAST({field} AS TIMESTAMP) {comparison} TRY_CAST({value} AS TIMESTAMP)")
-            elif dialect == "sqlite":
-                clauses.append(f"datetime({field}) {comparison} datetime({value})")
-            else:
-                raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
+            clauses.append(f"TRY_CAST({field} AS TIMESTAMP) {comparison} TRY_CAST(? AS TIMESTAMP)")
+            params.append(value)
         else:
             raise QueryRuntimeError(f"Unsupported filter operator: {operator}")
-    return " AND ".join(clauses)
+    return " AND ".join(clauses), params
 
 
 def cursor_rows(cursor: Any) -> list[dict[str, Any]]:
@@ -121,6 +225,50 @@ def _ensure_manifest(duck_connection: Any) -> None:
     )
 
 
+def validate_replica_binding(
+    duck_connection: Any,
+    *,
+    logical_table: str,
+    expected_source_version: str,
+    expected_row_count: int | None = None,
+) -> dict[str, Any]:
+    """Fail closed when a published replica is missing, stale, or only half switched."""
+    if _relation_kind(duck_connection, "__aibi_replica_manifest") is None:
+        raise QueryRuntimeError("replica-manifest-missing")
+    row = duck_connection.execute(
+        "SELECT source_version, replica_table, row_count FROM __aibi_replica_manifest WHERE logical_table = ?",
+        [logical_table],
+    ).fetchone()
+    if row is None:
+        raise QueryRuntimeError(f"replica-binding-missing:{logical_table}")
+    source_version = str(row[0])
+    replica_table = str(row[1])
+    row_count = int(row[2] or 0)
+    if source_version != str(expected_source_version):
+        raise QueryRuntimeError(f"replica-version-stale:{logical_table}")
+    if expected_row_count is not None and row_count != int(expected_row_count):
+        raise QueryRuntimeError(f"replica-row-count-drift:{logical_table}")
+    if _relation_kind(duck_connection, replica_table) != "BASE TABLE":
+        raise QueryRuntimeError(f"replica-table-missing:{logical_table}")
+    if _relation_kind(duck_connection, logical_table) != "VIEW":
+        raise QueryRuntimeError(f"replica-view-not-published:{logical_table}")
+    physical_count = int(duck_connection.execute(
+        f"SELECT COUNT(*) FROM {quote_identifier(replica_table)}"
+    ).fetchone()[0] or 0)
+    view_count = int(duck_connection.execute(
+        f"SELECT COUNT(*) FROM {quote_identifier(logical_table)}"
+    ).fetchone()[0] or 0)
+    if physical_count != row_count or view_count != row_count:
+        raise QueryRuntimeError(f"replica-content-drift:{logical_table}")
+    return {
+        "logicalTable": logical_table,
+        "sourceVersion": source_version,
+        "replicaTable": replica_table,
+        "rowCount": row_count,
+        "status": "current",
+    }
+
+
 def sync_table_to_duckdb(
     sqlite_connection: Any,
     duck_connection: Any,
@@ -128,6 +276,7 @@ def sync_table_to_duckdb(
     columns: list[str],
     *,
     source_version: str,
+    cleanup_stale: bool = True,
 ) -> dict[str, Any]:
     _ensure_manifest(duck_connection)
     current = duck_connection.execute(
@@ -135,11 +284,17 @@ def sync_table_to_duckdb(
         [physical_table],
     ).fetchone()
     if current and str(current[0]) == source_version and _relation_kind(duck_connection, physical_table) == "VIEW":
+        validated = validate_replica_binding(
+            duck_connection,
+            logical_table=physical_table,
+            expected_source_version=source_version,
+            expected_row_count=int(current[2] or 0),
+        )
         return {
             "syncedRows": 0,
             "replicaStatus": "current",
-            "replicaTable": str(current[1]),
-            "rowCount": int(current[2] or 0),
+            "replicaTable": str(validated["replicaTable"]),
+            "rowCount": int(validated["rowCount"]),
         }
 
     replica_table = replica_table_name(physical_table, source_version)
@@ -177,18 +332,25 @@ def sync_table_to_duckdb(
     except Exception:
         duck_connection.execute("ROLLBACK")
         raise
-    stale_replicas = duck_connection.execute(
-        "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE '__aibi_replica_%' AND table_name NOT IN (?, '__aibi_replica_manifest')",
-        [replica_table],
-    ).fetchall()
-    active_replicas = {
-        str(row[0])
-        for row in duck_connection.execute("SELECT replica_table FROM __aibi_replica_manifest").fetchall()
-    }
-    for stale in stale_replicas:
-        stale_name = str(stale[0])
-        if stale_name not in active_replicas:
-            duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(stale_name)}")
+    validate_replica_binding(
+        duck_connection,
+        logical_table=physical_table,
+        expected_source_version=source_version,
+        expected_row_count=len(rows),
+    )
+    if cleanup_stale:
+        stale_replicas = duck_connection.execute(
+            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE '__aibi_replica_%' AND table_name NOT IN (?, '__aibi_replica_manifest')",
+            [replica_table],
+        ).fetchall()
+        active_replicas = {
+            str(row[0])
+            for row in duck_connection.execute("SELECT replica_table FROM __aibi_replica_manifest").fetchall()
+        }
+        for stale in stale_replicas:
+            stale_name = str(stale[0])
+            if stale_name not in active_replicas:
+                duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(stale_name)}")
     return {
         "syncedRows": len(rows),
         "replicaStatus": "published",
@@ -205,7 +367,7 @@ def compile_aggregate_sql(
     aggregation: str,
     limit: int,
     filters: list[dict[str, Any]] | None = None,
-) -> str:
+) -> tuple[str, list[Any]]:
     if aggregation not in SAFE_AGGREGATIONS:
         raise QueryRuntimeError(f"Unsupported aggregation: {aggregation}")
     if aggregation == "count":
@@ -214,7 +376,7 @@ def compile_aggregate_sql(
         select_measure = f"COUNT(DISTINCT {quote_identifier(measure)}) AS value"
     else:
         select_measure = f"{aggregation.upper()}({numeric_sql(quote_identifier(measure))}) AS value"
-    where_sql = compile_filter_sql(filters, dialect="duckdb")
+    where_sql, params = compile_filter_sql(filters, dialect="duckdb")
     where_clause = f"WHERE {where_sql} " if where_sql else ""
     if group:
         safe_limit = max(1, min(int(limit), 500))
@@ -225,31 +387,25 @@ def compile_aggregate_sql(
             f"{where_clause}"
             f"GROUP BY {group_sql} "
             f"ORDER BY value DESC NULLS LAST "
-            f"LIMIT {safe_limit}"
+            f"LIMIT {safe_limit}",
+            params,
         )
-    return f"SELECT {select_measure} FROM {quote_identifier(physical_table)} {where_clause}".strip()
+    return f"SELECT {select_measure} FROM {quote_identifier(physical_table)} {where_clause}".strip(), params
 
 
 def run_duckdb_aggregate_query(
     *,
-    sqlite_connection: Any,
     duckdb_path: Path,
     physical_table: str,
-    columns: list[str],
     group: str | None,
     measure: str,
     aggregation: str,
     limit: int,
     filters: list[dict[str, Any]] | None = None,
-    source_version: str | None = None,
+    source_version: str,
+    expected_row_count: int,
 ) -> dict[str, Any]:
-    try:
-        import duckdb  # type: ignore
-    except Exception as exc:  # pragma: no cover - depends on local Python env
-        raise DuckDBUnavailable(str(exc)) from exc
-
-    duckdb_path.parent.mkdir(parents=True, exist_ok=True)
-    sql = compile_aggregate_sql(
+    sql, params = compile_aggregate_sql(
         physical_table=physical_table,
         group=group,
         measure=measure,
@@ -257,73 +413,21 @@ def run_duckdb_aggregate_query(
         limit=limit,
         filters=filters,
     )
-    try:
-        with duckdb.connect(str(duckdb_path)) as duck_connection:
-            version = str(source_version or f"legacy:{physical_table}:{len(columns)}")
-            replica = sync_table_to_duckdb(
-                sqlite_connection,
-                duck_connection,
-                physical_table,
-                columns,
-                source_version=version,
-            )
-            cursor = duck_connection.execute(sql)
-            rows = cursor_rows(cursor)
-    except Exception as exc:
-        raise QueryRuntimeError(str(exc)) from exc
+    expectation = ReplicaExpectation(
+        logical_table=physical_table,
+        source_version=str(source_version),
+        row_count=int(expected_row_count),
+    )
+    with open_validated_duckdb_query(duckdb_path, [expectation]) as query:
+        rows = query.rows(sql, params)
+        replica = query.replicas[0]
+        runtime = query.runtime(compiled_sql=sql, params=params)
     return {
-        "engine": "duckdb",
-        "database": str(duckdb_path),
-        "compiledSql": sql,
-        "syncedRows": replica["syncedRows"],
-        "sourceVersion": version,
-        "replicaStatus": replica["replicaStatus"],
+        **runtime,
+        "syncedRows": 0,
+        "sourceVersion": str(source_version),
+        "replicaStatus": replica["status"],
         "replicaTable": replica["replicaTable"],
         "replicaRowCount": replica["rowCount"],
-        "rows": rows,
-    }
-
-
-def sqlite_cursor_rows(rows: Iterable[Any]) -> list[dict[str, Any]]:
-    return [dict(row) for row in rows]
-
-
-def run_sqlite_aggregate_query(
-    *,
-    sqlite_connection: Any,
-    physical_table: str,
-    group: str | None,
-    measure: str,
-    aggregation: str,
-    limit: int,
-    filters: list[dict[str, Any]] | None = None,
-) -> dict[str, Any]:
-    if aggregation == "count":
-        select_measure = "COUNT(*) AS value"
-    elif aggregation == "count-distinct":
-        select_measure = f"COUNT(DISTINCT {quote_identifier(measure)}) AS value"
-    else:
-        select_measure = (
-            f"{aggregation.upper()}(CAST(NULLIF(REPLACE({quote_identifier(measure)}, ',', ''), '') AS REAL)) AS value"
-        )
-    where_sql = compile_filter_sql(filters, dialect="sqlite")
-    where_clause = f"WHERE {where_sql} " if where_sql else ""
-    if group:
-        sql = (
-            f"SELECT {quote_identifier(group)} AS label, {select_measure} "
-            f"FROM {quote_identifier(physical_table)} "
-            f"{where_clause}"
-            f"GROUP BY {quote_identifier(group)} "
-            "ORDER BY value DESC LIMIT ?"
-        )
-        rows = sqlite_cursor_rows(sqlite_connection.execute(sql, (limit,)))
-    else:
-        sql = f"SELECT {select_measure} FROM {quote_identifier(physical_table)} {where_clause}".strip()
-        rows = sqlite_cursor_rows(sqlite_connection.execute(sql))
-    return {
-        "engine": "sqlite",
-        "database": "metadata-store",
-        "compiledSql": sql,
-        "syncedRows": None,
         "rows": rows,
     }

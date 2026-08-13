@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -10,9 +11,27 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from semantic_query_planner import build_workspace_semantic_plan  # noqa: E402
-from semantic_query_execution import build_semantic_query_execution_plan, execute_workspace_semantic_query  # noqa: E402
+from semantic_query_execution import (  # noqa: E402
+    build_semantic_query_execution_plan,
+    execute_workspace_semantic_query as execute_workspace_semantic_query_runtime,
+)
 from relationship_tools import build_relationship_query  # noqa: E402
 from context_pack_service import workspace_schema_fingerprint  # noqa: E402
+from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
+
+
+TEST_REPLICA_ROOT = tempfile.TemporaryDirectory(prefix="aibi-c-semantic-plan-")
+TEST_REPLICA_PATH = Path(TEST_REPLICA_ROOT.name) / "analysis.duckdb"
+
+
+def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: object, **kwargs: object) -> dict[str, object]:
+    publish_sqlite_fixture_to_duckdb(connection, TEST_REPLICA_PATH)
+    return execute_workspace_semantic_query_runtime(
+        connection,
+        *args,
+        **kwargs,
+        duckdb_path=TEST_REPLICA_PATH,
+    )
 
 
 def create_connection() -> sqlite3.Connection:

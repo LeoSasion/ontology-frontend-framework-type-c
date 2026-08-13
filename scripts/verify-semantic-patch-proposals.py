@@ -33,6 +33,7 @@ def main() -> None:
             **os.environ,
             "AIBI_HYBRID_DB_PATH": str(sqlite_path),
             "AIBI_HYBRID_DUCKDB_PATH": str(duckdb_path),
+            "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp_root / "workspace-recovery"),
             "AIBI_AGENT_PROVIDER": "deterministic",
             "DEEPSEEK_API_KEY": "",
             "PYTHONIOENCODING": "utf-8",
@@ -70,7 +71,7 @@ def main() -> None:
                 "INSERT INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at) VALUES('sales', 'default', 'Sales', 'sales_physical', 'fixture.csv', 2, 3, '2026-01-01T00:00:00+00:00', 1, '2026-01-01T00:00:00+00:00')"
             )
             connection.commit()
-        check("schema-v15-bootstrap", status.get("ok") is True and schema_version == 15, schema_version)
+        check("schema-v16-bootstrap", status.get("ok") is True and schema_version == 16, schema_version)
 
         adapters_one = cli(["knowledge-source-adapters"])
         adapters_two = cli(["knowledge-source-adapters"])
@@ -172,7 +173,17 @@ def main() -> None:
         default_keys = {item["proposalKey"] for item in cli(["semantic-patch-proposals", "--workspace", "default"])["proposals"]}
         sandbox_keys = {item["proposalKey"] for item in cli(["semantic-patch-proposals", "--workspace", "review_sandbox"])["proposals"]}
         check("semantic-review-state-is-workspace-isolated", sandbox["proposals"][0]["proposalKey"] not in default_keys and sandbox["proposals"][0]["proposalKey"] in sandbox_keys, {"default": len(default_keys), "sandbox": len(sandbox_keys)})
-        deletion = cli(["workspace-delete", "review_sandbox", "--yes"])
+        delete_request_key = "semantic-review-sandbox-workspace-delete"
+        delete_preview = cli([
+            "workspace-delete", "review_sandbox",
+            "--request-key", delete_request_key,
+        ])
+        deletion = cli([
+            "workspace-delete", "review_sandbox",
+            "--request-key", delete_request_key,
+            "--expected-plan", str((delete_preview.get("deletePlan") or {}).get("planFingerprint") or ""),
+            "--yes",
+        ])
         check("workspace-delete-removes-source-and-proposal-state", deletion["deletedCounts"].get("knowledge_sources") == 1 and deletion["deletedCounts"].get("semantic_patch_proposals") == 1, deletion["deletedCounts"])
 
         config_path = temp_root / "portable-config.json"

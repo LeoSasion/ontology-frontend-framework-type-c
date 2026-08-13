@@ -87,9 +87,14 @@ export function useAppWorkspaceActions({
     if (result.ok !== false) await openWorkspaceLanding();
   }, [activeWorkspaceId, openWorkspaceLanding, setLastActionResult]);
 
-  const handleWorkspaceDelete = useCallback(async (workspaceId: string, confirm = false) => {
+  const handleWorkspaceDelete = useCallback(async (
+    workspaceId: string,
+    confirm = false,
+    requestKey = "",
+    expectedPlan = "",
+  ) => {
     if (!workspaceId || workspaceId === "default" || workspaceId === activeWorkspaceId) return;
-    const result = await deleteWorkspace(workspaceId, confirm);
+    const result = await deleteWorkspace(workspaceId, confirm, requestKey, expectedPlan);
     setLastActionResult(result);
     if (confirm && result.ok !== false) await openWorkspaceLanding();
     return result;

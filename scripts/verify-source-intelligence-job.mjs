@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -37,7 +37,8 @@ try {
   ]);
   checks.push({
     label: "job-created-and-queued",
-    ok: created.ok && created.parsed?.job?.status === "queued" && created.parsed?.job?.kind === "source-intelligence" && created.parsed?.job?.capabilityId === "cli.source-intelligence-job-run",
+    ok: created.ok && created.parsed?.job?.status === "queued" && created.parsed?.job?.kind === "source-intelligence" && created.parsed?.job?.capabilityId === "cli.source-intelligence-job-run" &&
+      !JSON.stringify(created.parsed).includes(verifyDir),
   });
   const jobKey = created.parsed?.job?.jobKey;
   const workspaceId = created.parsed?.job?.workspaceId;
@@ -54,11 +55,26 @@ try {
     label: "artifacts-and-evidence-preserved",
     ok: detail.parsed?.job?.artifactRefs?.length > 0 &&
       detail.parsed?.job?.evidenceRefs?.length === 1 &&
-      existsSync(detail.parsed.job.evidenceRefs[0].path),
+      detail.parsed.job.artifactRefs.every((ref) => ref.path === "[local-path]" && existsSync(join(outputDir, ref.label))) &&
+      detail.parsed.job.evidenceRefs[0].path === "[local-path]" &&
+      String(detail.parsed?.job?.result?.evidenceBundle?.contentAddress ?? "").startsWith("sha256:"),
   });
   checks.push({
     label: "source-run-linked",
     ok: String(detail.parsed?.job?.sourceRunId ?? "").startsWith("source_intelligence_"),
+  });
+
+  const emptyInputDir = join(verifyDir, "empty-input");
+  mkdirSync(emptyInputDir);
+  const invalid = run(["source-intelligence-job-create", emptyInputDir]);
+  const invalidRun = run([
+    "source-intelligence-job-run",
+    "--job", invalid.parsed?.job?.jobKey,
+    "--workspace", invalid.parsed?.job?.workspaceId,
+  ], 1);
+  checks.push({
+    label: "invalid-input-fails-terminal-instead-of-stranding-running-job",
+    ok: invalidRun.ok && invalidRun.parsed?.job?.status === "failed" && invalidRun.parsed?.job?.error?.code === "source-intelligence-failed",
   });
 
   const stranded = run([

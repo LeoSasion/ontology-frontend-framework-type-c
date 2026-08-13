@@ -11,7 +11,7 @@ import {
   setViewport,
   waitFor,
 } from "./ui-verify-chrome.mjs";
-import { postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
+import { postJson, runDurableImport, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? "http://127.0.0.1:8787";
 const url = process.env.AIBI_UI_URL ?? `${baseUrl}/?section=views`;
@@ -176,11 +176,11 @@ try {
       filePath: importPath,
       table: "visual_records",
     });
-    const imported = await postJson("/api/import/commit", {
-      filePath: importPath,
+    const imported = await runDurableImport({
+      importKind: "single",
+      path: importPath,
       ...importPreview.commitOptions,
       expectedPlan: importPreview.planFingerprint,
-      confirm: true,
     });
     const savedView = await postJson("/api/views/save", {
       table: "visual_records",

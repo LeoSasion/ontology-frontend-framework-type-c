@@ -1,0 +1,367 @@
+.decisionFrameworkEntry {
+  container: decision-framework / inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+.decisionFrameworkEntry > div:first-child,
+.decisionFrameworkHeader > div,
+.decisionCandidatePanel > div:first-child,
+.decisionClaimsLead > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.decisionFrameworkEntry span,
+.decisionFrameworkHeader span,
+.decisionFrameworkCreate label > span,
+.decisionFrameworkHeader label > span,
+.decisionFrameworkTitle > span,
+.decisionCandidatePanel span,
+.decisionClaimsLead span,
+.decisionClaim label > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.decisionFrameworkEntry small,
+.decisionFrameworkHeader p,
+.decisionFrameworkCreate small,
+.decisionCandidatePanel small,
+.decisionClaimFooter small,
+.decisionFrameworkNotice {
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.decisionFrameworkEditor {
+  grid-column: 1 / -1;
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.decisionFrameworkHeader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.45fr);
+  gap: 14px;
+  align-items: end;
+}
+
+.decisionFrameworkHeader h3,
+.decisionFrameworkHeader p,
+.decisionCandidateList p,
+.decisionClaimList > p,
+.decisionFrameworkTrust p,
+.decisionFrameworkNotice {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.decisionFrameworkHeader h3 {
+  font-size: var(--ui-font-section-title);
+  line-height: 1.25;
+}
+
+.decisionFrameworkHeader label,
+.decisionFrameworkSelector,
+.decisionFrameworkTitle,
+.decisionClaim label,
+.decisionCandidateList label {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.decisionFrameworkSelector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.decisionFrameworkEditor input,
+.decisionFrameworkEditor select,
+.decisionFrameworkEditor textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.decisionFrameworkEditor textarea {
+  width: 100%;
+  resize: vertical;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.decisionFrameworkCreate {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.35fr) minmax(220px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 0;
+  padding: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.decisionFrameworkCreate legend {
+  padding: 0 6px;
+  font-weight: 760;
+}
+
+.decisionFrameworkCreate small {
+  grid-column: 1 / -1;
+}
+
+.decisionFrameworkTrust {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--success-text) 30%, var(--border-soft));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--success-text) 6%);
+}
+
+.decisionFrameworkTrust.stale {
+  border-color: color-mix(in srgb, var(--warning-text) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--warning-text) 8%);
+}
+
+.decisionFrameworkTrust > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.decisionFrameworkTrust > div:first-child span,
+.decisionFrameworkTrust dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.decisionFrameworkTrust dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.decisionFrameworkTrust dl > div {
+  display: grid;
+  gap: 2px;
+}
+
+.decisionFrameworkTrust dd {
+  margin: 0;
+  font-weight: 760;
+}
+
+.decisionFrameworkTrust p {
+  grid-column: 1 / -1;
+  color: var(--warning-text);
+}
+
+.decisionCandidatePanel,
+.decisionClaims {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+}
+
+.decisionCandidateList,
+.decisionClaimList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 10px;
+}
+
+.decisionCandidateList article,
+.decisionClaim {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 220px;
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+  background: var(--surface);
+}
+
+.decisionCandidateList article {
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 0.45fr) auto;
+  align-items: end;
+}
+
+.decisionCandidateList p {
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.decisionClaimsLead,
+.decisionClaimMeta,
+.decisionClaimFooter,
+.decisionFrameworkActions,
+.decisionPublicationConfirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.decisionClaimMeta {
+  align-items: end;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.decisionClaimMeta label {
+  min-width: min(170px, 100%);
+}
+
+.decisionClaimBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.decisionClaimBadge.evidence_fact {
+  border-color: color-mix(in srgb, var(--success-text) 32%, var(--border-soft));
+  color: var(--success-text);
+}
+
+.decisionClaimBadge.hypothesis {
+  border-color: color-mix(in srgb, var(--warning-text) 35%, var(--border-soft));
+  color: var(--warning-text);
+}
+
+.decisionClaim.evidence_fact textarea:disabled {
+  color: var(--text);
+  opacity: 1;
+}
+
+.decisionClaimFooter {
+  align-items: flex-end;
+}
+
+.decisionFrameworkActions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.decisionPublicationConfirm {
+  align-items: flex-start;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border-soft));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-soft) 45%, var(--surface-raised));
+}
+
+.decisionPublicationConfirm > div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.decisionPublicationConfirm code {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.decisionFrameworkEditor button,
+.decisionFrameworkEditor input,
+.decisionFrameworkEditor select {
+  min-height: 44px;
+}
+
+@container decision-framework (max-width: 760px) {
+  .decisionFrameworkEntry,
+  .decisionFrameworkHeader,
+  .decisionFrameworkSelector,
+  .decisionFrameworkCreate,
+  .decisionFrameworkTrust {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decisionFrameworkEntry > button {
+    justify-self: start;
+  }
+
+  .decisionFrameworkTrust dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .decisionCandidateList article {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .decisionCandidateList article .miniButton {
+    justify-self: start;
+  }
+}
+
+@container viewport-stage (max-width: 720px) {
+  .decisionFrameworkEntry {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .decisionFrameworkEditor {
+    gap: 12px;
+  }
+
+  .decisionClaimsLead,
+  .decisionClaimFooter,
+  .decisionPublicationConfirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decisionClaimsLead .miniButton,
+  .decisionClaimFooter .miniButton,
+  .decisionPublicationConfirm .miniButton {
+    align-self: flex-start;
+  }
+}
+
+@container viewport-stage (max-height: 720px) and (min-width: 721px) {
+  .decisionFrameworkEntry {
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .decisionFrameworkEditor {
+    gap: 12px;
+  }
+
+  .decisionClaimsLead,
+  .decisionClaimFooter,
+  .decisionPublicationConfirm {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decisionClaimsLead .miniButton,
+  .decisionClaimFooter .miniButton,
+  .decisionPublicationConfirm .miniButton {
+    align-self: flex-start;
+  }
+}

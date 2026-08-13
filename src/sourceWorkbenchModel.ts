@@ -42,9 +42,7 @@ export function runtimeLabel(engine?: string) {
   if (engine === "duckdb") {
     return "DuckDB";
   }
-  if (engine === "sqlite") {
-    return biText("SQLite fallback", "SQLite fallback");
-  }
+  if (engine === "sqlite") return biText("已阻断的旧引擎", "Blocked legacy engine");
   return biText("待检测", "Unknown");
 }
 

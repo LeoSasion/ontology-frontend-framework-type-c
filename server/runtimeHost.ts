@@ -193,6 +193,9 @@ export class RuntimeHostPool {
   private queued = 0;
   private closed = false;
   private shutdownPromise: Promise<void> | null = null;
+  private recoveryPromise: Promise<void> | null = null;
+  private reconciledWriterGeneration = 0;
+  private recoveryError = "";
   private readonly maxQueueDepth: number;
   private readonly deadlineMs: number;
   private readonly startupDeadlineMs: number;
@@ -226,6 +229,40 @@ export class RuntimeHostPool {
     return this.startPromise;
   }
 
+  private recordRecoveryResult(result: RuntimeResult) {
+    const needsAttention = Array.isArray(result.needsAttention) ? result.needsAttention.length : 0;
+    if (result.ok !== true || needsAttention > 0) {
+      throw new RuntimeHostUnavailableError("Workspace recovery reconciliation requires owner attention");
+    }
+    this.reconciledWriterGeneration = this.writer.startCount;
+    this.recoveryError = "";
+  }
+
+  private ensureRecoveryReady() {
+    if (
+      this.writer.ready
+      && this.reconciledWriterGeneration === this.writer.startCount
+      && !this.recoveryError
+    ) return Promise.resolve();
+    if (this.recoveryPromise) return this.recoveryPromise;
+    this.recoveryPromise = (async () => {
+      try {
+        const result = await this.writer.request(
+          "run",
+          ["workspace-recovery-reconcile", "--all"],
+          this.startupDeadlineMs,
+        );
+        this.recordRecoveryResult(result);
+      } catch (error) {
+        this.recoveryError = error instanceof Error ? error.message : String(error);
+        throw error;
+      }
+    })().finally(() => {
+      this.recoveryPromise = null;
+    });
+    return this.recoveryPromise;
+  }
+
   private enqueue<T>(tail: Promise<unknown>, setTail: (next: Promise<unknown>) => void, task: () => Promise<T>) {
     if (this.closed) return Promise.reject(new RuntimeHostUnavailableError("Runtime Host pool is shut down"));
     if (this.queued >= this.maxQueueDepth) return Promise.reject(new RuntimeHostCapacityError(`Runtime Host queue reached ${this.maxQueueDepth} requests`));
@@ -242,20 +279,45 @@ export class RuntimeHostPool {
     const capability = this.catalog?.[command];
     const isWrite = !capability || capability.permissions?.database !== "read-only";
     const deadlineMs = capability?.timeoutClass === "long" ? 900_000 : this.deadlineMs;
+    if (command === "workspace-recovery-reconcile") {
+      return this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, async () => {
+        const result = await this.writer.request("run", args, deadlineMs, traceId);
+        this.recordRecoveryResult(result);
+        return result;
+      });
+    }
     if (isWrite) {
-      return this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, () => this.writer.request("run", args, deadlineMs, traceId));
+      return this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, async () => {
+        // Check the writer generation only after this request reaches the head
+        // of the queue. An earlier queued command may have killed/restarted the
+        // worker and left a persistent recovery journal behind.
+        await this.ensureRecoveryReady();
+        return this.writer.request("run", args, deadlineMs, traceId);
+      });
     }
     const index = this.readerCursor++ % this.readers.length;
-    return this.enqueue(this.readerTails[index], (next) => { this.readerTails[index] = next; }, () => this.readers[index].request("run", args, deadlineMs, traceId));
+    return this.enqueue(this.readerTails[index], (next) => { this.readerTails[index] = next; }, async () => {
+      await this.ensureRecoveryReady();
+      return this.readers[index].request("run", args, deadlineMs, traceId);
+    });
   }
 
   health() {
+    const recoveryReady = this.writer.ready
+      && this.reconciledWriterGeneration === this.writer.startCount
+      && !this.recoveryError;
     return {
-      ok: Boolean(this.catalog) && this.writer.ready && this.readers.every((worker) => worker.ready),
+      ok: Boolean(this.catalog) && recoveryReady && this.readers.every((worker) => worker.ready),
       schema: "aibi-runtime-host-health/v1",
       queueDepth: this.queued,
       writer: { ready: this.writer.ready, starts: this.writer.startCount },
       readers: this.readers.map((worker) => ({ ready: worker.ready, starts: worker.startCount })),
+      recovery: {
+        ready: recoveryReady,
+        writerGeneration: this.writer.startCount,
+        reconciledWriterGeneration: this.reconciledWriterGeneration,
+        error: this.recoveryError || null,
+      },
       commandCount: Object.keys(this.catalog ?? {}).length,
     };
   }
@@ -267,6 +329,8 @@ export class RuntimeHostPool {
       await Promise.all([this.writer.shutdown(), ...this.readers.map((worker) => worker.shutdown())]);
       this.catalog = null;
       this.startPromise = null;
+      this.recoveryPromise = null;
+      this.recoveryError = "";
     })();
     return this.shutdownPromise;
   }

@@ -7,7 +7,7 @@ from typing import Any
 
 from agent_action_draft_store import count_pending_action_drafts
 from bi_cli_contracts import build_cli_contract, command_contract_by_name, contract_to_markdown, filter_commands
-from bi_cli_core import DB_PATH, DUCKDB_PATH, source_label
+from bi_cli_core import DB_PATH, DUCKDB_PATH, ROOT, source_label
 from bi_cli_io_services import metric_sql_doctor_from_run, rows_to_dicts
 from bi_cli_schema import active_workspace_id, open_db, workspace_records
 from evidence_run_store import count_source_intelligence_runs, latest_source_intelligence_summary
@@ -35,6 +35,7 @@ from workspace_command_service import (
     workspace_rename_command as workspace_rename_command_service,
     workspace_select_command as workspace_select_command_service,
 )
+from workspace_recovery_service import configured_recovery_root
 
 def cli_contract_command(args: argparse.Namespace, parser: argparse.ArgumentParser) -> dict[str, Any]:
     contract = build_cli_contract(parser)
@@ -155,7 +156,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
             "ok": True,
             "workspace": workspace,
             "workspaces": workspaces,
-            "database": str(DB_PATH),
+            "database": "control-plane",
             "queryRuntime": runtime,
             "counts": counts,
             "sourceRuns": source_runs,
@@ -168,7 +169,7 @@ def status_command(args: argparse.Namespace) -> dict[str, Any]:
                     (
                         "DuckDB query runtime is available."
                         if runtime["available"]
-                        else "DuckDB package is missing; whitelist queries use SQLite fallback until requirements are installed."
+                        else "DuckDB analysis replica is unavailable; business queries are blocked until the replica is current."
                     ),
                 ],
             },
@@ -356,7 +357,13 @@ def workspace_rename_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def workspace_delete_command(args: argparse.Namespace) -> dict[str, Any]:
-    return workspace_delete_command_service(args, open_db=open_db, duckdb_path=DUCKDB_PATH)
+    return workspace_delete_command_service(
+        args,
+        open_db=open_db,
+        sqlite_path=DB_PATH,
+        duckdb_path=DUCKDB_PATH,
+        recovery_root=configured_recovery_root(ROOT),
+    )
 
 
 def domain_packs_command(args: argparse.Namespace) -> dict[str, Any]:

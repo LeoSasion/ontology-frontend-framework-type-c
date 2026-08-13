@@ -845,7 +845,9 @@ def build_runtime_catalog(
         "queryRuntime": {
             "engine": str(query_runtime.get("engine") or "duckdb"),
             "available": bool(query_runtime.get("available")),
-            "fallbackEngine": query_runtime.get("fallbackEngine"),
+            "fallbackEngine": None,
+            "queryAvailability": str(query_runtime.get("queryAvailability") or "blocked"),
+            "reasonCode": query_runtime.get("reasonCode"),
         },
         "connectors": connectors,
         "connectorAdapters": adapters,

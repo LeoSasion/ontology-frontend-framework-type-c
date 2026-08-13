@@ -80,8 +80,8 @@ def handle_import_commit_confirmation(
     action_key: str,
     yes: bool,
     confirmed_at: str,
-    build_import_preview: Callable[[sqlite3.Connection, str, str | None, str | None, str | None], dict[str, Any]],
-    execute_import_commit: Callable[[sqlite3.Connection, str, str | None, str | None, str, str | None, str | None], dict[str, Any]],
+    build_import_preview: Callable[..., dict[str, Any]],
+    execute_import_commit: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     file_path = str(payload.get("filePath", ""))
     table_key = str(payload.get("tableKey", "")) or None
@@ -93,8 +93,17 @@ def handle_import_commit_confirmation(
     conflict_rule_value = str(conflict_rule) if isinstance(conflict_rule, str) else None
     if not file_path:
         raise ValueError("Import action draft is missing filePath")
-    preview = build_import_preview(connection, file_path, table_key, unique_fields_value, conflict_rule_value)
     workspace_id = str(action["workspace_id"])
+    preview = build_import_preview(
+        connection,
+        file_path,
+        table_key,
+        unique_fields_value,
+        conflict_rule_value,
+        workspace_id=workspace_id,
+    )
+    if str(preview.get("workspaceId") or "") != workspace_id:
+        raise RuntimeError("Import action preview escaped the draft workspace.")
     workspace = connection.execute(
         "SELECT current_source_run_id FROM workspaces WHERE id = ?",
         (workspace_id,),
@@ -121,7 +130,18 @@ def handle_import_commit_confirmation(
     expected_mode = str((bound_preview.get("commitOptions") or {}).get("mode") or "")
     if mode != expected_mode:
         raise ValueError("Import mode changed after preview; create a new preview")
-    result = execute_import_commit(connection, file_path, table_key, name, mode, unique_fields_value, conflict_rule_value)
+    result = execute_import_commit(
+        connection,
+        file_path,
+        table_key,
+        name,
+        mode,
+        unique_fields_value,
+        conflict_rule_value,
+        workspace_id=workspace_id,
+    )
+    if str(result.get("workspaceId") or "") != workspace_id:
+        raise RuntimeError("Import action commit escaped the draft workspace.")
     mark_action_confirmed(connection, action_key, confirmed_at)
     connection.commit()
     return confirmed_response(action_key, importResult=result)

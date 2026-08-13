@@ -11,16 +11,33 @@ CAPABILITY_SCHEMA = "aibi-capability-contract/v1"
 FILESYSTEM_READ_COMMANDS = {
     "preview-import", "import-commit", "preview-import-folder", "import-folder",
     "source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run",
+    "import-job-create", "import-job-run", "import-job-resume", "import-job-recover", "import-job-process-exit",
+    "workspace-recovery-create", "workspace-recovery-restore", "workspace-recovery-delete",
+    "workspace-recovery-reconcile", "workspace-delete",
+    "sqlserver-adapter-snapshot",
     "validate-config", "apply-config",
     "discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "domain-pack-lint", "analytical-skill-lint", "analytical-skill-install",
 }
 FILESYSTEM_WRITE_COMMANDS = {
     "source-intelligence", "source-intelligence-job-run", "export-evidence", "export-analysis", "export-config", "cli-contract",
     "domain-pack-install", "domain-pack-uninstall", "sync-connector",
+    "import-job-run", "import-job-recover", "import-job-process-exit",
+    "workspace-recovery-create", "workspace-recovery-restore", "workspace-recovery-delete",
+    "workspace-recovery-reconcile", "workspace-delete",
+    "sqlserver-adapter-snapshot",
 }
-NETWORK_READ_COMMANDS = {"discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "sync-connector"}
-OWNED_WORKER_COMMANDS = {"source-intelligence-job-run"}
-JOB_SUPPORTED_COMMANDS = {"source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run", "jobs", "job-cancel", "job-recover", "job-process-exit"}
+NETWORK_READ_COMMANDS = {
+    "discover-connector", "preview-connector", "plan-connector-sync", "federation-proof", "sync-connector",
+    "sqlserver-adapter-test", "sqlserver-adapter-discover", "sqlserver-adapter-preview", "sqlserver-adapter-snapshot",
+}
+OWNED_WORKER_COMMANDS = {"source-intelligence-job-run", "import-job-run"}
+LEGACY_DURABLE_DELEGATE_COMMANDS = {"import-commit", "import-folder", "sync-connector"}
+JOB_SUPPORTED_COMMANDS = {
+    "source-intelligence", "source-intelligence-job-create", "source-intelligence-job-run",
+    "jobs", "job-cancel", "job-recover", "job-process-exit",
+    "import-job-create", "import-job-run", "import-job-resume", "import-job-recover", "import-job-process-exit",
+    *LEGACY_DURABLE_DELEGATE_COMMANDS,
+}
 AGENT_ENTRY_COMMANDS = {"ask", "confirm-action", "action-drafts", "semantic-query", "agent-turn-run", "agent-turns", "agent-turn-cancel", "agent-session-create", "agent-sessions", "agent-session-resume", "agent-session-fork", "agent-context-compact", "agent-runtime-profiles", "agent-runtime-profile-set", "agent-provider-evaluations", "agent-provider-evaluation-record", "restricted-workflow-operators", "restricted-workflow-validate", "agent-workflow-graph"}
 
 
@@ -69,6 +86,7 @@ def build_capability_contract(command: str, semantics: dict[str, Any] | None = N
         "job": {
             "supported": command in JOB_SUPPORTED_COMMANDS,
             "ownedWorker": command in OWNED_WORKER_COMMANDS,
+            "delegatesTo": "cli.import-job-run" if command in LEGACY_DURABLE_DELEGATE_COMMANDS else None,
             "restartPolicy": "fail-explicitly" if command in OWNED_WORKER_COMMANDS else "not-applicable",
         },
         "evidence": {
@@ -76,7 +94,7 @@ def build_capability_contract(command: str, semantics: dict[str, Any] | None = N
             "requiredTypes": evidence_types,
             "preserveReferences": True,
         },
-        "timeoutClass": "long" if command in {"source-intelligence", "source-intelligence-job-run", "import-folder"} else "short",
+        "timeoutClass": "long" if command in {"source-intelligence", "source-intelligence-job-run", "import-commit", "import-folder", "import-job-run", "sync-connector", "sqlserver-adapter-discover", "sqlserver-adapter-preview", "sqlserver-adapter-snapshot"} else "short",
     }
 
 

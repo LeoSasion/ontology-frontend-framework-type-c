@@ -6,6 +6,7 @@ export type AnalysisJobStatus =
   | "canceled"
   | "succeeded"
   | "failed"
+  | "needs_attention"
   | string;
 
 export interface AnalysisJobEvent {
@@ -35,6 +36,7 @@ export interface AnalysisJob {
   stage: string;
   cancelRequested: boolean;
   inputFingerprint: string;
+  requestKeyFingerprint?: string;
   input: Record<string, unknown>;
   result: unknown;
   error: Record<string, unknown> | null;

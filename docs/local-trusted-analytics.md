@@ -39,7 +39,7 @@ CLI、API、Agent 与按需展开的分析面板消费同一合同。诊断命�
 - 快照保留 Unit/Receipt key 与定义、结果、数据、schema、关系、来源、Domain Pack、Workspace Manifest 指纹，以及创建原因、行数上限、内容哈希和父快照。公开列表只返回摘要、状态和指纹，不返回冻结行、任意查询、外部路径或 Provider 内容。
 - `refresh` 只接受指标、维度、聚合、筛选、参与表、关系路径和结果形状相同的新 Unit，并追加不可变子快照；语义变化必须显式 `replace`，同样追加子快照而不覆盖父对象。
 - 来源漂移、Unit/Receipt 缺失或绑定变化后旧快照进入 `stale | missing`；历史仍可审计，但 `usableForPlanning=false` 且所有消费者固定 `staleFallbackUsed=false`。
-- 删除只擦除冻结内容并保留 lineage tombstone；快照最多保存 500 行，工作区删除会清理全部快照，SQLite schema v15 的隔离迁移、恢复点和回滚覆盖该表及原子 sourceRun 成员关系。
+- 删除只擦除冻结内容并保留 lineage tombstone；快照最多保存 500 行，工作区删除会清理全部快照，SQLite schema v16 的隔离迁移、恢复点和回滚覆盖该表及原子 sourceRun 成员关系。
 
 CLI、API 与 Analysis Unit 下按需展开的面板消费同一合同。面板在操作期间禁用重复提交并拒绝晚到请求；创建原因和行数上限可核对，确认成功后保留明确结果消息。Provider 不参与快照生成、刷新、替换或删除。
 

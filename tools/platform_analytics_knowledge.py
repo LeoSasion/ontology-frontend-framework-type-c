@@ -7,6 +7,9 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from bi_cli_core import DUCKDB_PATH
+from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
+
 
 KNOWLEDGE_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "platform-commerce.v1.json"
 
@@ -74,7 +77,7 @@ def platform_knowledge_pack() -> dict[str, Any]:
 
 def _table_catalog(connection: sqlite3.Connection, workspace_id: str) -> list[dict[str, Any]]:
     rows = connection.execute(
-        "SELECT table_key, display_name, physical_table FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
+        "SELECT workspace_id, table_key, display_name, physical_table, data_version, row_count FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
         (workspace_id,),
     ).fetchall()
     catalog: list[dict[str, Any]] = []
@@ -186,13 +189,25 @@ def match_platform_knowledge(
 def execute_platform_knowledge(
     connection: sqlite3.Connection,
     match: dict[str, Any],
+    *,
+    duckdb_path: Path = DUCKDB_PATH,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if match.get("entity"):
         params["entity"] = match["entity"]
     if match.get("threshold") is not None:
         params["threshold"] = match["threshold"]
-    rows = [dict(row) for row in connection.execute(match["sql"], params).fetchall()]
+    roles = list(match["roles"].values())
+    with open_validated_duckdb_query(
+        duckdb_path,
+        [replica_expectation(table) for table in roles],
+    ) as analysis_connection:
+        cursor = analysis_connection.connection.execute(match["sql"], params)
+        rows = cursor_rows(cursor)
+        runtime = analysis_connection.runtime(
+            compiled_sql=match["sql"],
+            params=[params[key] for key in sorted(params)],
+        )
     metrics = [
         {
             "label": {"zh": str(row.get("label") or "结果"), "en": str(row.get("label") or "Result")},
@@ -225,12 +240,7 @@ def execute_platform_knowledge(
             "group": None,
             "measure": match["ruleId"],
             "aggregation": "knowledge-rule",
-            "runtime": {
-                "engine": "sqlite",
-                "database": "metadata-store",
-                "compiledSql": match["sql"],
-                "parameters": params,
-            },
+            "runtime": runtime,
             "filters": [],
             "joins": role_refs[1:],
             "fallbackReason": None,
@@ -254,9 +264,10 @@ def execute_platform_knowledge(
             },
             {
                 "type": "queryRuntime",
-                "engine": "sqlite",
+                "engine": "duckdb",
                 "compiledSql": match["sql"],
-                "parameters": params,
+                "parameterCount": runtime["parameterCount"],
+                "parameterFingerprint": runtime["parameterFingerprint"],
             },
         ],
         "nextActions": [

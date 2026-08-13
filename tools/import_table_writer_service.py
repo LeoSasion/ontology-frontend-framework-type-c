@@ -132,6 +132,9 @@ def revalidate_relationships_for_table(
                 right_table_key=str(right["table_key"]),
                 mappings=payload["fieldMappings"],
                 relationship_preview=preview,
+                # Import revalidation profiles the writer transaction before the
+                # new replica is published; production readers never pass this.
+                writer_profiling_connection=connection,
             )
             validation = relationship_validation_snapshot(preview)
             validation["dataVersions"] = {
@@ -218,6 +221,7 @@ def import_csv_as_table(
     table_key: str | None = None,
     display_name: str | None = None,
     mode: str = "create",
+    workspace_id: str | None = None,
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
@@ -229,8 +233,8 @@ def import_csv_as_table(
         raise ValueError(f"No headers found in {path}")
     table_key = table_key or slug(path.stem)
     display_name = display_name or path.stem
-    workspace_id = active_workspace_id(connection)
-    physical_table = physical_table_for_workspace(workspace_id, table_key)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
+    physical_table = physical_table_for_workspace(resolved_workspace_id, table_key)
     profile = profile_rows(headers, rows)
 
     connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(physical_table)}")
@@ -243,7 +247,7 @@ def import_csv_as_table(
     display_source = source_label(path)
     data_version = upsert_table_registry_record(
         connection,
-        workspace_id=workspace_id,
+        workspace_id=resolved_workspace_id,
         table_key=table_key,
         display_name=display_name,
         physical_table=physical_table,
@@ -253,7 +257,7 @@ def import_csv_as_table(
     )
     relationship_revalidations = revalidate_relationships_for_table(
         connection,
-        workspace_id=workspace_id,
+        workspace_id=resolved_workspace_id,
         table_key=table_key,
     )
     source_run_id = unique_key(f"source_run_{table_key}")
@@ -269,7 +273,7 @@ def import_csv_as_table(
         INSERT OR REPLACE INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at)
         VALUES(?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)
         """,
-        (source_run_id, workspace_id, table_key, display_name, display_source, len(rows), len(headers), json.dumps(profile, ensure_ascii=False), json.dumps(evidence, ensure_ascii=False), now_iso()),
+        (source_run_id, resolved_workspace_id, table_key, display_name, display_source, len(rows), len(headers), json.dumps(profile, ensure_ascii=False), json.dumps(evidence, ensure_ascii=False), now_iso()),
     )
     for field in profile["fields"]:
         connection.execute(
@@ -277,9 +281,9 @@ def import_csv_as_table(
             INSERT OR REPLACE INTO field_semantics(workspace_id, table_key, field_name, role, usage, confidence)
             VALUES(?, ?, ?, ?, ?, ?)
             """,
-            (workspace_id, table_key, field["field"], field["role"], field["usage"], field["confidence"]),
+            (resolved_workspace_id, table_key, field["field"], field["role"], field["usage"], field["confidence"]),
         )
-    create_metrics_for_profile(connection, table_key, profile, workspace_id=workspace_id)
+    create_metrics_for_profile(connection, table_key, profile, workspace_id=resolved_workspace_id)
     upsert_navigation_module(
         connection,
         module_key=f"table:{table_key}",
@@ -288,14 +292,15 @@ def import_csv_as_table(
         table_key=table_key,
         created_by="manual",
         agent_managed=1,
+        workspace_id=resolved_workspace_id,
     )
-    connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = ?", (source_run_id, workspace_id))
+    connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = ?", (source_run_id, resolved_workspace_id))
     connection.execute(
         """
         INSERT OR REPLACE INTO import_jobs(job_key, workspace_id, source_file, table_key, mode, status, row_count, result_json, created_at)
         VALUES(?, ?, ?, ?, ?, 'success', ?, ?, ?)
         """,
-        (unique_key(f"import_{table_key}"), workspace_id, display_source, table_key, mode, len(rows), json.dumps({"profile": profile}, ensure_ascii=False), now_iso()),
+        (unique_key(f"import_{table_key}"), resolved_workspace_id, display_source, table_key, mode, len(rows), json.dumps({"profile": profile}, ensure_ascii=False), now_iso()),
     )
     return {
         "tableKey": table_key,
@@ -304,6 +309,7 @@ def import_csv_as_table(
         "profile": profile,
         "dataVersion": data_version,
         "relationshipRevalidations": relationship_revalidations,
+        "workspaceId": resolved_workspace_id,
     }
 
 
@@ -320,11 +326,12 @@ def update_table_metadata_after_write(
     mode: str,
     result: dict[str, Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
+    workspace_id: str | None = None,
 ) -> str:
-    workspace_id = active_workspace_id(connection)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
     data_version = upsert_table_registry_record(
         connection,
-        workspace_id=workspace_id,
+        workspace_id=resolved_workspace_id,
         table_key=table_key,
         display_name=display_name,
         physical_table=physical_table,
@@ -334,7 +341,7 @@ def update_table_metadata_after_write(
     )
     relationship_revalidations = revalidate_relationships_for_table(
         connection,
-        workspace_id=workspace_id,
+        workspace_id=resolved_workspace_id,
         table_key=table_key,
     )
     result["dataVersion"] = data_version
@@ -352,7 +359,7 @@ def update_table_metadata_after_write(
         INSERT OR REPLACE INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at)
         VALUES(?, ?, ?, ?, 'ready', ?, ?, ?, ?, ?, ?)
         """,
-        (source_run_id, workspace_id, table_key, display_name, source_file, row_count, column_count, json.dumps(profile, ensure_ascii=False), json.dumps(evidence, ensure_ascii=False), now_iso()),
+        (source_run_id, resolved_workspace_id, table_key, display_name, source_file, row_count, column_count, json.dumps(profile, ensure_ascii=False), json.dumps(evidence, ensure_ascii=False), now_iso()),
     )
     for field in profile["fields"]:
         connection.execute(
@@ -360,16 +367,16 @@ def update_table_metadata_after_write(
             INSERT OR REPLACE INTO field_semantics(workspace_id, table_key, field_name, role, usage, confidence)
             VALUES(?, ?, ?, ?, ?, ?)
             """,
-            (workspace_id, table_key, field["field"], field["role"], field["usage"], field["confidence"]),
+            (resolved_workspace_id, table_key, field["field"], field["role"], field["usage"], field["confidence"]),
         )
-    create_metrics_for_profile(connection, table_key, profile, workspace_id=workspace_id)
-    connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = ?", (source_run_id, workspace_id))
+    create_metrics_for_profile(connection, table_key, profile, workspace_id=resolved_workspace_id)
+    connection.execute("UPDATE workspaces SET current_source_run_id = ? WHERE id = ?", (source_run_id, resolved_workspace_id))
     connection.execute(
         """
         INSERT OR REPLACE INTO import_jobs(job_key, workspace_id, source_file, table_key, mode, status, row_count, result_json, created_at)
         VALUES(?, ?, ?, ?, ?, 'success', ?, ?, ?)
         """,
-        (unique_key(f"import_{table_key}"), workspace_id, source_file, table_key, mode, row_count, json.dumps(result, ensure_ascii=False), now_iso()),
+        (unique_key(f"import_{table_key}"), resolved_workspace_id, source_file, table_key, mode, row_count, json.dumps(result, ensure_ascii=False), now_iso()),
     )
     return source_run_id
 
@@ -382,13 +389,15 @@ def merge_import_into_table(
     unique_fields: list[str],
     conflict_rule: str,
     display_name: str | None = None,
+    workspace_id: str | None = None,
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
-    registry = registry_for_table(connection, table_key)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
+    registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
     if not registry:
         raise ValueError(f"Unknown table for merge: {table_key}")
     headers, raw_rows = read_table_file(path)
@@ -474,6 +483,8 @@ def merge_import_into_table(
         mode="merge",
         result=result,
         active_workspace_id=active_workspace_id,
+        workspace_id=resolved_workspace_id,
     )
     result["sourceRunId"] = source_run_id
+    result["workspaceId"] = resolved_workspace_id
     return result

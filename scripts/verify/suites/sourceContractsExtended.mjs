@@ -374,7 +374,7 @@ export function appendSourceContractExtendedChecks(context) {
         label: "source-workbench-connector-panel-boundary",
         ok: existsSync(join(root, "src", "components", "SourceWorkbenchConnectorPanel.tsx")) &&
           sourceWorkbenchAdvancedModulesSource.includes("export const SourceWorkbenchConnectorPanel = lazy") &&
-          sourceWorkbenchAdvancedPanelsSource.includes('from "./SourceWorkbenchConnectorPanel"') &&
+          sourceWorkbenchAdvancedModulesSource.includes('import("./components/SourceWorkbenchConnectorPanel")') &&
           sourceWorkbenchSource.includes("<SourceWorkbenchConnectorPanel") &&
           !sourceWorkbenchSource.includes('data-testid="connector-business-lead"') &&
           !sourceWorkbenchSource.includes('data-testid="connector-operation-receipt"') &&

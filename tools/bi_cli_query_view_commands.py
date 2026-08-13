@@ -8,7 +8,7 @@ from bi_cli_core import DUCKDB_PATH, now_iso, quote_identifier
 from bi_cli_io_services import analysis_columns_for_table
 from bi_cli_schema import active_workspace_id, open_db, registry_for_table, table_columns, upsert_navigation_module
 from bi_cli_source_commands import resolve_table_registry
-from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, run_duckdb_aggregate_query, run_sqlite_aggregate_query
+from query_runtime import SAFE_AGGREGATIONS, run_duckdb_aggregate_query
 from query_plan_receipt_service import create_query_plan_receipt
 from saved_view_query_service import (
     build_save_view_plan as build_save_view_plan_service,
@@ -33,29 +33,17 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
             raise ValueError(f"Unknown group field: {args.group}")
         if args.measure != "*" and args.measure not in table_columns:
             raise ValueError(f"Unknown measure field: {args.measure}")
-        try:
-            runtime = run_duckdb_aggregate_query(
-                sqlite_connection=connection,
-                duckdb_path=DUCKDB_PATH,
-                physical_table=physical_table,
-                columns=table_columns,
-                group=args.group,
-                measure=args.measure,
-                aggregation=args.agg,
-                limit=args.limit,
-                source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
-            )
-            fallback_reason = None
-        except DuckDBUnavailable as exc:
-            runtime = run_sqlite_aggregate_query(
-                sqlite_connection=connection,
-                physical_table=physical_table,
-                group=args.group,
-                measure=args.measure,
-                aggregation=args.agg,
-                limit=args.limit,
-            )
-            fallback_reason = str(exc)
+        runtime = run_duckdb_aggregate_query(
+            duckdb_path=DUCKDB_PATH,
+            physical_table=physical_table,
+            group=args.group,
+            measure=args.measure,
+            aggregation=args.agg,
+            limit=args.limit,
+            source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
+            expected_row_count=int(registry["row_count"] or 0),
+        )
+        fallback_reason = None
         rows = runtime.pop("rows")
         workspace_id = active_workspace_id(connection)
         request_text = str(args.request or "").strip() or f"{args.agg} {args.measure} by {args.group or '-'} from {args.table}"

@@ -5,9 +5,12 @@ import hashlib
 import json
 import re
 import sqlite3
+from pathlib import Path
 from typing import Any, Callable
 
 from agent_intent_service import build_business_intent_frame
+from bi_cli_core import DUCKDB_PATH
+from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 from relationship_tools import (
     normalize_relationship_filter,
     normalize_relationship_preaggregation,
@@ -715,11 +718,11 @@ def _terminal_reachability_proof(
 
 
 def _runtime_sources_and_proof(
-    connection: sqlite3.Connection,
+    connection: Any,
     execution_plan: dict[str, Any],
     registries: dict[str, sqlite3.Row],
     *,
-    table_columns: Callable[[sqlite3.Connection, str], list[str]],
+    columns_by_table: dict[str, list[str]],
     quote_identifier: Callable[[str], str],
 ) -> tuple[dict[str, dict[str, Any]], dict[str, Any], list[str]]:
     tables = execution_plan["pathTables"]
@@ -730,7 +733,6 @@ def _runtime_sources_and_proof(
     blockers: list[str] = []
     warnings: list[str] = []
 
-    columns_by_table: dict[str, list[str]] = {}
     physical_by_table: dict[str, str] = {}
     for table_key in tables:
         registry = registries.get(table_key)
@@ -739,7 +741,8 @@ def _runtime_sources_and_proof(
             continue
         physical = str(registry["physical_table"])
         physical_by_table[table_key] = physical
-        columns_by_table[table_key] = table_columns(connection, physical)
+        if table_key not in columns_by_table:
+            blockers.append(f"relationship-columns-missing-at-execution:{table_key}")
     if blockers:
         path_proof.update({"status": "blocked", "blockers": blockers})
         return {}, path_proof, blockers
@@ -1146,7 +1149,8 @@ def _execute_path_query(
         f"SELECT {', '.join(select_parts)} FROM {from_sql}"
         f"{where_sql}{group_sql} ORDER BY {quote_identifier(metric_name)} DESC LIMIT ?"
     )
-    rows = connection.execute(sql, (*params, *post_params, safe_limit)).fetchall()
+    query_params = (*params, *post_params, safe_limit)
+    rows = cursor_rows(connection.execute(sql, query_params))
     mode = "semantic-relationship" if len(relationships) == 1 else f"semantic-{len(relationships)}-hop"
     return {
         "mode": mode,
@@ -1174,7 +1178,9 @@ def _execute_path_query(
         "relationshipPathProof": path_proof,
         "metricName": metric_name,
         "columns": [*[item["outputName"] for item in output_groups], metric_name],
-        "rows": [dict(row) for row in rows],
+        "rows": rows,
+        "compiledSql": sql,
+        "_compiledParams": list(query_params),
         "sqlShape": {
             "tables": tables,
             "relationshipKeys": [item["relationKey"] for item in relationships],
@@ -1197,6 +1203,7 @@ def execute_workspace_semantic_query(
     build_relationship_query: Callable[..., dict[str, Any]],
     semantic_plan: dict[str, Any] | None = None,
     intent_frame: dict[str, Any] | None = None,
+    duckdb_path: Path = DUCKDB_PATH,
 ) -> dict[str, Any]:
     # build_relationship_query remains in the signature for CLI/API compatibility;
     # all relationship-path execution now goes through the same N-hop compiler.
@@ -1227,31 +1234,48 @@ def execute_workspace_semantic_query(
         (workspace_id, *table_keys),
     ).fetchall()
     registries = {str(row["table_key"]): row for row in registry_rows}
-    try:
-        sources, path_proof, blockers = _runtime_sources_and_proof(
-            connection,
-            execution_plan,
-            registries,
-            table_columns=table_columns,
-            quote_identifier=quote_identifier,
-        )
-    except (sqlite3.Error, ValueError, KeyError) as error:
+    missing_registry_tables = [table_key for table_key in table_keys if table_key not in registries]
+    if missing_registry_tables:
+        blockers = [f"relationship-table-missing-at-execution:{table_key}" for table_key in missing_registry_tables]
         path_proof = dict(execution_plan.get("relationshipPathProof") or {})
-        path_proof.update({"status": "blocked", "blockers": [f"path-proof-failed:{error}"]})
-        blockers = [f"path-proof-failed:{error}"]
-        sources = {}
-    if blockers:
+        path_proof.update({"status": "blocked", "blockers": blockers})
         execution_plan = _runtime_blocked_plan(execution_plan, blockers, path_proof)
         return {"ok": True, "executed": False, "semanticPlan": semantic_plan, "executionPlan": execution_plan}
+    columns_by_table = {
+        table_key: table_columns(connection, str(registry["physical_table"]))
+        for table_key, registry in registries.items()
+    }
+    expectations = [replica_expectation(registries[table_key]) for table_key in table_keys if table_key in registries]
+    with open_validated_duckdb_query(duckdb_path, expectations) as analysis_connection:
+        try:
+            sources, path_proof, blockers = _runtime_sources_and_proof(
+                analysis_connection,
+                execution_plan,
+                registries,
+                columns_by_table=columns_by_table,
+                quote_identifier=quote_identifier,
+            )
+        except (ValueError, KeyError) as error:
+            path_proof = dict(execution_plan.get("relationshipPathProof") or {})
+            path_proof.update({"status": "blocked", "blockers": [f"path-proof-failed:{error}"]})
+            blockers = [f"path-proof-failed:{error}"]
+            sources = {}
+        if blockers:
+            execution_plan = _runtime_blocked_plan(execution_plan, blockers, path_proof)
+            return {"ok": True, "executed": False, "semanticPlan": semantic_plan, "executionPlan": execution_plan}
 
-    query = _execute_path_query(
-        connection,
-        execution_plan,
-        sources,
-        path_proof,
-        limit=limit,
-        quote_identifier=quote_identifier,
-    )
+        query = _execute_path_query(
+            analysis_connection,
+            execution_plan,
+            sources,
+            path_proof,
+            limit=limit,
+            quote_identifier=quote_identifier,
+        )
+        query_runtime = analysis_connection.runtime(
+            compiled_sql=str(query.get("compiledSql") or "semantic whitelist join"),
+            params=query.pop("_compiledParams", []),
+        )
     execution_plan = {**execution_plan, "relationshipPathProof": path_proof}
     relationships = execution_plan["relationships"]
     return {
@@ -1274,8 +1298,7 @@ def execute_workspace_semantic_query(
             "joins": relationships,
             "relationshipPathProof": path_proof,
             "runtime": {
-                "engine": "sqlite",
-                "compiledSql": f"semantic {len(relationships)}-hop whitelist join",
+                **query_runtime,
                 "executionPlanHash": execution_plan["planHash"],
                 "pathProofFingerprint": path_proof.get("fingerprint"),
             },

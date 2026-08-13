@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from capability_contract_service import build_capability_contract
+from job_runtime_service import sanitize_public_value
 
 
 WORKFLOW_STAGE_SCHEMA = "aibi-workflow-stage/v1"
@@ -22,7 +23,15 @@ def _hash(value: Any) -> str:
 def safe_argument_payload(args: argparse.Namespace | dict[str, Any] | None) -> dict[str, Any]:
     values = vars(args) if isinstance(args, argparse.Namespace) else dict(args or {})
     hidden = {"json", "command", "yes"}
-    return {key: value for key, value in sorted(values.items()) if key not in hidden and value not in (None, "", [], {})}
+    payload: dict[str, Any] = {}
+    for key, value in sorted(values.items()):
+        if key in hidden or value in (None, "", [], {}):
+            continue
+        if key in {"request_key", "requestKey"}:
+            payload["requestKeyFingerprint"] = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
+            continue
+        payload[key] = sanitize_public_value(value, key=key)
+    return payload
 
 
 def build_workflow_stage(

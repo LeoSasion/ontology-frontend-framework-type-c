@@ -75,6 +75,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-metric-monitor-", ignore_cleanup_e
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(database),
         "AIBI_HYBRID_DUCKDB_PATH": str(temp / "runtime.duckdb"),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp / "workspace-recovery"),
         "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp / "evidence"),
         "PYTHONIOENCODING": "utf-8",
     }
@@ -217,8 +218,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-metric-monitor-", ignore_cleanup_e
         indexes = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
         trace_count = int(connection.execute("SELECT COUNT(*) FROM metric_monitor_evaluations WHERE workspace_id = 'default' AND monitor_key = ?", (monitor_key,)).fetchone()[0])
     check(
-        "schema-v15-persists-monitor-definitions-and-replayable-traces",
-        version == 15
+        "schema-v16-persists-monitor-definitions-and-replayable-traces",
+        version == 16
         and {"metric_monitors", "metric_monitor_evaluations"}.issubset(tables)
         and {"idx_metric_monitors_workspace_status", "idx_metric_monitors_workspace_input", "idx_metric_monitor_evaluations_workspace_monitor"}.issubset(indexes)
         and trace_count == 3,
@@ -231,7 +232,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-metric-monitor-", ignore_cleanup_e
     isolated = run(env, ["metric-monitors"])
     check("monitor-definitions-and-traces-are-workspace-isolated", isolated.get("count") == 0 and isolated.get("metricMonitors") == [], isolated)
     run(env, ["workspace-select", "default", "--yes"])
-    workspace_delete = run(env, ["workspace-delete", isolated_id, "--yes"])
+    delete_request_key = "metric-monitor-isolated-workspace-delete"
+    delete_preview = run(env, [
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+    ])
+    workspace_delete = run(env, [
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str((delete_preview.get("deletePlan") or {}).get("planFingerprint") or ""),
+        "--yes",
+    ])
     check("workspace-delete-covers-monitor-tables", workspace_delete.get("deletedCounts", {}).get("metric_monitors") == 0 and workspace_delete.get("deletedCounts", {}).get("metric_monitor_evaluations") == 0, workspace_delete)
 
 

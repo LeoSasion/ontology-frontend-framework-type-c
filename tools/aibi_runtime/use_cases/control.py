@@ -15,7 +15,7 @@ from agent_session_service import (
 )
 from agent_turn_service import agent_turns_command, cancel_agent_turn_command, run_agent_turn_command
 from analysis_unit_service import attach_analysis_unit
-from bi_cli_core import now_iso
+from bi_cli_core import DB_PATH, DUCKDB_PATH, ROOT, now_iso
 from bi_cli_schema import active_workspace_id, open_db
 from bi_cli_system_commands import cli_contract_command, list_commands_command, quality_doctor_command, status_command
 from capability_contract_service import capability_registry
@@ -35,5 +35,17 @@ from semantic_patch_service import (
 )
 from workflow_command_service import capability_contracts_command, context_budget_command, workflow_plan_command
 from workspace_manifest_service import business_field_profiles_command, runtime_catalog_command, workspace_manifest_command
+from workspace_recovery_service import (
+    configured_recovery_root,
+    workspace_recovery_create_command,
+    workspace_recovery_delete_command,
+    workspace_recovery_inspect_command,
+    workspace_recovery_list_command,
+    workspace_recovery_reconcile_command,
+    workspace_recovery_restore_command,
+)
 
 from .agent_interaction import ask_command
+
+
+WORKSPACE_RECOVERY_ROOT = configured_recovery_root(ROOT)

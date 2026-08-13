@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/aibi_cli.py --json <command>`
-Command count: `171`
+Command count: `204`
 
 This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -11,17 +11,17 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | Domain | Commands |
 |---|---:|
 | `agent` | 18 |
-| `analysis` | 24 |
+| `analysis` | 37 |
 | `analytical-skill` | 6 |
 | `config` | 3 |
-| `connector` | 9 |
+| `connector` | 18 |
 | `context` | 9 |
 | `dashboard` | 19 |
 | `domain-pack` | 5 |
 | `evidence` | 8 |
 | `formula` | 4 |
 | `import` | 7 |
-| `job` | 6 |
+| `job` | 11 |
 | `metric` | 3 |
 | `navigation` | 2 |
 | `performance` | 2 |
@@ -35,16 +35,17 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `workbench` | 1 |
 | `workflow` | 4 |
 | `workspace` | 6 |
+| `workspace-recovery` | 6 |
 
 | Mutation mode | Commands |
 |---|---:|
 | `action-confirmation` | 1 |
 | `action-draft` | 2 |
 | `artifact-export` | 2 |
-| `dry-run-confirm` | 72 |
-| `evidence-receipt` | 9 |
-| `read-only` | 75 |
-| `runtime-receipt` | 10 |
+| `dry-run-confirm` | 81 |
+| `evidence-receipt` | 15 |
+| `read-only` | 88 |
+| `runtime-receipt` | 15 |
 
 ## Commands
 
@@ -108,6 +109,11 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `dashboard-op` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--op`, `--dashboard`, `--source`, `--name`, `--table`, `--yes` |
 | `dashboard-widget-catalog` | `dashboard` | `read-only` | `no` | `no` | - |
 | `dashboards` | `dashboard` | `read-only` | `no` | `no` | `--dashboard` |
+| `decision-framework-create` | `analysis` | `runtime-receipt` | `no` | `no` | `--unit`, `--framework-type`, `--title`, `--request-key` |
+| `decision-framework-export` | `analysis` | `read-only` | `no` | `no` | `--framework` |
+| `decision-framework-publish` | `analysis` | `dry-run-confirm` | `yes` | `yes` | `--framework`, `--yes`, `--expected-plan` |
+| `decision-framework-save` | `analysis` | `runtime-receipt` | `no` | `no` | `--framework`, `--title`, `--claims-json`, `--expected-content` |
+| `decision-frameworks` | `analysis` | `read-only` | `no` | `no` | `--framework`, `--unit`, `--limit` |
 | `delete-formula` | `formula` | `dry-run-confirm` | `yes` | `no` | `formula`, `--yes` |
 | `delete-source` | `source` | `dry-run-confirm` | `yes` | `no` | `source`, `--yes` |
 | `delete-view` | `view` | `dry-run-confirm` | `yes` | `no` | `--view`, `--yes` |
@@ -118,6 +124,9 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `domain-pack-uninstall` | `domain-pack` | `dry-run-confirm` | `yes` | `no` | `--pack`, `--yes` |
 | `domain-packs` | `domain-pack` | `read-only` | `no` | `no` | `--workspace` |
 | `erp-unit-library` | `dashboard` | `read-only` | `no` | `no` | `--table`, `--limit`, `--select`, `--summary` |
+| `evidence-retrieval-evaluate` | `analysis` | `evidence-receipt` | `no` | `yes` | `--provider-profile` |
+| `evidence-retrieval-receipts` | `analysis` | `read-only` | `no` | `no` | `--limit` |
+| `evidence-retrieval-status` | `analysis` | `read-only` | `no` | `no` | - |
 | `exploration-anchor-add` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--thread`, `--parent-anchor`, `--run`, `--unit`, `--session`, `--turn`, `--label`, `--expected-plan`, `...` |
 | `exploration-board-set` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--thread`, `--anchor`, `--state`, `--position`, `--expected-plan`, `--yes` |
 | `exploration-thread-create` | `analysis` | `dry-run-confirm` | `yes` | `no` | `--run`, `--unit`, `--session`, `--turn`, `--title`, `--label`, `--expected-plan`, `--yes` |
@@ -131,6 +140,11 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `formula-preview` | `formula` | `read-only` | `no` | `no` | `expression`, `--table`, `--mode` |
 | `import-commit` | `import` | `dry-run-confirm` | `yes` | `no` | `file`, `--table`, `--name`, `--mode`, `--unique-fields`, `--conflict-rule`, `--expected-plan`, `--require-plan`, `...` |
 | `import-folder` | `import` | `dry-run-confirm` | `yes` | `no` | `path`, `--limit`, `--no-recursive`, `--unique-fields`, `--conflict-rule`, `--expected-plan`, `--yes` |
+| `import-job-create` | `job` | `evidence-receipt` | `no` | `yes` | `--import-kind`, `--path`, `--request-key`, `--expected-plan`, `--workspace`, `--label`, `--table`, `--name`, `...` |
+| `import-job-process-exit` | `job` | `evidence-receipt` | `no` | `yes` | `--job`, `--workspace`, `--exit-code`, `--signal`, `--lease-token` |
+| `import-job-recover` | `job` | `evidence-receipt` | `no` | `yes` | `--workspace`, `--all` |
+| `import-job-resume` | `job` | `evidence-receipt` | `no` | `yes` | `--job`, `--workspace` |
+| `import-job-run` | `job` | `evidence-receipt` | `no` | `yes` | `--job`, `--workspace`, `--lease-token` |
 | `infer-metrics` | `metric` | `dry-run-confirm` | `yes` | `no` | `--table`, `--yes` |
 | `infer-semantics` | `semantic` | `dry-run-confirm` | `yes` | `no` | `--table`, `--overwrite-manual`, `--yes` |
 | `inspect-table` | `source` | `read-only` | `no` | `no` | `table` |
@@ -191,6 +205,11 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `research-runs` | `analysis` | `read-only` | `no` | `no` | `--research`, `--limit` |
 | `restricted-workflow-operators` | `workflow` | `read-only` | `no` | `no` | - |
 | `restricted-workflow-validate` | `workflow` | `read-only` | `no` | `no` | `--graph-json`, `--workspace` |
+| `reviewed-publication-deprecate` | `analysis` | `dry-run-confirm` | `yes` | `yes` | `--publication`, `--reason`, `--expected-head`, `--yes` |
+| `reviewed-publication-export` | `analysis` | `read-only` | `no` | `no` | `--publication`, `--skill-fingerprint`, `--forensic` |
+| `reviewed-publication-plan` | `analysis` | `read-only` | `no` | `no` | `--memory`, `--unit`, `--title`, `--content-json`, `--skill-fingerprint` |
+| `reviewed-publication-publish` | `analysis` | `dry-run-confirm` | `yes` | `yes` | `--memory`, `--unit`, `--title`, `--content-json`, `--skill-fingerprint`, `--expected-plan`, `--yes` |
+| `reviewed-publications` | `analysis` | `read-only` | `no` | `no` | `--publication`, `--status`, `--skill-fingerprint`, `--limit` |
 | `runtime-catalog` | `workspace` | `read-only` | `no` | `no` | `--workspace` |
 | `save-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--name`, `--type`, `--provider`, `--status`, `--endpoint`, `--resource`, `--page-param`, `...` |
 | `save-dashboard-modules` | `dashboard` | `dry-run-confirm` | `yes` | `no` | `--dashboard`, `--name`, `--default-table`, `--canvas-width-mode`, `--widgets-json`, `--layout-json`, `--filters-json`, `--yes` |
@@ -210,6 +229,15 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `source-intelligence-job-run` | `job` | `evidence-receipt` | `no` | `yes` | `--job`, `--workspace` |
 | `source-intelligence-runs` | `evidence` | `read-only` | `no` | `no` | `--limit`, `--all` |
 | `source-run` | `source` | `read-only` | `no` | `no` | `source_run_id` |
+| `sqlserver-adapter-activate` | `connector` | `dry-run-confirm` | `yes` | `yes` | `--connector`, `--workspace`, `--request-key`, `--expected-plan`, `--expected-manifest`, `--yes` |
+| `sqlserver-adapter-activation-finalize` | `connector` | `dry-run-confirm` | `yes` | `yes` | `--job`, `--workspace`, `--all`, `--yes` |
+| `sqlserver-adapter-activation-status` | `connector` | `read-only` | `no` | `no` | `--connector`, `--workspace`, `--request-key`, `--expected-plan`, `--expected-manifest` |
+| `sqlserver-adapter-discover` | `connector` | `runtime-receipt` | `no` | `no` | `--connector`, `--max-tables`, `--max-columns`, `--timeout` |
+| `sqlserver-adapter-plan` | `connector` | `runtime-receipt` | `no` | `no` | `--connector`, `--request-key`, `--catalog`, `--selections-json`, `--budget-json` |
+| `sqlserver-adapter-preview` | `connector` | `read-only` | `no` | `no` | `--connector`, `--catalog`, `--resources`, `--sample-rows`, `--timeout` |
+| `sqlserver-adapter-probe` | `connector` | `read-only` | `no` | `no` | `--connector` |
+| `sqlserver-adapter-snapshot` | `connector` | `dry-run-confirm` | `yes` | `yes` | `--connector`, `--request-key`, `--expected-plan`, `--yes` |
+| `sqlserver-adapter-test` | `connector` | `read-only` | `no` | `no` | `--connector`, `--timeout` |
 | `status` | `system` | `read-only` | `no` | `no` | - |
 | `sync-connector` | `connector` | `dry-run-confirm` | `yes` | `no` | `--connector`, `--allow-paused`, `--yes` |
 | `theme-palettes` | `settings` | `dry-run-confirm` | `yes` | `no` | `--action`, `--theme-key`, `--name`, `--mode`, `--tokens-json`, `--sort`, `--yes` |
@@ -217,7 +245,13 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `workbench` | `workbench` | `read-only` | `no` | `no` | `--limit` |
 | `workflow-plan` | `workflow` | `read-only` | `no` | `no` | `target_command`, `--entrypoint`, `--workspace`, `--input-json`, `--confirmed` |
 | `workspace-create` | `workspace` | `dry-run-confirm` | `yes` | `no` | `--name`, `--yes` |
-| `workspace-delete` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--yes` |
+| `workspace-delete` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--request-key`, `--expected-plan`, `--yes` |
 | `workspace-manifest` | `workspace` | `read-only` | `no` | `no` | `--workspace` |
+| `workspace-recovery-create` | `workspace-recovery` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--reason`, `--request-key`, `--expected-plan`, `--yes` |
+| `workspace-recovery-delete` | `workspace-recovery` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--recovery-point`, `--request-key`, `--expected-plan`, `--yes` |
+| `workspace-recovery-inspect` | `workspace-recovery` | `read-only` | `no` | `no` | `--workspace`, `--recovery-point` |
+| `workspace-recovery-list` | `workspace-recovery` | `read-only` | `no` | `no` | `--workspace`, `--limit`, `--verify` |
+| `workspace-recovery-reconcile` | `workspace-recovery` | `runtime-receipt` | `no` | `no` | `--all` |
+| `workspace-recovery-restore` | `workspace-recovery` | `dry-run-confirm` | `yes` | `no` | `--workspace`, `--recovery-point`, `--request-key`, `--expected-plan`, `--yes` |
 | `workspace-rename` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--name`, `--yes` |
 | `workspace-select` | `workspace` | `dry-run-confirm` | `yes` | `no` | `workspace`, `--yes` |

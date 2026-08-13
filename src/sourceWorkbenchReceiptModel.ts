@@ -1,4 +1,4 @@
-import type { DataConnectorConfig, ImportPreview } from "./types";
+import type { DataConnectorConfig } from "./types";
 import { biText } from "./components/Bilingual";
 import { splitCsv } from "./sourceWorkbenchModel";
 
@@ -18,15 +18,12 @@ type ImportPreviewReceiptOptions = {
   conflictRule: string;
 };
 
-type ImportCommitReceiptOptions = {
-  confirm: boolean;
-  preview: ImportPreview;
-  matchedTableName: string;
-  targetTable: string;
-  importInsertRows: number;
-  importUpdateRows: number;
-  importSkipRows: number;
-  importAfterRows: number;
+type DurableImportQueuedReceiptOptions = {
+  jobKey: string;
+  planFingerprint: string;
+  importKind: "single" | "folder";
+  fileCount?: number;
+  tableCount?: number;
 };
 
 type ImportPolicyReceiptOptions = {
@@ -62,26 +59,26 @@ export function buildImportPreviewReceipt({
   };
 }
 
-export function buildImportCommitReceipt({
-  confirm,
-  preview,
-  matchedTableName,
-  targetTable,
-  importInsertRows,
-  importUpdateRows,
-  importSkipRows,
-  importAfterRows,
-}: ImportCommitReceiptOptions): WorkbenchOperationReceipt {
+export function buildDurableImportQueuedReceipt({
+  jobKey,
+  planFingerprint,
+  importKind,
+  fileCount = 0,
+  tableCount = 0,
+}: DurableImportQueuedReceiptOptions): WorkbenchOperationReceipt {
+  const folder = importKind === "folder";
   return {
-    title: confirm ? biText("导入已确认", "Import confirmed") : biText("导入影响已预演", "Import impact previewed"),
-    detail: confirm
-      ? biText(`数据会写入 ${preview.matchedTable ? matchedTableName : (preview.suggestedTableKey || targetTable)}，工作区刷新后可用于查询、证据摘要和看板。`, `Data writes to ${preview.matchedTable ? matchedTableName : (preview.suggestedTableKey || targetTable)} and can be used by queries, evidence summaries, and dashboards after refresh.`)
-      : biText("这次只是预演，不写入工作区；确认导入前可以继续调整文件、目标表或唯一键。", "This is only a preview and does not write to the workspace. Adjust file, target table, or unique key before confirming."),
-    nextStep: confirm
-      ? biText("下一步生成证据摘要，或直接查看看板。", "Next, create an evidence summary or open dashboards.")
-      : biText("确认影响无误后再点“确认导入”。", "Confirm import after the impact looks right."),
-    technical: `willWrite=${confirm}; insert=${importInsertRows}; update=${importUpdateRows}; skip=${importSkipRows}; after=${importAfterRows}`,
-    tone: confirm ? "ok" : "warn",
+    title: folder
+      ? biText("文件夹导入已进入持久队列", "Folder import entered the durable queue")
+      : biText("导入任务已进入持久队列", "Import job entered the durable queue"),
+    detail: folder
+      ? biText(`计划包含 ${fileCount} 个文件、${tableCount} 张业务表。`, `The plan contains ${fileCount} files and ${tableCount} business tables.`)
+      : biText("可以查看阶段进度或取消；完成前不会把部分结果标记为成功。", "Track stages or cancel; partial work is never reported as successful."),
+    nextStep: folder
+      ? biText("阶段进度会在下方更新；需要人工处理时不会自动重试写入。", "Stage progress updates below; writes do not auto-retry when attention is required.")
+      : biText("任务完成后只刷新当前工作区的数据源状态。", "Only active-workspace source state refreshes after completion."),
+    technical: `job=${jobKey}; plan=${planFingerprint}`,
+    tone: "ok",
   };
 }
 

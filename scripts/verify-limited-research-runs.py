@@ -67,6 +67,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(db_path),
         "AIBI_HYBRID_DUCKDB_PATH": str(temp / "analytics.duckdb"),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp / "workspace-recovery"),
         "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp / "evidence"),
         "PYTHONIOENCODING": "utf-8",
     }
@@ -76,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
-    check("schema-v15-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 15 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
+    check("schema-v16-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 16 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
 
     root_turn, root_run, root_unit = create_result(env, "请将net_sales按channel合计并生成柱状图")
     session_key = str((root_turn.get("session") or {}).get("sessionKey") or "")
@@ -183,7 +184,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     isolated_list = run(["research-runs"], env)
     cross_scope = run(["research-runs", "--research", research_key], env)
     run(["workspace-select", "default", "--yes"], env)
-    deleted = run(["workspace-delete", isolated_id, "--yes"], env)
+    delete_request_key = "limited-research-isolated-workspace-delete"
+    delete_preview = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+    ], env)
+    deleted = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str((delete_preview.get("deletePlan") or {}).get("planFingerprint") or ""),
+        "--yes",
+    ], env)
     check("research-state-is-workspace-isolated-and-delete-aware", isolated_list.get("count") == 0 and cross_scope.get("processExitCode") == 1 and deleted.get("confirmed") is True and all(name in deleted.get("deletedCounts", {}) for name in ("research_runs", "research_plan_revisions", "research_observations", "research_run_events")), {"isolated": isolated_list, "cross": cross_scope, "deleted": deleted})
 
     replaced = run(["import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders refreshed", "--mode", "replace", "--yes"], env)

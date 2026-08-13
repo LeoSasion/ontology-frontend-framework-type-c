@@ -224,7 +224,7 @@ export default function SettingsAgentRuntimeProfilePanel({ workspaceId }: Props)
           <summary>{biText("查看运行目录与安全边界", "View runtime catalog and boundaries")}</summary>
           <dl>
             <div><dt>{biText("当前解释 Profile", "Active profile")}</dt><dd>{runtimeCatalog.agentRuntime.selectedProfileId}</dd></div>
-            <div><dt>{biText("查询引擎", "Query engine")}</dt><dd>{runtimeCatalog.queryRuntime.engine} · {runtimeCatalog.queryRuntime.available ? biText("可用", "available") : biText("降级", "fallback")}</dd></div>
+            <div><dt>{biText("查询引擎", "Query engine")}</dt><dd>{runtimeCatalog.queryRuntime.engine} · {runtimeCatalog.queryRuntime.queryAvailability === "current" ? biText("当前可用", "current") : biText("已阻断", "blocked")}</dd></div>
             <div><dt>{biText("候选可授权连接", "Candidates authorize joins")}</dt><dd>{biText("否", "No")}</dd></div>
             <div><dt>fingerprint</dt><dd>{runtimeCatalog.fingerprint}</dd></div>
           </dl>

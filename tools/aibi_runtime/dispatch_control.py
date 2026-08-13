@@ -40,6 +40,12 @@ COMMANDS = frozenset({
     'status',
     'workflow-plan',
     'workspace-manifest',
+    'workspace-recovery-create',
+    'workspace-recovery-delete',
+    'workspace-recovery-inspect',
+    'workspace-recovery-list',
+    'workspace-recovery-reconcile',
+    'workspace-recovery-restore',
 })
 
 
@@ -94,6 +100,30 @@ def dispatch(args, parser):
         result = runtime.status_command(args)
     elif args.command == 'workspace-manifest':
         result = runtime.workspace_manifest_command(args, command_capabilities=runtime.capability_registry(parser), open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command in {
+        'workspace-recovery-list',
+        'workspace-recovery-reconcile',
+        'workspace-recovery-inspect',
+        'workspace-recovery-create',
+        'workspace-recovery-restore',
+        'workspace-recovery-delete',
+    }:
+        recovery_dependencies = {
+            'open_db': runtime.open_db,
+            'active_workspace_id': runtime.active_workspace_id,
+            'sqlite_path': runtime.DB_PATH,
+            'duckdb_path': runtime.DUCKDB_PATH,
+            'recovery_root': runtime.WORKSPACE_RECOVERY_ROOT,
+        }
+        recovery_command = {
+            'workspace-recovery-list': runtime.workspace_recovery_list_command,
+            'workspace-recovery-reconcile': runtime.workspace_recovery_reconcile_command,
+            'workspace-recovery-inspect': runtime.workspace_recovery_inspect_command,
+            'workspace-recovery-create': runtime.workspace_recovery_create_command,
+            'workspace-recovery-restore': runtime.workspace_recovery_restore_command,
+            'workspace-recovery-delete': runtime.workspace_recovery_delete_command,
+        }[args.command]
+        result = recovery_command(args, **recovery_dependencies)
     elif args.command == 'runtime-catalog':
         result = runtime.runtime_catalog_command(args, command_capabilities=runtime.capability_registry(parser), open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command == 'business-field-profiles':

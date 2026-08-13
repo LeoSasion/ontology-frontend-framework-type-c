@@ -121,18 +121,18 @@ export function appendCoreContractChecks(context) {
           verifyBiCliAgentContractSource.includes("preview-import-evidence-bundle") &&
           biCliContractDocSource.includes("# BI CLI Contract") &&
           biCliContractDocSource.includes("`source-intelligence`") &&
-          byLabel["cli-contract"].parsed?.contract?.schema === "aibi-bi-cli-contract/v1" &&
-          byLabel["cli-contract"].parsed?.contract?.commandCount >= 70 &&
-          byLabel["cli-contract-markdown-output"].parsed?.outputPath &&
-          existsSync(byLabel["cli-contract-markdown-output"].parsed.outputPath) &&
-          byLabel["cli-list-dashboard-write-commands"].parsed?.commands?.some((command) => command.name === "business-dashboard" && command.writesEvidence === true) &&
-          byLabel["cli-status"].parsed?.envelope?.schema === "aibi-bi-cli-envelope/v1" &&
-          byLabel["cli-status"].parsed?.artifacts?.some((artifact) => artifact.label === "database") &&
-          byLabel["cli-preview-import"].parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1" &&
-          existsSync(byLabel["cli-preview-import"].parsed?.evidenceBundle?.manifestPath ?? "") &&
-          byLabel["cli-business-dashboard-draft"].parsed?.requiresConfirmation === false &&
-          byLabel["cli-business-dashboard-draft"].parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1" &&
-          byLabel["cli-source-intelligence-validation-inputs"].parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1",
+          byLabel["cli-contract"]?.parsed?.contract?.schema === "aibi-bi-cli-contract/v1" &&
+          byLabel["cli-contract"]?.parsed?.contract?.commandCount >= 70 &&
+          byLabel["cli-contract-markdown-output"]?.parsed?.outputPath &&
+          existsSync(byLabel["cli-contract-markdown-output"]?.parsed?.outputPath) &&
+          byLabel["cli-list-dashboard-write-commands"]?.parsed?.commands?.some((command) => command.name === "business-dashboard" && command.writesEvidence === true) &&
+          byLabel["cli-status"]?.parsed?.envelope?.schema === "aibi-bi-cli-envelope/v1" &&
+          byLabel["cli-status"]?.parsed?.artifacts?.some((artifact) => artifact.label === "database") &&
+          byLabel["cli-preview-import"]?.parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1" &&
+          existsSync(byLabel["cli-preview-import"]?.parsed?.evidenceBundle?.manifestPath ?? "") &&
+          byLabel["cli-business-dashboard-draft"]?.parsed?.requiresConfirmation === false &&
+          byLabel["cli-business-dashboard-draft"]?.parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1" &&
+          byLabel["cli-source-intelligence-validation-inputs"]?.parsed?.evidenceBundle?.schema === "aibi-evidence-bundle/v1",
       },
     {
         label: "agent-prompt-resolution-boundary",
@@ -149,8 +149,8 @@ export function appendCoreContractChecks(context) {
           agentPromptResolutionSource.includes("def build_agent_action_payload(") &&
           agentPromptResolutionSource.includes("def agent_action_kind(") &&
           agentPromptResolutionSource.includes("def agent_action_evidence(") &&
-          byLabel["cli-agent-widget-draft"].parsed?.actionDraft?.kind === "dashboard.widget.add" &&
-          byLabel["cli-agent-dashboard-filter-draft"].parsed?.actionDraft?.kind === "dashboard.filter.add",
+          byLabel["cli-agent-widget-draft"]?.parsed?.actionDraft?.kind === "dashboard.widget.add" &&
+          byLabel["cli-agent-dashboard-filter-draft"]?.parsed?.actionDraft?.kind === "dashboard.filter.add",
       },
     {
         label: "agent-action-confirmation-boundary",
@@ -164,9 +164,9 @@ export function appendCoreContractChecks(context) {
           agentActionConfirmationsSource.includes("from agent_action_draft_store import mark_action_confirmed, mark_action_rejected") &&
           agentActionConfirmationsSource.includes("def confirmed_response(") &&
           agentActionConfirmationsSource.includes("def rejected_response(") &&
-          byLabel["cli-agent-confirm-widget"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard-filter"].parsed?.confirmed === true &&
-          byLabel["cli-agent-reject-dashboard"].parsed?.decision === "reject",
+          byLabel["cli-agent-confirm-widget"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard-filter"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-reject-dashboard"]?.parsed?.decision === "reject",
       },
     {
         label: "agent-action-draft-store-boundary",
@@ -187,10 +187,10 @@ export function appendCoreContractChecks(context) {
           agentActionDraftStoreSource.includes("def count_pending_action_drafts(") &&
           agentActionDraftStoreSource.includes("def mark_action_confirmed(") &&
           agentActionDraftStoreSource.includes("def mark_action_rejected(") &&
-          byLabel["cli-agent-widget-draft"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-source-dashboard-draft"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-agent-action-drafts-after-widget-confirm"].parsed?.pendingCount >= 0 &&
-          byLabel["cli-source-dashboard-action-drafts-after-confirm"].parsed?.pendingCount >= 0,
+          byLabel["cli-agent-widget-draft"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-agent-action-drafts-after-widget-confirm"]?.parsed?.pendingCount >= 0 &&
+          byLabel["cli-source-dashboard-action-drafts-after-confirm"]?.parsed?.pendingCount >= 0,
       },
     {
         label: "agent-confirm-execution-handlers-phase1-boundary",
@@ -205,9 +205,9 @@ export function appendCoreContractChecks(context) {
           agentConfirmExecutionHandlersSource.includes("build_index_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_relationship_save_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_import_preview: Callable") &&
-          byLabel["cli-agent-confirm-index"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-relationship"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-import"].parsed?.confirmed === true,
+          byLabel["cli-agent-confirm-index"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-relationship"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-import"]?.parsed?.confirmed === true,
       },
     {
         label: "agent-confirm-execution-handlers-phase2-boundary",
@@ -224,10 +224,10 @@ export function appendCoreContractChecks(context) {
           agentConfirmExecutionHandlersSource.includes("build_save_view_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_metric_add_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_semantic_set_plan: Callable") &&
-          byLabel["cli-agent-confirm-formula"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-view"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-metric"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-semantic"].parsed?.confirmed === true,
+          byLabel["cli-agent-confirm-formula"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-view"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-metric"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-semantic"]?.parsed?.confirmed === true,
       },
     {
         label: "agent-confirm-execution-handlers-phase3-boundary",
@@ -245,12 +245,12 @@ export function appendCoreContractChecks(context) {
           agentConfirmExecutionHandlersSource.includes("build_dashboard_filter_add_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_dashboard_operation_plan: Callable") &&
           agentConfirmExecutionHandlersSource.includes("build_agent_dashboard_create_draft: Callable") &&
-          byLabel["cli-agent-confirm-widget"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard-filter"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard-copy"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard-rename"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard-delete"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-dashboard"].parsed?.confirmed === true,
+          byLabel["cli-agent-confirm-widget"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard-filter"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard-copy"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard-rename"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard-delete"]?.parsed?.confirmed === true &&
+          byLabel["cli-agent-confirm-dashboard"]?.parsed?.confirmed === true,
       },
     {
         label: "agent-recommended-commands-boundary",
@@ -263,8 +263,8 @@ export function appendCoreContractChecks(context) {
           agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json add-widget") &&
           agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json add-filter") &&
           agentRecommendedCommandsSource.includes("python tools/aibi_cli.py --json save-view") &&
-          byLabel["cli-agent-widget-draft"].parsed?.recommendedCommands?.some((command) => command.includes("add-widget")) &&
-          byLabel["cli-agent-dashboard-filter-draft"].parsed?.recommendedCommands?.some((command) => command.includes("add-filter")) &&
+          byLabel["cli-agent-widget-draft"]?.parsed?.recommendedCommands?.some((command) => command.includes("add-widget")) &&
+          byLabel["cli-agent-dashboard-filter-draft"]?.parsed?.recommendedCommands?.some((command) => command.includes("add-filter")) &&
           readOnlyAgentCheck.parsed?.recommendedCommands?.some((command) => command.includes("--json query")),
       },
     {
@@ -287,8 +287,8 @@ export function appendCoreContractChecks(context) {
           savedViewQueryServiceSource.includes("def execute_save_view_plan(") &&
           savedViewQueryServiceSource.includes("def copy_view_command(") &&
           savedViewQueryServiceSource.includes("def delete_view_command(") &&
-          byLabel["cli-save-view-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-save-view-confirm"].parsed?.confirmed === true,
+          byLabel["cli-save-view-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-save-view-confirm"]?.parsed?.confirmed === true,
       },
     {
         label: "metric-formula-command-service-boundary",
@@ -318,11 +318,11 @@ export function appendCoreContractChecks(context) {
           !biCliRuntimeSource.includes("INSERT INTO metric_definitions(") &&
           !biCliRuntimeSource.includes("INSERT INTO calculated_fields(") &&
           !biCliRuntimeSource.includes("\"sqlite-formula-metric\"") &&
-          byLabel["cli-add-metric-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-query-metric"].parsed?.tableQuery?.rows?.some((row) => row.channel === "Douyin" && Number(row.sum_net_sales) === 3440) &&
-          byLabel["cli-formula-preview"].parsed?.compiledSql?.includes("CASE WHEN") &&
-          byLabel["cli-save-formula-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-delete-formula-confirm"].parsed?.confirmed === true,
+          byLabel["cli-add-metric-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-query-metric"]?.parsed?.tableQuery?.rows?.some((row) => row.channel === "Douyin" && Number(row.sum_net_sales) === 3440) &&
+          byLabel["cli-formula-preview"]?.parsed?.compiledSql?.includes("CASE WHEN") &&
+          byLabel["cli-save-formula-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-delete-formula-confirm"]?.parsed?.confirmed === true,
       },
     {
         label: "connector-command-service-boundary",
@@ -347,11 +347,11 @@ export function appendCoreContractChecks(context) {
           connectorCommandServiceSource.includes("last_sync_status = 'success'") &&
           !biCliRuntimeSource.includes("INSERT OR REPLACE INTO data_connectors(") &&
           !biCliRuntimeSource.includes("DELETE FROM data_connectors WHERE connector_key = ?") &&
-          byLabel["cli-save-connector-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-save-connector-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-sync-connector-confirm"].parsed?.connectorSync?.importResult?.tableKey === "orders" &&
-          byLabel["cli-sync-external-connector-blocked"].parsed?.ok === false &&
-          byLabel["cli-remove-connector-dry-run"].parsed?.requiresConfirmation === true,
+          byLabel["cli-save-connector-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-save-connector-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-sync-connector-confirm"]?.parsed?.connectorSync?.importResult?.tableKey === "orders" &&
+          byLabel["cli-sync-external-connector-blocked"]?.parsed?.ok === false &&
+          byLabel["cli-remove-connector-dry-run"]?.parsed?.requiresConfirmation === true,
       },
     {
         label: "import-job-command-service-boundary",
@@ -367,10 +367,10 @@ export function appendCoreContractChecks(context) {
           importJobCommandServiceSource.includes("DELETE FROM import_jobs WHERE job_key = ? AND workspace_id = ?") &&
           !biCliRuntimeSource.includes("INSERT OR REPLACE INTO import_policies(table_key, workspace_id, unique_fields_json, conflict_rule, updated_at)") &&
           !biCliRuntimeSource.includes("DELETE FROM import_jobs WHERE job_key = ? AND workspace_id = ?") &&
-          byLabel["cli-set-import-policy-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-set-import-policy-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-list-import-jobs"].parsed?.importJobs?.some((job) => job.table_key === "orders" && job.status === "success") &&
-          byLabel["cli-remove-import-job-dry-run"].parsed?.requiresConfirmation === true,
+          byLabel["cli-set-import-policy-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-set-import-policy-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-list-import-jobs"]?.parsed?.importJobs?.some((job) => job.table_key === "orders" && job.status === "success") &&
+          byLabel["cli-remove-import-job-dry-run"]?.parsed?.requiresConfirmation === true,
       },
     {
         label: "import-command-service-boundary",
@@ -395,17 +395,17 @@ export function appendCoreContractChecks(context) {
           importCommandServiceSource.includes("upsert_navigation_module(") &&
           importCommandServiceSource.includes("recommendedCommand") &&
           !biCliRuntimeSource.includes("\"matchType\": \"exactOrder\"") &&
-          byLabel["cli-preview-import"].parsed?.sourcePipelineContract?.stages?.length > 0 &&
-          byLabel["cli-preview-import"].parsed?.mergePolicyPreview?.mergePlan?.incomingRows &&
-          byLabel["cli-preview-import-folder"].parsed?.fileCount >= 2 &&
-          byLabel["cli-preview-import-folder"].parsed?.tableCount >= 2 &&
-          byLabel["cli-preview-import-folder"].parsed?.items?.length === byLabel["cli-preview-import-folder"].parsed?.fileCount &&
-          byLabel["cli-preview-import-folder"].parsed?.groups?.length === byLabel["cli-preview-import-folder"].parsed?.tableCount &&
-          byLabel["cli-import-folder-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-import-folder-dry-run"].parsed?.willWrite === false &&
-          byLabel["cli-import-delete-source-validation-input"].parsed?.committed === true &&
-          byLabel["cli-import-delete-source-validation-input"].parsed?.result?.tableKey === "verify_delete_source" &&
-          byLabel["cli-agent-confirm-import"].parsed?.confirmed === true,
+          byLabel["cli-preview-import"]?.parsed?.sourcePipelineContract?.stages?.length > 0 &&
+          byLabel["cli-preview-import"]?.parsed?.mergePolicyPreview?.mergePlan?.incomingRows &&
+          byLabel["cli-preview-import-folder"]?.parsed?.fileCount >= 2 &&
+          byLabel["cli-preview-import-folder"]?.parsed?.tableCount >= 2 &&
+          byLabel["cli-preview-import-folder"]?.parsed?.items?.length === byLabel["cli-preview-import-folder"]?.parsed?.fileCount &&
+          byLabel["cli-preview-import-folder"]?.parsed?.groups?.length === byLabel["cli-preview-import-folder"]?.parsed?.tableCount &&
+          byLabel["cli-import-folder-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-import-folder-dry-run"]?.parsed?.willWrite === false &&
+          byLabel["cli-import-delete-source-validation-input"]?.parsed?.committed === true &&
+          byLabel["cli-import-delete-source-validation-input"]?.parsed?.result?.tableKey === "verify_delete_source" &&
+          byLabel["cli-agent-confirm-import"]?.parsed?.confirmed === true,
       },
     {
         label: "import-table-writer-service-boundary",
@@ -432,10 +432,10 @@ export function appendCoreContractChecks(context) {
           importTableWriterServiceSource.includes("existing_rows_by_unique_key(") &&
           importTableWriterServiceSource.includes("\"writeSummary\"") &&
           importTableWriterServiceSource.includes("导入文件字段与目标表不匹配") &&
-          byLabel["cli-import-delete-source-validation-input"].parsed?.committed === true &&
-          byLabel["cli-import-delete-source-validation-input"].parsed?.result?.sourceRunId &&
-          byLabel["cli-sync-connector-confirm"].parsed?.connectorSync?.importResult?.writeSummary?.rowCountAfter === 10 &&
-          byLabel["cli-agent-confirm-import"].parsed?.importResult?.sourceRunId,
+          byLabel["cli-import-delete-source-validation-input"]?.parsed?.committed === true &&
+          byLabel["cli-import-delete-source-validation-input"]?.parsed?.result?.sourceRunId &&
+          byLabel["cli-sync-connector-confirm"]?.parsed?.connectorSync?.importResult?.writeSummary?.rowCountAfter === 10 &&
+          byLabel["cli-agent-confirm-import"]?.parsed?.importResult?.sourceRunId,
       },
     {
         label: "ui-real-import-generic-single-chart-flow",
@@ -502,11 +502,11 @@ export function appendCoreContractChecks(context) {
           !biCliRuntimeSource.includes("DELETE FROM relationships WHERE relation_key = ? AND workspace_id = ?") &&
           !biCliRuntimeSource.includes("sample-overlap:") &&
           !biCliRuntimeSource.includes("shared-business-token:") &&
-          byLabel["cli-relationship-preview"].parsed?.relationshipPreview?.metrics?.confidence >= 0.8 &&
-          byLabel["cli-relationship-save-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-list-relationships"].parsed?.relationships?.some((relationship) => relationship.relation_key === "orders_refunds_order_id_order_id") &&
-          byLabel["cli-query-relationship"].parsed?.relationshipQuery?.joinType === "left" &&
-          byLabel["cli-remove-relationship-dry-run"].parsed?.requiresConfirmation === true,
+          byLabel["cli-relationship-preview"]?.parsed?.relationshipPreview?.metrics?.confidence >= 0.8 &&
+          byLabel["cli-relationship-save-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-list-relationships"]?.parsed?.relationships?.some((relationship) => relationship.relation_key === "orders_refunds_order_id_order_id") &&
+          byLabel["cli-query-relationship"]?.parsed?.relationshipQuery?.joinType === "left" &&
+          byLabel["cli-remove-relationship-dry-run"]?.parsed?.requiresConfirmation === true,
       },
     {
         label: "source-evidence-engine-renamed",
@@ -580,37 +580,37 @@ export function appendCoreContractChecks(context) {
           sourceIntelligenceRunStoreSource.includes("LIMIT 200") &&
           sourceIntelligenceRunStoreSource.includes("def source_intelligence_run_manifest(") &&
           sourceIntelligenceRunStoreSource.includes("def count_source_intelligence_runs(") &&
-          byLabel["cli-source-intelligence-validation-inputs"].parsed?.runKey &&
-          byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns?.some((run) =>
-            run.run_key === byLabel["cli-source-intelligence-validation-inputs"].parsed?.runKey &&
+          byLabel["cli-source-intelligence-validation-inputs"]?.parsed?.runKey &&
+          byLabel["cli-source-intelligence-runs-after-validation-input"]?.parsed?.sourceIntelligenceRuns?.some((run) =>
+            run.run_key === byLabel["cli-source-intelligence-validation-inputs"]?.parsed?.runKey &&
             run.fileCoverage?.dashboardCandidate?.source === "source-intelligence-receipts"
           ),
       },
     {
         label: "source-intelligence-dashboard-draft-action-boundary",
-        ok: byLabel["cli-source-dashboard-draft"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-source-dashboard-draft"].parsed?.actionDraft?.kind === "dashboard.create" &&
-          byLabel["cli-source-dashboard-draft"].parsed?.source === "source-intelligence-dashboard-candidate" &&
-          byLabel["cli-source-dashboard-draft"].parsed?.dashboardDraft?.source === "source-intelligence-dashboard-candidate" &&
-          byLabel["cli-source-dashboard-draft"].parsed?.dashboardDraft?.widgets?.length >= 2 &&
-          byLabel["cli-source-dashboard-draft"].parsed?.dashboardDraft?.widgets?.every((widget) =>
+        ok: byLabel["cli-source-dashboard-draft"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.actionDraft?.kind === "dashboard.create" &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.source === "source-intelligence-dashboard-candidate" &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.dashboardDraft?.source === "source-intelligence-dashboard-candidate" &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.dashboardDraft?.widgets?.length >= 2 &&
+          byLabel["cli-source-dashboard-draft"]?.parsed?.dashboardDraft?.widgets?.every((widget) =>
             widget.type === "text" &&
             widget.sourceRunKey &&
             widget.evidenceRefs?.some((ref) => String(ref).startsWith("source-intelligence:"))
           ) &&
-          byLabel["cli-source-dashboard-confirm-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-source-dashboard-confirm-dry-run"].parsed?.dashboardDraft?.source === "source-intelligence-dashboard-candidate" &&
-          byLabel["cli-source-dashboard-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-source-dashboard-after-confirm"].parsed?.dashboards?.some((dashboard) =>
-            dashboard.dashboard_key === byLabel["cli-source-dashboard-confirm"].parsed?.createdDashboardKey &&
+          byLabel["cli-source-dashboard-confirm-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-source-dashboard-confirm-dry-run"]?.parsed?.dashboardDraft?.source === "source-intelligence-dashboard-candidate" &&
+          byLabel["cli-source-dashboard-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-source-dashboard-after-confirm"]?.parsed?.dashboards?.some((dashboard) =>
+            dashboard.dashboard_key === byLabel["cli-source-dashboard-confirm"]?.parsed?.createdDashboardKey &&
             dashboard.widgets?.some((widget) =>
               widget.widget_type === "text" &&
-              widget.config?.sourceRunKey === byLabel["cli-source-dashboard-draft"].parsed?.sourceRunKey &&
+              widget.config?.sourceRunKey === byLabel["cli-source-dashboard-draft"]?.parsed?.sourceRunKey &&
               widget.config?.evidenceRefs?.some((ref) => String(ref).startsWith("source-intelligence:"))
             )
           ) &&
-          !byLabel["cli-source-dashboard-action-drafts-after-confirm"].parsed?.actionDrafts?.some((draft) =>
-            draft.action_key === byLabel["cli-source-dashboard-draft"].parsed?.actionDraft?.actionKey
+          !byLabel["cli-source-dashboard-action-drafts-after-confirm"]?.parsed?.actionDrafts?.some((draft) =>
+            draft.action_key === byLabel["cli-source-dashboard-draft"]?.parsed?.actionDraft?.actionKey
           ) &&
           biCliRuntimeSource.includes("def source_intelligence_dashboard_draft_command(") &&
           biCliRuntimeSource.includes("from evidence_dashboard_drafts import build_source_intelligence_dashboard_draft") &&
@@ -653,7 +653,7 @@ export function appendCoreContractChecks(context) {
           dashboardWidgetOperationsSource.includes("def next_dashboard_widget_sort_order(") &&
           dashboardWidgetOperationsSource.includes("def insert_dashboard_widget(") &&
           dashboardWidgetOperationsSource.includes("Dashboard widget insert requires workspace_id") &&
-          byLabel["cli-save-dashboard-modules-dry-run"].parsed?.proposedWidgets?.every((widget) => widget.workspace_id),
+          byLabel["cli-save-dashboard-modules-dry-run"]?.parsed?.proposedWidgets?.every((widget) => widget.workspace_id),
       },
     {
         label: "dashboard-widget-proposal-service-boundary",
@@ -669,8 +669,8 @@ export function appendCoreContractChecks(context) {
           dashboardWidgetProposalServiceSource.includes("widget_config_from_options") &&
           dashboardWidgetProposalServiceSource.includes("resolve_dashboard_widget_key") &&
           dashboardWidgetProposalServiceSource.includes("next_dashboard_widget_sort_order") &&
-          byLabel["cli-add-widget-view-dry-run"].parsed?.proposedWidget?.config?.dataMode === "view" &&
-          byLabel["cli-add-relationship-widget-dry-run"].parsed?.proposedWidget?.config?.dataMode === "relationship",
+          byLabel["cli-add-widget-view-dry-run"]?.parsed?.proposedWidget?.config?.dataMode === "view" &&
+          byLabel["cli-add-relationship-widget-dry-run"]?.parsed?.proposedWidget?.config?.dataMode === "relationship",
       },
     {
         label: "dashboard-widget-command-service-boundary",
@@ -693,11 +693,11 @@ export function appendCoreContractChecks(context) {
           dashboardWidgetCommandServiceSource.includes("same type/title/source already exists") &&
           dashboardWidgetCommandServiceSource.includes("UPDATE dashboard_widgets") &&
           dashboardWidgetCommandServiceSource.includes("DELETE FROM dashboard_widgets WHERE widget_key = ? AND workspace_id = ?") &&
-          byLabel["cli-add-recommended-widgets-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-add-widget-view-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-set-widget-style-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-copy-widget-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-remove-widget-dry-run"].parsed?.requiresConfirmation === true,
+          byLabel["cli-add-recommended-widgets-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-add-widget-view-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-set-widget-style-confirm"]?.parsed?.confirmed === true &&
+          byLabel["cli-copy-widget-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-remove-widget-dry-run"]?.parsed?.requiresConfirmation === true,
       },
     {
         label: "business-dashboard-service-boundary",
@@ -725,11 +725,11 @@ export function appendCoreContractChecks(context) {
           !businessDashboardTemplatesSource.includes("COST_MONITOR_NET_FORMULA") &&
           businessDashboardServiceSource.includes("namespaced_dashboard_widget_id") &&
           businessDashboardServiceSource.includes("save_dashboard_with_widgets") &&
-          byLabel["cli-business-dashboard-draft"].parsed?.templateCount >= 5 &&
-          byLabel["cli-business-dashboard-create-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-business-dashboard-create-confirm"].parsed?.confirmed === true &&
+          byLabel["cli-business-dashboard-draft"]?.parsed?.templateCount >= 5 &&
+          byLabel["cli-business-dashboard-create-dry-run"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-business-dashboard-create-confirm"]?.parsed?.confirmed === true &&
           !biCliParserSource.includes('"cost-monitor"') &&
-          byLabel["cli-agent-confirm-dashboard-dry-run"].parsed?.proposedDashboard?.source === "analysis-dashboard",
+          byLabel["cli-agent-confirm-dashboard-dry-run"]?.parsed?.proposedDashboard?.source === "analysis-dashboard",
       },
     {
         label: "erp-dashboard-unit-library",
@@ -739,7 +739,7 @@ export function appendCoreContractChecks(context) {
           biCliRuntimeSource.includes("from erp_dashboard_unit_library import ") &&
           biCliRuntimeSource.includes('sub.add_parser("erp-unit-library")') &&
           biCliRuntimeSource.includes('choices=["business", ERP_UNIT_LIBRARY_TEMPLATE_KEY]') &&
-          byLabel["cli-enable-erp-domain-pack"].parsed?.enabledDomainPacks?.some((item) => item.packId === "erp-units") &&
+          byLabel["cli-enable-erp-domain-pack"]?.parsed?.enabledDomainPacks?.some((item) => item.packId === "erp-units") &&
           businessDashboardServiceSource.includes("prompt_prefers_erp_unit_library(prompt)") &&
           businessDashboardServiceSource.includes("build_erp_dashboard_unit_templates(") &&
           erpDashboardUnitLibrarySource.includes('ERP_UNIT_LIBRARY_TEMPLATE_KEY = "erp-units"') &&
@@ -751,20 +751,20 @@ export function appendCoreContractChecks(context) {
           erpDashboardUnitLibrarySource.includes("not a fixed ERP dashboard template") &&
           businessDashboardServiceSource.includes('"erpUnitLibrary": erp_unit_library') &&
           businessDashboardServiceSource.includes('"erp-unit-library"') &&
-          byLabel["cli-dashboard-widget-catalog"].parsed?.erpUnitLibrary?.unitCount >= 150 &&
-          byLabel["cli-dashboard-widget-catalog"].parsed?.erpUnitLibrary?.referenceCount >= 45 &&
-          byLabel["cli-erp-unit-library-summary"].parsed?.catalog?.fieldAliasGroupCount >= 240 &&
-          byLabel["cli-erp-unit-library-selection"].parsed?.selection?.erpUnitLibrary?.selectedUnitCount > 0 &&
-          byLabel["cli-erp-unit-library-selection"].parsed?.selection?.erpUnitLibrary?.unavailableUnitCount >= 0 &&
-          Array.isArray(byLabel["cli-erp-unit-library-selection"].parsed?.selection?.erpUnitLibrary?.omittedUnitHints) &&
-          byLabel["cli-business-dashboard-erp-units-draft"].parsed?.draft?.templateKey === "erp-units" &&
-          byLabel["cli-business-dashboard-erp-units-draft"].parsed?.draft?.erpUnitLibrary?.selectedUnitCount > 0 &&
-          Array.isArray(byLabel["cli-business-dashboard-erp-units-draft"].parsed?.draft?.erpUnitLibrary?.categoryCoverage) &&
-          byLabel["cli-business-dashboard-erp-units-draft"].parsed?.draft?.widgets?.some((widget) => widget.erpUnitKey && widget.matchedFields) &&
-          byLabel["cli-agent-erp-dashboard-draft"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-agent-erp-dashboard-draft"].parsed?.actionDraft?.kind === "dashboard.create" &&
-          byLabel["cli-agent-action-drafts-before-confirm"].parsed?.actionDrafts?.some((draft) =>
-            draft.action_key === byLabel["cli-agent-erp-dashboard-draft"].parsed?.actionDraft?.actionKey &&
+          byLabel["cli-dashboard-widget-catalog"]?.parsed?.erpUnitLibrary?.unitCount >= 150 &&
+          byLabel["cli-dashboard-widget-catalog"]?.parsed?.erpUnitLibrary?.referenceCount >= 45 &&
+          byLabel["cli-erp-unit-library-summary"]?.parsed?.catalog?.fieldAliasGroupCount >= 240 &&
+          byLabel["cli-erp-unit-library-selection"]?.parsed?.selection?.erpUnitLibrary?.selectedUnitCount > 0 &&
+          byLabel["cli-erp-unit-library-selection"]?.parsed?.selection?.erpUnitLibrary?.unavailableUnitCount >= 0 &&
+          Array.isArray(byLabel["cli-erp-unit-library-selection"]?.parsed?.selection?.erpUnitLibrary?.omittedUnitHints) &&
+          byLabel["cli-business-dashboard-erp-units-draft"]?.parsed?.draft?.templateKey === "erp-units" &&
+          byLabel["cli-business-dashboard-erp-units-draft"]?.parsed?.draft?.erpUnitLibrary?.selectedUnitCount > 0 &&
+          Array.isArray(byLabel["cli-business-dashboard-erp-units-draft"]?.parsed?.draft?.erpUnitLibrary?.categoryCoverage) &&
+          byLabel["cli-business-dashboard-erp-units-draft"]?.parsed?.draft?.widgets?.some((widget) => widget.erpUnitKey && widget.matchedFields) &&
+          byLabel["cli-agent-erp-dashboard-draft"]?.parsed?.requiresConfirmation === true &&
+          byLabel["cli-agent-erp-dashboard-draft"]?.parsed?.actionDraft?.kind === "dashboard.create" &&
+          byLabel["cli-agent-action-drafts-before-confirm"]?.parsed?.actionDrafts?.some((draft) =>
+            draft.action_key === byLabel["cli-agent-erp-dashboard-draft"]?.parsed?.actionDraft?.actionKey &&
             draft.payload?.dashboardDraft?.templateKey === "erp-units" &&
             draft.payload?.dashboardDraft?.erpUnitLibrary?.selectedUnitCount > 0 &&
             Array.isArray(draft.payload?.dashboardDraft?.erpUnitLibrary?.omittedUnitHints) &&

@@ -3,6 +3,7 @@ import { countText } from "../sourceWorkbenchModel";
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 import { OperationReceipt } from "./OperationReceipt";
+import { ImportJobStatusCard } from "./ImportJobStatusCard";
 
 type SourceWorkbenchImportPanelProps = ReturnType<typeof useSourceWorkbenchImportController> & {
   busy: string | null;
@@ -31,6 +32,8 @@ export function SourceWorkbenchImportPanel({
   importOperationReceipt,
   folderImportPlan,
   singleImportPlanReady,
+  activeImportJob,
+  importJobActive,
   setFilePath,
   setTargetTable,
   setTargetName,
@@ -42,6 +45,8 @@ export function SourceWorkbenchImportPanel({
   runImportCommitAction,
   runFolderImportPreviewAction,
   runFolderImportCommitAction,
+  cancelActiveImportJob,
+  resumeActiveImportJob,
   runImportPolicyAction,
 }: SourceWorkbenchImportPanelProps) {
   const createTargetLabel = preview.suggestedDisplayName || targetName || preview.suggestedTableKey || targetTable;
@@ -78,7 +83,7 @@ export function SourceWorkbenchImportPanel({
           <button
             className="primaryButton compactAction"
             data-testid="source-import-preview-button"
-            disabled={sourceCheckBusy || !filePath.trim()}
+            disabled={sourceCheckBusy || importJobActive || !filePath.trim()}
             onClick={() => void checkSource()}
             type="button"
           >
@@ -167,6 +172,14 @@ export function SourceWorkbenchImportPanel({
           testId="import-operation-receipt"
         />
       ) : null}
+      {activeImportJob ? (
+        <ImportJobStatusCard
+          busy={busy !== null}
+          job={activeImportJob}
+          onCancel={cancelActiveImportJob}
+          onResume={resumeActiveImportJob}
+        />
+      ) : null}
       {folderImportPlan && folderImportPlan.fileCount > 0 ? (
         <div className="folderImportPlan" data-testid="folder-import-plan">
           <div className="folderImportPlanHeader">
@@ -181,7 +194,7 @@ export function SourceWorkbenchImportPanel({
             <button
               className="primaryButton compactAction"
               data-testid="folder-import-confirm-button"
-              disabled={busy === "folder-confirm" || folderImportPlan.readyToCommit !== true}
+              disabled={busy === "folder-confirm" || importJobActive || folderImportPlan.readyToCommit !== true}
               onClick={() => runBusy("folder-confirm", () => runFolderImportCommitAction(true))}
               type="button"
             >
@@ -241,7 +254,7 @@ export function SourceWorkbenchImportPanel({
               <button
                 className="primaryButton compactAction"
                 data-testid="import-confirmation-confirm"
-                disabled={busy === "import-confirm" || !singleImportPlanReady}
+                disabled={busy === "import-confirm" || importJobActive || !singleImportPlanReady}
                 onClick={() => runBusy("import-confirm", () => runImportCommitAction(true))}
                 type="button"
               >

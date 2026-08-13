@@ -2,27 +2,38 @@ from __future__ import annotations
 
 import math
 import sqlite3
+from pathlib import Path
 from typing import Any
 
-from query_runtime import SAFE_AGGREGATIONS, compile_filter_sql, quote_identifier
+from bi_cli_core import DUCKDB_PATH
+from query_runtime import (
+    SAFE_AGGREGATIONS,
+    ValidatedDuckDBQuery,
+    compile_filter_sql,
+    cursor_rows,
+    numeric_sql,
+    open_validated_duckdb_query,
+    quote_identifier,
+    replica_expectation,
+)
 
 
 APPAREL_METHOD_RESULT_SCHEMA = "aibi-apparel-commerce-method-result/v1"
 EXECUTABLE_METHODS = {"ranking", "concentration", "pareto", "decile"}
 
 
-def _sqlite_measure_sql(measure: str, aggregation: str) -> str:
+def _duckdb_measure_sql(measure: str, aggregation: str) -> str:
     if aggregation not in SAFE_AGGREGATIONS:
         raise ValueError(f"Unsupported aggregation: {aggregation}")
     if aggregation == "count":
         return "COUNT(*)"
     if aggregation == "count-distinct":
         return f"COUNT(DISTINCT {quote_identifier(measure)})"
-    return f"{aggregation.upper()}(CAST(NULLIF(REPLACE({quote_identifier(measure)}, ',', ''), '') AS REAL))"
+    return f"{aggregation.upper()}({numeric_sql(quote_identifier(measure))})"
 
 
 def _entity_population(
-    connection: sqlite3.Connection,
+    connection: ValidatedDuckDBQuery,
     *,
     physical_table: str,
     columns: list[str],
@@ -39,27 +50,21 @@ def _entity_population(
     for item in filters:
         if str(item.get("field") or "") not in columns:
             raise ValueError(f"Unknown filter field: {item.get('field')}")
-    where = compile_filter_sql(filters, dialect="sqlite")
-    predicates = [f"TRIM(CAST({quote_identifier(entity_field)} AS TEXT)) <> ''"]
+    where, params = compile_filter_sql(filters, dialect="duckdb")
+    predicates = [f"TRIM(CAST({quote_identifier(entity_field)} AS VARCHAR)) <> ''"]
     if where:
         predicates.append(where)
-    measure_sql = _sqlite_measure_sql(measure, aggregation)
+    measure_sql = _duckdb_measure_sql(measure, aggregation)
     direction = "ASC" if sort_direction == "asc" else "DESC"
     sql = (
-        f"SELECT CAST({quote_identifier(entity_field)} AS TEXT) AS label, {measure_sql} AS value "
+        f"SELECT CAST({quote_identifier(entity_field)} AS VARCHAR) AS label, {measure_sql} AS value "
         f"FROM {quote_identifier(physical_table)} "
         f"WHERE {' AND '.join(predicates)} "
         f"GROUP BY {quote_identifier(entity_field)} "
         f"ORDER BY value {direction}, label ASC"
     )
-    rows = [dict(row) for row in connection.execute(sql)]
-    return {
-        "engine": "sqlite",
-        "database": "metadata-store",
-        "compiledSql": sql,
-        "syncedRows": None,
-        "populationComplete": True,
-    }, rows
+    rows = cursor_rows(connection.execute(sql, params))
+    return {**connection.runtime(compiled_sql=sql, params=params), "populationComplete": True}, rows
 
 
 def _numeric_population(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -207,6 +212,7 @@ def execute_apparel_method(
     registry: sqlite3.Row,
     columns: list[str],
     query_intent: dict[str, Any],
+    duckdb_path: Path = DUCKDB_PATH,
 ) -> dict[str, Any] | None:
     method = str(query_intent.get("method") or "")
     if method not in EXECUTABLE_METHODS:
@@ -215,16 +221,17 @@ def execute_apparel_method(
     measure = str((query_intent.get("measure") or {}).get("field") or "")
     aggregation = str((query_intent.get("aggregation") or {}).get("function") or "")
     sort_direction = str((query_intent.get("sort") or {}).get("direction") or "desc")
-    runtime, raw_population = _entity_population(
-        connection,
-        physical_table=str(registry["physical_table"]),
-        columns=columns,
-        entity_field=entity_field,
-        measure=measure,
-        aggregation=aggregation,
-        filters=list(query_intent.get("filters") or []),
-        sort_direction=sort_direction,
-    )
+    with open_validated_duckdb_query(duckdb_path, [replica_expectation(registry)]) as analysis_connection:
+        runtime, raw_population = _entity_population(
+            analysis_connection,
+            physical_table=str(registry["physical_table"]),
+            columns=columns,
+            entity_field=entity_field,
+            measure=measure,
+            aggregation=aggregation,
+            filters=list(query_intent.get("filters") or []),
+            sort_direction=sort_direction,
+        )
     population = _numeric_population(raw_population)
     blockers: list[str] = []
     evidence: dict[str, Any]

@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -13,10 +13,14 @@ const previous = {
   db: process.env.AIBI_HYBRID_DB_PATH,
   duck: process.env.AIBI_HYBRID_DUCKDB_PATH,
   evidence: process.env.AIBI_EVIDENCE_BUNDLE_ROOT,
+  fixtureLog: process.env.AIBI_RUNTIME_FIXTURE_LOG,
+  fixtureBlocked: process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED,
 };
 process.env.AIBI_HYBRID_DB_PATH = join(temp, "runtime.sqlite");
 process.env.AIBI_HYBRID_DUCKDB_PATH = join(temp, "runtime.duckdb");
 process.env.AIBI_EVIDENCE_BUNDLE_ROOT = join(temp, "evidence");
+const fixtureLog = join(temp, "runtime-host-fixture.ndjson");
+process.env.AIBI_RUNTIME_FIXTURE_LOG = fixtureLog;
 
 const host = new RuntimeHostPool(process.cwd());
 const fixtureHosts: RuntimeHostPool[] = [];
@@ -105,6 +109,65 @@ try {
     detail: faultHost.health(),
   });
 
+  writeFileSync(fixtureLog, "", "utf8");
+  const queueRaceHost = new RuntimeHostPool(process.cwd(), 2, {
+    workerScript: fixture,
+    deadlineMs: 2_000,
+    startupDeadlineMs: 2_000,
+    maxQueueDepth: 2,
+  });
+  fixtureHosts.push(queueRaceHost);
+  await queueRaceHost.start();
+  const prequeuedCrash = queueRaceHost.run(["crash"]);
+  const prequeuedWrite = queueRaceHost.run(["write"]);
+  const [prequeuedCrashResult, prequeuedWriteResult] = await Promise.allSettled([prequeuedCrash, prequeuedWrite]);
+  const prequeuedEvents = readFileSync(fixtureLog, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { pid: number; command: string });
+  const crashIndex = prequeuedEvents.findIndex((event) => event.command === "crash");
+  const reconcileIndex = prequeuedEvents.findIndex((event, index) => index > crashIndex && event.command === "workspace-recovery-reconcile");
+  const writeIndex = prequeuedEvents.findIndex((event, index) => index > crashIndex && event.command === "write");
+  checks.push({
+    label: "prequeued-write-reconciles-new-writer-generation-first",
+    ok: prequeuedCrashResult.status === "rejected"
+      && prequeuedWriteResult.status === "fulfilled"
+      && crashIndex >= 0
+      && reconcileIndex > crashIndex
+      && writeIndex > reconcileIndex
+      && prequeuedEvents[crashIndex]?.pid !== prequeuedEvents[reconcileIndex]?.pid,
+    detail: prequeuedEvents,
+  });
+
+  const blockedFixtureLog = join(temp, "runtime-host-blocked.ndjson");
+  process.env.AIBI_RUNTIME_FIXTURE_LOG = blockedFixtureLog;
+  process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED = "1";
+  const blockedHost = new RuntimeHostPool(process.cwd(), 2, {
+    workerScript: fixture,
+    deadlineMs: 2_000,
+    startupDeadlineMs: 2_000,
+    maxQueueDepth: 2,
+  });
+  fixtureHosts.push(blockedHost);
+  await blockedHost.start();
+  const blockedWrite = await rejectsWith(() => blockedHost.run(["write"]), RuntimeHostUnavailableError);
+  const blockedEvents = readFileSync(blockedFixtureLog, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { pid: number; command: string });
+  checks.push({
+    label: "blocked-reconciliation-prevents-prequeued-business-write",
+    ok: blockedWrite
+      && blockedEvents.some((event) => event.command === "workspace-recovery-reconcile")
+      && blockedEvents.every((event) => event.command !== "write")
+      && blockedHost.health().ok === false,
+    detail: { events: blockedEvents, health: blockedHost.health() },
+  });
+  delete process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED;
+  process.env.AIBI_RUNTIME_FIXTURE_LOG = fixtureLog;
+
   const shutdownHost = new RuntimeHostPool(process.cwd(), 2, {
     workerScript: fixture,
     deadlineMs: 2_000,
@@ -129,6 +192,10 @@ try {
   process.env.AIBI_HYBRID_DB_PATH = previous.db;
   process.env.AIBI_HYBRID_DUCKDB_PATH = previous.duck;
   process.env.AIBI_EVIDENCE_BUNDLE_ROOT = previous.evidence;
+  if (previous.fixtureLog === undefined) delete process.env.AIBI_RUNTIME_FIXTURE_LOG;
+  else process.env.AIBI_RUNTIME_FIXTURE_LOG = previous.fixtureLog;
+  if (previous.fixtureBlocked === undefined) delete process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED;
+  else process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED = previous.fixtureBlocked;
   rmSync(temp, { recursive: true, force: true });
 }
 

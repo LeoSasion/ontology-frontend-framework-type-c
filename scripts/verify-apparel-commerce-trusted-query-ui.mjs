@@ -9,6 +9,7 @@ const visualization = source("src/components/AgentAnswerVisualization.tsx");
 const visualizationModel = source("src/components/agentAnswerVisualizationModel.ts");
 const folder = source("src/components/SourceWorkbenchImportPanel.tsx");
 const routes = source("server/sourceRoutes.ts");
+const durableRuntime = source("server/durableJobRuntime.ts");
 const types = source("src/typesAgent.ts");
 const checks = [];
 const check = (label, ok, detail = "") => checks.push({ label, ok: Boolean(ok), detail: ok ? "" : detail });
@@ -22,7 +23,10 @@ check("non-executed-states-never-mount-business-chart", answer.includes("canRend
 check("visualization-exposes-receipt-fingerprint-and-data-table", visualization.includes('data-receipt-key={queryPlanReceipt.receiptKey}') && visualization.includes('data-result-fingerprint={analysisUnit.resultFingerprint}') && visualization.includes('data-testid="agent-visualization-data-table"'));
 check("receipt-source-run-and-coverage-are-visible", answer.includes("currentSourceRunId") && answer.includes("agent-trusted-result-state") && answer.includes("executionCoverage"));
 check("folder-plan-blockers-disable-confirm", folder.includes("folderImportPlan.readyToCommit !== true") && folder.includes("group.blockers"));
-check("folder-plan-fingerprint-reaches-cli", routes.includes('body.expectedPlan') && routes.includes('"--expected-plan"'));
+check(
+  "folder-plan-fingerprint-reaches-durable-cli",
+  durableRuntime.includes('String(body.expectedPlan ?? "")') && durableRuntime.includes('"--expected-plan"'),
+);
 check("folder-owner-key-reaches-preview-and-commit", (routes.match(/--unique-fields/g) ?? []).length >= 4);
 
 const failedChecks = checks.filter((item) => !item.ok);

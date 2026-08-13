@@ -2,7 +2,7 @@ import { lazy } from "react";
 
 const loadAdvancedPanels = () => import("./components/SourceWorkbenchAdvancedPanels");
 
-export const SourceWorkbenchConnectorPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchConnectorPanel })));
+export const SourceWorkbenchConnectorPanel = lazy(() => import("./components/SourceWorkbenchConnectorPanel").then((module) => ({ default: module.SourceWorkbenchConnectorPanel })));
 export const SourceWorkbenchFieldMetricPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchFieldMetricPanel })));
 export const SourceWorkbenchOperationsPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchOperationsPanel })));
 export const SourceWorkbenchQueryFormulaPanel = lazy(() => loadAdvancedPanels().then((module) => ({ default: module.SourceWorkbenchQueryFormulaPanel })));

@@ -5,7 +5,8 @@ import json
 import sqlite3
 from typing import Any, Callable
 
-from bi_cli_core import parse_csv_list, unique_key
+from bi_cli_core import DUCKDB_PATH, parse_csv_list, unique_key
+from query_runtime import open_validated_duckdb_query, replica_expectation
 from table_query_tools import build_table_query
 
 
@@ -152,7 +153,14 @@ def query_table_command(
         if not registry:
             raise ValueError(f"Unknown table: {table_key}")
         columns = table_columns(connection, registry["physical_table"])
-        result = build_table_query(connection, registry["physical_table"], columns, table_query_payload_from_args(args, table_key, view))
+        with open_validated_duckdb_query(DUCKDB_PATH, [replica_expectation(registry)]) as analysis_connection:
+            result = build_table_query(
+                connection,
+                analysis_connection,
+                registry["physical_table"],
+                columns,
+                table_query_payload_from_args(args, table_key, view),
+            )
         result["tableKey"] = table_key
         result["tableName"] = registry["display_name"]
         result["sqlIntent"] = "Whitelist table query; no user SQL accepted"
@@ -225,7 +233,14 @@ def build_save_view_plan(
         "measure": "",
         "aggregation": "count",
     }
-    preview = build_table_query(connection, registry["physical_table"], columns, preview_payload)
+    with open_validated_duckdb_query(DUCKDB_PATH, [replica_expectation(registry)]) as analysis_connection:
+        preview = build_table_query(
+            connection,
+            analysis_connection,
+            registry["physical_table"],
+            columns,
+            preview_payload,
+        )
     return {
         "view_key": view_key or unique_key("view"),
         "workspace_id": active_workspace_id(connection),

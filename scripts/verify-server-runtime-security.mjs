@@ -8,6 +8,42 @@ const root = resolve(import.meta.dirname, "..");
 let service = null;
 let serviceLogs = "";
 let tempRoot = null;
+let serviceClosed = false;
+
+function sleep(ms) {
+  return new Promise((resolveWait) => setTimeout(resolveWait, ms));
+}
+
+function waitForServiceClose(timeoutMs = 5_000) {
+  if (!service || serviceClosed) return Promise.resolve(true);
+  return new Promise((resolveClose) => {
+    const timeout = setTimeout(() => {
+      service?.off("close", onClose);
+      resolveClose(false);
+    }, timeoutMs);
+    const onClose = () => {
+      clearTimeout(timeout);
+      serviceClosed = true;
+      resolveClose(true);
+    };
+    service.once("close", onClose);
+  });
+}
+
+async function terminateWindowsProcessTree(pid) {
+  const killer = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
+    windowsHide: true,
+    stdio: ["ignore", "ignore", "pipe"],
+  });
+  let stderr = "";
+  killer.stderr.setEncoding("utf8");
+  killer.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4_000); });
+  const result = await new Promise((resolveResult, rejectResult) => {
+    killer.once("error", rejectResult);
+    killer.once("close", (code) => resolveResult({ code, stderr }));
+  });
+  return result;
+}
 
 async function freePort() {
   const probe = createServer();
@@ -28,11 +64,12 @@ async function waitForApi(url, timeoutMs = 60_000) {
     if (service?.exitCode !== null) throw new Error(`Isolated API exited early (${service?.exitCode})\n${serviceLogs}`);
     try {
       const response = await fetch(`${url}/api/live`);
+      await response.arrayBuffer();
       if (response.ok) return;
     } catch {
       // Startup is expected to race the first few probes.
     }
-    await new Promise((resolveWait) => setTimeout(resolveWait, 200));
+    await sleep(200);
   }
   throw new Error(`Isolated API did not become live\n${serviceLogs}`);
 }
@@ -60,6 +97,7 @@ if (!apiBaseUrl) {
   });
   service.stdout.setEncoding("utf8");
   service.stderr.setEncoding("utf8");
+  service.once("close", () => { serviceClosed = true; });
   service.stdout.on("data", (chunk) => { serviceLogs = `${serviceLogs}${chunk}`.slice(-20_000); });
   service.stderr.on("data", (chunk) => { serviceLogs = `${serviceLogs}${chunk}`.slice(-20_000); });
   await waitForApi(apiBaseUrl);
@@ -78,23 +116,41 @@ try {
     method: "OPTIONS",
     headers: { origin: "https://untrusted.invalid" },
   });
+  await optionsResponse.arrayBuffer();
   const untrustedOriginResponse = await fetch(`${apiBaseUrl}/api/health`, {
     headers: { origin: "https://untrusted.invalid" },
   });
-  const invalidJsonResponse = await fetch(`${apiBaseUrl}/api/agent/ask`, {
+  await untrustedOriginResponse.arrayBuffer();
+  const sessionResponse = await fetch(`${apiBaseUrl}/api/runtime-session`);
+  const session = await sessionResponse.json();
+  const statusResponse = await fetch(`${apiBaseUrl}/api/status`);
+  const statusPayload = await statusResponse.json();
+  const recoveryReadResponse = await fetch(`${apiBaseUrl}/api/workspace-recovery?limit=1`);
+  await recoveryReadResponse.arrayBuffer();
+  const importHistoryResponse = await fetch(`${apiBaseUrl}/api/import/jobs?limit=5`);
+  const importHistory = await importHistoryResponse.json();
+  const ownerHeaders = {
+    "content-type": "application/json",
+    "x-aibi-runtime-token": String(session.token ?? ""),
+  };
+  const unauthorizedInvalidJsonResponse = await fetch(`${apiBaseUrl}/api/agent/ask`, {
     method: "POST",
     headers: { "content-type": "application/json" },
+    body: "{invalid",
+  });
+  const unauthorizedInvalidJson = await unauthorizedInvalidJsonResponse.json();
+  const invalidJsonResponse = await fetch(`${apiBaseUrl}/api/agent/ask`, {
+    method: "POST",
+    headers: ownerHeaders,
     body: "{invalid",
   });
   const invalidJson = await invalidJsonResponse.json();
   const oversizedResponse = await fetch(`${apiBaseUrl}/api/agent/ask`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: ownerHeaders,
     body: JSON.stringify({ prompt: "x".repeat(1_100_000) }),
   });
   const oversized = await oversizedResponse.json();
-  const sessionResponse = await fetch(`${apiBaseUrl}/api/runtime-session`);
-  const session = await sessionResponse.json();
   const browserHeaders = {
     "content-type": "application/json",
     origin: apiBaseUrl,
@@ -107,17 +163,20 @@ try {
     headers: browserHeaders,
     body: JSON.stringify({ table: "missing_table", measure: "*", aggregation: "count" }),
   });
+  await missingIdempotency.arrayBuffer();
   const idempotencyHeaders = { ...browserHeaders, "x-idempotency-key": "security-runtime-query-1" };
   const firstMutation = await fetch(`${apiBaseUrl}/api/query`, {
     method: "POST",
     headers: idempotencyHeaders,
     body: JSON.stringify({ table: "missing_table", measure: "*", aggregation: "count" }),
   });
+  await firstMutation.arrayBuffer();
   const secondMutation = await fetch(`${apiBaseUrl}/api/query`, {
     method: "POST",
     headers: idempotencyHeaders,
     body: JSON.stringify({ table: "missing_table", measure: "*", aggregation: "count" }),
   });
+  await secondMutation.arrayBuffer();
   const conflictingMutation = await fetch(`${apiBaseUrl}/api/query`, {
     method: "POST",
     headers: idempotencyHeaders,
@@ -131,9 +190,28 @@ try {
     check("security-headers-present", healthResponse.headers.get("x-content-type-options") === "nosniff" && healthResponse.headers.get("x-frame-options") === "DENY" && healthResponse.headers.get("referrer-policy") === "no-referrer", Object.fromEntries(["x-content-type-options", "x-frame-options", "referrer-policy"].map((name) => [name, healthResponse.headers.get(name)]))),
     check("cors-disabled-by-default", !healthResponse.headers.get("access-control-allow-origin") && !optionsResponse.headers.get("access-control-allow-origin"), { get: healthResponse.headers.get("access-control-allow-origin"), options: optionsResponse.headers.get("access-control-allow-origin") }),
     check("untrusted-origin-rejected", untrustedOriginResponse.status === 403, untrustedOriginResponse.status),
+    check(
+      "unauthorized-mutation-rejected-before-body-parse",
+      unauthorizedInvalidJsonResponse.status === 403 && unauthorizedInvalidJson.errorCode === "runtime-token-invalid",
+      { status: unauthorizedInvalidJsonResponse.status, payload: unauthorizedInvalidJson },
+    ),
     check("invalid-json-rejected", invalidJsonResponse.status === 400 && String(invalidJson.error ?? "").includes("valid JSON"), { status: invalidJsonResponse.status, error: invalidJson.error }),
     check("oversized-body-rejected", oversizedResponse.status === 413 && String(oversized.error ?? "").includes("exceeds"), { status: oversizedResponse.status, error: oversized.error }),
     check("runtime-session-token-issued", sessionResponse.ok && String(session.token ?? "").length >= 32, { status: sessionResponse.status }),
+    check("loopback-read-capability-does-not-require-owner-token", recoveryReadResponse.status !== 403, recoveryReadResponse.status),
+    check(
+      "durable-import-history-is-readable-and-kind-scoped",
+      importHistoryResponse.ok && Array.isArray(importHistory.jobs) && importHistory.jobs.every((job) => job.kind === "import"),
+      { status: importHistoryResponse.status, payload: importHistory },
+    ),
+    check(
+      "public-runtime-status-redacts-database-paths",
+      statusResponse.ok
+        && statusPayload.database === "control-plane"
+        && statusPayload.queryRuntime?.database === "analysis-replica"
+        && (!tempRoot || !JSON.stringify(statusPayload).includes(tempRoot)),
+      statusPayload,
+    ),
     check("browser-idempotency-required", missingIdempotency.status === 400, missingIdempotency.status),
     check("idempotency-result-replayed", secondMutation.status === firstMutation.status && secondMutation.headers.get("x-idempotency-replayed") === "true", { first: firstMutation.status, second: secondMutation.status, replayed: secondMutation.headers.get("x-idempotency-replayed") }),
     check("idempotency-key-binds-request-content", conflictingMutation.status === 409 && conflictingPayload.errorCode === "idempotency-key-conflict", { status: conflictingMutation.status, payload: conflictingPayload }),
@@ -153,12 +231,31 @@ try {
   console.log(JSON.stringify(receipt, null, 2));
   if (failedChecks.length) process.exitCode = 1;
 } finally {
-  if (service && service.exitCode === null) {
-    service.kill("SIGTERM");
-    await Promise.race([
-      new Promise((resolveExit) => service.once("exit", resolveExit)),
-      new Promise((resolveTimeout) => setTimeout(resolveTimeout, 5_000)),
-    ]);
+  if (service) {
+    let closePromise = waitForServiceClose(10_000);
+    let treeKillResult = null;
+    if (service.exitCode === null) {
+      if (process.platform === "win32") {
+        if (!service.pid) throw new Error("Isolated API process does not expose a PID for tree cleanup.");
+        treeKillResult = await terminateWindowsProcessTree(service.pid);
+      } else {
+        service.kill("SIGTERM");
+      }
+    }
+    let closed = await closePromise;
+    if (!closed && service.exitCode === null && process.platform !== "win32") {
+      closePromise = waitForServiceClose();
+      service.kill("SIGKILL");
+      closed = await closePromise;
+    }
+    if (!closed) {
+      service.stdout?.destroy();
+      service.stderr?.destroy();
+      const treeKillDetail = treeKillResult
+        ? `\ntaskkill exit=${treeKillResult.code}: ${treeKillResult.stderr}`
+        : "";
+      throw new Error(`Isolated API did not close its process pipes before cleanup.${treeKillDetail}\n${serviceLogs}`);
+    }
   }
   if (tempRoot) {
     rmSync(tempRoot, {

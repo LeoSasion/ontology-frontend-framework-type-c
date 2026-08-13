@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { captureScreenshot, check, click, evaluate, finishReceipt, launchChrome, navigate, waitFor, waitForAppReady } from "./ui-verify-chrome.mjs";
-import { apiBaseUrl, fetchJson, postJson, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
+import { apiBaseUrl, fetchJson, postJson, runDurableImport, withTemporaryWorkspace } from "./ui-verify-workspace.mjs";
 
 const baseUrl = process.env.AIBI_UI_BASE_URL ?? apiBaseUrl;
 const screenshotDir = mkdtempSync(join(tmpdir(), "aibi-ui-connector-adapter-"));
@@ -15,11 +15,11 @@ const run = await withTemporaryWorkspace("codex_connector_adapter", async ({ tem
     filePath: importPath,
     table: "orders",
   });
-  await postJson("/api/import/commit", {
-    filePath: importPath,
+  await runDurableImport({
+    importKind: "single",
+    path: importPath,
     ...importPreview.commitOptions,
     expectedPlan: importPreview.planFingerprint,
-    confirm: true,
   });
   const saved = await postJson("/api/connectors", {
     name: `M11 UI ${temporaryWorkspaceId}`,

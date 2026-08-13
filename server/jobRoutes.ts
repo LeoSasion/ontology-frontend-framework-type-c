@@ -40,7 +40,7 @@ export async function handleJobApi({ cancelJobProcess, cli, request, response, u
     const status = job && typeof job === "object" && !Array.isArray(job)
       ? String((job as Record<string, unknown>).status ?? "")
       : "";
-    const execution = body.confirm === true && status === "cancel_requested" && cancelJobProcess
+    const execution = body.confirm === true && ["cancel_requested", "canceled"].includes(status) && cancelJobProcess
       ? cancelJobProcess(jobKey)
       : undefined;
     sendJson(

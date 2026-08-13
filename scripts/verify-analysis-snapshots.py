@@ -124,6 +124,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-analysis-snapshots-") as temp_dir:
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(database),
         "AIBI_HYBRID_DUCKDB_PATH": str(temp / "runtime.duckdb"),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp / "workspace-recovery"),
         "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp / "evidence"),
         "PYTHONIOENCODING": "utf-8",
     }
@@ -175,8 +176,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-analysis-snapshots-") as temp_dir:
         binding = json.loads(stored["binding_json"] if stored else "{}")
         indexes = {str(row[1]) for row in connection.execute("PRAGMA index_list(analysis_snapshots)").fetchall()}
     check(
-        "schema-v15-persists-content-provenance-and-indexes",
-        version == 15
+        "schema-v16-persists-content-provenance-and-indexes",
+        version == 16
         and stored is not None
         and len(content.get("unit", {}).get("rows") or []) == 1
         and binding.keys() >= {"unitKey", "queryReceiptKey", "unitDefinitionFingerprint", "resultFingerprint", "receiptBindingFingerprint", "source", "domainPackFingerprint", "workspaceManifestFingerprint"}
@@ -310,7 +311,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-analysis-snapshots-") as temp_dir:
             values,
         )
         connection.commit()
-    delete_workspace = run(env, ["workspace-delete", isolated_id, "--yes"])
+    delete_request_key = "analysis-snapshot-isolated-workspace-delete"
+    delete_preview = run(env, [
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+    ])
+    delete_workspace = run(env, [
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str((delete_preview.get("deletePlan") or {}).get("planFingerprint") or ""),
+        "--yes",
+    ])
     check(
         "workspace-delete-removes-snapshot-state",
         delete_workspace.get("deletedCounts", {}).get("analysis_snapshots") == 1,

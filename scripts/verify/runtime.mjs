@@ -47,6 +47,7 @@ export function createVerifyRuntime({ prefix = "aibi-hybrid-verify-", ignoredDir
         ...process.env,
         AIBI_HYBRID_DB_PATH: verifyDbPath,
         AIBI_HYBRID_DUCKDB_PATH: verifyDuckDbPath,
+        AIBI_WORKSPACE_RECOVERY_ROOT: join(verifyDataDir, "workspace-recovery"),
         PYTHONIOENCODING: "utf-8",
       },
       windowsHide: true,

@@ -31,6 +31,11 @@ COMMANDS = frozenset({
     'federation-proof',
     'import-commit',
     'import-folder',
+    'import-job-create',
+    'import-job-process-exit',
+    'import-job-recover',
+    'import-job-resume',
+    'import-job-run',
     'infer-metrics',
     'infer-semantics',
     'inspect-table',
@@ -58,6 +63,15 @@ COMMANDS = frozenset({
     'set-import-policy',
     'set-semantic',
     'set-widget',
+    'sqlserver-adapter-discover',
+    'sqlserver-adapter-activate',
+    'sqlserver-adapter-activation-finalize',
+    'sqlserver-adapter-activation-status',
+    'sqlserver-adapter-plan',
+    'sqlserver-adapter-preview',
+    'sqlserver-adapter-probe',
+    'sqlserver-adapter-snapshot',
+    'sqlserver-adapter-test',
     'source-dashboard-draft',
     'source-intelligence',
     'source-intelligence-runs',
@@ -160,6 +174,16 @@ def dispatch(args, parser):
         result = runtime.preview_import_folder_command(args)
     elif args.command == 'import-folder':
         result = runtime.import_folder_command(args)
+    elif args.command == 'import-job-create':
+        result = runtime.import_job_create_command(args)
+    elif args.command == 'import-job-run':
+        result = runtime.import_job_run_command(args)
+    elif args.command == 'import-job-resume':
+        result = runtime.import_job_resume_command(args)
+    elif args.command == 'import-job-recover':
+        result = runtime.import_job_recover_command(args)
+    elif args.command == 'import-job-process-exit':
+        result = runtime.import_job_process_exit_command(args)
     elif args.command == 'list-import-jobs':
         result = runtime.list_import_jobs_command(args)
     elif args.command == 'remove-import-job':
@@ -182,6 +206,24 @@ def dispatch(args, parser):
         result = runtime.plan_connector_sync_command(args)
     elif args.command == 'federation-proof':
         result = runtime.federation_proof_command(args)
+    elif args.command == 'sqlserver-adapter-probe':
+        result = runtime.sqlserver_capability_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-test':
+        result = runtime.sqlserver_test_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-discover':
+        result = runtime.sqlserver_catalog_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-preview':
+        result = runtime.sqlserver_statistics_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-plan':
+        result = runtime.sqlserver_plan_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-snapshot':
+        result = runtime.sqlserver_execute_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-activate':
+        result = runtime.sqlserver_activate_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-activation-status':
+        result = runtime.sqlserver_activation_status_command(args, open_db=runtime.open_db)
+    elif args.command == 'sqlserver-adapter-activation-finalize':
+        result = runtime.sqlserver_activation_finalize_command(args, open_db=runtime.open_db)
     elif args.command == 'infer-semantics':
         result = runtime.infer_semantics_command(args)
     elif args.command == 'list-semantics':

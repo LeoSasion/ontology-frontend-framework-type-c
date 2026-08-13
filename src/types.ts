@@ -44,3 +44,5 @@ export type {
 export type { QueryRuntimeStatus, SelectionConfidence, SourceRunSummary, WorkspaceRecord, WorkspaceStatus } from "./typesWorkspace";
 export type { AnalysisRunsPayload, ConfirmedPlanMemory, ConfirmedPlansPayload, ConfirmedQueriesPayload, ConfirmedQuery, ContextPackPayload, ContextRule, ContextTerm, KnowledgeSource, QueryReceiptsPayload, RecallCandidate, RecallReceipt, RecallReceiptsPayload, SemanticPatchCollectionPayload, SemanticPatchProposal } from "./typesTrust";
 export type { BusinessFieldProfile, BusinessFieldProfileCollection, BusinessFieldProfileStatus, RuntimeCatalogSummary, WorkspaceManifestSummary } from "./typesWorkspaceContext";
+export type { WorkspaceRecoveryFileSummary, WorkspaceRecoveryOperation, WorkspaceRecoveryPayload, WorkspaceRecoveryPlan, WorkspaceRecoveryPoint } from "./typesWorkspaceRecovery";
+export type { EvidenceLedgerVerification, ReviewedPublication, ReviewedPublicationDriftReason, ReviewedPublicationExport, ReviewedPublicationPayload, ReviewedPublicationStatus } from "./typesReviewedPublication";

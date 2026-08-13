@@ -8,7 +8,7 @@ from bi_cli_core import DUCKDB_PATH
 from bi_cli_schema import active_workspace_id, table_columns
 from bi_cli_source_commands import resolve_table_registry
 from apparel_analytics_service import execute_apparel_method
-from query_runtime import DuckDBUnavailable, quote_identifier, run_duckdb_aggregate_query, run_sqlite_aggregate_query
+from query_runtime import quote_identifier, run_duckdb_aggregate_query
 from trusted_query_service import build_execution_coverage, build_trusted_query_intent, trusted_result_state
 
 
@@ -157,31 +157,18 @@ def _safe_answer_aggregate(
     unknown_filter_fields = [str(item.get("field") or "") for item in filters if str(item.get("field") or "") not in columns]
     if unknown_filter_fields:
         return None, [], f"Unknown filter fields: {', '.join(unknown_filter_fields)}"
-    try:
-        runtime = run_duckdb_aggregate_query(
-            sqlite_connection=connection,
-            duckdb_path=DUCKDB_PATH,
-            physical_table=registry["physical_table"],
-            columns=columns,
-            group=group,
-            measure=measure,
-            aggregation=aggregation,
-            limit=limit,
-            filters=filters,
-            source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
-        )
-        fallback_reason = None
-    except DuckDBUnavailable as exc:
-        runtime = run_sqlite_aggregate_query(
-            sqlite_connection=connection,
-            physical_table=registry["physical_table"],
-            group=group,
-            measure=measure,
-            aggregation=aggregation,
-            limit=limit,
-            filters=filters,
-        )
-        fallback_reason = str(exc)
+    runtime = run_duckdb_aggregate_query(
+        duckdb_path=DUCKDB_PATH,
+        physical_table=registry["physical_table"],
+        group=group,
+        measure=measure,
+        aggregation=aggregation,
+        limit=limit,
+        filters=filters,
+        source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
+        expected_row_count=int(registry["row_count"] or 0),
+    )
+    fallback_reason = None
     rows = runtime.pop("rows")
     return runtime, rows, fallback_reason
 

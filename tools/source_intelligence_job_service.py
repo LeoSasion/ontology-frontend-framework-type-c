@@ -16,6 +16,7 @@ from job_runtime_service import (
     TERMINAL_STATUSES,
     create_job,
     get_job,
+    job_input,
     transition_job,
     update_job_progress,
 )
@@ -122,6 +123,7 @@ def source_intelligence_job_run_command(
             raise ValueError(f"Job {job_key} is not a {JOB_KIND} job.")
         if job["status"] in TERMINAL_STATUSES:
             return {"ok": True, "changed": False, "job": job}
+        input_value = job_input(connection, workspace_id=workspace_id, job_key=job_key)
         if job["status"] == STATUS_CREATED:
             transition_job(
                 connection,
@@ -143,7 +145,6 @@ def source_intelligence_job_run_command(
         )
         connection.commit()
 
-    input_value = job.get("input") or {}
     run_args = argparse.Namespace(
         inputs=list(input_value.get("inputs") or []),
         label=input_value.get("label") or job["label"],

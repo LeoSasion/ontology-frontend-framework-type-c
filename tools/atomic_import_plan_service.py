@@ -48,6 +48,7 @@ def bind_single_import_plan(
     fingerprint_material = {
         "schema": ATOMIC_IMPORT_PLAN_SCHEMA,
         "kind": "single-file",
+        "workspaceId": str(preview.get("workspaceId") or ""),
         "file": resolved_path.as_posix(),
         "contentHash": file_content_hash(resolved_path),
         "parentSourceRunId": current_source_run_id,
@@ -244,6 +245,7 @@ def enrich_atomic_import_plan(
 
     fingerprint_material = {
         "schema": ATOMIC_IMPORT_PLAN_SCHEMA,
+        "workspaceId": str(base_plan.get("workspaceId") or ""),
         "path": root.as_posix(),
         "parentSourceRunId": current_source_run_id,
         "items": [

@@ -17,6 +17,14 @@ COMMANDS = frozenset({
     'confirm-query',
     'confirmed-plans',
     'confirmed-queries',
+    'decision-framework-create',
+    'decision-framework-export',
+    'decision-framework-publish',
+    'decision-framework-save',
+    'decision-frameworks',
+    'evidence-retrieval-evaluate',
+    'evidence-retrieval-receipts',
+    'evidence-retrieval-status',
     'exploration-anchor-add',
     'exploration-board-set',
     'exploration-thread-create',
@@ -35,6 +43,11 @@ COMMANDS = frozenset({
     'metric-monitors',
     'query-receipts',
     'recall-receipts',
+    'reviewed-publication-deprecate',
+    'reviewed-publication-export',
+    'reviewed-publication-plan',
+    'reviewed-publication-publish',
+    'reviewed-publications',
     'research-run-create',
     'research-run-finalize',
     'research-run-observe',
@@ -110,6 +123,32 @@ def dispatch(args, parser):
         result = runtime.forecast_readiness_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command == 'chart-adapt':
         result = runtime.chart_adapt_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'decision-frameworks':
+        result = runtime.decision_frameworks_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'decision-framework-create':
+        result = runtime.decision_framework_create_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'decision-framework-save':
+        result = runtime.decision_framework_save_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'decision-framework-publish':
+        result = runtime.decision_framework_publish_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'decision-framework-export':
+        result = runtime.decision_framework_export_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'reviewed-publication-plan':
+        result = runtime.reviewed_publication_plan_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'reviewed-publication-publish':
+        result = runtime.reviewed_publication_publish_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'reviewed-publications':
+        result = runtime.reviewed_publications_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'reviewed-publication-deprecate':
+        result = runtime.reviewed_publication_deprecate_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'reviewed-publication-export':
+        result = runtime.reviewed_publication_export_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'evidence-retrieval-status':
+        result = runtime.evidence_retrieval_status_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'evidence-retrieval-receipts':
+        result = runtime.evidence_retrieval_receipts_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'evidence-retrieval-evaluate':
+        result = runtime.evidence_retrieval_evaluate_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
     elif args.command == 'jobs':
         result = runtime.jobs_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command == 'job-cancel':

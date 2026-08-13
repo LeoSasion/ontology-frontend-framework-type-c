@@ -16,6 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
+from bi_cli_envelope import error_output
+from capability_contract_service import build_capability_contract
 
 CHECKS: list[dict[str, Any]] = []
 
@@ -43,6 +45,28 @@ def cli(env: dict[str, str], *args: str, expected: int = 0) -> dict[str, Any]:
     return payload
 
 
+workspace_delete_capability = build_capability_contract("workspace-delete")
+workspace_delete_failure = error_output("workspace-delete", RuntimeError("confirmation binding missing"))
+check(
+    "workspace-delete-parserless-capability-stays-confirmed-write",
+    workspace_delete_capability.get("mutationMode") == "dry-run-confirm"
+    and workspace_delete_capability.get("permissions", {}).get("database") == "confirmed-write"
+    and workspace_delete_capability.get("permissions", {}).get("filesystem") == "write"
+    and workspace_delete_capability.get("confirmation", {}).get("required") is True
+    and "confirmation-receipt" in workspace_delete_capability.get("evidence", {}).get("requiredTypes", []),
+    workspace_delete_capability,
+)
+check(
+    "workspace-delete-error-envelope-preserves-destructive-capability-contract",
+    workspace_delete_failure.get("envelope", {}).get("mutationMode") == "dry-run-confirm"
+    and workspace_delete_failure.get("capability", {}).get("permissions", {}).get("database") == "confirmed-write"
+    and workspace_delete_failure.get("capability", {}).get("permissions", {}).get("filesystem") == "write"
+    and workspace_delete_failure.get("capability", {}).get("confirmation", {}).get("required") is True
+    and "confirmation-receipt" in workspace_delete_failure.get("capability", {}).get("evidence", {}).get("requiredTypes", []),
+    workspace_delete_failure,
+)
+
+
 with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     temp = Path(temp_name)
     source = temp / "orders.csv"
@@ -53,6 +77,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(db_path),
         "AIBI_HYBRID_DUCKDB_PATH": str(duck_path),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp / "workspace-recovery"),
         "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp / "evidence"),
         "PYTHONIOENCODING": "utf-8",
     }
@@ -105,6 +130,25 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
         "--yes",
     )
     check("single-file-bound-plan-commits", committed.get("committed") is True, committed)
+    replayed = cli(
+        env,
+        "import-commit", str(source),
+        "--table", str(refreshed_options.get("table") or "orders"),
+        "--name", str(refreshed_options.get("name") or "Orders"),
+        "--mode", str(refreshed_options.get("mode") or "create"),
+        "--expected-plan", str(refreshed.get("planFingerprint") or ""),
+        "--require-plan",
+        "--yes",
+    )
+    check(
+        "legacy-confirmed-retry-replays-the-same-durable-job",
+        replayed.get("durableJob", {}).get("jobKey") == committed.get("durableJob", {}).get("jobKey")
+        and replayed.get("activationJournalKey") == committed.get("activationJournalKey"),
+        {
+            "firstJob": committed.get("durableJob", {}).get("jobKey"),
+            "replayedJob": replayed.get("durableJob", {}).get("jobKey"),
+        },
+    )
 
     table_key = str((committed.get("result") or {}).get("tableKey") or refreshed_options.get("table") or "orders")
     query_args = ("query", "--table", table_key, "--measure", "*", "--agg", "count")
@@ -113,9 +157,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     first_runtime = (first_query.get("query") or {}).get("runtime") or {}
     second_runtime = (second_query.get("query") or {}).get("runtime") or {}
     check(
-        "duckdb-replica-publishes-once-then-reuses-version",
-        first_runtime.get("replicaStatus") == "published"
-        and int(first_runtime.get("syncedRows") or 0) > 0
+        "durable-activation-publishes-and-read-query-reuses-version",
+        first_runtime.get("replicaStatus") == "current"
+        and int(first_runtime.get("syncedRows") or 0) == 0
         and second_runtime.get("replicaStatus") == "current"
         and int(second_runtime.get("syncedRows") or 0) == 0
         and first_runtime.get("sourceVersion") == second_runtime.get("sourceVersion"),
@@ -136,7 +180,10 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     check(
         "new-data-version-atomically-publishes-new-replica",
         (replaced.get("result") or {}).get("dataVersion") == 2
-        and third_runtime.get("replicaStatus") == "published"
+        and bool(replaced.get("activationJournalKey"))
+        and replaced.get("durableJob", {}).get("status") == "succeeded"
+        and third_runtime.get("replicaStatus") == "current"
+        and int(third_runtime.get("syncedRows") or 0) == 0
         and third_runtime.get("sourceVersion") != second_runtime.get("sourceVersion"),
         {"replace": replaced, "runtime": third_runtime},
     )
@@ -164,7 +211,20 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     )
 
     selected_default = cli(env, "workspace-select", "default", "--yes")
-    deleted_workspace = cli(env, "workspace-delete", workspace_id, "--yes")
+    delete_request_key = "runtime-hardening-workspace-delete"
+    delete_preview = cli(
+        env,
+        "workspace-delete", workspace_id,
+        "--request-key", delete_request_key,
+    )
+    delete_plan = delete_preview.get("deletePlan") if isinstance(delete_preview.get("deletePlan"), dict) else {}
+    deleted_workspace = cli(
+        env,
+        "workspace-delete", workspace_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str(delete_plan.get("planFingerprint") or ""),
+        "--yes",
+    )
     remaining_relations: list[tuple[Any, ...]] = []
     remaining_manifest: list[tuple[Any, ...]] = []
     if duck_path.is_file():

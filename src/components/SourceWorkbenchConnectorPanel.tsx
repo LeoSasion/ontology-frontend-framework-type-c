@@ -2,6 +2,7 @@ import type { ConnectorAdapterContract, DataConnectorConfig, ImportJob } from ".
 import type { useSourceWorkbenchConnectorController } from "../useSourceWorkbenchConnectorController";
 import { Bilingual, biText } from "./Bilingual";
 import { OperationReceipt } from "./OperationReceipt";
+import { SourceWorkbenchSqlServerCapability } from "./SourceWorkbenchSqlServerCapability";
 
 type SourceWorkbenchConnectorPanelProps = ReturnType<typeof useSourceWorkbenchConnectorController> & {
   showAdvanced: boolean;
@@ -56,6 +57,9 @@ export function SourceWorkbenchConnectorPanel({
   const selectedAdapter = connectorAdapters.find((adapter) => adapter.connectorType === connectorType);
   const selectedAdapterAvailable = selectedAdapter?.available === true;
   const selectedUnavailableAdapter = selectedAdapter && !selectedAdapter.available ? selectedAdapter : null;
+  const selectedSqlServerConnector = connectors.find((connector) => (
+    connector.type === "sqlserver" && connector.connectorKey === connectorEditingKey
+  )) ?? connectors.find((connector) => connector.type === "sqlserver");
 
   function connectorTypeLabel(connectorTypeValue: string) {
     if (connectorTypeValue === "file") return biText("文件", "File");
@@ -198,6 +202,12 @@ export function SourceWorkbenchConnectorPanel({
             </li>
           ))}
         </ul>
+        {showAdvanced && selectedSqlServerConnector ? (
+          <SourceWorkbenchSqlServerCapability
+            connectorKey={selectedSqlServerConnector.connectorKey}
+            connectorName={selectedSqlServerConnector.name}
+          />
+        ) : null}
       </article>
 
       <article className={panelClassName}>

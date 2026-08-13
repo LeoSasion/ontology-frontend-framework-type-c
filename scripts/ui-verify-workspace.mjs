@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 export const apiBaseUrl = process.env.AIBI_API_BASE_URL ?? "http://127.0.0.1:8787";
+let runtimeTokenPromise = null;
 
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -32,11 +33,26 @@ export async function fetchJson(path, options = {}) {
 }
 
 export async function postJson(path, body) {
+  runtimeTokenPromise ??= fetch(`${apiBaseUrl}/api/runtime-session`)
+    .then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      const token = String(payload?.token ?? "").trim();
+      if (!response.ok || token.length < 32) {
+        throw new Error("Local runtime session is unavailable.");
+      }
+      return token;
+    })
+    .catch((error) => {
+      runtimeTokenPromise = null;
+      throw error;
+    });
+  const runtimeToken = await runtimeTokenPromise;
   return fetchJson(path, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-idempotency-key": `ui-verify-${randomUUID()}`,
+      "x-aibi-runtime-token": runtimeToken,
     },
     body: JSON.stringify(body),
   });
@@ -72,7 +88,33 @@ async function selectWorkspace(workspaceId) {
 
 async function deleteWorkspace(workspaceId) {
   if (!workspaceId) return null;
-  return postJson("/api/workspaces", { op: "delete", workspaceId, confirm: true });
+  const requestKey = `ui-verify-workspace-delete:${randomUUID()}`;
+  const preview = await postJson("/api/workspaces", { op: "delete", workspaceId, requestKey });
+  const expectedPlan = String(preview?.deletePlan?.planFingerprint ?? "").trim();
+  if (!expectedPlan) throw new Error("Workspace delete preview did not return an exact plan fingerprint.");
+  return postJson("/api/workspaces", {
+    op: "delete",
+    workspaceId,
+    requestKey,
+    expectedPlan,
+    confirm: true,
+  });
+}
+
+export async function runDurableImport(input, { timeoutMs = 90000 } = {}) {
+  const requestKey = String(input?.requestKey ?? `ui-verify-import:${randomUUID()}`);
+  const started = await postJson("/api/import/jobs", { ...input, requestKey });
+  const jobKey = String(started?.job?.jobKey ?? "").trim();
+  if (!jobKey) throw new Error("Durable import creation did not return a job key.");
+  const settled = await waitForApi(async () => {
+    const payload = await fetchJson(`/api/import/jobs/${encodeURIComponent(jobKey)}`);
+    const status = String(payload?.job?.status ?? "");
+    return { ok: ["succeeded", "failed", "canceled", "needs_attention"].includes(status), payload, status };
+  }, { timeoutMs, intervalMs: 300, label: `durable import ${jobKey}` });
+  if (settled.status !== "succeeded") {
+    throw new Error(`Durable import ${jobKey} ended in ${settled.status}.`);
+  }
+  return { ...started, job: settled.payload.job, events: settled.payload.events ?? [] };
 }
 
 export function zeroCounts(counts = {}) {

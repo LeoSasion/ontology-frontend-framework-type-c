@@ -79,8 +79,12 @@ export function AppMainView({
 }: AppMainViewProps) {
   const {
     handleAddMetric,
-    handleCommitFolderImport,
-    handleCommitImport,
+    handleCreateImportJob,
+    handleFetchImportJob,
+    handleListImportJobs,
+    handleCancelImportJob,
+    handleResumeImportJob,
+    handleImportJobCompleted,
     handleCopyView,
     handleDashboardRelationshipSave,
     handleDeleteFormula,
@@ -199,6 +203,7 @@ export function AppMainView({
         focus={evidenceFocus}
         lastActionResult={lastActionResult}
         pendingDraftCount={pendingDraftCount}
+        workspaceId={status.workspace.id}
         onSetSemantic={handleSetSemantic}
         onSourceIntelligenceRun={handleSourceIntelligenceRun}
         onOpenBusinessStep={onOpenBusinessStep}
@@ -233,6 +238,7 @@ export function AppMainView({
         onSavePreferences={handleSavePreferences}
         onSaveThemePalette={handleSaveThemePalette}
         onSetDomainPack={handleSetDomainPack}
+        onWorkspaceRecoveryInvalidated={dataActions.handleWorkspaceRecoveryInvalidated}
         status={status}
         onValidateConfig={handleValidateConfig}
         workbench={workbench}
@@ -249,9 +255,13 @@ export function AppMainView({
       focusedTableKey={focusedTableKey}
       onTableFocus={(tableKey) => navigateTo({ section: "sources", tableKey })}
       onPreview={handlePreview}
-      onCommitImport={handleCommitImport}
       onPreviewFolderImport={handlePreviewFolderImport}
-      onCommitFolderImport={handleCommitFolderImport}
+      onCreateImportJob={handleCreateImportJob}
+      onFetchImportJob={handleFetchImportJob}
+      onListImportJobs={handleListImportJobs}
+      onCancelImportJob={handleCancelImportJob}
+      onResumeImportJob={handleResumeImportJob}
+      onImportJobCompleted={handleImportJobCompleted}
       onImportPolicy={handleImportPolicy}
       onRemoveImportJob={handleRemoveImportJob}
       onInspectSource={handleInspectSource}

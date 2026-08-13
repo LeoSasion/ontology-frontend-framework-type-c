@@ -177,6 +177,7 @@ def import_csv_as_table(
     table_key: str | None = None,
     display_name: str | None = None,
     mode: str = "create",
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     return import_csv_as_table_service(
         connection,
@@ -184,6 +185,7 @@ def import_csv_as_table(
         table_key=table_key,
         display_name=display_name,
         mode=mode,
+        workspace_id=workspace_id,
         read_table_file=read_table_file,
         profile_rows=profile_rows,
         active_workspace_id=active_workspace_id,
@@ -192,11 +194,15 @@ def import_csv_as_table(
     )
 
 
-def saved_import_policy(connection: sqlite3.Connection, table_key: str) -> dict[str, Any] | None:
-    workspace_id = active_workspace_id(connection)
+def saved_import_policy(
+    connection: sqlite3.Connection,
+    table_key: str,
+    workspace_id: str | None = None,
+) -> dict[str, Any] | None:
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
     row = connection.execute(
         "SELECT * FROM import_policies WHERE table_key = ? AND workspace_id = ?",
-        (table_key, workspace_id),
+        (table_key, resolved_workspace_id),
     ).fetchone()
     if not row:
         return None
@@ -248,6 +254,7 @@ def update_table_metadata_after_write(
     profile: dict[str, Any],
     mode: str,
     result: dict[str, Any],
+    workspace_id: str | None = None,
 ) -> str:
     return update_table_metadata_after_write_service(
         connection,
@@ -261,6 +268,7 @@ def update_table_metadata_after_write(
         mode=mode,
         result=result,
         active_workspace_id=active_workspace_id,
+        workspace_id=workspace_id,
     )
 
 
@@ -272,6 +280,7 @@ def merge_import_into_table(
     unique_fields: list[str],
     conflict_rule: str,
     display_name: str | None = None,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     return merge_import_into_table_service(
         connection,
@@ -280,6 +289,7 @@ def merge_import_into_table(
         unique_fields=unique_fields,
         conflict_rule=conflict_rule,
         display_name=display_name,
+        workspace_id=workspace_id,
         registry_for_table=registry_for_table,
         read_table_file=read_table_file,
         table_columns=table_columns,

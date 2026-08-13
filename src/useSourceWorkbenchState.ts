@@ -39,9 +39,13 @@ export function useSourceWorkbenchState({
   query,
   workbench,
   onPreview,
-  onCommitImport,
   onPreviewFolderImport,
-  onCommitFolderImport,
+  onCreateImportJob,
+  onFetchImportJob,
+  onListImportJobs,
+  onCancelImportJob,
+  onResumeImportJob,
+  onImportJobCompleted,
   onImportPolicy,
   onRemoveImportJob,
   onInspectSource,
@@ -180,12 +184,17 @@ export function useSourceWorkbenchState({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const sourceProfileInFlightRef = useRef(false);
   const importController = useSourceWorkbenchImportController({
+    workspaceId: status.workspace.id,
     preview,
     importPolicies,
     onPreview,
-    onCommitImport,
     onPreviewFolderImport,
-    onCommitFolderImport,
+    onCreateImportJob,
+    onFetchImportJob,
+    onListImportJobs,
+    onCancelImportJob,
+    onResumeImportJob,
+    onImportJobCompleted,
     onImportPolicy,
     onCommittedInputs: async (inputs) => {
       setSourceProfileInputs(inputs.join("\n"));

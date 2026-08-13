@@ -24,9 +24,14 @@ from workspace_command_service import (
     set_system_flag as set_system_flag_service,
     workspace_records as workspace_records_service,
 )
+from decision_framework_service import ensure_decision_framework_schema
+from evidence_retrieval_service import ensure_evidence_retrieval_schema
+from reviewed_publication_service import ensure_reviewed_publication_schema
+from source_activation_journal_service import ensure_activation_journal_schema
+from sqlserver_snapshot_commands import SQLSERVER_SNAPSHOT_METADATA_DDL
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 15
+CURRENT_SQLITE_SCHEMA_VERSION = 16
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -360,8 +365,16 @@ def physical_table_for_workspace(workspace_id: str, table_key: str) -> str:
     return f"data_{slug(workspace_id)[:28]}_{slug(table_key)[:48]}"[:96]
 
 
-def registry_for_table(connection: sqlite3.Connection, table_key: str) -> sqlite3.Row | None:
-    return connection.execute("SELECT * FROM table_registry WHERE table_key = ? AND workspace_id = ?", (table_key, active_workspace_id(connection))).fetchone()
+def registry_for_table(
+    connection: sqlite3.Connection,
+    table_key: str,
+    workspace_id: str | None = None,
+) -> sqlite3.Row | None:
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
+    return connection.execute(
+        "SELECT * FROM table_registry WHERE table_key = ? AND workspace_id = ?",
+        (table_key, resolved_workspace_id),
+    ).fetchone()
 
 
 def all_available_fields(connection: sqlite3.Connection, table_key: str | None = None) -> set[str]:
@@ -1306,6 +1319,11 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     ensure_column(connection, "action_drafts", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
     ensure_column(connection, "source_intelligence_runs", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
     ensure_column(connection, "analysis_jobs", "capability_id", "TEXT NOT NULL DEFAULT ''")
+    ensure_activation_journal_schema(connection)
+    ensure_reviewed_publication_schema(connection)
+    ensure_evidence_retrieval_schema(connection)
+    ensure_decision_framework_schema(connection)
+    connection.executescript(SQLSERVER_SNAPSHOT_METADATA_DDL)
     ensure_column(connection, "metric_monitors", "semantic_fingerprint", "TEXT NOT NULL DEFAULT ''")
     migrate_workspace_scoped_constraints(connection)
     for relationship in connection.execute(
@@ -1391,16 +1409,20 @@ def navigation_module_payload(row: sqlite3.Row) -> dict[str, Any]:
     }
 
 
-def next_navigation_sort(connection: sqlite3.Connection, module_type: str) -> int:
+def next_navigation_sort(
+    connection: sqlite3.Connection,
+    module_type: str,
+    workspace_id: str | None = None,
+) -> int:
     base = {"table": 100, "view": 400, "dashboard": 700}.get(module_type, 900)
-    workspace_id = active_workspace_id(connection)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
     row = connection.execute(
         """
         SELECT COALESCE(MAX(sort_order), ?) AS max_sort
         FROM navigation_modules
         WHERE module_type = ? AND workspace_id = ?
         """,
-        (base, module_type, workspace_id),
+        (base, module_type, resolved_workspace_id),
     ).fetchone()
     return int(row["max_sort"] or base) + 10
 
@@ -1415,12 +1437,13 @@ def upsert_navigation_module(
     dashboard_key: str = "",
     created_by: str = "system",
     agent_managed: int = 1,
+    workspace_id: str | None = None,
 ) -> None:
     now = now_iso()
-    workspace_id = active_workspace_id(connection)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
     existing = connection.execute(
         "SELECT * FROM navigation_modules WHERE module_key = ? AND workspace_id = ?",
-        (module_key, workspace_id),
+        (module_key, resolved_workspace_id),
     ).fetchone()
     if existing:
         next_table_key = table_key or None
@@ -1435,7 +1458,7 @@ def upsert_navigation_module(
                 updated_at = ?
             WHERE module_key = ? AND workspace_id = ?
             """,
-            (next_table_key, next_dashboard_key, now, module_key, workspace_id),
+            (next_table_key, next_dashboard_key, now, module_key, resolved_workspace_id),
         )
         return
     connection.execute(
@@ -1448,12 +1471,12 @@ def upsert_navigation_module(
         """,
         (
             module_key,
-            workspace_id,
+            resolved_workspace_id,
             name,
             module_type,
             table_key or None,
             dashboard_key or None,
-            next_navigation_sort(connection, module_type),
+            next_navigation_sort(connection, module_type, workspace_id=resolved_workspace_id),
             created_by,
             int(agent_managed),
             now,

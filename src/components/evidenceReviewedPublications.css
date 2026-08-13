@@ -1,0 +1,284 @@
+.reviewedPublicationsPanel {
+  container: reviewed-publications / inline-size;
+  grid-column: 1 / -1;
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: var(--surface-raised);
+}
+
+.reviewedPublicationsHeader,
+.reviewedPublicationTitle,
+.reviewedPublicationActions,
+.reviewedPublicationConfirmation {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reviewedPublicationsHeader > div,
+.reviewedPublicationTitle > div,
+.reviewedPublicationConfirmation > div,
+.reviewedPublicationSelector,
+.reviewedPublicationDeprecation label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.reviewedPublicationsHeader span,
+.reviewedPublicationSelector > span,
+.reviewedPublicationTitle span,
+.reviewedPublicationHead span,
+.reviewedPublicationDeprecation label > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.reviewedPublicationsHeader small,
+.reviewedPublicationTitle small,
+.reviewedPublicationNotice,
+.reviewedPublicationEmpty,
+.reviewedPublicationBlockers p,
+.reviewedPublicationDeprecation small,
+.reviewedPublicationDeprecatedReason {
+  color: var(--text-muted);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.reviewedPublicationSelector select,
+.reviewedPublicationDeprecation textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.reviewedPublicationDetail {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 520px;
+  display: grid;
+  min-width: 0;
+  gap: 13px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--success-text) 30%, var(--border-soft));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 95%, var(--success-text) 5%);
+}
+
+.reviewedPublicationDetail.drifted,
+.reviewedPublicationDetail.deprecated {
+  border-color: color-mix(in srgb, var(--warning-text) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface) 93%, var(--warning-text) 7%);
+}
+
+.reviewedPublicationDetail.integrity_failed {
+  border-color: color-mix(in srgb, var(--danger-text) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface) 92%, var(--danger-text) 8%);
+}
+
+.reviewedPublicationTitle h4,
+.reviewedPublicationBlockers p,
+.reviewedPublicationNotice,
+.reviewedPublicationEmpty,
+.reviewedPublicationDeprecatedReason {
+  margin: 0;
+}
+
+.reviewedPublicationTitle h4 {
+  font-size: var(--ui-font-card-title);
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.reviewedPublicationTrustGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.reviewedPublicationTrustGrid > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-raised);
+}
+
+.reviewedPublicationTrustGrid dt {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.reviewedPublicationTrustGrid dd {
+  margin: 0;
+  font-weight: 760;
+  overflow-wrap: anywhere;
+}
+
+.reviewedPublicationHead {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.reviewedPublicationHead code,
+.reviewedPublicationConfirmation code {
+  max-width: 100%;
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.reviewedPublicationBlockers {
+  display: grid;
+  gap: 8px;
+}
+
+.reviewedPublicationBlockers ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reviewedPublicationBlockers li {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.reviewedPublicationBlockers li span {
+  color: var(--warning-text);
+  font-size: 11px;
+  font-weight: 760;
+}
+
+.reviewedPublicationBlockers li code {
+  overflow-wrap: anywhere;
+}
+
+.reviewedPublicationActions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
+
+.reviewedPublicationDeprecation {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 11px;
+}
+
+.reviewedPublicationDeprecation legend {
+  padding: 0 6px;
+  font-weight: 760;
+}
+
+.reviewedPublicationDeprecation textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.reviewedPublicationDeprecation small {
+  grid-column: 1 / -1;
+}
+
+.reviewedPublicationConfirmation {
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--danger-text) 35%, var(--border-soft));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface-raised) 91%, var(--danger-text) 9%);
+}
+
+.reviewedPublicationConfirmation > div {
+  margin-right: auto;
+}
+
+.reviewedPublicationsPanel button,
+.reviewedPublicationsPanel select,
+.reviewedPublicationsPanel textarea {
+  min-height: 44px;
+}
+
+@container reviewed-publications (max-width: 720px) {
+  .reviewedPublicationsHeader,
+  .reviewedPublicationTitle,
+  .reviewedPublicationConfirmation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reviewedPublicationTrustGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reviewedPublicationDeprecation {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container viewport-stage (max-width: 720px) {
+  .reviewedPublicationsPanel {
+    gap: 11px;
+    padding: 12px;
+  }
+
+  .reviewedPublicationDetail {
+    gap: 10px;
+    padding: 11px;
+  }
+
+  .reviewedPublicationTrustGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reviewedPublicationConfirmation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reviewedPublicationConfirmation .miniButton {
+    align-self: flex-start;
+  }
+}
+
+@container viewport-stage (max-height: 720px) and (min-width: 721px) {
+  .reviewedPublicationsPanel {
+    gap: 11px;
+    padding: 12px;
+  }
+
+  .reviewedPublicationDetail {
+    gap: 10px;
+    padding: 11px;
+  }
+
+  .reviewedPublicationTrustGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reviewedPublicationConfirmation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .reviewedPublicationConfirmation .miniButton {
+    align-self: flex-start;
+  }
+}

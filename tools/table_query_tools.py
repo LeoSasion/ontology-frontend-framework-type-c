@@ -5,7 +5,7 @@ import sqlite3
 from typing import Any
 
 from formula_engine import ast_to_sql, parse_and_validate_formula
-from query_runtime import SAFE_AGGREGATIONS
+from query_runtime import SAFE_AGGREGATIONS, ValidatedDuckDBQuery, cursor_rows
 
 
 FILTER_OPERATORS = {"contains", "equals", "notEquals", "in", "between", "gt", "gte", "lt", "lte", "empty", "notEmpty"}
@@ -102,8 +102,8 @@ def numeric_expr(field: str) -> str:
     return f"CAST(NULLIF(REPLACE(TRIM(CAST({quote_identifier(field)} AS TEXT)), ',', ''), '') AS REAL)"
 
 
-def is_numeric_column(connection: sqlite3.Connection, physical_table: str, field: str) -> bool:
-    rows = connection.execute(
+def is_numeric_column(connection: ValidatedDuckDBQuery, physical_table: str, field: str) -> bool:
+    rows = cursor_rows(connection.execute(
         f"""
         SELECT {quote_identifier(field)} AS value
         FROM {quote_identifier(physical_table)}
@@ -111,7 +111,7 @@ def is_numeric_column(connection: sqlite3.Connection, physical_table: str, field
           AND TRIM(CAST({quote_identifier(field)} AS TEXT)) <> ''
         LIMIT 80
         """
-    ).fetchall()
+    ))
     if not rows:
         return False
     numeric_count = 0
@@ -219,18 +219,25 @@ def numeric_field_expression(connection: sqlite3.Connection, table_key: str, fie
     return f"CAST(NULLIF(REPLACE(TRIM(CAST({field_expression(connection, table_key, field, raw_columns)} AS TEXT)), ',', ''), '') AS REAL)"
 
 
-def is_numeric_analysis_field(connection: sqlite3.Connection, physical_table: str, table_key: str, field: str, raw_columns: list[str]) -> bool:
+def is_numeric_analysis_field(
+    control_connection: sqlite3.Connection,
+    analysis_connection: ValidatedDuckDBQuery,
+    physical_table: str,
+    table_key: str,
+    field: str,
+    raw_columns: list[str],
+) -> bool:
     if field in raw_columns:
-        return is_numeric_column(connection, physical_table, field)
-    expression = field_expression(connection, table_key, field, raw_columns)
-    rows = connection.execute(
+        return is_numeric_column(analysis_connection, physical_table, field)
+    expression = field_expression(control_connection, table_key, field, raw_columns)
+    rows = cursor_rows(analysis_connection.execute(
         f"""
         SELECT {expression} AS value
         FROM {quote_identifier(physical_table)}
         WHERE {expression} IS NOT NULL
         LIMIT 80
         """
-    ).fetchall()
+    ))
     if not rows:
         return False
     numeric_count = 0
@@ -305,17 +312,23 @@ def where_sql(
     return (f" WHERE {' AND '.join(clauses)}" if clauses else "", params)
 
 
-def build_detail_query(connection: sqlite3.Connection, physical_table: str, all_columns: list[str], payload: dict[str, Any]) -> dict[str, Any]:
-    table_key = resolve_table_key(connection, physical_table, payload)
+def build_detail_query(
+    control_connection: sqlite3.Connection,
+    analysis_connection: ValidatedDuckDBQuery,
+    physical_table: str,
+    all_columns: list[str],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    table_key = resolve_table_key(control_connection, physical_table, payload)
     raw_columns = [column for column in all_columns if column != "id"]
-    analysis_columns = analysis_field_names(connection, table_key, raw_columns)
+    analysis_columns = analysis_field_names(control_connection, table_key, raw_columns)
     selected_columns = normalize_columns(analysis_columns, payload.get("columns"))
     filters = normalize_filters(analysis_columns, payload.get("filters", []))
     sort = normalize_sort(analysis_columns, payload.get("sort", []))
     limit = normalize_limit(payload.get("limit"), default=50)
     offset = normalize_offset(payload.get("offset"))
-    field_sql = lambda field: field_expression(connection, table_key, field, raw_columns)
-    numeric_sql_for_field = lambda field: numeric_field_expression(connection, table_key, field, raw_columns)
+    field_sql = lambda field: field_expression(control_connection, table_key, field, raw_columns)
+    numeric_sql_for_field = lambda field: numeric_field_expression(control_connection, table_key, field, raw_columns)
     where, params = where_sql(
         filters,
         selected_columns,
@@ -327,17 +340,25 @@ def build_detail_query(connection: sqlite3.Connection, physical_table: str, all_
     for item in sort:
         expression = (
             numeric_sql_for_field(item["field"])
-            if is_numeric_analysis_field(connection, physical_table, table_key, item["field"], raw_columns)
+            if is_numeric_analysis_field(
+                control_connection,
+                analysis_connection,
+                physical_table,
+                table_key,
+                item["field"],
+                raw_columns,
+            )
             else field_sql(item["field"])
         )
         order_parts.append(f"{expression} {item['direction'].upper()}")
     order = f" ORDER BY {', '.join(order_parts)}" if order_parts else ""
     select_sql = ", ".join(f"{field_sql(column)} AS {quote_identifier(column)}" for column in selected_columns)
     table_sql = quote_identifier(physical_table)
-    total_rows = int(connection.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0] or 0)
-    filtered_rows = int(connection.execute(f"SELECT COUNT(*) FROM {table_sql}{where}", params).fetchone()[0] or 0)
+    total_rows = int(analysis_connection.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0] or 0)
+    filtered_rows = int(analysis_connection.execute(f"SELECT COUNT(*) FROM {table_sql}{where}", params).fetchone()[0] or 0)
     sql = f"SELECT {select_sql} FROM {table_sql}{where}{order} LIMIT ? OFFSET ?"
-    rows = [dict(row) for row in connection.execute(sql, [*params, limit, offset])]
+    query_params = [*params, limit, offset]
+    rows = cursor_rows(analysis_connection.execute(sql, query_params))
     return {
         "mode": "detail",
         "columns": selected_columns,
@@ -351,7 +372,7 @@ def build_detail_query(connection: sqlite3.Connection, physical_table: str, all_
         "filters": filters,
         "sort": sort,
         "search": str(payload.get("search") or "").strip(),
-        "runtime": {"engine": "sqlite-detail", "compiledSql": sql, "params": [*params, limit, offset]},
+        "runtime": analysis_connection.runtime(compiled_sql=sql, params=query_params),
     }
 
 
@@ -375,12 +396,18 @@ def aggregate_expr(aggregation: str, measure: str, *, field_sql=quote_identifier
     return f"{aggregation.upper()}({numeric_sql_for_field(measure)})", f"{aggregation}_{measure}"
 
 
-def build_aggregate_query(connection: sqlite3.Connection, physical_table: str, all_columns: list[str], payload: dict[str, Any]) -> dict[str, Any]:
-    table_key = resolve_table_key(connection, physical_table, payload)
+def build_aggregate_query(
+    control_connection: sqlite3.Connection,
+    analysis_connection: ValidatedDuckDBQuery,
+    physical_table: str,
+    all_columns: list[str],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    table_key = resolve_table_key(control_connection, physical_table, payload)
     raw_columns = [column for column in all_columns if column != "id"]
-    analysis_columns = analysis_field_names(connection, table_key, raw_columns)
-    field_sql = lambda field: field_expression(connection, table_key, field, raw_columns)
-    numeric_sql_for_field = lambda field: numeric_field_expression(connection, table_key, field, raw_columns)
+    analysis_columns = analysis_field_names(control_connection, table_key, raw_columns)
+    field_sql = lambda field: field_expression(control_connection, table_key, field, raw_columns)
+    numeric_sql_for_field = lambda field: numeric_field_expression(control_connection, table_key, field, raw_columns)
     groups = normalize_groups(analysis_columns, payload.get("groupFields"))
     measure = str(payload.get("measure") or "").strip()
     aggregation = str(payload.get("aggregation") or "count").strip()
@@ -404,10 +431,11 @@ def build_aggregate_query(connection: sqlite3.Connection, physical_table: str, a
     if sort:
         order_sql = f" ORDER BY {', '.join(f'{quote_identifier(item["field"])} {item["direction"].upper()}' for item in sort)}"
     table_sql = quote_identifier(physical_table)
-    total_rows = int(connection.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0] or 0)
-    filtered_rows = int(connection.execute(f"SELECT COUNT(*) FROM {table_sql}{where}", params).fetchone()[0] or 0)
+    total_rows = int(analysis_connection.execute(f"SELECT COUNT(*) FROM {table_sql}").fetchone()[0] or 0)
+    filtered_rows = int(analysis_connection.execute(f"SELECT COUNT(*) FROM {table_sql}{where}", params).fetchone()[0] or 0)
     sql = f"SELECT {', '.join(select_parts)} FROM {table_sql}{where}{group_sql}{order_sql} LIMIT ?"
-    rows = [dict(row) for row in connection.execute(sql, [*params, limit])]
+    query_params = [*params, limit]
+    rows = cursor_rows(analysis_connection.execute(sql, query_params))
     return {
         "mode": "aggregate",
         "columns": [*groups, metric_name],
@@ -422,14 +450,20 @@ def build_aggregate_query(connection: sqlite3.Connection, physical_table: str, a
         "filters": filters,
         "sort": sort,
         "search": str(payload.get("search") or "").strip(),
-        "runtime": {"engine": "sqlite-aggregate", "compiledSql": sql, "params": [*params, limit]},
+        "runtime": analysis_connection.runtime(compiled_sql=sql, params=query_params),
     }
 
 
-def build_table_query(connection: sqlite3.Connection, physical_table: str, all_columns: list[str], payload: dict[str, Any]) -> dict[str, Any]:
+def build_table_query(
+    control_connection: sqlite3.Connection,
+    analysis_connection: ValidatedDuckDBQuery,
+    physical_table: str,
+    all_columns: list[str],
+    payload: dict[str, Any],
+) -> dict[str, Any]:
     mode = str(payload.get("mode") or "detail").strip().lower()
     if mode == "detail":
-        return build_detail_query(connection, physical_table, all_columns, payload)
+        return build_detail_query(control_connection, analysis_connection, physical_table, all_columns, payload)
     if mode == "aggregate":
-        return build_aggregate_query(connection, physical_table, all_columns, payload)
+        return build_aggregate_query(control_connection, analysis_connection, physical_table, all_columns, payload)
     raise ValueError(f"Unsupported query-table mode: {mode}")

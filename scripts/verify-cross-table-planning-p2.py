@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -15,13 +16,28 @@ from semantic_query_execution import (  # noqa: E402
     _build_base_source,
     _filter_clause,
     build_semantic_query_execution_plan,
-    execute_workspace_semantic_query,
+    execute_workspace_semantic_query as execute_workspace_semantic_query_runtime,
 )
 from semantic_query_planner import (  # noqa: E402
     build_semantic_query_plan,
     build_workspace_semantic_plan,
     semantic_query_prompt_directives,
 )
+from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
+
+
+TEST_REPLICA_ROOT = tempfile.TemporaryDirectory(prefix="aibi-c-cross-table-plan-")
+TEST_REPLICA_PATH = Path(TEST_REPLICA_ROOT.name) / "analysis.duckdb"
+
+
+def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: object, **kwargs: object) -> dict[str, object]:
+    publish_sqlite_fixture_to_duckdb(connection, TEST_REPLICA_PATH)
+    return execute_workspace_semantic_query_runtime(
+        connection,
+        *args,
+        **kwargs,
+        duckdb_path=TEST_REPLICA_PATH,
+    )
 
 
 def columns(connection: sqlite3.Connection, table: str) -> list[str]:

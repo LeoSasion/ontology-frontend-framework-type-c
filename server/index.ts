@@ -8,7 +8,11 @@ import { handleAnalysisUnitApi } from "./analysisUnitRoutes";
 import { handleExportApi } from "./exportRoutes";
 import { DurableJobRuntime } from "./durableJobRuntime";
 import { handleJobApi } from "./jobRoutes";
+import { handleImportJobApi } from "./importJobRoutes";
 import { handleDashboardApi } from "./dashboardRoutes";
+import { handleDecisionFrameworkApi } from "./decisionFrameworkRoutes";
+import { handleReviewedPublicationApi } from "./reviewedPublicationRoutes";
+import { handleSqlServerSnapshotApi } from "./sqlServerSnapshotRoutes";
 import { handleModelApi } from "./modelRoutes";
 import { handleQueryApi } from "./queryRoutes";
 import {
@@ -31,6 +35,7 @@ import { handleSourceApi } from "./sourceRoutes";
 import { handleSettingsApi } from "./settingsRoutes";
 import { handleStatic } from "./staticServer";
 import { handleWorkspaceApi } from "./workspaceRoutes";
+import { handleWorkspaceRecoveryApi } from "./workspaceRecoveryRoutes";
 import { handleWorkflowApi } from "./workflowRoutes";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -88,7 +93,19 @@ const cli = (args: string[]) => runCli(root, args);
 // A read through the deterministic CLI is the startup compatibility gate.
 // New databases are initialized here; legacy or future schemas stop before the API binds.
 await cli(["status"]);
+const workspaceRecovery = await cli(["workspace-recovery-reconcile", "--all"]);
+if (workspaceRecovery.ok !== true || (Array.isArray(workspaceRecovery.needsAttention) && workspaceRecovery.needsAttention.length > 0)) {
+  throw new Error("Workspace recovery reconciliation failed; API startup is fenced until recovery succeeds.");
+}
 await cli(["job-recover", "--all", "--yes"]);
+const importRecovery = await cli(["import-job-recover", "--all"]);
+if (importRecovery.ok !== true) {
+  throw new Error("Import activation reconciliation failed; API startup is fenced until recovery succeeds.");
+}
+const sqlServerActivationRecovery = await cli(["sqlserver-adapter-activation-finalize", "--all", "--yes"]);
+if (sqlServerActivationRecovery.ok !== true) {
+  throw new Error("SQL Server activation reconciliation failed; API startup is fenced until recovery succeeds.");
+}
 const jobRuntime = new DurableJobRuntime(root, cli);
 
 type IdempotencyEntry = {
@@ -187,11 +204,33 @@ function apiBoundaryFailure(request: IncomingMessage) {
     if (request.headers["x-requested-with"] !== "aibi-web" || request.headers["x-aibi-envelope-version"] !== "aibi-command/v1") {
       return { status: 403, errorCode: "browser-command-envelope-required", error: "Browser mutation is missing the local command envelope" };
     }
-    if (!equalRuntimeToken(String(request.headers["x-aibi-runtime-token"] ?? ""))) {
-      return { status: 403, errorCode: "runtime-token-invalid", error: "Local runtime session is missing or expired" };
-    }
+  }
+  // A JSON content type is not an identity. Every mutation, including local
+  // non-browser automation, must present the server-owned session token before
+  // idempotency middleware is allowed to consume its body.
+  if (!equalRuntimeToken(String(request.headers["x-aibi-runtime-token"] ?? ""))) {
+    return { status: 403, errorCode: "runtime-token-invalid", error: "Local runtime session is missing or expired" };
   }
   return null;
+}
+
+type LocalPrincipalRole = "viewer" | "operator" | "owner";
+
+function localPrincipalRole(request: IncomingMessage): LocalPrincipalRole {
+  return equalRuntimeToken(String(request.headers["x-aibi-runtime-token"] ?? "")) ? "owner" : "viewer";
+}
+
+function minimumRoleForCapability(capability: string): LocalPrincipalRole {
+  // v1 is deliberately a single-user local-owner product. We retain
+  // capability labels for auditability: loopback callers may inspect state,
+  // while every mutation still requires the server-owned owner session token.
+  return capability.endsWith(":read") ? "viewer" : "owner";
+}
+
+function authorizeLocalCapability(capability: string, request: IncomingMessage) {
+  if (apiBoundaryFailure(request) !== null) return false;
+  const rank: Record<LocalPrincipalRole, number> = { viewer: 0, operator: 1, owner: 2 };
+  return rank[localPrincipalRole(request)] >= rank[minimumRoleForCapability(capability)];
 }
 
 async function handleIdempotentMutation(
@@ -308,7 +347,13 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
   }
 
   if (url.pathname === "/api/runtime-session" && request.method === "GET") {
-    sendJson(response, 200, { ok: true, schema: "aibi-runtime-session/v1", token: runtimeToken });
+    sendJson(response, 200, {
+      ok: true,
+      schema: "aibi-runtime-session/v1",
+      role: "owner",
+      trustBoundary: "same-local-user",
+      token: runtimeToken,
+    });
     return;
   }
 
@@ -317,6 +362,19 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
   }
 
   if (await handleDashboardApi({ cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleImportJobApi({
+    authorize: authorizeLocalCapability,
+    cancelJobProcess: (jobKey) => jobRuntime.cancel(jobKey),
+    cli,
+    request,
+    response,
+    resumeImportJob: (jobKey) => jobRuntime.resumeImport(jobKey),
+    startImportJob: (body) => jobRuntime.startImport(body),
+    url,
+  })) {
     return;
   }
 
@@ -334,6 +392,10 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
     return;
   }
 
+  if (await handleWorkspaceRecoveryApi({ authorize: authorizeLocalCapability, cli, request, response, url })) {
+    return;
+  }
+
   if (await handleModelApi({ cli, request, response, url })) {
     return;
   }
@@ -347,6 +409,25 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
   }
 
   if (await handleAnalysisUnitApi({ cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleDecisionFrameworkApi({ authorize: authorizeLocalCapability, cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleReviewedPublicationApi({ authorize: authorizeLocalCapability, cli, request, response, url })) {
+    return;
+  }
+
+  if (await handleSqlServerSnapshotApi({
+    authorize: authorizeLocalCapability,
+    cli,
+    request,
+    response,
+    startActivationJob: (body) => jobRuntime.startSqlServerActivation(body),
+    url,
+  })) {
     return;
   }
 
@@ -415,11 +496,32 @@ const server = createServer(async (request, response) => {
               : error instanceof RuntimeHostUnavailableError
                 ? 503
             : 500;
+    const knownError = error instanceof RequestBodyTooLargeError
+      || error instanceof InvalidJsonBodyError
+      || error instanceof UnsupportedMediaTypeError;
+    const errorCode = error instanceof RuntimeCommandLimitError
+      ? "runtime-command-limit"
+      : error instanceof RuntimeHostCapacityError
+        ? "runtime-host-capacity"
+        : error instanceof RuntimeHostUnavailableError
+          ? "runtime-host-unavailable"
+          : status >= 500
+            ? "internal-server-error"
+            : "request-invalid";
+    const publicError = knownError
+      ? (error as Error).message
+      : error instanceof RuntimeCommandLimitError
+        ? "The local analysis command exceeded its execution limit."
+        : error instanceof RuntimeHostCapacityError
+          ? "The local analysis queue is at capacity; retry shortly."
+          : error instanceof RuntimeHostUnavailableError
+            ? "The local analysis runtime is unavailable or requires recovery."
+            : "The request could not be completed safely.";
     sendJson(response, status, {
       ok: false,
       action: url.pathname.startsWith("/api/") ? actionForApiPath(url) : "static",
-      errorCode: error instanceof RuntimeCommandLimitError ? "runtime-command-limit" : undefined,
-      error: error instanceof Error ? error.message : String(error),
+      errorCode,
+      error: publicError,
     });
   }
 });

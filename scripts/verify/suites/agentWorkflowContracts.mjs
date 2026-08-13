@@ -16,7 +16,9 @@ export function appendAgentWorkflowContractChecks(context) {
         label: "b-formula-save-query-delete-workflow",
         ok: byLabel["cli-save-formula-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-save-formula-confirm"].parsed?.savedFormula?.metricType === "formula" &&
-          byLabel["cli-query-formula-metric"].parsed?.tableQuery?.runtime?.engine === "sqlite-formula-metric" &&
+          byLabel["cli-query-formula-metric"].parsed?.tableQuery?.runtime?.engine === "duckdb" &&
+          byLabel["cli-query-formula-metric"].parsed?.tableQuery?.runtime?.queryAvailability === "current" &&
+          !Object.hasOwn(byLabel["cli-query-formula-metric"].parsed?.tableQuery?.runtime ?? {}, "params") &&
           byLabel["cli-query-formula-metric"].parsed?.rows?.some((row) => row.channel === "Douyin" && Number(row.formula_value) > 0) &&
           byLabel["cli-list-formulas"].parsed?.metricFormulas?.some((formula) => formula.metricKey === "verify_formula_metric") &&
           byLabel["cli-delete-formula-dry-run"].parsed?.requiresConfirmation === true &&

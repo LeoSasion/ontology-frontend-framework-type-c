@@ -92,7 +92,7 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     return true;
   }
 
-  if (url.pathname === "/api/import/jobs" && request.method === "GET") {
+  if (url.pathname === "/api/import/executions" && request.method === "GET") {
     const args = ["list-import-jobs"];
     const table = url.searchParams.get("table");
     const status = url.searchParams.get("status");
@@ -117,38 +117,26 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
   }
 
   if (url.pathname === "/api/import/commit" && request.method === "POST") {
-    const body = await readBody(request);
-    const filePath = String(body.filePath ?? "");
-    const args = ["import-commit", filePath];
-    if (body.table) args.push("--table", String(body.table));
-    if (body.name) args.push("--name", String(body.name));
-    if (body.mode) args.push("--mode", String(body.mode));
-    if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
-    if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
-    if (body.confirm === true) {
-      if (!body.expectedPlan) {
-        sendJson(response, 409, { ok: false, action: "import-commit", code: "IMPORT_PLAN_REQUIRED", error: "Run the file preview again before confirming this import." });
-        return true;
-      }
-      args.push("--expected-plan", String(body.expectedPlan), "--require-plan", "--yes");
-    }
-    const result = await cli(args);
-    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    await readBody(request);
+    sendJson(response, 410, {
+      ok: false,
+      action: "import-commit",
+      code: "DURABLE_IMPORT_REQUIRED",
+      error: "Synchronous import was retired; preview first, then create a durable import job at /api/import/jobs.",
+      recoveryAction: "create-durable-import-job",
+    });
     return true;
   }
 
   if (url.pathname === "/api/import/folder/commit" && request.method === "POST") {
-    const body = await readBody(request);
-    const folderPath = String(body.path ?? body.folderPath ?? "");
-    const args = ["import-folder", folderPath];
-    if (body.limit) args.push("--limit", String(body.limit));
-    if (body.recursive === false) args.push("--no-recursive");
-    if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
-    if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
-    if (body.expectedPlan) args.push("--expected-plan", String(body.expectedPlan));
-    if (body.confirm === true) args.push("--yes");
-    const result = await cli(args);
-    sendJson(response, result.requiresConfirmation ? 202 : 200, result);
+    await readBody(request);
+    sendJson(response, 410, {
+      ok: false,
+      action: "import-folder",
+      code: "DURABLE_IMPORT_REQUIRED",
+      error: "Synchronous folder import was retired; preview first, then create a durable import job at /api/import/jobs.",
+      recoveryAction: "create-durable-import-job",
+    });
     return true;
   }
 

@@ -423,6 +423,8 @@ def build_import_preview(
     table: str | None = None,
     unique_fields_value: str | None = None,
     conflict_rule_value: str | None = None,
+    *,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     return build_import_preview_service(
         connection,
@@ -430,6 +432,7 @@ def build_import_preview(
         table,
         unique_fields_value,
         conflict_rule_value,
+        workspace_id=workspace_id,
         read_table_file=read_table_file,
         profile_rows=profile_rows,
         normalize_records_for_columns=normalize_records_for_columns,
@@ -447,8 +450,9 @@ def build_import_preview(
 
 def preview_import_command(args: argparse.Namespace) -> dict[str, Any]:
     result = preview_import_command_service(args, open_db=open_db, build_import_preview=build_import_preview)
-    with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+    workspace_id = str(result.get("workspaceId") or "")
+    if not workspace_id:
+        raise RuntimeError("Import preview evidence is missing its workspace binding.")
     result["evidenceBundle"] = write_evidence_bundle(
         command="preview-import",
         workspace_id=workspace_id,
@@ -480,6 +484,8 @@ def execute_import_commit(
     mode: str = "create",
     unique_fields_value: str | None = None,
     conflict_rule_value: str | None = None,
+    *,
+    workspace_id: str | None = None,
 ) -> dict[str, Any]:
     return execute_import_commit_service(
         connection,
@@ -489,6 +495,7 @@ def execute_import_commit(
         mode,
         unique_fields_value,
         conflict_rule_value,
+        workspace_id=workspace_id,
         build_import_preview=build_import_preview,
         merge_import_into_table=merge_import_into_table,
         import_csv_as_table=import_csv_as_table,
@@ -497,12 +504,22 @@ def execute_import_commit(
 
 
 def import_commit_command(args: argparse.Namespace) -> dict[str, Any]:
-    return import_commit_command_service(
-        args,
-        open_db=open_db,
-        build_import_preview=build_import_preview,
-        execute_import_commit=execute_import_commit,
-    )
+    if bool(getattr(args, "yes", False)):
+        # Compatibility-only path: every confirmed import must share the
+        # durable job + activation journal lifecycle. The import is lazy to
+        # avoid a module cycle in the composition layer.
+        from import_job_commands import legacy_import_commit_command
+
+        return legacy_import_commit_command(args)
+    from import_job_commands import legacy_import_preview_boundary
+
+    with legacy_import_preview_boundary():
+        return import_commit_command_service(
+            args,
+            open_db=open_db,
+            build_import_preview=build_import_preview,
+            execute_import_commit=execute_import_commit,
+        )
 
 
 def preview_import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
@@ -516,13 +533,20 @@ def preview_import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
-    return import_folder_command_service(
-        args,
-        open_db=open_db,
-        build_import_preview=build_import_preview,
-        execute_import_commit=execute_import_commit,
-        read_table_file=read_table_file,
-        active_workspace_id=active_workspace_id,
-    )
+    if bool(getattr(args, "yes", False)):
+        from import_job_commands import legacy_import_folder_command
+
+        return legacy_import_folder_command(args)
+    from import_job_commands import legacy_import_preview_boundary
+
+    with legacy_import_preview_boundary():
+        return import_folder_command_service(
+            args,
+            open_db=open_db,
+            build_import_preview=build_import_preview,
+            execute_import_commit=execute_import_commit,
+            read_table_file=read_table_file,
+            active_workspace_id=active_workspace_id,
+        )
 
 

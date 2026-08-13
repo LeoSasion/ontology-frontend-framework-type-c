@@ -7,8 +7,9 @@ import sqlite3
 from contextlib import closing
 from typing import Any, Callable
 
-from bi_cli_core import now_iso, slug
+from bi_cli_core import DUCKDB_PATH, now_iso, slug
 from apparel_entity_mapping_service import build_apparel_entity_mapping_proof
+from query_runtime import open_validated_duckdb_query, replica_expectation
 
 
 def parse_json_object(value: Any, default: Any | None = None) -> Any:
@@ -220,7 +221,7 @@ def sample_field_values(
         """,
         (max(1, int(limit)),),
     ).fetchall()
-    return {str(row["value"]).strip() for row in rows if str(row["value"]).strip()}
+    return {str(row[0]).strip() for row in rows if str(row[0]).strip()}
 
 
 def saved_relationship_signatures(
@@ -259,7 +260,7 @@ def recommend_relationships_for_connection(
     build_relationship_preview: Callable[..., dict[str, Any]],
     relation_candidate_fields: Callable[[sqlite3.Connection, sqlite3.Row], list[dict[str, Any]]],
     relationship_name_score: Callable[[str, str], tuple[int, list[str]]],
-    sample_field_values: Callable[[sqlite3.Connection, str, str], set[str]],
+    sample_field_values: Callable[[Any, str, str], set[str]],
     saved_relationship_signatures: Callable[[sqlite3.Connection], set[tuple[str, str, str, str]]],
 ) -> list[dict[str, Any]]:
     workspace_id = active_workspace_id(connection)
@@ -272,8 +273,14 @@ def recommend_relationships_for_connection(
     value_cache: dict[tuple[str, str], set[str]] = {}
     recommendations: list[dict[str, Any]] = []
     seen: set[tuple[str, str, str, str]] = set()
-    for left_index, left in enumerate(registries):
-        for right in registries[left_index + 1:]:
+    if len(registries) < 2:
+        return []
+    with open_validated_duckdb_query(
+        DUCKDB_PATH,
+        [replica_expectation(registry) for registry in registries],
+    ) as analysis_connection:
+        for left_index, left in enumerate(registries):
+          for right in registries[left_index + 1:]:
             left_table = left["table_key"]
             right_table = right["table_key"]
             for left_candidate in candidates_by_table.get(left_table, []):
@@ -297,8 +304,8 @@ def recommend_relationships_for_connection(
                         reasons.append(f"tag-overlap:{','.join(tag_overlap[:3])}")
                     if score < 48:
                         continue
-                    left_values = value_cache.setdefault((left["physical_table"], left_field), sample_field_values(connection, left["physical_table"], left_field))
-                    right_values = value_cache.setdefault((right["physical_table"], right_field), sample_field_values(connection, right["physical_table"], right_field))
+                    left_values = value_cache.setdefault((left["physical_table"], left_field), sample_field_values(analysis_connection, left["physical_table"], left_field))
+                    right_values = value_cache.setdefault((right["physical_table"], right_field), sample_field_values(analysis_connection, right["physical_table"], right_field))
                     overlap_ratio = 0.0
                     if left_values and right_values:
                         overlap_ratio = len(left_values & right_values) / max(1, min(len(left_values), len(right_values)))
@@ -308,7 +315,7 @@ def recommend_relationships_for_connection(
                         score += min(38, int(round(overlap_ratio * 38)))
                         reasons.append(f"sample-overlap:{round(overlap_ratio * 100)}%")
                     preview = build_relationship_preview(
-                        connection,
+                        analysis_connection,
                         left["physical_table"],
                         right["physical_table"],
                         table_columns(connection, left["physical_table"]),
@@ -468,6 +475,8 @@ def resolve_relationship_query_inputs(
         "savedFilters": saved_filters,
         "savedPreaggregation": saved_preaggregation,
         "validation": validation,
+        "leftRegistry": left,
+        "rightRegistry": right,
     }
 
 
@@ -627,12 +636,11 @@ def query_relationship_command(
     quote_relationship_identifier: Callable[[str], str],
 ) -> dict[str, Any]:
     with closing(open_db()) as connection:
-        # Keep validation, registry versions, physical-column discovery and the
-        # compiled query on one stable SQLite snapshot. BEGIN IMMEDIATE also
-        # prevents an import/replace writer from racing between proof and use.
+        # Keep control metadata on one stable SQLite snapshot; business rows are
+        # read only from bindings validated in the analysis replica.
         if connection.in_transaction:
             connection.commit()
-        connection.execute("BEGIN IMMEDIATE")
+        connection.execute("BEGIN")
         resolved = resolve_relationship_query_inputs(
             args,
             connection,
@@ -652,49 +660,56 @@ def query_relationship_command(
         )
         proof_validation = resolved["validation"]
         validation_scope = "saved-relationship"
-        if definition_changed:
-            # Runtime filters/preaggregation change the cardinality surface that
-            # the saved validation described. Recompute the exact effective
-            # shape while the source-version lock is still held; never reuse a
-            # safe saved proof for a different query definition.
-            effective_preview = build_relationship_preview(
-                connection,
+        expectations = [
+            replica_expectation(resolved["leftRegistry"]),
+            replica_expectation(resolved["rightRegistry"]),
+        ]
+        with open_validated_duckdb_query(DUCKDB_PATH, expectations) as analysis_connection:
+            if definition_changed:
+                # Runtime filters/preaggregation change the cardinality surface
+                # and therefore require a proof over the same validated replica.
+                effective_preview = build_relationship_preview(
+                    analysis_connection,
+                    resolved["leftPhysicalTable"],
+                    resolved["rightPhysicalTable"],
+                    resolved["leftColumns"],
+                    resolved["rightColumns"],
+                    resolved["mappings"],
+                    join_type=resolved["joinType"],
+                    sample_limit=max(1, min(int(args.limit or 50), 50)),
+                    quote_identifier=quote_relationship_identifier,
+                    filters=filters,
+                    preaggregation=preaggregation,
+                )
+                proof_validation = {"metrics": effective_preview.get("metrics", {})}
+                validation_scope = "effective-query-preview"
+            fanout_proof = relationship_measure_fanout_proof(proof_validation, measure)
+            fanout_proof["validationScope"] = validation_scope
+            fanout_proof["runtimeFilterCount"] = len(runtime_filters)
+            fanout_proof["runtimePreaggregationOverride"] = runtime_preaggregation is not None
+            payload = build_relationship_query(
+                analysis_connection,
                 resolved["leftPhysicalTable"],
                 resolved["rightPhysicalTable"],
                 resolved["leftColumns"],
                 resolved["rightColumns"],
                 resolved["mappings"],
+                group_fields=group_fields,
+                measure=measure,
+                aggregation=args.agg,
                 join_type=resolved["joinType"],
-                sample_limit=max(1, min(int(args.limit or 50), 50)),
-                quote_identifier=quote_relationship_identifier,
                 filters=filters,
                 preaggregation=preaggregation,
+                limit=args.limit,
+                sort_by=args.sort_by,
+                sort_direction=args.sort_direction,
+                quote_identifier=quote_relationship_identifier,
             )
-            proof_validation = {"metrics": effective_preview.get("metrics", {})}
-            validation_scope = "effective-query-preview"
-        fanout_proof = relationship_measure_fanout_proof(proof_validation, measure)
-        fanout_proof["validationScope"] = validation_scope
-        fanout_proof["runtimeFilterCount"] = len(runtime_filters)
-        fanout_proof["runtimePreaggregationOverride"] = runtime_preaggregation is not None
-        payload = build_relationship_query(
-            connection,
-            resolved["leftPhysicalTable"],
-            resolved["rightPhysicalTable"],
-            resolved["leftColumns"],
-            resolved["rightColumns"],
-            resolved["mappings"],
-            group_fields=group_fields,
-            measure=measure,
-            aggregation=args.agg,
-            join_type=resolved["joinType"],
-            filters=filters,
-            preaggregation=preaggregation,
-            limit=args.limit,
-            sort_by=args.sort_by,
-            sort_direction=args.sort_direction,
-            quote_identifier=quote_relationship_identifier,
-        )
-        payload["fanoutSafety"] = fanout_proof
+            payload["fanoutSafety"] = fanout_proof
+            query_runtime = analysis_connection.runtime(
+                compiled_sql=str(payload.get("compiledSql") or "relationship whitelist join"),
+                params=payload.pop("_compiledParams", []),
+            )
     return {
         "ok": True,
         "relationship": {
@@ -715,7 +730,7 @@ def query_relationship_command(
             "measure": payload["metricName"],
             "aggregation": payload["aggregation"],
             "sqlIntent": "Whitelist relationship query; no user SQL accepted",
-            "runtime": {"engine": "sqlite", "compiledSql": "relationship whitelist join"},
+            "runtime": query_runtime,
         },
         "rows": relationship_rows_for_chart(payload),
     }
@@ -789,19 +804,23 @@ def relationship_preview_command(
         mappings = relationship_mappings_from_args(args)
         filters = relationship_filters_from_args(args)
         preaggregation = relationship_preaggregation_from_args(args)
-        preview = build_relationship_preview(
-            connection,
-            left["physical_table"],
-            right["physical_table"],
-            left_columns,
-            right_columns,
-            mappings,
-            join_type=args.join_type,
-            sample_limit=args.limit,
-            quote_identifier=quote_identifier,
-            filters=filters,
-            preaggregation=preaggregation,
-        )
+        with open_validated_duckdb_query(
+            DUCKDB_PATH,
+            [replica_expectation(left), replica_expectation(right)],
+        ) as analysis_connection:
+            preview = build_relationship_preview(
+                analysis_connection,
+                left["physical_table"],
+                right["physical_table"],
+                left_columns,
+                right_columns,
+                mappings,
+                join_type=args.join_type,
+                sample_limit=args.limit,
+                quote_identifier=quote_identifier,
+                filters=filters,
+                preaggregation=preaggregation,
+            )
     return {
         "ok": True,
         "workspaceId": workspace_id,
@@ -859,19 +878,23 @@ def build_relationship_save_plan(
     )
     if not normalized_mappings:
         raise ValueError("At least one complete relationship mapping is required.")
-    preview = build_relationship_preview(
-        connection,
-        left["physical_table"],
-        right["physical_table"],
-        left_columns,
-        right_columns,
-        normalized_mappings,
-        join_type=join_type,
-        sample_limit=limit,
-        quote_identifier=quote_identifier,
-        filters=filters,
-        preaggregation=preaggregation,
-    )
+    with open_validated_duckdb_query(
+        DUCKDB_PATH,
+        [replica_expectation(left), replica_expectation(right)],
+    ) as analysis_connection:
+        preview = build_relationship_preview(
+            analysis_connection,
+            left["physical_table"],
+            right["physical_table"],
+            left_columns,
+            right_columns,
+            normalized_mappings,
+            join_type=join_type,
+            sample_limit=limit,
+            quote_identifier=quote_identifier,
+            filters=filters,
+            preaggregation=preaggregation,
+        )
     resolved_workspace_id = str(workspace_id or left["workspace_id"])
     apparel_mapping_proof = build_apparel_entity_mapping_proof(
         connection,

@@ -605,7 +605,7 @@ def source_intelligence(
     stage_timings: dict[str, int] = {}
     files = timed(stage_timings, "discover_files_ms", lambda: discover_source_files(input_paths))
     if not files:
-        raise SystemExit("No CSV/XLSX sources found")
+        raise ValueError("No CSV/XLSX sources found")
     output_dir.mkdir(parents=True, exist_ok=True)
     core_semantic_runtime, source_pipeline_contract = load_core_semantic_runtime(
         core_semantic_runtime_path,

@@ -17,6 +17,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from openpyxl import load_workbook
 
 from bi_cli_core import ROOT, source_label
+from sqlserver_snapshot_adapter_service import adapter_contract as sqlserver_adapter_contract
 
 
 ADAPTER_SCHEMA = "aibi-connector-adapter/v1"
@@ -119,7 +120,7 @@ def adapter_contracts() -> list[dict[str, Any]]:
             "credentials": {"mode": "server-env-reference", "valuesInReceipts": False},
             "reason": "No provider-specific allowlist adapter is installed; registration grants no execution authority.",
         })
-    return [local_contract, http_contract, sqlite_contract, *unavailable]
+    return [local_contract, http_contract, sqlite_contract, sqlserver_adapter_contract(None), *unavailable]
 
 
 def adapter_contract_for(connector_type: str) -> dict[str, Any]:

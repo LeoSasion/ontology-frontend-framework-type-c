@@ -4,9 +4,13 @@ import hashlib
 import json
 import re
 import sqlite3
+from contextlib import nullcontext
+from pathlib import Path
 from typing import Any
 
 from bi_cli_core import quote_identifier
+from bi_cli_core import DUCKDB_PATH
+from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 from trusted_query_service import current_source_run_binding
 
 
@@ -41,7 +45,7 @@ def classify_apparel_field(field: str) -> dict[str, Any]:
 
 
 def _fingerprint(value: Any) -> str:
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -67,26 +71,27 @@ def _columns(connection: sqlite3.Connection, physical_table: str) -> list[str]:
     return [str(row["name"]) for row in connection.execute(f"PRAGMA table_info({quote_identifier(physical_table)})")]
 
 
-def _scope_snapshot(connection: sqlite3.Connection, registry: sqlite3.Row, columns: list[str]) -> dict[str, Any]:
+def _scope_snapshot(connection: Any, registry: sqlite3.Row, columns: list[str]) -> dict[str, Any]:
     fields = [field for field in columns if any(token.casefold() in field.casefold() for token in SCOPE_FIELD_TOKENS)]
     values: dict[str, list[str]] = {}
     for field in fields[:4]:
-        rows = connection.execute(
+        rows = cursor_rows(connection.execute(
             f"SELECT DISTINCT CAST({quote_identifier(field)} AS TEXT) AS value "
             f"FROM {quote_identifier(registry['physical_table'])} "
             f"WHERE TRIM(CAST({quote_identifier(field)} AS TEXT)) <> '' ORDER BY value LIMIT 100"
-        ).fetchall()
+        ))
         values[field] = [str(row["value"]) for row in rows]
     return {"fields": fields, "values": values, "proven": bool(fields)}
 
 
 def _time_snapshot(
-    connection: sqlite3.Connection,
+    control_connection: sqlite3.Connection,
+    analysis_connection: Any,
     workspace_id: str,
     registry: sqlite3.Row,
     columns: list[str],
 ) -> dict[str, Any]:
-    rows = connection.execute(
+    rows = control_connection.execute(
         """
         SELECT field_name FROM field_semantics
         WHERE workspace_id = ? AND table_key = ? AND role IN ('event_time', 'time')
@@ -97,16 +102,16 @@ def _time_snapshot(
     fields = [str(row["field_name"]) for row in rows if str(row["field_name"]) in columns]
     windows: dict[str, dict[str, Any]] = {}
     for field in fields[:2]:
-        row = connection.execute(
-            f"SELECT MIN(datetime({quote_identifier(field)})) AS start_at, "
-            f"MAX(datetime({quote_identifier(field)})) AS end_at, "
-            f"SUM(CASE WHEN datetime({quote_identifier(field)}) IS NOT NULL THEN 1 ELSE 0 END) AS parsed_rows "
+        row = analysis_connection.execute(
+            f"SELECT MIN(TRY_CAST({quote_identifier(field)} AS TIMESTAMP)) AS start_at, "
+            f"MAX(TRY_CAST({quote_identifier(field)} AS TIMESTAMP)) AS end_at, "
+            f"SUM(CASE WHEN TRY_CAST({quote_identifier(field)} AS TIMESTAMP) IS NOT NULL THEN 1 ELSE 0 END) AS parsed_rows "
             f"FROM {quote_identifier(registry['physical_table'])}"
         ).fetchone()
         windows[field] = {
-            "startAt": row["start_at"],
-            "endAt": row["end_at"],
-            "parsedRows": int(row["parsed_rows"] or 0),
+            "startAt": str(row[0]) if row[0] is not None else None,
+            "endAt": str(row[1]) if row[1] is not None else None,
+            "parsedRows": int(row[2] or 0),
         }
     return {"fields": fields, "windows": windows, "proven": any(item["parsedRows"] > 0 for item in windows.values())}
 
@@ -162,6 +167,8 @@ def build_apparel_entity_mapping_proof(
     right_table_key: str,
     mappings: list[dict[str, str]],
     relationship_preview: dict[str, Any],
+    duckdb_path: Path = DUCKDB_PATH,
+    writer_profiling_connection: Any | None = None,
 ) -> dict[str, Any]:
     left_registry = _registry(connection, workspace_id, left_table_key)
     right_registry = _registry(connection, workspace_id, right_table_key)
@@ -202,13 +209,22 @@ def build_apparel_entity_mapping_proof(
     if cardinality == "many-to-many":
         blockers.append("apparel-many-to-many-requires-preaggregation")
 
-    left_scope = _scope_snapshot(connection, left_registry, left_columns)
-    right_scope = _scope_snapshot(connection, right_registry, right_columns)
+    analysis_context = (
+        nullcontext(writer_profiling_connection)
+        if writer_profiling_connection is not None
+        else open_validated_duckdb_query(
+            duckdb_path,
+            [replica_expectation(left_registry), replica_expectation(right_registry)],
+        )
+    )
+    with analysis_context as analysis_connection:
+        left_scope = _scope_snapshot(analysis_connection, left_registry, left_columns)
+        right_scope = _scope_snapshot(analysis_connection, right_registry, right_columns)
+        left_time = _time_snapshot(connection, analysis_connection, workspace_id, left_registry, left_columns)
+        right_time = _time_snapshot(connection, analysis_connection, workspace_id, right_registry, right_columns)
     scope_overlap = _scope_overlap(left_scope, right_scope)
     if scope_overlap["status"] in {"unproven", "scope-mismatch"}:
         blockers.append("apparel-platform-shop-scope-unproven")
-    left_time = _time_snapshot(connection, workspace_id, left_registry, left_columns)
-    right_time = _time_snapshot(connection, workspace_id, right_registry, right_columns)
     time_overlap = _time_overlap(left_time, right_time)
     if time_overlap["status"] in {"no-overlap", "one-sided-only"}:
         blockers.append("apparel-time-coverage-incompatible")

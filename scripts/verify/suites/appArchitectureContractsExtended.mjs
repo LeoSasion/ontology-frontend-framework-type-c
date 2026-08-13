@@ -208,14 +208,20 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           developmentRoadmapDocSource.includes("## 目标架构") &&
           developmentRoadmapDocSource.includes("## P0：消除运行时结构性风险") &&
           developmentRoadmapDocSource.includes("### P0-A｜拆出 Application Use Case") &&
-          developmentRoadmapDocSource.includes("### P0-B｜建立长驻 Runtime Host 与单写者队列") &&
-          developmentRoadmapDocSource.includes("### P0-C｜把 DuckDB 改为版本化分析副本") &&
+          !developmentRoadmapDocSource.includes("### P0-B｜建立长驻 Runtime Host 与单写者队列") &&
+          !developmentRoadmapDocSource.includes("### P0-C｜把 DuckDB 改为版本化分析副本") &&
+          developmentRoadmapDocSource.includes("Node API 已通过长驻 Runtime Host 进入统一 Registry") &&
+          !developmentRoadmapDocSource.includes("### P1-D｜完成 SQL Server 暂存到来源激活") &&
           developmentRoadmapDocSource.includes("## P1：降低前后端耦合与刷新成本") &&
           developmentRoadmapDocSource.includes("## P2：形成可扩展但不扩权的插件面") &&
           !developmentRoadmapDocSource.includes("第二个独立业务领域验收") &&
           !developmentRoadmapDocSource.includes("### 2. 带证据导出") &&
           implementationStatusSource.includes("| Analysis Unit 与图表适配 | 稳定初版 |") &&
-          implementationStatusSource.includes("| Connector Adapter | 稳定受控 |") &&
+          implementationStatusSource.includes("| 导入、画像与来源激活 | 稳定受控 |") &&
+          implementationStatusSource.includes("| 跨引擎查询正确性 | 稳定门禁 |") &&
+          implementationStatusSource.includes("| Connector Adapter | 稳定受控 / SQL Server 可选 |") &&
+          implementationStatusSource.includes("fake-driver 已走完 stage → Durable Import → Journal → active") &&
+          implementationStatusSource.includes("SQLite schema v16") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&
@@ -409,7 +415,9 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           appSource.includes("useAppWorkspaceActions({") &&
           appWorkspaceActionsSource.includes("createWorkspace(name, false)") &&
           appWorkspaceActionsSource.includes("selectWorkspace(workspaceId, true)") &&
-          appWorkspaceActionsSource.includes("deleteWorkspace(workspaceId, confirm)") &&
+          appWorkspaceActionsSource.includes("deleteWorkspace(workspaceId, confirm, requestKey, expectedPlan)") &&
+          sidebarSource.includes("deleteIntent.requestKey") &&
+          sidebarSource.includes("deleteIntent.expectedPlan") &&
           appWorkspaceActionsSource.includes("renameWorkspace(workspaceId, nextName, false)") &&
           appWorkspaceActionsSource.includes("const handleWorkspaceDelete = useCallback") &&
           appWorkspaceActionsSource.includes("reloadWorkspaceSurface"),

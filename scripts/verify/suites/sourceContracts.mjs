@@ -176,8 +176,7 @@ export function appendSourceContractChecks(context) {
     {
         label: "source-workbench-data-entry-panel-boundary",
         ok: existsSync(join(root, "src", "components", "SourceWorkbenchDataEntryPanel.tsx")) &&
-          sourceWorkbenchSource.includes('import { SourceWorkbenchDataEntryPanel } from "./SourceWorkbenchDataEntryPanel"') &&
-          !sourceWorkbenchDeferredModulesSource.includes("SourceWorkbenchDataEntryPanel") &&
+          sourceWorkbenchDeferredModulesSource.includes('import("./components/SourceWorkbenchDataEntryPanel")') &&
           sourceWorkbenchSource.includes("<SourceWorkbenchDataEntryPanel") &&
           !sourceWorkbenchSource.includes('data-testid="source-intelligence-folder-entry"') &&
           !sourceWorkbenchSource.includes("const aTestdataMonths") &&
@@ -363,7 +362,16 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-safety"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
-          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm" || !singleImportPlanReady}') &&
+          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm" || importJobActive || !singleImportPlanReady}') &&
+          sourceWorkbenchImportPanelSource.includes("<ImportJobStatusCard") &&
+          sourceWorkbenchImportPanelSource.includes("onCancel={cancelActiveImportJob}") &&
+          sourceWorkbenchImportPanelSource.includes("onResume={resumeActiveImportJob}") &&
+          sourceWorkbenchContractsSource.includes("onCreateImportJob:") &&
+          sourceWorkbenchContractsSource.includes("onFetchImportJob:") &&
+          sourceWorkbenchContractsSource.includes("onListImportJobs:") &&
+          sourceWorkbenchContractsSource.includes("onCancelImportJob:") &&
+          sourceWorkbenchContractsSource.includes("onResumeImportJob:") &&
+          !sourceWorkbenchContractsSource.includes("onCommitImport:") &&
           !sourceWorkbenchActionPanelSource.includes("不可读或未预检时不能确认导入") &&
           sourceWorkbenchSource.includes("{hasData ? (") &&
           !sourceWorkbenchSource.includes("hasData && sourceProfileComplete ? (") &&
@@ -405,8 +413,16 @@ export function appendSourceContractChecks(context) {
         ok: existsSync(join(root, "src", "sourceWorkbenchReceiptModel.ts")) &&
           sourceWorkbenchImportControllerSource.includes('from "./sourceWorkbenchReceiptModel"') &&
           sourceWorkbenchImportControllerSource.includes("buildImportPreviewReceipt({") &&
-          sourceWorkbenchImportControllerSource.includes("buildImportCommitReceipt({") &&
+          sourceWorkbenchImportControllerSource.includes("buildDurableImportQueuedReceipt({") &&
           sourceWorkbenchImportControllerSource.includes("buildImportPolicyReceipt({") &&
+          sourceWorkbenchImportControllerSource.includes("const job = await createImportJobOnce({") &&
+          sourceWorkbenchImportControllerSource.includes("onListImportJobs().then(selectJob)") &&
+          sourceWorkbenchImportControllerSource.includes("stableRequestKey(requestFingerprint)") &&
+          sourceWorkbenchImportControllerSource.includes('importKind: "single"') &&
+          sourceWorkbenchImportControllerSource.includes('importKind: "folder"') &&
+          !sourceWorkbenchImportControllerSource.includes("buildImportCommitReceipt") &&
+          !sourceWorkbenchImportControllerSource.includes("导入任务已进入持久队列") &&
+          !sourceWorkbenchImportControllerSource.includes("文件夹导入已进入持久队列") &&
           sourceWorkbenchConnectorControllerSource.includes('from "./sourceWorkbenchReceiptModel"') &&
           sourceWorkbenchConnectorControllerSource.includes("buildConnectorSaveReceipt({") &&
           sourceWorkbenchConnectorControllerSource.includes("buildConnectorSyncReceipt(connector, confirm, result)") &&
@@ -418,7 +434,9 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchSource.includes('title: biText("连接删除已确认"') &&
           sourceWorkbenchReceiptModelSource.includes("export type WorkbenchOperationReceipt") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildImportPreviewReceipt(") &&
-          sourceWorkbenchReceiptModelSource.includes("export function buildImportCommitReceipt(") &&
+          sourceWorkbenchReceiptModelSource.includes("export function buildDurableImportQueuedReceipt(") &&
+          sourceWorkbenchReceiptModelSource.includes('importKind: "single" | "folder"') &&
+          !sourceWorkbenchReceiptModelSource.includes("export function buildImportCommitReceipt(") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildImportPolicyReceipt(") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildConnectorSaveReceipt(") &&
           sourceWorkbenchReceiptModelSource.includes("export function buildConnectorSyncReceipt(") &&

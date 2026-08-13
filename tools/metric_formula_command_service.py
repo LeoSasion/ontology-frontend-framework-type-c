@@ -6,7 +6,8 @@ import json
 import sqlite3
 from typing import Any, Callable
 
-from bi_cli_core import slug
+from bi_cli_core import DUCKDB_PATH, slug
+from query_runtime import ValidatedDuckDBQuery, cursor_rows, open_validated_duckdb_query, replica_expectation
 from saved_view_query_service import parse_query_filter
 
 
@@ -486,6 +487,7 @@ def execute_formula_save_plan(
 
 def build_formula_metric_query(
     connection: sqlite3.Connection,
+    analysis_connection: ValidatedDuckDBQuery,
     row: sqlite3.Row,
     args: argparse.Namespace,
     *,
@@ -512,7 +514,8 @@ def build_formula_metric_query(
     order_sql = f" ORDER BY {quote_identifier(metric_name)} DESC" if groups else ""
     limit = max(1, min(int(args.limit or 50), 500))
     sql = f"SELECT {', '.join(select_parts)} FROM {quote_identifier(row['physical_table'])}{where}{group_sql}{order_sql} LIMIT ?"
-    rows = [dict(item) for item in connection.execute(sql, [*params, limit]).fetchall()]
+    query_params = [*params, limit]
+    rows = cursor_rows(analysis_connection.execute(sql, query_params))
     return {
         "mode": "aggregate",
         "columns": [*groups, metric_name],
@@ -523,7 +526,7 @@ def build_formula_metric_query(
         "metricName": metric_name,
         "filters": filters,
         "limit": limit,
-        "runtime": {"engine": "sqlite-formula-metric", "compiledSql": sql, "params": [*params, limit]},
+        "runtime": analysis_connection.runtime(compiled_sql=sql, params=query_params),
     }
 
 
@@ -563,7 +566,7 @@ def query_metric_command(
     open_db: Callable[[], Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
     metric_row_to_payload: Callable[[sqlite3.Row, str | None], dict[str, Any]],
-    build_formula_metric_query: Callable[[sqlite3.Connection, sqlite3.Row, argparse.Namespace], dict[str, Any]],
+    build_formula_metric_query: Callable[[sqlite3.Connection, ValidatedDuckDBQuery, sqlite3.Row, argparse.Namespace], dict[str, Any]],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     metric_filters_from_cli: Callable[[list[str]], list[dict[str, Any]]],
     parse_query_sort: Callable[[str], dict[str, str]],
@@ -573,7 +576,8 @@ def query_metric_command(
         workspace_id = active_workspace_id(connection)
         row = connection.execute(
             """
-            SELECT m.*, COALESCE(t.display_name, m.table_key) AS table_name, t.physical_table
+            SELECT m.*, COALESCE(t.display_name, m.table_key) AS table_name, t.physical_table,
+                   t.data_version, t.row_count
             FROM metric_definitions m
             LEFT JOIN table_registry t
               ON t.table_key = m.table_key
@@ -589,32 +593,40 @@ def query_metric_command(
         metric = metric_row_to_payload(row, row["table_name"])
         if not row["physical_table"]:
             raise ValueError(f"Metric table is missing: {metric['tableKey']}")
-        if metric.get("metricType") == "formula" or metric.get("formulaText"):
-            result = build_formula_metric_query(connection, row, args)
-            return {
-                "ok": True,
-                "metric": metric,
-                "tableQuery": result,
-                "rows": result["rows"],
-                "sqlIntent": "Formula metric whitelist query; formula DSL compiled locally, no user SQL accepted",
-            }
         columns = table_columns(connection, row["physical_table"])
-        groups = args.group or ([metric["dimension"]] if metric.get("dimension") else [])
-        filters = list(metric.get("filters") or [])
-        filters.extend(metric_filters_from_cli(args.filter))
-        sort = []
-        if args.sort:
-            sort.append(parse_query_sort(args.sort))
-        payload = {
-            "mode": "aggregate",
-            "groupFields": groups,
-            "measure": "" if metric["measure"] == "*" else metric["measure"],
-            "aggregation": metric["aggregation"],
-            "filters": filters,
-            "sort": sort,
-            "limit": args.limit,
-        }
-        result = build_table_query(connection, row["physical_table"], columns, payload)
+        with open_validated_duckdb_query(DUCKDB_PATH, [replica_expectation(row)]) as analysis_connection:
+            if metric.get("metricType") == "formula" or metric.get("formulaText"):
+                result = build_formula_metric_query(connection, analysis_connection, row, args)
+                return {
+                    "ok": True,
+                    "metric": metric,
+                    "tableQuery": result,
+                    "rows": result["rows"],
+                    "sqlIntent": "Formula metric whitelist query; formula DSL compiled locally, no user SQL accepted",
+                }
+            groups = args.group or ([metric["dimension"]] if metric.get("dimension") else [])
+            filters = list(metric.get("filters") or [])
+            filters.extend(metric_filters_from_cli(args.filter))
+            sort = []
+            if args.sort:
+                sort.append(parse_query_sort(args.sort))
+            payload = {
+                "tableKey": metric["tableKey"],
+                "mode": "aggregate",
+                "groupFields": groups,
+                "measure": "" if metric["measure"] == "*" else metric["measure"],
+                "aggregation": metric["aggregation"],
+                "filters": filters,
+                "sort": sort,
+                "limit": args.limit,
+            }
+            result = build_table_query(
+                connection,
+                analysis_connection,
+                row["physical_table"],
+                columns,
+                payload,
+            )
     return {
         "ok": True,
         "metric": metric,

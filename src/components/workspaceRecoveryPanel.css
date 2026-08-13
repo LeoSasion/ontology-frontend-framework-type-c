@@ -1,0 +1,195 @@
+.workspaceRecoveryPanel {
+  display: grid;
+  gap: 0.8rem;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--bi-border) 82%, transparent);
+  border-radius: var(--bi-radius);
+  background: var(--bi-surface);
+  container-type: inline-size;
+}
+
+.workspaceRecoveryHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.workspaceRecoveryHeading > div:first-child,
+.workspaceRecoveryPointTitle,
+.workspaceRecoveryConfirmation > div {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.workspaceRecoveryHeading span,
+.workspaceRecoveryPointTitle span,
+.workspaceRecoveryConfirmation span,
+.workspaceRecoveryCreate span {
+  color: var(--bi-muted);
+  font-size: 0.75rem;
+}
+
+.workspaceRecoveryHeading small,
+.workspaceRecoveryPointTitle small,
+.workspaceRecoveryConfirmation small,
+.workspaceRecoveryBoundary {
+  color: var(--bi-muted);
+}
+
+.workspaceRecoveryHealth {
+  display: grid;
+  gap: 0.1rem;
+  flex: 0 0 auto;
+  padding: 0.45rem 0.65rem;
+  border: 1px solid var(--bi-border);
+  border-radius: 999px;
+  text-align: right;
+}
+
+.workspaceRecoveryHealth.ready {
+  border-color: color-mix(in srgb, var(--success) 48%, var(--bi-border));
+}
+
+.workspaceRecoveryHealth.attention {
+  border-color: color-mix(in srgb, var(--warning) 58%, var(--bi-border));
+}
+
+.workspaceRecoveryHealth span {
+  font-size: 0.7rem;
+}
+
+.workspaceRecoveryCreate {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+}
+
+.workspaceRecoveryCreate label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.workspaceRecoveryCreate input {
+  min-width: 0;
+}
+
+.workspaceRecoveryConfirmation {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--warning) 42%, var(--bi-border));
+  border-radius: var(--bi-radius);
+  background: color-mix(in srgb, var(--warning) 8%, var(--bi-surface));
+}
+
+.workspaceRecoveryConfirmation > div {
+  margin-right: auto;
+}
+
+.workspaceRecoveryList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  gap: 0.65rem;
+}
+
+.workspaceRecoveryList article {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--bi-border);
+  border-radius: var(--bi-radius);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 18rem;
+}
+
+.workspaceRecoveryPointTitle strong,
+.workspaceRecoveryPointTitle small,
+.workspaceRecoveryList dd {
+  overflow-wrap: anywhere;
+}
+
+.workspaceRecoveryList dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin: 0;
+}
+
+.workspaceRecoveryList dl div {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.workspaceRecoveryList dt {
+  color: var(--bi-muted);
+  font-size: 0.72rem;
+}
+
+.workspaceRecoveryList dd {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.workspaceRecoveryActions,
+.workspaceRecoveryFooter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.workspaceRecoveryActions .danger {
+  color: var(--danger);
+}
+
+.workspaceRecoveryList details ul {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem 0 0;
+  margin: 0;
+  list-style: none;
+}
+
+.workspaceRecoveryList details li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.45rem;
+  color: var(--bi-muted);
+  font-size: 0.75rem;
+}
+
+.workspaceRecoveryEmpty,
+.workspaceRecoveryMessage,
+.workspaceRecoveryBoundary {
+  margin: 0;
+}
+
+.workspaceRecoveryMessage {
+  color: var(--warning);
+}
+
+@container (max-width: 720px) {
+  .workspaceRecoveryHeading,
+  .workspaceRecoveryConfirmation {
+    display: grid;
+  }
+
+  .workspaceRecoveryHealth {
+    justify-self: start;
+    text-align: left;
+  }
+
+  .workspaceRecoveryCreate {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 520px) {
+  .workspaceRecoveryList dl,
+  .workspaceRecoveryList details li {
+    grid-template-columns: 1fr;
+  }
+}

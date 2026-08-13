@@ -4,6 +4,7 @@ from bi_cli_dashboard_commands import list_navigation_command, navigation_operat
 from bi_cli_io_services import apply_config_command, export_config_command, validate_config_command
 from bi_cli_misc_commands import cli_capabilities_command
 from bi_cli_relationship_formula_commands import query_metric_command
+from bi_cli_schema import open_db
 from bi_cli_semantic_metric_commands import (
     add_metric_command,
     infer_metrics_command,
@@ -68,6 +69,24 @@ from bi_cli_widget_commands import (
     remove_widget_command,
     save_dashboard_modules_command,
     set_widget_command,
+)
+from import_job_commands import (
+    import_job_create_command,
+    import_job_process_exit_command,
+    import_job_recover_command,
+    import_job_resume_command,
+    import_job_run_command,
+)
+from sqlserver_snapshot_commands import (
+    sqlserver_activate_command,
+    sqlserver_activation_finalize_command,
+    sqlserver_activation_status_command,
+    sqlserver_capability_command,
+    sqlserver_catalog_command,
+    sqlserver_execute_command,
+    sqlserver_plan_command,
+    sqlserver_statistics_command,
+    sqlserver_test_command,
 )
 
 from .agent_interaction import source_intelligence_dashboard_draft_command

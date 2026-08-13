@@ -30,8 +30,6 @@ export {
 export { previewRelationship, saveRelationship } from "./apiRelationship";
 export { applyConfig, exportConfig, savePreferences, saveThemePalette, validateConfig } from "./apiSettings";
 export {
-  commitImport,
-  commitFolderImport,
   createSourceDashboardDraft,
   deleteSource,
   inspectSource,

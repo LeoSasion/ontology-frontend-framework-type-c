@@ -289,7 +289,18 @@ export function appendAppArchitectureContractChecks(context) {
           appSource.includes("handleSourceIntelligenceRun,") &&
           appDataActionsSource.includes("export function useAppDataActions(") &&
           appDataActionsSource.includes("type AppDataActionsOptions") &&
-          appDataActionsSource.includes("const handleCommitImport = useCallback") &&
+          appDataActionsSource.includes("const handleCreateImportJob = useCallback") &&
+          appDataActionsSource.includes("const handleFetchImportJob = useCallback") &&
+          appDataActionsSource.includes("const handleCancelImportJob = useCallback") &&
+          appDataActionsSource.includes("const handleResumeImportJob = useCallback") &&
+          appDataActionsSource.includes("const handleImportJobCompleted = useCallback") &&
+          appDataActionsSource.includes("const requireActiveImportJob = useCallback") &&
+          appDataActionsSource.includes("job.workspaceId !== activeWorkspaceId") &&
+          appMainViewSource.includes("handleCreateImportJob,") &&
+          appMainViewSource.includes("handleFetchImportJob,") &&
+          appMainViewSource.includes("handleCancelImportJob,") &&
+          appMainViewSource.includes("handleResumeImportJob,") &&
+          appMainViewSource.includes("handleImportJobCompleted,") &&
           appDataActionsSource.includes("const handleSourceIntelligenceRun = useCallback") &&
           appDataActionsSource.includes("const handleSourceDashboardDraft = useCallback") &&
           appDataActionsSource.includes("const handleDashboardRelationshipSave = useCallback") &&
@@ -303,6 +314,8 @@ export function appendAppArchitectureContractChecks(context) {
           appDataActionsSource.includes('section: "dashboards"') &&
           appDataActionsSource.includes("allowLocked: true") &&
           appDataActionsSource.includes('section: "agent"') &&
+          !appDataActionsSource.includes("const handleCommitImport = useCallback") &&
+          !appDataActionsSource.includes("commitImport(options)") &&
           !appSource.includes("const handleCommitImport = useCallback") &&
           !appSource.includes("const handleSourceIntelligenceRun = useCallback") &&
           !appSource.includes("const handleSourceDashboardDraft = useCallback") &&
@@ -723,6 +736,8 @@ export function appendAppArchitectureContractChecks(context) {
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/workspaces"') &&
           serverWorkspaceRoutesSource.includes('op === "delete"') &&
           serverWorkspaceRoutesSource.includes('"workspace-delete"') &&
+          serverWorkspaceRoutesSource.includes('args.push("--request-key", requestKey)') &&
+          serverWorkspaceRoutesSource.includes('args.push("--expected-plan", expectedPlan)') &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/workbench"') &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/navigation"') &&
           serverWorkspaceRoutesSource.includes('url.pathname === "/api/sources"'),

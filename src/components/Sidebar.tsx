@@ -15,7 +15,12 @@ type SidebarProps = {
   flow: WorkspaceFlowModel;
   actionDrafts: ActionDraft[];
   onWorkspaceCreate: (name: string) => Promise<Record<string, unknown> | void>;
-  onWorkspaceDelete: (workspaceId: string, confirm?: boolean) => Promise<Record<string, unknown> | void>;
+  onWorkspaceDelete: (
+    workspaceId: string,
+    confirm?: boolean,
+    requestKey?: string,
+    expectedPlan?: string,
+  ) => Promise<Record<string, unknown> | void>;
   onWorkspaceRename: (workspaceId: string, name: string) => Promise<Record<string, unknown> | void>;
   onWorkspaceSelect: (workspaceId: string) => Promise<void>;
 };
@@ -60,6 +65,7 @@ export function Sidebar({
   const [workspaceRenameName, setWorkspaceRenameName] = useState(currentWorkspace.name);
   const [managedWorkspaceId, setManagedWorkspaceId] = useState("");
   const [deletePreview, setDeletePreview] = useState<Record<string, unknown> | null>(null);
+  const [deleteIntent, setDeleteIntent] = useState<{ workspaceId: string; requestKey: string; expectedPlan: string } | null>(null);
   const [workspaceNotice, setWorkspaceNotice] = useState<{ message: string; tone: "ok" | "error" } | null>(null);
   const readiness = buildProductReadiness(status, {
     hasData: flow.hasData,
@@ -85,9 +91,13 @@ export function Sidebar({
     setWorkspaceRenameName(currentWorkspace.name);
     setManagedWorkspaceId("");
     setDeletePreview(null);
+    setDeleteIntent(null);
   }, [currentWorkspace.id, currentWorkspace.name]);
 
-  useEffect(() => setDeletePreview(null), [managedWorkspaceId]);
+  useEffect(() => {
+    setDeletePreview(null);
+    setDeleteIntent(null);
+  }, [managedWorkspaceId]);
 
   function openSection(section: AppSection) {
     onSectionChange(resolveSectionForFlow(section, flow));
@@ -134,16 +144,35 @@ export function Sidebar({
 
   async function previewWorkspaceDelete() {
     if (!managedWorkspaceId) return;
-    const result = await runWorkspaceTask(() => onWorkspaceDelete(managedWorkspaceId, false));
-    setDeletePreview(result && typeof result === "object" ? result as Record<string, unknown> : null);
+    const requestKey = `workspace-delete:${managedWorkspaceId}:${globalThis.crypto.randomUUID()}`;
+    const result = await runWorkspaceTask(() => onWorkspaceDelete(managedWorkspaceId, false, requestKey));
+    const preview = result && typeof result === "object" ? result as Record<string, unknown> : null;
+    const plan = preview?.deletePlan && typeof preview.deletePlan === "object"
+      ? preview.deletePlan as Record<string, unknown>
+      : null;
+    const expectedPlan = typeof plan?.planFingerprint === "string" ? plan.planFingerprint : "";
+    setDeletePreview(preview);
+    setDeleteIntent(expectedPlan ? { workspaceId: managedWorkspaceId, requestKey, expectedPlan } : null);
   }
 
   async function confirmWorkspaceDelete() {
-    if (!managedWorkspaceId || deletePreview?.requiresConfirmation !== true) return;
-    const result = await runWorkspaceTask(() => onWorkspaceDelete(managedWorkspaceId, true));
+    if (
+      !managedWorkspaceId
+      || deletePreview?.requiresConfirmation !== true
+      || deleteIntent?.workspaceId !== managedWorkspaceId
+      || !deleteIntent.requestKey
+      || !deleteIntent.expectedPlan
+    ) return;
+    const result = await runWorkspaceTask(() => onWorkspaceDelete(
+      managedWorkspaceId,
+      true,
+      deleteIntent.requestKey,
+      deleteIntent.expectedPlan,
+    ));
     if (!result || typeof result !== "object") return;
     setManagedWorkspaceId("");
     setDeletePreview(null);
+    setDeleteIntent(null);
     setWorkspaceNotice({ message: biText("工作区已删除", "Workspace deleted"), tone: "ok" });
   }
 
@@ -278,7 +307,7 @@ export function Sidebar({
                         `${numberValue(impactCounts.table_registry)} tables · ${numberValue(impactCounts.dashboards)} dashboards`,
                       )}
                     </span>
-                    <button className="dangerButton" disabled={workspaceBusy || deletePreview.requiresConfirmation !== true} onClick={() => void confirmWorkspaceDelete()} type="button">
+                    <button className="dangerButton" disabled={workspaceBusy || deletePreview.requiresConfirmation !== true || !deleteIntent?.expectedPlan} onClick={() => void confirmWorkspaceDelete()} type="button">
                       <Bilingual zh="确认删除" en="Delete" />
                     </button>
                   </div>

@@ -49,6 +49,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-plan-quality-", ignore_cleanup_err
         **os.environ,
         "AIBI_HYBRID_DB_PATH": str(sqlite_path),
         "AIBI_HYBRID_DUCKDB_PATH": str(temp_dir / "runtime.duckdb"),
+        "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp_dir / "workspace-recovery"),
         "PYTHONIOENCODING": "utf-8",
     }
 
@@ -59,7 +60,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-plan-quality-", ignore_cleanup_err
     with sqlite3.connect(sqlite_path) as connection:
         pragma_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    check("schema-v15-plan-quality-store-boots", status.get("ok") is True and pragma_version == 15 and "plan_quality_scorecards" in tables, {"status": status, "pragma": pragma_version})
+    check("schema-v16-plan-quality-store-boots", status.get("ok") is True and pragma_version == 16 and "plan_quality_scorecards" in tables, {"status": status, "pragma": pragma_version})
 
     cases = run(["business-expression-cases"], env)
     case_items = cases.get("cases") or []
@@ -144,7 +145,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-plan-quality-", ignore_cleanup_err
 
     isolated_evaluation = run(["plan-quality-evaluate", "--workspace", isolated_id], env)
     selected_default = run(["workspace-select", "default", "--yes"], env)
-    deleted = run(["workspace-delete", isolated_id, "--yes"], env)
+    delete_request_key = "plan-quality-isolated-workspace-delete"
+    delete_preview = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+    ], env)
+    deleted = run([
+        "workspace-delete", isolated_id,
+        "--request-key", delete_request_key,
+        "--expected-plan", str((delete_preview.get("deletePlan") or {}).get("planFingerprint") or ""),
+        "--yes",
+    ], env)
     with sqlite3.connect(sqlite_path) as connection:
         orphan_count = int(connection.execute("SELECT COUNT(*) FROM plan_quality_scorecards WHERE workspace_id = ?", (isolated_id,)).fetchone()[0])
     check(

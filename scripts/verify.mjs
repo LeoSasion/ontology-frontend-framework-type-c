@@ -336,6 +336,18 @@ const verifyDashboardModulesFilters = JSON.stringify([
   { id: "verify_bulk_filter", field: "channel", operator: "equals", value: "Douyin", enabled: true },
 ]);
 
+const verifyWorkspaceDeleteRequestKey = "verify-workspace-delete";
+
+function runWorkspaceDeleteConfirmation(label, workspaceId, preview) {
+  const deletePlan = preview?.parsed?.deletePlan;
+  return run(label, "python", [
+    "tools/aibi_cli.py", "--json", "workspace-delete", workspaceId,
+    "--request-key", verifyWorkspaceDeleteRequestKey,
+    "--expected-plan", String(deletePlan?.planFingerprint ?? "missing-plan-fingerprint"),
+    "--yes",
+  ]);
+}
+
 const repositoryInventory = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
   cwd: root,
   encoding: "utf8",
@@ -343,6 +355,37 @@ const repositoryInventory = spawnSync("git", ["ls-files", "--cached", "--others"
 });
 const repositoryFiles = String(repositoryInventory.stdout ?? "").split(/\r?\n/).filter(Boolean);
 const fileViolations = repositoryFiles.filter((file) => forbiddenPatterns.some((pattern) => pattern.test(file)));
+const workspaceDeleteSetup = [
+  run("cli-workspace-create-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "验证工作区"]),
+  run("cli-workspace-create-confirm", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "verify_workspace", "--yes"]),
+  run("cli-status-after-workspace-create", "python", ["tools/aibi_cli.py", "--json", "status"]),
+  run("cli-workspace-select-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "verify_workspace"]),
+  run("cli-workspace-select-confirm", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "verify_workspace", "--yes"]),
+  run("cli-status-after-workspace-select", "python", ["tools/aibi_cli.py", "--json", "status"]),
+  run("cli-workspace-select-default", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
+  run("cli-workspace-delete-target-create", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "delete_workspace_target", "--yes"]),
+  run("cli-workspace-delete-target-select-default", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
+];
+const workspaceDeletePreview = run("cli-workspace-delete-dry-run", "python", [
+  "tools/aibi_cli.py", "--json", "workspace-delete", "delete_workspace_target",
+  "--request-key", verifyWorkspaceDeleteRequestKey,
+]);
+const workspaceDeleteChecks = [
+  ...workspaceDeleteSetup,
+  workspaceDeletePreview,
+  runWorkspaceDeleteConfirmation("cli-workspace-delete-confirm", "delete_workspace_target", workspaceDeletePreview),
+  runExpectedFailure("cli-workspace-delete-default-blocked", "python", ["tools/aibi_cli.py", "--json", "workspace-delete", "default", "--yes"]),
+  run("cli-workspace-active-delete-target-create", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "active_delete_workspace", "--yes"]),
+  run("cli-workspace-active-delete-target-select", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "active_delete_workspace", "--yes"]),
+  runExpectedFailure("cli-workspace-delete-active-blocked", "python", [
+    "tools/aibi_cli.py", "--json", "workspace-delete", "active_delete_workspace",
+    "--request-key", "verify-active-workspace-delete",
+    "--expected-plan", "0".repeat(64),
+    "--yes",
+  ]),
+  run("cli-workspace-select-default-after-delete-check", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
+];
+
 const checks = [
   {
     label: "repository-inventory-readable",
@@ -361,22 +404,7 @@ const checks = [
   runWorkspaceIsolationSmoke(),
   runWorkspaceModelIsolationSmoke(),
   runWorkspaceSameKeyIsolationSmoke(),
-  run("cli-workspace-create-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "验证工作区"]),
-  run("cli-workspace-create-confirm", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "verify_workspace", "--yes"]),
-  run("cli-status-after-workspace-create", "python", ["tools/aibi_cli.py", "--json", "status"]),
-  run("cli-workspace-select-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "verify_workspace"]),
-  run("cli-workspace-select-confirm", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "verify_workspace", "--yes"]),
-  run("cli-status-after-workspace-select", "python", ["tools/aibi_cli.py", "--json", "status"]),
-  run("cli-workspace-select-default", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
-  run("cli-workspace-delete-target-create", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "delete_workspace_target", "--yes"]),
-  run("cli-workspace-delete-target-select-default", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
-  run("cli-workspace-delete-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-delete", "delete_workspace_target"]),
-  run("cli-workspace-delete-confirm", "python", ["tools/aibi_cli.py", "--json", "workspace-delete", "delete_workspace_target", "--yes"]),
-  runExpectedFailure("cli-workspace-delete-default-blocked", "python", ["tools/aibi_cli.py", "--json", "workspace-delete", "default", "--yes"]),
-  run("cli-workspace-active-delete-target-create", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "active_delete_workspace", "--yes"]),
-  run("cli-workspace-active-delete-target-select", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "active_delete_workspace", "--yes"]),
-  runExpectedFailure("cli-workspace-delete-active-blocked", "python", ["tools/aibi_cli.py", "--json", "workspace-delete", "active_delete_workspace", "--yes"]),
-  run("cli-workspace-select-default-after-delete-check", "python", ["tools/aibi_cli.py", "--json", "workspace-select", "default", "--yes"]),
+  ...workspaceDeleteChecks,
   run("cli-workspace-create-chinese-dry-run", "python", ["tools/aibi_cli.py", "--json", "workspace-create", "--name", "验证中文工作区"]),
   runExpectedFailure("cli-source-intelligence-no-input-blocked", "python", ["tools/aibi_cli.py", "--json", "source-intelligence"]),
   run("verify-bootstrap-import-orders", "python", ["tools/aibi_cli.py", "--json", "import-commit", "validation-inputs/orders.csv", "--table", "orders", "--name", "Orders", "--mode", "create", "--yes"]),
@@ -697,8 +725,8 @@ const {
   agentEvidenceStylesSource,
 } = sourceCatalog;
 const stylesSource = `${globalStylesSource}\n${dashboardDeferredStylesSource}\n${sourceWorkbenchAdvancedStylesSource}\n${viewWorkspaceStylesSource}\n${viewAgentTaskStripStylesSource}\n${viewDashboardBridgePanelStylesSource}\n${homeOverviewStylesSource}\n${productActivationStylesSource}\n${settingsPanelStylesSource}\n${agentEvidenceStylesSource}`;
-const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"].parsed?.sourceIntelligenceRuns ?? [];
-const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"].parsed?.sourceIntelligenceRuns ?? [];
+const sourceCoverageRuns = byLabel["cli-source-intelligence-runs-after-validation-input"]?.parsed?.sourceIntelligenceRuns ?? [];
+const sourceCoverageAllRuns = byLabel["cli-source-intelligence-runs-after-validation-input-all"]?.parsed?.sourceIntelligenceRuns ?? [];
 const contractCheckContext = {
   ...sourceCatalog,
   globalStylesSource,
