@@ -124,6 +124,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .workbenchGrid > .workbenchPanel,
   .workbenchGrid > .workbenchPanel:nth-child(1),
   .workbenchGrid > .workbenchPanel:nth-child(2),
   .workbenchGrid > .workbenchPanel:nth-child(3),
@@ -516,6 +517,40 @@
   grid-column: span 2;
 }
 
+.importPathExample {
+  display: block;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.recentImportPaths {
+  display: grid;
+  gap: 7px;
+}
+
+.recentImportPaths > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recentImportPaths > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.recentImportPaths button {
+  min-width: 0;
+  max-width: min(100%, 240px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .sourceProfileControl {
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -670,6 +705,46 @@
   color: var(--muted);
   font-size: 12px;
   line-height: 1.42;
+}
+
+.importStageSeal {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  border: 1px solid color-mix(in srgb, var(--success) 32%, var(--bi-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--success) 7%, var(--surface));
+  color: var(--success);
+  padding: 10px 11px;
+}
+
+.importStageSeal > svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+
+.importStageSeal div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.importStageSeal strong {
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.importStageSeal span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.importReplaceRecovery {
+  margin-top: 10px;
 }
 
 .importImpactGrid div {
@@ -961,8 +1036,15 @@
 .operationReceipt span,
 .operationReceipt small {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
+}
+
+.operationReceiptActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 9px;
 }
 
 .operationReceipt details {
@@ -1045,6 +1127,40 @@
 }
 
 @container viewport-stage (max-width: 720px) {
+  .sourceSecondaryGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sourceImportPanel .formGrid:not(.oneCol) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sourceImportPanel .policyActionStrip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sourceImportPanel .policyActionStrip .buttonRow {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sourceImportPanel .policyActionStrip .buttonRow > *,
+  .sourceImportPanel .importCheckActions > button,
+  .sourceImportPanel .importConfirmationSummary > .buttonRow > button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sourceImportPanel :is(button, input:not([type="checkbox"]), select),
+  .sourceImportPanel .advancedDetails > summary {
+    min-height: 44px;
+  }
+
+  .sourceImportPanel .advancedDetails > summary {
+    display: flex;
+    align-items: center;
+  }
+
   .operationReceipt,
   .folderImportPlanHeader {
     grid-template-columns: minmax(0, 1fr);

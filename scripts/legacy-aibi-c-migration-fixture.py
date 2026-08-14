@@ -177,6 +177,18 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
                 "SELECT name FROM sqlite_master WHERE type = 'index' AND name LIKE 'idx_metric_monitor%' ORDER BY name"
             ).fetchall()
         ]
+        trusted_release_tables = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('semantic_releases', 'semantic_release_events', 'metric_contract_versions', 'metric_contract_events', 'workflow_recipes', 'workflow_recipe_events') ORDER BY name"
+            ).fetchall()
+        ]
+        trusted_release_indexes = [
+            str(row[0])
+            for row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'index' AND name IN ('idx_semantic_releases_workspace_status', 'idx_semantic_release_events_release', 'idx_metric_contract_versions_metric', 'idx_metric_contract_events_contract', 'idx_workflow_recipe_events_recipe') ORDER BY name"
+            ).fetchall()
+        ]
     with duckdb.connect(str(duckdb_path), read_only=True) as connection:
         duckdb_row = connection.execute("SELECT product, value FROM legacy_aibi_c_rows").fetchone()
         metadata = connection.execute(
@@ -204,6 +216,8 @@ def inspect_fixture(sqlite_path: Path, duckdb_path: Path) -> dict[str, object]:
         "analysisSnapshotIndexes": analysis_snapshot_indexes,
         "metricMonitorTables": metric_monitor_tables,
         "metricMonitorIndexes": metric_monitor_indexes,
+        "trustedReleaseTables": trusted_release_tables,
+        "trustedReleaseIndexes": trusted_release_indexes,
         "duckdbRow": list(duckdb_row) if duckdb_row else None,
         "duckdbVersion": duckdb_version,
     }

@@ -28,6 +28,12 @@ WORKSPACE_DELETE_TOMBSTONE_REASON = "workspace deleted by confirmed workspace li
 
 
 WORKSPACE_SCOPED_TABLES = [
+    "workflow_recipe_events",
+    "workflow_recipes",
+    "metric_contract_events",
+    "metric_contract_versions",
+    "semantic_release_events",
+    "semantic_releases",
     "decision_framework_events",
     "decision_frameworks",
     "retrieval_evaluation_runs",

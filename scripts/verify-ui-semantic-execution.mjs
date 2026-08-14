@@ -184,6 +184,8 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
       pathHopCount: document.querySelectorAll('[data-testid="agent-relationship-path-proof"] li').length,
       unit: document.querySelector('[data-testid="agent-analysis-unit-strip"]')?.textContent ?? "",
       exportButton: document.querySelector('[data-testid="agent-analysis-export"]')?.textContent ?? "",
+      exportFormats: Array.from(document.querySelectorAll('[data-testid="agent-answer-card"] .agentAnalysisExportFormat option'))
+        .map((option) => option.textContent ?? ""),
       hasError: Boolean(document.querySelector(".appFallback, .fallbackPanel, vite-error-overlay")),
     }));
     checks.push(
@@ -199,7 +201,16 @@ const run = await withTemporaryWorkspace("codex_semantic_execution", async ({ te
         visibleState,
       ),
       check("semantic-ui-analysis-unit-rationale-visible", /可复算分析单元|Recomputable analysis unit/.test(visibleState.unit) && /比较|comparison/.test(visibleState.unit) && /柱状图|bar chart/.test(visibleState.unit), visibleState),
-      check("semantic-ui-analysis-export-action-visible", /导出 Excel \+ 报告|Export Excel \+ report/.test(visibleState.exportButton), visibleState),
+      check(
+        "semantic-ui-analysis-export-action-visible",
+        /生成导出|Generate export/.test(visibleState.exportButton)
+          && visibleState.exportFormats.length === 4
+          && visibleState.exportFormats.some((label) => /Excel \+ 报告|Excel \+ report/.test(label))
+          && visibleState.exportFormats.some((label) => /Word 文档|Word document/.test(label))
+          && visibleState.exportFormats.some((label) => /PowerPoint/.test(label))
+          && visibleState.exportFormats.some((label) => /完整交付包|Complete bundle/.test(label)),
+        visibleState,
+      ),
     );
 
     const browserSessionBeforeReload = await evaluate(browser.client, (workspaceId) => ({

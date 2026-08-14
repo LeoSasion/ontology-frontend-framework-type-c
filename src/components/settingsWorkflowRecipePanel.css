@@ -1,0 +1,11 @@
+.workflowRecipePanel { display:grid; gap:12px; }
+.workflowRecipeBuilder { display:grid; grid-template-columns:minmax(150px,.45fr) minmax(0,1fr) auto; align-items:end; gap:10px; }
+.workflowRecipeBuilder label,.workflowRecipeBuilder > div { display:grid; gap:5px; }
+.workflowRecipeBuilder select { width:100%; min-width:0; }
+.workflowRecipeBuilder small,.workflowRecipeList small,.workflowRecipeResult span,.workflowRecipeResult small { color:var(--text-muted); }
+.workflowRecipeConfirm { display:flex!important; flex-wrap:wrap; align-items:center; gap:7px!important; }
+.workflowRecipeList { display:grid; gap:7px; }
+.workflowRecipeList article { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--border-soft); }
+.workflowRecipeList article > div,.workflowRecipeResult { display:grid; gap:3px; }
+.workflowRecipeResult { padding:10px 12px; border-left:3px solid var(--accent); background:var(--surface-soft); }
+@container viewport-stage (max-width:760px) { .workflowRecipePanel button,.workflowRecipePanel select { min-height:44px; } .workflowRecipeBuilder { grid-template-columns:minmax(0,1fr); } .workflowRecipeList article { align-items:stretch; flex-direction:column; } }

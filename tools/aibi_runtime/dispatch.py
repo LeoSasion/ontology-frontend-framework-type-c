@@ -39,6 +39,7 @@ RECOVERY_FENCE_ALLOWED_COMMANDS = frozenset({
     "capability-contracts",
     "list-commands",
     "status",
+    "workspace-recovery-compare",
     "workspace-recovery-inspect",
     "workspace-recovery-list",
     "workspace-recovery-reconcile",

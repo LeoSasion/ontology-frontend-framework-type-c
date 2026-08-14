@@ -1,5 +1,5 @@
 import "./settingsPanel.css";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { getUserPreferences, makeThemeCopy, resolveThemePalette } from "../theme";
 import type { ThemePaletteConfig, UserPreferencesConfig, WorkbenchPayload, WorkspaceStatus } from "../types";
 import { Bilingual } from "./Bilingual";
@@ -11,7 +11,32 @@ import { loadSettingsWorkspaceRecoveryPanel } from "./workspaceRecoveryLoader";
 const TrustContextSettingsPanel = lazy(() => import("./TrustContextSettingsPanel"));
 const SettingsDomainPackPanel = lazy(() => import("./SettingsDomainPackPanel").then((module) => ({ default: module.SettingsDomainPackPanel })));
 const SettingsAgentRuntimeProfilePanel = lazy(() => import("./SettingsAgentRuntimeProfilePanel"));
+const SettingsKnowledgeSourcePanel = lazy(() => import("./SettingsKnowledgeSourcePanel"));
+const SettingsWorkflowRecipePanel = lazy(() => import("./SettingsWorkflowRecipePanel"));
 const SettingsWorkspaceRecoveryPanel = lazy(loadSettingsWorkspaceRecoveryPanel);
+
+function DeferredSettingsDetails({ children, loading, testId, title }: {
+  children: ReactNode;
+  loading: ReactNode;
+  testId: string;
+  title: ReactNode;
+}) {
+  const [opened, setOpened] = useState(false);
+  return (
+    <details
+      className="progressiveDetails settingsProgressiveDetails"
+      data-testid={testId}
+      onToggle={(event) => {
+        if (event.currentTarget.open) setOpened(true);
+      }}
+    >
+      <summary>{title}</summary>
+      <div className="progressiveDetailsBody single">
+        {opened ? <Suspense fallback={<div className="settingsLoading">{loading}</div>}>{children}</Suspense> : null}
+      </div>
+    </details>
+  );
+}
 
 type SettingsPanelProps = {
   workbench: WorkbenchPayload;
@@ -129,10 +154,6 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
       </div>
 
       <div className="settingsGrid">
-        <Suspense fallback={<div className="settingsLoading"><Bilingual zh="正在加载 Agent Runtime Profile…" en="Loading Agent Runtime Profile…" /></div>}>
-          <SettingsAgentRuntimeProfilePanel workspaceId={status.workspace.id} />
-        </Suspense>
-
         <SettingsThemePreferencePanel
           busyKey={busyKey}
           draftPreferences={draftPreferences}
@@ -154,6 +175,30 @@ export function SettingsPanel({ workbench, status, onSavePreferences, onSaveThem
             runtime={status.domainPacks}
           />
         </Suspense>
+
+        <DeferredSettingsDetails
+          loading={<Bilingual zh="正在加载知识源…" en="Loading knowledge sources…" />}
+          testId="settings-knowledge-source-details"
+          title={<Bilingual zh="本地知识源" en="Local knowledge sources" />}
+        >
+          <SettingsKnowledgeSourcePanel />
+        </DeferredSettingsDetails>
+
+        <DeferredSettingsDetails
+          loading={<Bilingual zh="正在加载 Workflow Recipe…" en="Loading Workflow Recipes…" />}
+          testId="settings-workflow-recipe-details"
+          title={<Bilingual zh="可复用工作流" en="Reusable workflows" />}
+        >
+          <SettingsWorkflowRecipePanel />
+        </DeferredSettingsDetails>
+
+        <DeferredSettingsDetails
+          loading={<Bilingual zh="正在加载 Agent 模型与质量…" en="Loading Agent models and quality…" />}
+          testId="settings-agent-runtime-details"
+          title={<Bilingual zh="Agent 模型与质量" en="Agent models and quality" />}
+        >
+          <SettingsAgentRuntimeProfilePanel workspaceId={status.workspace.id} />
+        </DeferredSettingsDetails>
 
         <details className="progressiveDetails settingsProgressiveDetails" data-testid="settings-sandbox-details">
           <summary><Bilingual zh="写入保护和沙盒边界" en="Write protection and sandbox boundaries" /></summary>

@@ -102,7 +102,7 @@ try {
   results.push(run("remove-composite-before-semantic", ["remove-relationship", "--relationship", "orders_refunds_order_id_order_id_item_id_item_id", "--yes"]));
   results.push(run("semantic-single-hop-query", ["semantic-query", "按 channel 看 refund_amount", "--table", "orders", "--limit", "20"]));
   results.push(run("agent-semantic-single-hop", ["ask", "订单 按 channel 看 refund_amount", "--read-only"]));
-  results.push(run("replace-refunds", ["import-commit", refundsChangedFile, "--table", "refunds", "--name", "退款", "--mode", "replace", "--yes"]));
+  results.push(run("replace-refunds", ["import-commit", refundsChangedFile, "--table", "refunds", "--name", "退款", "--mode", "replace", "--confirm-schema-change", "--yes"]));
   results.push(run("list-after-source-change", ["list-relationships"]));
   results.push(run("inspect-refunds-after-source-change", ["inspect-table", "refunds"]));
   results.push(run("stale-preaggregation-query", ["query-relationship", "--relationship", "orders_refunds_order_id_order_id", "--group", "left:channel", "--measure", "left:net_sales", "--agg", "sum"]));

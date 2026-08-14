@@ -1,5 +1,5 @@
 import { fetchJsonStrict } from "./apiClient";
-import type { WorkspaceRecoveryOperation, WorkspaceRecoveryPayload } from "./typesWorkspaceRecovery";
+import type { WorkspaceRecoveryComparison, WorkspaceRecoveryOperation, WorkspaceRecoveryPayload } from "./typesWorkspaceRecovery";
 
 export type WorkspaceRecoveryMutation = {
   operation: WorkspaceRecoveryOperation;
@@ -21,6 +21,13 @@ export function getWorkspaceRecoveryPoints(options: { limit?: number; verify?: b
 export function inspectWorkspaceRecoveryPoint(recoveryPointKey: string, signal?: AbortSignal) {
   return fetchJsonStrict<WorkspaceRecoveryPayload>(
     `/api/workspace-recovery/${encodeURIComponent(recoveryPointKey)}`,
+    { signal },
+  );
+}
+
+export function compareWorkspaceRecoveryPoint(recoveryPointKey: string, signal?: AbortSignal) {
+  return fetchJsonStrict<WorkspaceRecoveryComparison>(
+    `/api/workspace-recovery/${encodeURIComponent(recoveryPointKey)}/compare`,
     { signal },
   );
 }

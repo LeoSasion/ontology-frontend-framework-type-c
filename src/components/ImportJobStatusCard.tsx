@@ -21,6 +21,18 @@ function stageLabel(stage: string) {
   } as Record<string, string>)[stage] ?? stage;
 }
 
+function statusLabel(status: string) {
+  return ({
+    queued: biText("等待执行", "Queued"),
+    running: biText("正在执行", "Running"),
+    cancel_requested: biText("正在取消", "Cancel requested"),
+    canceled: biText("已取消", "Canceled"),
+    succeeded: biText("已完成", "Succeeded"),
+    failed: biText("失败", "Failed"),
+    needs_attention: biText("需要处理", "Needs attention"),
+  } as Record<string, string>)[status] ?? status;
+}
+
 export function ImportJobStatusCard({ job, busy = false, onCancel, onResume }: ImportJobStatusCardProps) {
   const technical = {
     schema: job.schema,
@@ -34,7 +46,7 @@ export function ImportJobStatusCard({ job, busy = false, onCancel, onResume }: I
       <div className="tileHeader">
         <div>
           <span className={`statusBadge ${job.status === "succeeded" ? "ok" : job.status === "failed" || job.status === "needs_attention" ? "warn" : ""}`}>
-            {job.status}
+            {statusLabel(job.status)}
           </span>
           <h4>{job.label}</h4>
           <p>{stageLabel(job.stage)} · {job.progress}%</p>

@@ -33,10 +33,18 @@ from semantic_patch_service import (
     semantic_patch_propose_command,
     semantic_patch_review_command,
 )
+from semantic_release_service import (
+    semantic_release_preview_command,
+    semantic_release_publish_command,
+    semantic_release_rollback_command,
+    semantic_releases_command,
+)
 from workflow_command_service import capability_contracts_command, context_budget_command, workflow_plan_command
+from workflow_recipe_service import workflow_recipe_plan_command, workflow_recipe_preview_command, workflow_recipe_publish_command, workflow_recipes_command
 from workspace_manifest_service import business_field_profiles_command, runtime_catalog_command, workspace_manifest_command
 from workspace_recovery_service import (
     configured_recovery_root,
+    workspace_recovery_compare_command,
     workspace_recovery_create_command,
     workspace_recovery_delete_command,
     workspace_recovery_inspect_command,

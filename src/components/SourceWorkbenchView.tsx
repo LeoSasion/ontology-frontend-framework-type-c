@@ -4,6 +4,7 @@ import { emptyRelationshipPreview } from "../emptyWorkspaceData";
 import { invalidateRelationshipRequests } from "../relationshipRequestGuard";
 import type { SourceWorkbenchProps } from "../sourceWorkbenchContracts";
 import type { useSourceWorkbenchState } from "../useSourceWorkbenchState";
+import { lazyWithRetry } from "../lazyWithRetry";
 import {
   FederationProofPanel,
   SourceWorkbenchAdvancedLoading,
@@ -23,7 +24,9 @@ import {
 import { Bilingual, biText } from "./Bilingual";
 import { Icon } from "./Icons";
 import { SourceWorkbenchHeader } from "./SourceWorkbenchHeader";
-import { SourceWorkbenchImportPanel } from "./SourceWorkbenchImportPanel";
+
+const SourceWorkbenchImportPanel = lazyWithRetry(() => import("./SourceWorkbenchImportPanel")
+  .then((module) => ({ default: module.SourceWorkbenchImportPanel })));
 
 type SourceWorkbenchViewProps = SourceWorkbenchProps & ReturnType<typeof useSourceWorkbenchState>;
 
@@ -167,7 +170,11 @@ export function SourceWorkbenchView({
       <SourceWorkbenchHeader sourceProfileRunning={sourceProfileRunning} />
 
       <div className="workbenchGrid">
-        {!hasData ? <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} /> : null}
+        {!hasData ? (
+          <Suspense fallback={<SourceWorkbenchAdvancedLoading />}>
+            <SourceWorkbenchImportPanel {...importController} busy={busy} runBusy={runBusy} />
+          </Suspense>
+        ) : null}
 
         {hasData ? <Suspense fallback={null}><SourceJobRuntimePanel /></Suspense> : null}
 

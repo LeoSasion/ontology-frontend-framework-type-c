@@ -1,5 +1,6 @@
 import "./agentEvidenceWorkspace.css";
 import "./AgentBusinessUnderstanding.css";
+import "./agentAnalysisExport.css";
 import { Suspense, useEffect, useState } from "react";
 import type { ActionDraft, AgentAskResult, WorkbenchPayload } from "../types";
 import {
@@ -91,15 +92,15 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
     }
   }
 
-  async function exportVerifiedAnalysis() {
+  async function exportVerifiedAnalysis(formats: Array<"xlsx" | "docx" | "pptx" | "md">) {
     const receiptKey = result.queryPlanReceipt?.receiptKey ?? result.answerCard?.queryPlanReceipt?.receiptKey ?? "";
     const unitKey = result.answerCard?.analysisUnitRef?.unitKey ?? "";
     if (!receiptKey || !unitKey) return;
-    setAnalysisExport({ status: "exporting", message: biText("正在生成 Excel 与报告…", "Generating Excel and report…") });
+    setAnalysisExport({ status: "exporting", message: biText("正在生成可验证导出…", "Generating verified export…") });
     try {
       const payload = await fetchJsonStrict<{ analysisExport?: { archivePath?: string; archiveSha256?: string } }>("/api/exports/analysis", {
         method: "POST",
-        body: JSON.stringify({ queryReceiptKey: receiptKey, unitKey }),
+        body: JSON.stringify({ queryReceiptKey: receiptKey, unitKey, formats }),
       });
       const path = String(payload.analysisExport?.archivePath ?? "");
       const hash = String(payload.analysisExport?.archiveSha256 ?? "").slice(0, 12);
@@ -544,7 +545,7 @@ export function AgentPanel({ result, actionDrafts, workbench, lastActionResult, 
               setPromptTouched(true);
               void submit(withSemanticPathSelection(original, relationKeys));
             }}
-            onExportAnalysis={() => void exportVerifiedAnalysis()}
+            onExportAnalysis={(formats) => void exportVerifiedAnalysis(formats)}
             analysisExportStatus={analysisExport.status}
             analysisExportMessage={analysisExport.message}
             forecastReadiness={result.forecastReadiness}

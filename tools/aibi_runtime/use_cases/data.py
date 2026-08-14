@@ -77,6 +77,12 @@ from import_job_commands import (
     import_job_resume_command,
     import_job_run_command,
 )
+from metric_contract_service import (
+    metric_contract_preview_command as metric_contract_preview_command_service,
+    metric_contract_publish_command as metric_contract_publish_command_service,
+    metric_contract_replay_command as metric_contract_replay_command_service,
+    metric_contracts_command as metric_contracts_command_service,
+)
 from sqlserver_snapshot_commands import (
     sqlserver_activate_command,
     sqlserver_activation_finalize_command,
@@ -88,5 +94,27 @@ from sqlserver_snapshot_commands import (
     sqlserver_statistics_command,
     sqlserver_test_command,
 )
+
+
+def metric_contract_preview_command(args):
+    from bi_cli_core import now_iso
+    from bi_cli_schema import active_workspace_id
+    return metric_contract_preview_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id, query_metric=query_metric_command)
+
+
+def metric_contract_publish_command(args):
+    from bi_cli_core import now_iso
+    from bi_cli_schema import active_workspace_id
+    return metric_contract_publish_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id, query_metric=query_metric_command, now_iso=now_iso)
+
+
+def metric_contracts_command(args):
+    from bi_cli_schema import active_workspace_id
+    return metric_contracts_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id)
+
+
+def metric_contract_replay_command(args):
+    from bi_cli_schema import active_workspace_id
+    return metric_contract_replay_command_service(args, open_db=open_db, active_workspace_id=active_workspace_id, query_metric=query_metric_command)
 
 from .agent_interaction import source_intelligence_dashboard_draft_command

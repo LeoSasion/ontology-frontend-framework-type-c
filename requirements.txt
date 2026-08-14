@@ -1,4 +1,6 @@
 duckdb==1.5.4
 pandas==3.0.3
 openpyxl==3.1.5
+python-docx==1.2.0
+python-pptx==1.0.2
 xlrd==2.0.2

@@ -573,7 +573,7 @@ def query_metric_command(
     build_table_query: Callable[[sqlite3.Connection, str, list[str], dict[str, Any]], dict[str, Any]],
 ) -> dict[str, Any]:
     with open_db() as connection:
-        workspace_id = active_workspace_id(connection)
+        workspace_id = str(getattr(args, "workspace", "") or "").strip() or active_workspace_id(connection)
         row = connection.execute(
             """
             SELECT m.*, COALESCE(t.display_name, m.table_key) AS table_name, t.physical_table,

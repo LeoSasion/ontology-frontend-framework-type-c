@@ -207,8 +207,8 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchHeaderSource.includes('data-testid="source-intelligence-run-button"') &&
           sourceWorkbenchImportPanelSource.split('data-testid="source-import-preview-button"').length === 2 &&
           sourceWorkbenchImportPanelSource.includes("function checkSource()") &&
-          sourceWorkbenchImportPanelSource.includes('return runBusy("preview", runImportPreviewAction)') &&
-          sourceWorkbenchImportPanelSource.includes('return runBusy("folder-preview", runFolderImportPreviewAction)') &&
+          sourceWorkbenchImportPanelSource.includes('return runImportAction("preview", runImportPreviewAction)') &&
+          sourceWorkbenchImportPanelSource.includes('return runImportAction("folder-preview", runFolderImportPreviewAction)') &&
           sourceWorkbenchImportPanelSource.includes("检查来源") &&
           !sourceWorkbenchImportPanelSource.includes('data-testid="import-preview-button"') &&
           !sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-preview"') &&
@@ -217,7 +217,7 @@ export function appendSourceContractChecks(context) {
           !sourceWorkbenchHeaderSource.includes("aTestdata0305SourceIntelligenceOptions()") &&
           sourceWorkbenchImportPanelSource.includes('testId="import-operation-receipt"') &&
           sourceWorkbenchImportPanelSource.includes('role="status"') &&
-          sourceWorkbenchImportPanelSource.includes("导入去重规则") &&
+          sourceWorkbenchImportPanelSource.includes("目标表与写入规则") &&
           sourceWorkbenchActionPanelSource.includes("数据模型与管理") &&
           !sourceWorkbenchSource.includes('data-testid="source-expert-details"') &&
           sourceWorkbenchHeaderSource.includes("所有写入都会先预检并等待确认"),
@@ -362,10 +362,13 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-safety"') &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-confirmation-confirm"') &&
           sourceWorkbenchImportPanelSource.includes("{previewReadable ? (") &&
-          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm" || importJobActive || !singleImportPlanReady}') &&
+          sourceWorkbenchImportPanelSource.includes('disabled={busy === "import-confirm" || importJobActive || !singleImportPlanReady || (schemaChangeConfirmationRequired && !schemaChangeAcknowledged)}') &&
+          sourceWorkbenchImportPanelSource.includes('data-testid="import-schema-change-report"') === false &&
+          sourceWorkbenchImportPanelSource.includes('lazyWithRetry(() => import("./ImportSchemaChangeReport"))') &&
+          sourceWorkbenchImportPanelSource.includes("schemaChangeConfirmationRequired && !schemaChangeAcknowledged") &&
           sourceWorkbenchImportPanelSource.includes("<ImportJobStatusCard") &&
-          sourceWorkbenchImportPanelSource.includes("onCancel={cancelActiveImportJob}") &&
-          sourceWorkbenchImportPanelSource.includes("onResume={resumeActiveImportJob}") &&
+          sourceWorkbenchImportPanelSource.includes('onCancel={(job) => runImportAction("import-cancel", () => cancelActiveImportJob(job))}') &&
+          sourceWorkbenchImportPanelSource.includes('onResume={(job) => runImportAction("import-resume", () => resumeActiveImportJob(job))}') &&
           sourceWorkbenchContractsSource.includes("onCreateImportJob:") &&
           sourceWorkbenchContractsSource.includes("onFetchImportJob:") &&
           sourceWorkbenchContractsSource.includes("onListImportJobs:") &&
@@ -560,14 +563,14 @@ export function appendSourceContractChecks(context) {
     {
         label: "source-workbench-import-panel-boundary",
         ok: existsSync(join(root, "src", "components", "SourceWorkbenchImportPanel.tsx")) &&
-          sourceWorkbenchSource.includes('import { SourceWorkbenchImportPanel } from "./SourceWorkbenchImportPanel"') &&
+          sourceWorkbenchSource.includes('lazyWithRetry(() => import("./SourceWorkbenchImportPanel")') &&
           sourceWorkbenchSource.includes("<SourceWorkbenchImportPanel") &&
           !sourceWorkbenchSource.includes('data-testid="import-confirmation-summary"') &&
           !sourceWorkbenchSource.includes('data-testid="import-operation-receipt"') &&
           sourceWorkbenchImportPanelSource.includes("type SourceWorkbenchImportPanelProps") &&
           sourceWorkbenchImportPanelSource.includes("ReturnType<typeof useSourceWorkbenchImportController>") &&
           sourceWorkbenchImportControllerSource.includes("importPolicies: ImportPolicy[]") &&
-          sourceWorkbenchImportControllerSource.includes("async function runImportPreviewAction()") &&
+          sourceWorkbenchImportControllerSource.includes("async function runImportPreviewAction(modeOverride?: string)") &&
           sourceWorkbenchImportControllerSource.includes("async function runImportCommitAction(confirm: boolean)") &&
           sourceWorkbenchImportControllerSource.includes("async function runImportPolicyAction(confirm: boolean)") &&
           sourceWorkbenchImportPanelSource.includes('data-testid="import-policy-dry-run-button"') &&

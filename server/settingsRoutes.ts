@@ -68,6 +68,24 @@ export async function handleSettingsApi(options: SettingsRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/knowledge-sources/propose" && request.method === "POST") {
+    const body = await readBody(request);
+    const input = String(body.input ?? "").trim();
+    const adapter = String(body.adapter ?? "auto").trim();
+    const sourceType = String(body.sourceType ?? "documentation").trim();
+    const sourceName = String(body.sourceName ?? "").trim();
+    if (!input || input.length > 2048 || !new Set(["auto", "knowledge-json-v1", "knowledge-markdown-v1"]).has(adapter) || !new Set(["data-dictionary", "documentation"]).has(sourceType) || sourceName.length > 160) {
+      sendJson(response, 400, { ok: false, code: "KNOWLEDGE_SOURCE_INPUT_INVALID", error: "A bounded local JSON/Markdown input and supported adapter are required." });
+      return true;
+    }
+    const args = ["semantic-patch-propose", "--input", input, "--adapter", adapter, "--source-type", sourceType];
+    if (sourceName) args.push("--source-name", sourceName);
+    if (body.confirm === true) args.push("--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/semantic-patches" && request.method === "GET") {
     const args = ["semantic-patch-proposals", "--limit", url.searchParams.get("limit") ?? "100"];
     const proposal = url.searchParams.get("proposal");
@@ -127,6 +145,62 @@ export async function handleSettingsApi(options: SettingsRoutesOptions) {
     const result = await cli(args);
     sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
     return true;
+  }
+
+  if (url.pathname === "/api/semantic-releases" && request.method === "GET") {
+    const requestedLimit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const boundedLimit = Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50;
+    const args = ["semantic-releases", "--limit", String(boundedLimit)];
+    const release = url.searchParams.get("release");
+    if (release) args.push("--release", release);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname.startsWith("/api/semantic-releases/") && request.method === "POST") {
+    const body = await readBody(request);
+    const requestKey = String(body.requestKey ?? "").trim();
+    const proposalKeys = Array.isArray(body.proposalKeys) ? body.proposalKeys.map(String) : [];
+    const expectedPlan = String(body.expectedPlanFingerprint ?? "").trim();
+    if (!requestKey || requestKey.length > 200 || proposalKeys.length > 100 || proposalKeys.some((item) => !/^patch_[a-f0-9]{20}$/.test(item))) {
+      sendJson(response, 400, { ok: false, code: "SEMANTIC_RELEASE_INPUT_INVALID", error: "A bounded requestKey and valid proposal keys are required." });
+      return true;
+    }
+    if (url.pathname === "/api/semantic-releases/preview") {
+      if (proposalKeys.length < 1) {
+        sendJson(response, 400, { ok: false, code: "SEMANTIC_RELEASE_PROPOSALS_REQUIRED", error: "Select at least one semantic proposal." });
+        return true;
+      }
+      const args = ["semantic-release-preview", "--request-key", requestKey, "--label", String(body.label ?? "Semantic release")];
+      for (const proposal of proposalKeys) args.push("--proposal", proposal);
+      const result = await cli(args);
+      sendJson(response, result.ok === false ? 409 : 200, result);
+      return true;
+    }
+    if (url.pathname === "/api/semantic-releases/publish") {
+      if (body.confirm !== true || proposalKeys.length < 1 || !/^[a-f0-9]{64}$/.test(expectedPlan)) {
+        sendJson(response, 400, { ok: false, code: "SEMANTIC_RELEASE_CONFIRMATION_REQUIRED", error: "Publish requires confirm=true and the exact preview fingerprint." });
+        return true;
+      }
+      const args = ["semantic-release-publish", "--request-key", requestKey, "--label", String(body.label ?? "Semantic release"), "--expected-plan", expectedPlan, "--yes"];
+      for (const proposal of proposalKeys) args.push("--proposal", proposal);
+      const result = await cli(args);
+      sendJson(response, result.ok === false ? 409 : 200, result);
+      return true;
+    }
+    if (url.pathname === "/api/semantic-releases/rollback") {
+      const releaseKey = String(body.releaseKey ?? "").trim();
+      if (!/^release_[a-f0-9]{20}$/.test(releaseKey) || (body.confirm === true && !/^[a-f0-9]{64}$/.test(expectedPlan))) {
+        sendJson(response, 400, { ok: false, code: "SEMANTIC_RELEASE_ROLLBACK_INPUT_INVALID", error: "Rollback requires a valid release and exact preview binding when confirmed." });
+        return true;
+      }
+      const args = ["semantic-release-rollback", "--release", releaseKey, "--request-key", requestKey];
+      if (body.confirm === true) args.push("--expected-plan", expectedPlan, "--yes");
+      const result = await cli(args);
+      sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+      return true;
+    }
   }
 
   if (url.pathname === "/api/confirmed-queries" && request.method === "GET") {

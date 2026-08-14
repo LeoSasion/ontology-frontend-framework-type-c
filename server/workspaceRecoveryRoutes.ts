@@ -68,6 +68,22 @@ export async function handleWorkspaceRecoveryApi({ authorize, cli, request, resp
     return true;
   }
 
+  if (url.pathname.startsWith("/api/workspace-recovery/") && url.pathname.endsWith("/compare") && request.method === "GET") {
+    let recoveryPointKey = "";
+    try {
+      recoveryPointKey = decodeURIComponent(url.pathname.slice("/api/workspace-recovery/".length, -"/compare".length));
+    } catch {
+      recoveryPointKey = "";
+    }
+    if (!RECOVERY_KEY.test(recoveryPointKey)) {
+      sendJson(response, 400, { ok: false, code: "RECOVERY_POINT_KEY_INVALID", error: "A valid recoveryPointKey is required" });
+      return true;
+    }
+    const result = await cli(["workspace-recovery-compare", "--recovery-point", recoveryPointKey]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname.startsWith("/api/workspace-recovery/") && request.method === "GET") {
     let recoveryPointKey = "";
     try {

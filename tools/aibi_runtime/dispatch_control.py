@@ -37,10 +37,19 @@ COMMANDS = frozenset({
     'semantic-patch-proposals',
     'semantic-patch-propose',
     'semantic-patch-review',
+    'semantic-release-preview',
+    'semantic-release-publish',
+    'semantic-release-rollback',
+    'semantic-releases',
     'status',
     'workflow-plan',
+    'workflow-recipe-plan',
+    'workflow-recipe-preview',
+    'workflow-recipe-publish',
+    'workflow-recipes',
     'workspace-manifest',
     'workspace-recovery-create',
+    'workspace-recovery-compare',
     'workspace-recovery-delete',
     'workspace-recovery-inspect',
     'workspace-recovery-list',
@@ -58,6 +67,14 @@ def dispatch(args, parser):
         result = runtime.capability_contracts_command(args, parser)
     elif args.command == 'workflow-plan':
         result = runtime.workflow_plan_command(args, parser)
+    elif args.command == 'workflow-recipe-preview':
+        result = runtime.workflow_recipe_preview_command(args, parser=parser, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'workflow-recipe-publish':
+        result = runtime.workflow_recipe_publish_command(args, parser=parser, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'workflow-recipes':
+        result = runtime.workflow_recipes_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'workflow-recipe-plan':
+        result = runtime.workflow_recipe_plan_command(args, parser=parser, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command == 'context-budget':
         result = runtime.context_budget_command(args)
     elif args.command == 'restricted-workflow-operators':
@@ -102,6 +119,7 @@ def dispatch(args, parser):
         result = runtime.workspace_manifest_command(args, command_capabilities=runtime.capability_registry(parser), open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command in {
         'workspace-recovery-list',
+        'workspace-recovery-compare',
         'workspace-recovery-reconcile',
         'workspace-recovery-inspect',
         'workspace-recovery-create',
@@ -117,6 +135,7 @@ def dispatch(args, parser):
         }
         recovery_command = {
             'workspace-recovery-list': runtime.workspace_recovery_list_command,
+            'workspace-recovery-compare': runtime.workspace_recovery_compare_command,
             'workspace-recovery-reconcile': runtime.workspace_recovery_reconcile_command,
             'workspace-recovery-inspect': runtime.workspace_recovery_inspect_command,
             'workspace-recovery-create': runtime.workspace_recovery_create_command,
@@ -146,6 +165,14 @@ def dispatch(args, parser):
         result = runtime.semantic_patch_proposals_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
     elif args.command == 'semantic-patch-review':
         result = runtime.semantic_patch_review_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'semantic-release-preview':
+        result = runtime.semantic_release_preview_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'semantic-release-publish':
+        result = runtime.semantic_release_publish_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
+    elif args.command == 'semantic-releases':
+        result = runtime.semantic_releases_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id)
+    elif args.command == 'semantic-release-rollback':
+        result = runtime.semantic_release_rollback_command(args, open_db=runtime.open_db, active_workspace_id=runtime.active_workspace_id, now_iso=runtime.now_iso)
     else:
         raise ValueError(f'Command is not registered in control: {args.command}')
     return result

@@ -31,7 +31,7 @@ type AgentAnswerCardProps = {
   tableNameByKey?: Map<string, string>;
   queryRuntimeRef?: Record<string, unknown>;
   runtimeEngine: string;
-  onExportAnalysis?: () => void;
+  onExportAnalysis?: (formats: Array<"xlsx" | "docx" | "pptx" | "md">) => void;
   analysisExportStatus?: "idle" | "exporting" | "ready" | "error";
   analysisExportMessage?: string;
   forecastReadiness?: AgentAskResult["forecastReadiness"];
@@ -284,6 +284,7 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
   const hasInitialForecastReadiness = Boolean(forecastReadiness);
   const [forecastOpen, setForecastOpen] = useState(hasInitialForecastReadiness);
   const [snapshotOpen, setSnapshotOpen] = useState(false);
+  const [exportPreset, setExportPreset] = useState<"bundle" | "docx" | "pptx" | "complete">("bundle");
 
   useEffect(() => {
     setForecastOpen(hasInitialForecastReadiness);
@@ -602,16 +603,25 @@ export function AgentAnswerCard({ answerCard, answerEvidenceSteps, answerQuery, 
           </details>
           {answerCard.analysisUnitRef.status === "ready" ? (
             <div className="agentAnalysisUnitExport">
+              <label className="agentAnalysisExportFormat">
+                <span>{biText("导出格式", "Export format")}</span>
+                <select disabled={analysisExportStatus === "exporting"} onChange={(event) => setExportPreset(event.target.value as typeof exportPreset)} value={exportPreset}>
+                  <option value="bundle">{biText("Excel + 报告", "Excel + report")}</option>
+                  <option value="docx">{biText("Word 文档", "Word document")}</option>
+                  <option value="pptx">{biText("PowerPoint", "PowerPoint")}</option>
+                  <option value="complete">{biText("完整交付包", "Complete bundle")}</option>
+                </select>
+              </label>
               <button
                 className="miniButton"
                 data-testid="agent-analysis-export"
                 disabled={!onExportAnalysis || analysisExportStatus === "exporting"}
-                onClick={onExportAnalysis}
+                onClick={() => onExportAnalysis?.(exportPreset === "docx" ? ["docx"] : exportPreset === "pptx" ? ["pptx"] : exportPreset === "complete" ? ["xlsx", "md", "docx", "pptx"] : ["xlsx", "md"])}
                 type="button"
               >
                 {analysisExportStatus === "exporting"
                   ? biText("正在导出…", "Exporting…")
-                  : biText("导出 Excel + 报告", "Export Excel + report")}
+                  : biText("生成导出", "Generate export")}
               </button>
               {analysisExportMessage ? <small className={analysisExportStatus}>{analysisExportMessage}</small> : null}
               <button className="miniButton" data-testid="analysis-snapshot-open" onClick={() => setSnapshotOpen((current) => !current)} type="button">

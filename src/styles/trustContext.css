@@ -101,7 +101,8 @@
   color: var(--success-text);
 }
 
-.semanticReviewInbox {
+.semanticReviewInbox,
+.semanticReleasePanel {
   display: grid;
   gap: 14px;
   margin: 18px 0;
@@ -109,6 +110,65 @@
   border: 1px solid var(--border-soft);
   border-radius: 16px;
   background: color-mix(in srgb, var(--surface-raised) 86%, transparent);
+}
+
+.semanticReleasePanel {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border-soft));
+  background: color-mix(in srgb, var(--surface-raised) 92%, var(--accent) 8%);
+}
+
+.semanticReleaseActions,
+.semanticReleaseConfirmation,
+.semanticRollbackActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.semanticReleaseActions {
+  justify-content: space-between;
+}
+
+.semanticReleaseConfirmation {
+  justify-content: flex-end;
+}
+
+.semanticReleaseConfirmation > span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.semanticReleaseList {
+  display: grid;
+  gap: 9px;
+}
+
+.semanticReleaseItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-raised);
+}
+
+.semanticReleaseItem > div:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.semanticReleaseItem span,
+.semanticReleaseItem small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.semanticReleaseItem.status-stale {
+  border-color: var(--warning-border, var(--border-soft));
 }
 
 .semanticReviewHeader,
@@ -306,9 +366,15 @@
   }
 
   .semanticReviewHeader,
-  .semanticProposalTopline {
+  .semanticProposalTopline,
+  .semanticReleaseActions,
+  .semanticReleaseConfirmation {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .semanticReleaseItem {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .trustContextForm .wide {

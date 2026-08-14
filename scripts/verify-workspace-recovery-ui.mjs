@@ -39,6 +39,16 @@ const checks = [
       && types.includes('"aibi-workspace-recovery-point/v1"'),
   },
   {
+    label: "restore-impact-is-compared-before-operator-confirmation",
+    ok: panel.includes("compareWorkspaceRecoveryPoint")
+      && panel.includes('data-testid="workspace-recovery-comparison"')
+      && panel.includes("exposesBusinessRows !== false")
+      && panel.includes("current?.recoveryPointKey === payload.recoveryPlan!.recoveryPointKey")
+      && panel.includes("comparison.recoveryPointKey")
+      && api.includes("compareWorkspaceRecoveryPoint")
+      && types.includes('"aibi-workspace-recovery-comparison/v1"'),
+  },
+  {
     label: "advanced-list-is-bounded-and-content-virtualized",
     ok: panel.includes("points.slice(0, 1)")
       && panel.includes("limit: 50")

@@ -1,6 +1,6 @@
 # AIBI-C 未来开发队列
 
-本文件是跨产品未交付工作队列。当前能力见 [实现状态](implementation-status.md)，稳定需求见 [PRD](PRD.md)，业务理解专题的合同、Skills、验收与细分顺序见 [业务理解与分析 Skills](business-understanding-skills.md)。持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的当前执行批次统一见 [可信能力吸收开发规格](trusted-capability-absorption.md)。
+本文件是跨产品未交付工作队列。当前能力见 [实现状态](implementation-status.md)，稳定需求见 [PRD](PRD.md)，业务理解专题的合同、Skills、验收与细分顺序见 [业务理解与分析 Skills](business-understanding-skills.md)。持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的执行合同见 [可信能力吸收开发规格](trusted-capability-absorption.md)；AIBI-A/B/D/E 只读借鉴及本轮已落地的密封导入、语义版本、指标合同、Recipe、恢复对比和办公导出见 [跨项目能力吸收与开发规格](cross-project-capability-development.md)。
 
 ## 不变的主流程
 

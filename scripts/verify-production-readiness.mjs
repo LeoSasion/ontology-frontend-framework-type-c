@@ -42,6 +42,9 @@ const checks = [
   check("data-backup-manifest", backupScript.includes('schema: "aibi-local-backup/v1"') && snapshotScript.includes("sha256") && snapshotScript.includes("loadLocalEnv") && backupScript.includes("assertLocalServiceStopped"), "Local database backup reads the active local configuration, requires stopped services, and writes checksums."),
   check("data-restore-guard", restoreScript.includes('args.has("--confirm")') && restoreScript.includes("verifyManifestFiles") && restoreScript.includes("createSafetyBackup"), "Restore previews by default, verifies checksums, and preserves current files before writing."),
   check("schema-migration-guard", migrationScript.includes('args.has("--confirm")') && migrationScript.includes("createSafetyBackup") && migrationScript.includes("originalUnchanged") && schemaSource.includes("CURRENT_SQLITE_SCHEMA_VERSION") && schemaSource.includes("assert_duckdb_schema_compatible"), "Schema upgrades preview on isolated copies, preserve a restore point, and block incompatible SQLite or DuckDB versions."),
+  check("startup-compatibility-fails-before-reconciliation", serverIndex.includes('const startupCompatibility = await cli(["status"])')
+    && serverIndex.includes("startupCompatibility.ok !== true")
+    && serverIndex.indexOf("startupCompatibility.ok !== true") < serverIndex.indexOf('workspace-recovery-reconcile'), "The API reports an incompatible local schema before any recovery command can misclassify the startup failure."),
   check("ci-browser-smoke", workflow.includes("Verify complete browser paths")
     && workflow.includes("npm run verify:ui")
     && workflow.includes("Upload browser evidence")

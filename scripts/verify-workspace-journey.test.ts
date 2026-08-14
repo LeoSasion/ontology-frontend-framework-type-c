@@ -3,6 +3,7 @@ import test from "node:test";
 import type { AgentAskResult, SourceIntelligenceRunSummary, WorkbenchPayload, WorkspaceStatus } from "../src/types";
 import type { AnalysisJob } from "../src/typesJobs";
 import { buildWorkspaceJourney, sourceIntelligenceInputs } from "../src/workspaceJourneyModel";
+import { buildTrustedAnswerCoordinator } from "../src/trustedAnswerCoordinator";
 
 function status(tableCount = 0, actionDrafts = 0): WorkspaceStatus {
   return {
@@ -227,4 +228,58 @@ test("failed and stale understanding are explicit rather than silently treated a
   });
   assert.equal(stale.understanding.state, "stale");
   assert.equal(stale.hasCurrentEvidence, false);
+});
+
+test("first trusted answer coordinator exposes exactly one prioritized recommendation", () => {
+  const connect = buildTrustedAnswerCoordinator({ status: status(), workbench: workbench(), agent: agent() });
+  assert.deepEqual(
+    { action: connect.recommendation.actionKey, enabled: connect.recommendation.enabled },
+    { action: "connect-data", enabled: true },
+  );
+
+  const running = buildTrustedAnswerCoordinator({
+    status: status(1),
+    workbench: workbench({ hasData: true }),
+    agent: agent(),
+    sourceIntelligenceJobs: [job("running", 22)],
+  });
+  assert.deepEqual(
+    { action: running.recommendation.actionKey, enabled: running.recommendation.enabled },
+    { action: "wait-for-understanding", enabled: false },
+  );
+
+  const recovery = buildTrustedAnswerCoordinator({
+    status: status(1),
+    workbench: workbench({ hasData: true }),
+    agent: agent(),
+    sourceIntelligenceJobs: [job("failed")],
+  });
+  assert.equal(recovery.recommendation.stage, "recover");
+
+  const ask = buildTrustedAnswerCoordinator({
+    status: status(1),
+    workbench: workbench({ hasData: true, runs: [run()] }),
+    agent: agent(),
+  });
+  assert.equal(ask.recommendation.actionKey, "ask-question");
+
+  const clarificationAgent = agent({
+    workspaceId: "journey-test",
+    clarification: { required: true } as AgentAskResult["clarification"],
+  });
+  const clarify = buildTrustedAnswerCoordinator({
+    status: status(1),
+    workbench: workbench({ hasData: true, runs: [run()] }),
+    agent: clarificationAgent,
+  });
+  assert.equal(clarify.recommendation.actionKey, "answer-clarification");
+
+  const confirm = buildTrustedAnswerCoordinator({
+    status: status(1, 1),
+    workbench: workbench({ hasData: true, runs: [run()] }),
+    agent: { ...clarificationAgent, requiresConfirmation: true },
+    pendingDraftCount: 1,
+  });
+  assert.equal(confirm.recommendation.actionKey, "review-draft");
+  assert.equal(Object.keys(confirm).filter((key) => key === "recommendation").length, 1);
 });

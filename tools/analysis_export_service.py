@@ -366,6 +366,152 @@ def _write_workbook(path: Path, receipt: dict[str, Any], unit: dict[str, Any], g
     _normalize_zip(path)
 
 
+def _write_docx(path: Path, receipt: dict[str, Any], unit: dict[str, Any], gaps: dict[str, Any]) -> None:
+    try:
+        from docx import Document
+        from docx.enum.text import WD_ALIGN_PARAGRAPH
+        from docx.shared import Pt, RGBColor
+    except ImportError as error:
+        raise RuntimeError("DOCX export requires python-docx; install requirements.txt before requesting docx") from error
+    document = Document()
+    document.core_properties.author = "AIBI-C"
+    document.core_properties.last_modified_by = "AIBI-C"
+    document.core_properties.title = str(unit.get("title") or "AIBI-C verified analysis")
+    document.core_properties.subject = "Receipt-bound, frozen Analysis Unit export"
+    normal = document.styles["Normal"]
+    normal.font.name = "Microsoft YaHei"
+    normal.font.size = Pt(10.5)
+    title = document.add_heading(str(unit.get("title") or "AIBI-C 可验证分析报告"), level=0)
+    title.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    for run in title.runs:
+        run.font.color.rgb = RGBColor(15, 118, 110)
+    document.add_paragraph("AIBI-C · Receipt-bound verified analysis", style="Subtitle")
+    summary = document.add_table(rows=0, cols=2)
+    summary.style = "Light Shading Accent 1"
+    for label, value in (
+        ("Status", unit.get("status")),
+        ("Analysis kind", unit.get("kind")),
+        ("Query Receipt", receipt.get("receiptKey")),
+        ("Analysis Unit", unit.get("unitKey")),
+        ("Result fingerprint", unit.get("resultFingerprint")),
+        ("Rows", (unit.get("shape") or {}).get("rowCount")),
+    ):
+        cells = summary.add_row().cells
+        cells[0].text = str(label)
+        formatted = _format_cell_value(value)
+        cells[1].text = str("—" if formatted is None else formatted)
+    document.add_heading("口径与计算 / Grain and calculation", level=1)
+    document.add_paragraph(json.dumps(_safe_value(unit.get("grain", {})), ensure_ascii=False, indent=2, sort_keys=True))
+    document.add_paragraph(json.dumps(_safe_value(unit.get("calculation", {})), ensure_ascii=False, indent=2, sort_keys=True))
+    rows = unit.get("rows") if isinstance(unit.get("rows"), list) else []
+    shape = unit.get("shape") if isinstance(unit.get("shape"), dict) else {}
+    columns = [str(item) for item in (shape.get("columns") or [])]
+    if not columns:
+        columns = sorted({str(key) for row in rows if isinstance(row, dict) for key in row})
+    document.add_heading("冻结结果 / Frozen result", level=1)
+    if columns and rows:
+        table = document.add_table(rows=1, cols=len(columns))
+        table.style = "Light Shading Accent 1"
+        for index, column in enumerate(columns):
+            table.rows[0].cells[index].text = column
+        for row in rows[:100]:
+            cells = table.add_row().cells
+            record = row if isinstance(row, dict) else {}
+            for index, column in enumerate(columns):
+                formatted = _format_cell_value(_safe_value(record.get(column), column))
+                cells[index].text = str("" if formatted is None else formatted)
+        if len(rows) > 100:
+            document.add_paragraph(f"Only the first 100 of {len(rows)} frozen rows are displayed in DOCX; the complete frozen payload remains in the export bundle.")
+    else:
+        document.add_paragraph("No frozen rows.")
+    document.add_heading("验证与限制 / Validation and limitations", level=1)
+    validation = unit.get("validation") if isinstance(unit.get("validation"), dict) else {}
+    for label, items in (("Blockers", validation.get("blockers", [])), ("Warnings", validation.get("warnings", [])), ("Omissions", gaps.get("omissions", []))):
+        document.add_paragraph(f"{label}: {', '.join(map(str, items)) or 'None'}")
+    document.add_paragraph("Trust boundary: generated only from the stored Query Receipt and frozen Analysis Unit. No requery and no business database write.")
+    document.save(path)
+    _normalize_zip(path)
+
+
+def _write_pptx(path: Path, receipt: dict[str, Any], unit: dict[str, Any], gaps: dict[str, Any]) -> None:
+    try:
+        from pptx import Presentation
+        from pptx.dml.color import RGBColor
+        from pptx.enum.text import PP_ALIGN
+        from pptx.util import Inches, Pt
+    except ImportError as error:
+        raise RuntimeError("PPTX export requires python-pptx; install requirements.txt before requesting pptx") from error
+    presentation = Presentation()
+    presentation.slide_width = Inches(13.333)
+    presentation.slide_height = Inches(7.5)
+    presentation.core_properties.author = "AIBI-C"
+    presentation.core_properties.last_modified_by = "AIBI-C"
+    presentation.core_properties.title = str(unit.get("title") or "AIBI-C verified analysis")
+
+    def add_title(slide, title: str, subtitle: str = "") -> None:
+        slide.shapes.title.text = title
+        paragraph = slide.shapes.title.text_frame.paragraphs[0]
+        paragraph.font.name = "Microsoft YaHei"
+        paragraph.font.size = Pt(28)
+        paragraph.font.bold = True
+        paragraph.font.color.rgb = RGBColor(15, 118, 110)
+        if subtitle and len(slide.placeholders) > 1:
+            slide.placeholders[1].text = subtitle
+
+    cover = presentation.slides.add_slide(presentation.slide_layouts[0])
+    add_title(cover, str(unit.get("title") or "AIBI-C 可验证分析"), f"Receipt {receipt.get('receiptKey')} · Unit {unit.get('unitKey')}")
+
+    overview = presentation.slides.add_slide(presentation.slide_layouts[1])
+    add_title(overview, "结论与可信状态 / Conclusion and trust")
+    overview.placeholders[1].text = "\n".join([
+        f"Status: {unit.get('status') or '—'}",
+        f"Analysis kind: {unit.get('kind') or '—'}",
+        f"Frozen rows: {(unit.get('shape') or {}).get('rowCount') or 0}",
+        f"Result fingerprint: {str(unit.get('resultFingerprint') or '')[:20]}",
+        "Source: stored Query Receipt + frozen Analysis Unit",
+    ])
+
+    data_slide = presentation.slides.add_slide(presentation.slide_layouts[5])
+    add_title(data_slide, "冻结结果摘要 / Frozen result snapshot")
+    rows = unit.get("rows") if isinstance(unit.get("rows"), list) else []
+    shape = unit.get("shape") if isinstance(unit.get("shape"), dict) else {}
+    columns = [str(item) for item in (shape.get("columns") or [])]
+    if not columns:
+        columns = sorted({str(key) for row in rows if isinstance(row, dict) for key in row})
+    visible_columns = columns[:6]
+    visible_rows = rows[:8]
+    if visible_columns:
+        table = data_slide.shapes.add_table(len(visible_rows) + 1, len(visible_columns), Inches(0.6), Inches(1.5), Inches(12.1), Inches(4.8)).table
+        for column_index, column in enumerate(visible_columns):
+            table.cell(0, column_index).text = column
+        for row_index, row in enumerate(visible_rows, start=1):
+            record = row if isinstance(row, dict) else {}
+            for column_index, column in enumerate(visible_columns):
+                formatted = _format_cell_value(_safe_value(record.get(column), column))
+                table.cell(row_index, column_index).text = str("" if formatted is None else formatted)
+        for cell in table.iter_cells():
+            for paragraph in cell.text_frame.paragraphs:
+                paragraph.font.name = "Microsoft YaHei"
+                paragraph.font.size = Pt(10)
+                paragraph.alignment = PP_ALIGN.LEFT
+    else:
+        textbox = data_slide.shapes.add_textbox(Inches(0.8), Inches(2), Inches(11), Inches(1))
+        textbox.text_frame.text = "No frozen rows."
+
+    evidence = presentation.slides.add_slide(presentation.slide_layouts[1])
+    add_title(evidence, "证据与限制 / Evidence and limitations")
+    validation = unit.get("validation") if isinstance(unit.get("validation"), dict) else {}
+    evidence.placeholders[1].text = "\n".join([
+        f"Receipt status: {receipt.get('status') or '—'}",
+        f"Blockers: {', '.join(map(str, validation.get('blockers', []))) or 'None'}",
+        f"Warnings: {', '.join(map(str, validation.get('warnings', []))) or 'None'}",
+        f"Omissions: {', '.join(map(str, gaps.get('omissions', []))) or 'None'}",
+        "No requery · No business database write · No credentials or local paths",
+    ])
+    presentation.save(path)
+    _normalize_zip(path)
+
+
 def _normalize_zip(path: Path) -> None:
     normalized = path.with_suffix(path.suffix + ".normalized")
     with zipfile.ZipFile(path, "r") as source, zipfile.ZipFile(normalized, "w", compression=zipfile.ZIP_DEFLATED) as target:
@@ -448,6 +594,11 @@ def export_analysis_command(
     unit_key = str(args.unit or "").strip()
     if not receipt_key or not unit_key:
         raise ValueError("receipt and unit are required")
+    requested_formats = list(dict.fromkeys(str(item).strip().casefold() for item in (getattr(args, "format", None) or []) if str(item).strip()))
+    formats = requested_formats or ["xlsx", "md"]
+    unsupported_formats = sorted(set(formats) - {"xlsx", "docx", "pptx", "md"})
+    if unsupported_formats:
+        raise ValueError(f"Unsupported analysis export format: {unsupported_formats[0]}")
     with open_db() as connection:
         workspace_id = active_workspace_id(connection)
         receipt = get_query_receipt(connection, workspace_id, receipt_key)
@@ -494,9 +645,15 @@ def export_analysis_command(
         _write_json(staging / "snapshots" / "analysis-unit.json", safe_unit)
         _write_json(staging / "snapshots" / "chart-adapter.json", safe_unit.get("chartAdapter", {}))
         _write_json(staging / "gaps.json", gaps)
-        report = _report_markdown(safe_receipt, safe_unit, gaps)
-        (staging / "report.md").write_text(report, encoding="utf-8")
-        _write_workbook(staging / "result.xlsx", safe_receipt, safe_unit, gaps)
+        if "md" in formats:
+            report = _report_markdown(safe_receipt, safe_unit, gaps)
+            (staging / "report.md").write_text(report, encoding="utf-8")
+        if "xlsx" in formats:
+            _write_workbook(staging / "result.xlsx", safe_receipt, safe_unit, gaps)
+        if "docx" in formats:
+            _write_docx(staging / "result.docx", safe_receipt, safe_unit, gaps)
+        if "pptx" in formats:
+            _write_pptx(staging / "result.pptx", safe_receipt, safe_unit, gaps)
 
         files = sorted(path for path in staging.rglob("*") if path.is_file())
         file_entries = [
@@ -510,6 +667,7 @@ def export_analysis_command(
             "workspace": hashlib.sha256(workspace_id.encode("utf-8")).hexdigest()[:16],
             "status": "ready",
             "projection": "scalar-result-fields-only",
+            "formats": formats,
             "sourceCreatedAt": safe_receipt.get("createdAt"),
             "files": file_entries,
             "contentFingerprint": _fingerprint(file_entries),
@@ -531,6 +689,7 @@ def export_analysis_command(
             "receiptKey": receipt_key,
             "unitKey": unit_key,
             "fileCount": len(manifest["files"]) + 1,
+            "formats": formats,
             "contentFingerprint": manifest["contentFingerprint"],
             "manifest": manifest,
             "verification": verification,

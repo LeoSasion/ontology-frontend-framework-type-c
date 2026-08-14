@@ -90,6 +90,7 @@ const textSourceFiles = {
   homeOverviewSource: ["src", "components", "HomeOverview.tsx"],
   homeOverviewStylesSource: ["src", "components", "homeOverview.css"],
   workspaceJourneyModelSource: ["src", "workspaceJourneyModel.ts"],
+  trustedAnswerCoordinatorSource: ["src", "trustedAnswerCoordinator.ts"],
   productActivationPanelSource: ["src", "components", "ProductActivationPanel.tsx"],
   productActivationStylesSource: ["src", "components", "productActivationPanel.css"],
   safeValueSource: ["src", "safeValue.ts"],

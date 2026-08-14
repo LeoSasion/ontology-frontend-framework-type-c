@@ -722,7 +722,7 @@ def main() -> None:
         )
 
         file_drift_path = temp_root / "文件漂移.csv"
-        write_csv(file_drift_path, [["id", "value"], ["1", "before"]])
+        write_csv(file_drift_path, [["id", "staged_value"], ["1", "before"]])
         with open_db() as connection:
             file_drift_preview = build_import_preview(connection, file_drift_path, "file_drift_table", None, None)
             parent = connection.execute(
@@ -742,29 +742,44 @@ def main() -> None:
             "name": "文件漂移",
         })
         file_drift_created = import_job_create_command(file_drift_args, **create_dependencies)
-        write_csv(file_drift_path, [["id", "value"], ["1", "after"]])
+        write_csv(file_drift_path, [["id", "staged_value"], ["1", "after"]])
         file_drift_result = import_job_run_command(
             argparse.Namespace(job=file_drift_created["job"]["jobKey"], workspace="default"),
             **run_dependencies,
         )
         with open_db() as connection:
             file_drift_table = connection.execute(
-                "SELECT 1 FROM table_registry WHERE workspace_id = 'default' AND table_key = 'file_drift_table'"
+                "SELECT physical_table FROM table_registry WHERE workspace_id = 'default' AND table_key = 'file_drift_table'"
             ).fetchone()
+            staged_value = (
+                connection.execute(
+                    f'SELECT staged_value FROM "{file_drift_table[0]}" WHERE id = ?',
+                    ("1",),
+                ).fetchone()
+                if file_drift_table is not None
+                else None
+            )
         check(
             checks,
-            "file-drift-fails-before-business-write",
-            file_drift_result["job"]["status"] == "failed"
-            and file_drift_table is None
-            and file_drift_result["job"].get("error", {}).get("code") == "import-job-failed"
-            and file_drift_result["job"].get("error", {}).get("recoveryAction") == "re-preview",
-            {"result": file_drift_result, "table": file_drift_table},
+            "accepted-stage-is-immutable-after-source-drift",
+            file_drift_result["job"]["status"] == "succeeded"
+            and file_drift_table is not None
+            and staged_value is not None
+            and staged_value[0] == "before",
+            {"result": file_drift_result, "value": staged_value[0] if staged_value else None},
         )
 
         parent_drift_path = temp_root / "父版本漂移.csv"
-        write_csv(parent_drift_path, [["id", "value"], ["1", "parent"]])
+        write_csv(parent_drift_path, [["id", "parent_only"], ["1", "parent"]])
         with open_db() as connection:
-            parent_drift_preview = build_import_preview(connection, parent_drift_path, "parent_drift_table", None, None)
+            parent_drift_preview = build_import_preview(
+                connection,
+                parent_drift_path,
+                "parent_drift_table",
+                None,
+                None,
+                mode_value="create",
+            )
             parent_before_drift = connection.execute(
                 "SELECT current_source_run_id FROM workspaces WHERE id = 'default'"
             ).fetchone()[0]

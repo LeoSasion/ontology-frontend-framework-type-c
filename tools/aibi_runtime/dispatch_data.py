@@ -43,6 +43,10 @@ COMMANDS = frozenset({
     'list-connectors',
     'list-import-jobs',
     'list-metrics',
+    'metric-contract-preview',
+    'metric-contract-publish',
+    'metric-contract-replay',
+    'metric-contracts',
     'list-navigation',
     'list-semantics',
     'list-tables',
@@ -238,6 +242,14 @@ def dispatch(args, parser):
         result = runtime.add_metric_command(args)
     elif args.command == 'query-metric':
         result = runtime.query_metric_command(args)
+    elif args.command == 'metric-contract-preview':
+        result = runtime.metric_contract_preview_command(args)
+    elif args.command == 'metric-contract-publish':
+        result = runtime.metric_contract_publish_command(args)
+    elif args.command == 'metric-contracts':
+        result = runtime.metric_contracts_command(args)
+    elif args.command == 'metric-contract-replay':
+        result = runtime.metric_contract_replay_command(args)
     elif args.command == 'preferences':
         result = runtime.preferences_command(args)
     elif args.command == 'theme-palettes':

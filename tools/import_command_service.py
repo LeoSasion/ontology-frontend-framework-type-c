@@ -10,6 +10,8 @@ from typing import Any, Callable
 
 from atomic_import_plan_service import bind_single_import_plan, enrich_atomic_import_plan
 from bi_cli_core import now_iso, parse_csv_list, slug, source_label, unique_key
+from import_schema_change_service import build_import_schema_change_preview
+from import_stage_service import create_import_stage, read_import_stage
 from import_table_writer_service import revalidate_relationships_for_table
 
 SUPPORTED_IMPORT_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
@@ -113,6 +115,7 @@ def build_folder_import_plan(
     unique_fields_value: str | None = None,
     conflict_rule_value: str | None = None,
     workspace_id: str | None = None,
+    stage_bindings: dict[str, str] | None = None,
     build_import_preview: Callable[..., dict[str, Any]],
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
@@ -120,11 +123,21 @@ def build_folder_import_plan(
     resolved_workspace_id = str(workspace_id or active_workspace_id(connection)).strip()
     if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (resolved_workspace_id,)).fetchone():
         raise ValueError(f"Unknown workspace: {resolved_workspace_id}")
+    import_root = Path(path).resolve()
     files = discover_import_files(path, recursive=recursive, limit=limit)
     groups: dict[str, dict[str, Any]] = {}
     items: list[dict[str, Any]] = []
     planned_tables: set[str] = set()
+    normalized_stage_bindings = {
+        str(key): str(value)
+        for key, value in (stage_bindings or {}).items()
+        if str(key).strip() and str(value).strip()
+    }
     for file_path in files:
+        try:
+            file_identity = file_path.relative_to(import_root if import_root.is_dir() else import_root.parent).as_posix()
+        except ValueError:
+            file_identity = file_path.name
         preview = build_import_preview(
             connection,
             file_path,
@@ -132,6 +145,7 @@ def build_folder_import_plan(
             unique_fields_value,
             conflict_rule_value,
             workspace_id=resolved_workspace_id,
+            stage_key=normalized_stage_bindings.get(file_identity),
         )
         if str(preview.get("workspaceId") or "") != resolved_workspace_id:
             raise RuntimeError("Folder import preview escaped the requested workspace.")
@@ -145,6 +159,7 @@ def build_folder_import_plan(
         unique_fields = _preview_unique_key(preview)
         item = {
             "file": source_label(file_path),
+            "fileIdentity": file_identity,
             "absolutePath": str(file_path),
             "tableKey": table_key,
             "displayName": display_name,
@@ -197,9 +212,27 @@ def build_folder_import_plan(
         "groups": normalized_groups,
         "willWrite": False,
     }
+
+    stages_by_path = {
+        str(Path(item["absolutePath"]).resolve()): str(
+            ((item.get("_preview") or {}).get("importStage") or {}).get("stageKey") or ""
+        )
+        for item in items
+    }
+
+    def read_sealed_plan_file(file_path: Path):
+        stage_key = stages_by_path.get(str(Path(file_path).resolve()))
+        if not stage_key:
+            return read_table_file(file_path)
+        headers, rows, _profile, _summary = read_import_stage(
+            stage_key=stage_key,
+            workspace_id=resolved_workspace_id,
+        )
+        return headers, rows
+
     return enrich_atomic_import_plan(
         base_plan,
-        read_table_file=read_table_file,
+        read_table_file=read_sealed_plan_file,
         current_source_run_id=(str(workspace["current_source_run_id"] or "") or None) if workspace else None,
     )
 
@@ -212,6 +245,8 @@ def build_import_preview(
     conflict_rule_value: str | None = None,
     *,
     workspace_id: str | None = None,
+    mode_value: str | None = None,
+    stage_key: str | None = None,
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
     normalize_records_for_columns: Callable[[list[dict[str, Any]], list[str]], list[dict[str, Any]]],
@@ -228,11 +263,27 @@ def build_import_preview(
     resolved_workspace_id = str(workspace_id or active_workspace_id(connection)).strip()
     if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (resolved_workspace_id,)).fetchone():
         raise ValueError(f"Unknown workspace: {resolved_workspace_id}")
+    requested_mode = str(mode_value or "auto").strip().lower()
+    if requested_mode not in {"auto", "create", "merge", "replace"}:
+        raise ValueError(f"Unsupported import preview mode: {requested_mode}")
     path = Path(file).resolve()
-    if not path.exists():
-        raise FileNotFoundError(path)
-    headers, rows = read_table_file(path)
-    profile = profile_rows(headers, rows)
+    if stage_key:
+        headers, rows, profile, import_stage = read_import_stage(
+            stage_key=str(stage_key),
+            workspace_id=resolved_workspace_id,
+        )
+    else:
+        if not path.exists():
+            raise FileNotFoundError(path)
+        headers, rows = read_table_file(path)
+        profile = profile_rows(headers, rows)
+        import_stage = create_import_stage(
+            source_path=path,
+            workspace_id=resolved_workspace_id,
+            headers=headers,
+            rows=rows,
+            profile=profile,
+        )
     table_key = suggested_import_table_key(path, table)
     suggested_display_name = suggested_import_display_name(path)
     matches: list[dict[str, Any]] = []
@@ -335,6 +386,24 @@ def build_import_preview(
                     conflict_rule,
                     quote_identifier,
                 )
+    effective_mode = "create"
+    schema_compatible = True
+    schema_change = None
+    blockers: list[str] = []
+    if existing:
+        effective_mode = "replace" if requested_mode in {"create", "replace"} else "merge"
+        registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
+        physical_columns = table_columns(connection, registry["physical_table"]) if registry else []
+        schema_compatible = set(headers) == set(physical_columns)
+        if effective_mode == "replace":
+            schema_change = build_import_schema_change_preview(
+                connection,
+                workspace_id=resolved_workspace_id,
+                table_key=table_key,
+                incoming_fields=headers,
+            )
+        elif not schema_compatible:
+            blockers.append("merge-schema-mismatch")
     return {
         "ok": True,
         "dryRun": True,
@@ -345,13 +414,19 @@ def build_import_preview(
         "suggestedTableKey": table_key,
         "suggestedDisplayName": suggested_display_name,
         "profile": profile,
+        "importStage": import_stage,
         "uniqueKeyQuality": unique_quality,
+        "schemaChange": schema_change,
+        "blockers": blockers,
+        "readyToCommit": not blockers,
         "mergePolicyPreview": {
-            "mode": "merge" if existing else "create",
+            "mode": effective_mode,
             "uniqueFields": selected_unique_fields,
             "conflictRule": conflict_rule,
             "savedPolicy": import_policy,
             "mergePlan": merge_plan,
+            "schemaCompatible": schema_compatible,
+            "blockers": blockers,
             "willWrite": False,
         },
         "sourcePipelineContract": source_pipeline_contract(),
@@ -372,6 +447,7 @@ def preview_import_command(
             getattr(args, "unique_fields", None),
             getattr(args, "conflict_rule", None),
             workspace_id=(str(getattr(args, "workspace", "") or "").strip() or None),
+            mode_value=getattr(args, "mode", None),
         )
         workspace_id = str(preview.get("workspaceId") or "")
         if not workspace_id:
@@ -393,6 +469,7 @@ def execute_import_commit(
     conflict_rule_value: str | None = None,
     *,
     workspace_id: str | None = None,
+    stage_key: str | None = None,
     build_import_preview: Callable[..., dict[str, Any]],
     merge_import_into_table: Callable[..., dict[str, Any]],
     import_csv_as_table: Callable[..., dict[str, Any]],
@@ -408,6 +485,8 @@ def execute_import_commit(
         unique_fields_value,
         conflict_rule_value,
         workspace_id=workspace_id,
+        mode_value=mode,
+        stage_key=stage_key,
     )
     resolved_workspace_id = str(preview.get("workspaceId") or "")
     if not resolved_workspace_id or (workspace_id is not None and resolved_workspace_id != str(workspace_id)):
@@ -423,6 +502,7 @@ def execute_import_commit(
             conflict_rule=conflict_rule,
             display_name=name,
             workspace_id=resolved_workspace_id,
+            stage_key=stage_key,
         )
     else:
         result = import_csv_as_table(
@@ -432,6 +512,7 @@ def execute_import_commit(
             display_name=name or default_display_name,
             mode=mode,
             workspace_id=resolved_workspace_id,
+            stage_key=stage_key,
         )
     if str(result.get("workspaceId") or "") != resolved_workspace_id:
         raise RuntimeError("Import writer escaped the requested workspace.")
@@ -463,6 +544,7 @@ def import_commit_command(
             args.unique_fields,
             args.conflict_rule,
             workspace_id=(str(getattr(args, "workspace", "") or "").strip() or None),
+            mode_value=getattr(args, "mode", None),
         )
         workspace_id = str(preview.get("workspaceId") or "")
         if not workspace_id:
@@ -554,6 +636,7 @@ def execute_folder_import_plan(
             ",".join(unique_fields),
             None,
             workspace_id=resolved_workspace_id,
+            stage_key=str(item.get("stageKey") or "") or None,
         )
         if str(result.get("workspaceId") or "") != resolved_workspace_id:
             raise RuntimeError("Folder import item escaped the requested workspace.")

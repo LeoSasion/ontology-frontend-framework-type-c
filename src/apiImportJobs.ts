@@ -9,6 +9,9 @@ export type CreateImportJobOptions = {
   table?: string;
   name?: string;
   mode?: string;
+  stageKey?: string;
+  stageBindings?: Record<string, string>;
+  confirmSchemaChange?: boolean;
   uniqueFields?: string[];
   conflictRule?: string;
   recursive?: boolean;

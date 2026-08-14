@@ -87,7 +87,7 @@ try {
   );
   add(
     "sqlite-and-duckdb-reach-current-version",
-    inspected.status === 0 && inspectedPayload.sqliteVersion === 16 && inspectedPayload.duckdbVersion === 1,
+    inspected.status === 0 && inspectedPayload.sqliteVersion === 17 && inspectedPayload.duckdbVersion === 1,
     inspected.stderr || inspected.stdout,
   );
   add(
@@ -141,6 +141,12 @@ try {
     "v14-metric-monitor-tables-and-indexes-are-created",
     inspectedPayload.metricMonitorTables?.join(":") === "metric_monitor_evaluations:metric_monitors"
       && inspectedPayload.metricMonitorIndexes?.join(":") === "idx_metric_monitor_evaluations_workspace_monitor:idx_metric_monitors_workspace_input:idx_metric_monitors_workspace_status",
+    inspectedPayload,
+  );
+  add(
+    "v17-trusted-release-tables-and-indexes-are-created",
+    inspectedPayload.trustedReleaseTables?.join(":") === "metric_contract_events:metric_contract_versions:semantic_release_events:semantic_releases:workflow_recipe_events:workflow_recipes"
+      && inspectedPayload.trustedReleaseIndexes?.join(":") === "idx_metric_contract_events_contract:idx_metric_contract_versions_metric:idx_semantic_release_events_release:idx_semantic_releases_workspace_status:idx_workflow_recipe_events_recipe",
     inspectedPayload,
   );
 

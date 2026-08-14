@@ -222,20 +222,29 @@ def import_csv_as_table(
     display_name: str | None = None,
     mode: str = "create",
     workspace_id: str | None = None,
+    stage_key: str | None = None,
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    read_import_stage: Callable[..., tuple[list[str], list[dict[str, Any]], dict[str, Any], dict[str, Any]]],
     profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
     physical_table_for_workspace: Callable[[str, str], str],
     upsert_navigation_module: Callable[..., None],
 ) -> dict[str, Any]:
-    headers, rows = read_table_file(path)
+    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
+    if stage_key:
+        headers, rows, staged_profile, _stage = read_import_stage(
+            stage_key=stage_key,
+            workspace_id=resolved_workspace_id,
+        )
+    else:
+        headers, rows = read_table_file(path)
+        staged_profile = None
     if not headers:
         raise ValueError(f"No headers found in {path}")
     table_key = table_key or slug(path.stem)
     display_name = display_name or path.stem
-    resolved_workspace_id = str(workspace_id or active_workspace_id(connection))
     physical_table = physical_table_for_workspace(resolved_workspace_id, table_key)
-    profile = profile_rows(headers, rows)
+    profile = staged_profile or profile_rows(headers, rows)
 
     connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(physical_table)}")
     column_sql = ", ".join(f"{quote_identifier(header)} TEXT" for header in headers)
@@ -390,8 +399,10 @@ def merge_import_into_table(
     conflict_rule: str,
     display_name: str | None = None,
     workspace_id: str | None = None,
+    stage_key: str | None = None,
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    read_import_stage: Callable[..., tuple[list[str], list[dict[str, Any]], dict[str, Any], dict[str, Any]]],
     table_columns: Callable[[sqlite3.Connection, str], list[str]],
     profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
@@ -400,7 +411,13 @@ def merge_import_into_table(
     registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
     if not registry:
         raise ValueError(f"Unknown table for merge: {table_key}")
-    headers, raw_rows = read_table_file(path)
+    if stage_key:
+        headers, raw_rows, _staged_profile, _stage = read_import_stage(
+            stage_key=stage_key,
+            workspace_id=resolved_workspace_id,
+        )
+    else:
+        headers, raw_rows = read_table_file(path)
     physical_table = registry["physical_table"]
     existing_columns = table_columns(connection, physical_table)
     if set(headers) != set(existing_columns):

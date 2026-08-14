@@ -30,6 +30,9 @@ def safe_argument_payload(args: argparse.Namespace | dict[str, Any] | None) -> d
         if key in {"request_key", "requestKey"}:
             payload["requestKeyFingerprint"] = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
             continue
+        if key in {"bindings_json", "bindingsJson"}:
+            payload["bindingsFingerprint"] = hashlib.sha256(str(value).encode("utf-8")).hexdigest()
+            continue
         payload[key] = sanitize_public_value(value, key=key)
     return payload
 

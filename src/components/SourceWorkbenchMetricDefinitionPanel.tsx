@@ -1,8 +1,10 @@
-import type { Dispatch, SetStateAction } from "react";
+import { lazy, Suspense, type Dispatch, type SetStateAction } from "react";
 import type { FieldConfig, MetricDefinition } from "../types";
 import type { MetricMutationOptions, QueryMetricOptions } from "../sourceWorkbenchFieldMetricTypes";
 import { actionResultSummary } from "../sourceWorkbenchModel";
 import { Bilingual, biText } from "./Bilingual";
+
+const MetricContractPanel = lazy(() => import("./MetricContractPanel").then((module) => ({ default: module.MetricContractPanel })));
 
 type SourceWorkbenchMetricDefinitionPanelProps = {
   showAdvanced: boolean;
@@ -151,6 +153,7 @@ export function SourceWorkbenchMetricDefinitionPanel({
           </li>
         ))}
       </ul>
+      {selectedMetrics[0] ? <Suspense fallback={<div className="resultNotice">{biText("正在载入口径合同…", "Loading Metric Contract…")}</div>}><MetricContractPanel metric={selectedMetrics[0]} /></Suspense> : null}
       {semanticMetricResult ? (
         <div className="resultNotice" data-testid="semantic-metric-result">
           <strong>{actionResultSummary(semanticMetricResult)}</strong>

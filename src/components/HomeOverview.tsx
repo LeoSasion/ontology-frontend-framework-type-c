@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import type { AgentAskResult, WorkbenchPayload, WorkspaceStatus } from "../types";
 import type { SourceIntelligenceRunOptions } from "../sourceIntelligenceRunModel";
 import type { AnalysisJob } from "../typesJobs";
-import { buildWorkspaceJourney } from "../workspaceJourneyModel";
+import { buildTrustedAnswerCoordinator } from "../trustedAnswerCoordinator";
 import { Bilingual, biText, useLanguage } from "./Bilingual";
 import { Icon } from "./Icons";
 import type { AppSection } from "./Sidebar";
@@ -49,7 +49,8 @@ export function HomeOverview({
   const [busy, setBusy] = useState<"profile" | "ask" | null>(null);
   const [submitError, setSubmitError] = useState("");
   const [evidenceError, setEvidenceError] = useState("");
-  const journey = buildWorkspaceJourney({ status, workbench, agent, sourceIntelligenceJobs, pendingDraftCount });
+  const coordinator = buildTrustedAnswerCoordinator({ status, workbench, agent, sourceIntelligenceJobs, pendingDraftCount });
+  const { journey, recommendation } = coordinator;
   const latestRun = journey.latestRun;
   const latestUsableRun = journey.latestUsableRun;
   const workspaceName = status.workspace?.name || biText("当前工作区", "Current workspace");
@@ -193,7 +194,17 @@ export function HomeOverview({
         </section>
       ) : null}
 
-      <div className="workspacePrimaryTask" data-testid="workspace-primary-task">
+      <div
+        aria-label={biText("当前唯一推荐动作", "Current single recommended action")}
+        className="workspacePrimaryTask"
+        data-recommended-action={recommendation.actionKey}
+        data-testid="workspace-primary-task"
+      >
+        <div className="workspaceRecommendation" data-testid="workspace-recommendation" role="status">
+          <span><Bilingual zh="推荐下一步" en="Recommended next" /></span>
+          <strong>{recommendation.label}</strong>
+          <small>{recommendation.detail}</small>
+        </div>
         {!journey.hasData ? (
           <div className="workspaceTaskEmpty">
             <span className="workspaceTaskIcon"><Icon name="source" /></span>

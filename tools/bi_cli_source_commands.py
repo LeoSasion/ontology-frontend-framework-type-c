@@ -425,6 +425,8 @@ def build_import_preview(
     conflict_rule_value: str | None = None,
     *,
     workspace_id: str | None = None,
+    mode_value: str | None = None,
+    stage_key: str | None = None,
 ) -> dict[str, Any]:
     return build_import_preview_service(
         connection,
@@ -433,6 +435,8 @@ def build_import_preview(
         unique_fields_value,
         conflict_rule_value,
         workspace_id=workspace_id,
+        mode_value=mode_value,
+        stage_key=stage_key,
         read_table_file=read_table_file,
         profile_rows=profile_rows,
         normalize_records_for_columns=normalize_records_for_columns,
@@ -470,6 +474,7 @@ def preview_import_command(args: argparse.Namespace) -> dict[str, Any]:
             "uniqueKeyQuality": result.get("uniqueKeyQuality"),
             "mergePolicyPreview": result.get("mergePolicyPreview"),
             "sourcePipelineContract": result.get("sourcePipelineContract"),
+            "importStage": result.get("importStage"),
         },
         artifacts=[artifact_ref("source-file", args.file, kind="source")],
     )
@@ -486,6 +491,7 @@ def execute_import_commit(
     conflict_rule_value: str | None = None,
     *,
     workspace_id: str | None = None,
+    stage_key: str | None = None,
 ) -> dict[str, Any]:
     return execute_import_commit_service(
         connection,
@@ -496,6 +502,7 @@ def execute_import_commit(
         unique_fields_value,
         conflict_rule_value,
         workspace_id=workspace_id,
+        stage_key=stage_key,
         build_import_preview=build_import_preview,
         merge_import_into_table=merge_import_into_table,
         import_csv_as_table=import_csv_as_table,

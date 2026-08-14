@@ -55,6 +55,7 @@ export function appendAppArchitectureContractChecks(context) {
     hasCssRule,
     homeOverviewSource,
     workspaceJourneyModelSource,
+    trustedAnswerCoordinatorSource,
     implementationStatusSource,
     join,
     metricRepairModelSource,
@@ -537,8 +538,9 @@ export function appendAppArchitectureContractChecks(context) {
         label: "frontend-home-overview-model-boundary",
         ok: !homeOverviewSource.includes('from "../homeOverviewModel"') &&
           homeOverviewSource.includes("const questionStarters = [") &&
-          homeOverviewSource.includes('from "../workspaceJourneyModel"') &&
-          homeOverviewSource.includes("const journey = buildWorkspaceJourney(") &&
+          homeOverviewSource.includes('from "../trustedAnswerCoordinator"') &&
+          homeOverviewSource.includes("const coordinator = buildTrustedAnswerCoordinator(") &&
+          homeOverviewSource.includes("const { journey, recommendation } = coordinator") &&
           homeOverviewSource.includes("const workflowSteps = [") &&
           homeOverviewSource.includes("async function submitQuestion") &&
           homeOverviewSource.includes("async function generateEvidence") &&
@@ -546,6 +548,9 @@ export function appendAppArchitectureContractChecks(context) {
           workspaceJourneyModelSource.includes('export type WorkspaceJourneyPhase = "connect" | "understand" | "ask" | "review" | "confirm"') &&
           workspaceJourneyModelSource.includes("const hasCurrentEvidence = Boolean(latestUsableRun)") &&
           workspaceJourneyModelSource.includes('export type WorkspaceResultState = "none" | "ready" | "blocked"') &&
+          trustedAnswerCoordinatorSource.includes("export function buildTrustedAnswerCoordinator") &&
+          trustedAnswerCoordinatorSource.includes("const journey = buildWorkspaceJourney(options)") &&
+          trustedAnswerCoordinatorSource.includes('schema: "aibi-first-trusted-answer/v1"') &&
           !homeOverviewSource.includes("buildHomeReadiness") &&
           !homeOverviewSource.includes("buildHomeGuideSteps") &&
           !homeOverviewSource.includes("sourceDashboardCandidate"),

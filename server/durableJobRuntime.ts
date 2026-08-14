@@ -82,6 +82,11 @@ export class DurableJobRuntime {
     if (body.table) args.push("--table", String(body.table));
     if (body.name) args.push("--name", String(body.name));
     if (body.mode) args.push("--mode", String(body.mode));
+    if (body.stageKey) args.push("--stage-key", String(body.stageKey));
+    if (body.stageBindings && typeof body.stageBindings === "object") {
+      args.push("--stage-bindings", JSON.stringify(body.stageBindings));
+    }
+    if (body.confirmSchemaChange === true) args.push("--confirm-schema-change");
     if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) {
       args.push("--unique-fields", body.uniqueFields.map(String).join(","));
     }

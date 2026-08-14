@@ -29,6 +29,53 @@ export interface SourceFieldProfile {
   sampleValues: string[];
 }
 
+export interface ImportSchemaChangeImpactItem {
+  key: string;
+  label: string;
+  fields: string[];
+}
+
+export interface ImportSchemaChangePreview {
+  schema: "aibi-import-schema-change/v1" | string;
+  kind: "replace-schema" | string;
+  targetTableKey: string;
+  targetDisplayName: string;
+  currentFields: string[];
+  incomingFields: string[];
+  addedFields: string[];
+  removedFields: string[];
+  retainedFields: string[];
+  orderChanged: boolean;
+  confirmationRequired: boolean;
+  impact: {
+    relationships: ImportSchemaChangeImpactItem[];
+    metrics: ImportSchemaChangeImpactItem[];
+    calculatedFields: ImportSchemaChangeImpactItem[];
+    savedViews: ImportSchemaChangeImpactItem[];
+    dashboardWidgets: ImportSchemaChangeImpactItem[];
+    fieldSemantics: ImportSchemaChangeImpactItem[];
+    totalDependencies: number;
+    truncated: boolean;
+    fingerprint: string;
+  };
+}
+
+export interface ImportStageSummary {
+  schema: "aibi-import-stage/v1" | string;
+  stageKey: string;
+  workspaceId: string;
+  contentHash: string;
+  contentFingerprint: string;
+  parserVersion: string;
+  sourceName: string;
+  sourceBytes: number;
+  rowCount: number;
+  columnCount: number;
+  createdAt: string;
+  expiresAt: string;
+  sealed: boolean;
+}
+
 export interface ImportPreview {
   ok: boolean;
   dryRun: boolean;
@@ -51,17 +98,24 @@ export interface ImportPreview {
   };
   matches?: Array<Record<string, unknown>>;
   uniqueKeyQuality?: Record<string, unknown> | null;
+  schemaChange?: ImportSchemaChangePreview | null;
+  blockers?: string[];
+  readyToCommit?: boolean;
   mergePolicyPreview: {
     mode: string;
     uniqueFields: string[];
     conflictRule: string;
     mergePlan?: Record<string, unknown> | null;
+    schemaCompatible?: boolean;
+    blockers?: string[];
     willWrite: boolean;
   };
   sourcePipelineContract: SourcePipelineContract;
   contentHash?: string;
   parentSourceRunId?: string | null;
   planFingerprint?: string;
+  stageKey?: string | null;
+  importStage?: ImportStageSummary;
   commitOptions?: {
     table: string;
     name: string;
@@ -82,6 +136,9 @@ export interface FolderImportPlanItem {
   uniqueFields: string[];
   fileIdentity?: string;
   contentHash?: string;
+  stageKey?: string | null;
+  stageFingerprint?: string | null;
+  parserVersion?: string;
   keyDecision?: { uniqueFields: string[]; authority: string; quality?: Record<string, unknown> | null };
   rowImpact?: Record<string, number | string>;
   pii?: { classification: string; sensitiveFields?: string[]; requiresReview?: boolean };
@@ -294,6 +351,54 @@ export interface DataConnectorConfig {
   lastSyncAt?: string | null;
   lastSyncStatus?: string | null;
   lastSyncResult?: Record<string, unknown> | null;
+}
+
+export interface MetricContractScenario {
+  name: string;
+  groups: string[];
+  filters: Array<{ field: string; operator: string; hasValue: boolean; valueFingerprint: string }>;
+  limit: number;
+  baseline?: { resultFingerprint: string; rowCount: number; columnCount: number; scalar: number | null };
+}
+
+export interface MetricContractPlan {
+  schema: "aibi-metric-contract-plan/v2" | string;
+  workspaceId: string;
+  requestKeyFingerprint: string;
+  metricKey: string;
+  version: number;
+  definition: Record<string, unknown> & { contract: { population: string; grain: string; unit: string; nullPolicy: string; dedupKey: string; direction: string; owner: string } };
+  binding: { tableKey: string; dataVersion: number; rowCount: number };
+  scenarios: MetricContractScenario[];
+  changes: Array<{ field: string; kind: string }>;
+  planFingerprint: string;
+  readyToPublish: boolean;
+}
+
+export interface MetricContract {
+  schema: "aibi-metric-contract/v2" | string;
+  contractKey: string;
+  workspaceId: string;
+  metricKey: string;
+  version: number;
+  label: string;
+  status: "current" | "stale" | string;
+  definition: MetricContractPlan["definition"];
+  binding: MetricContractPlan["binding"];
+  freshness: { definitionCurrent: boolean; bindingCurrent: boolean; replayRecommended: boolean; mismatches: string[] };
+  scenarios: MetricContractScenario[];
+  planFingerprint: string;
+  publishedAt: string;
+}
+
+export interface MetricContractReplay {
+  schema: "aibi-metric-contract-replay/v1" | string;
+  contractKey: string;
+  metricKey: string;
+  status: "passed" | "changed" | "blocked" | string;
+  attribution: "no-drift" | "definition-changed" | "data-changed" | "definition-and-data-changed" | string;
+  comparisons: Array<{ name: string; status: string; scalarDelta: number | null; baseline?: Record<string, unknown>; current?: Record<string, unknown>; errorCode?: string }>;
+  summary: { total: number; passed: number; changed: number; blocked: number };
 }
 
 export interface ConnectorAdapterContract {

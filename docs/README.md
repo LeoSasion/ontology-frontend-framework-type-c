@@ -16,6 +16,7 @@
 | [实现状态](implementation-status.md) | 当前能力、限制、架构归属和验证入口 |
 | [未来开发队列](development-roadmap.md) | 尚未交付事项、优先级和退出条件 |
 | [可信能力吸收开发规格](trusted-capability-absorption.md) | 持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的本批执行合同 |
+| [跨项目能力吸收与开发规格](cross-project-capability-development.md) | 外部同类产品只读研究的取舍、密封导入、首个可信答案、语义发布、指标合同、Recipe、恢复对比与办公导出合同 |
 
 ## 技术合同与证据
 

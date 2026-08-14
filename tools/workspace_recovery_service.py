@@ -21,6 +21,7 @@ RECOVERY_PLAN_SCHEMA = "aibi-workspace-recovery-plan/v1"
 RECOVERY_COLLECTION_SCHEMA = "aibi-workspace-recovery-points/v1"
 RECOVERY_OPERATION_SCHEMA = "aibi-workspace-recovery-operation/v1"
 RECOVERY_JOURNAL_SCHEMA = "aibi-workspace-recovery-journal/v1"
+RECOVERY_COMPARISON_SCHEMA = "aibi-workspace-recovery-comparison/v1"
 
 # Point-in-time recovery changes current business configuration and physical
 # source data only. Evidence, append-only ledgers, source history, durable-job
@@ -1411,6 +1412,61 @@ class WorkspaceRecoveryService:
             "verified": bool(verify),
         }
 
+    def compare(self, workspace_id: str, recovery_point_key: str) -> dict[str, Any]:
+        """Compare current table versions with one verified point without exposing rows."""
+        workspace_id = _workspace_id(workspace_id)
+        recovery_point_key = _recovery_key(recovery_point_key)
+        manifest = self._load_manifest(workspace_id, recovery_point_key, verify=True)
+        with closing(self.open_db()) as connection:
+            connection.row_factory = sqlite3.Row
+            _assert_workspace_exists(connection, workspace_id)
+            current_versions = self._source_versions(connection, workspace_id)
+        target_versions = manifest.get("sourceVersions") if isinstance(manifest.get("sourceVersions"), list) else []
+        current_by_key = {str(item.get("tableKey") or ""): item for item in current_versions if isinstance(item, dict) and item.get("tableKey")}
+        target_by_key = {str(item.get("tableKey") or ""): item for item in target_versions if isinstance(item, dict) and item.get("tableKey")}
+        changes: list[dict[str, Any]] = []
+        for table_key in sorted(set(current_by_key) | set(target_by_key)):
+            current = current_by_key.get(table_key)
+            target = target_by_key.get(table_key)
+            current_version = int(current.get("dataVersion") or 0) if current else None
+            target_version = int(target.get("dataVersion") or 0) if target else None
+            if current is None:
+                change = "restore"
+            elif target is None:
+                change = "remove"
+            elif current_version != target_version:
+                change = "version-change"
+            else:
+                change = "unchanged"
+            changes.append({
+                "tableKey": table_key,
+                "change": change,
+                "currentDataVersion": current_version,
+                "targetDataVersion": target_version,
+            })
+        changed = [item for item in changes if item["change"] != "unchanged"]
+        current_state = self._state(workspace_id)
+        return {
+            "ok": True,
+            "schema": RECOVERY_COMPARISON_SCHEMA,
+            "workspaceId": workspace_id,
+            "recoveryPointKey": recovery_point_key,
+            "verified": True,
+            "currentWorkspaceStateFingerprint": current_state["fingerprint"],
+            "targetWorkspaceStateFingerprint": str(manifest.get("workspaceStateFingerprint") or ""),
+            "currentSourceRunId": current_state.get("currentSourceRunId"),
+            "targetSourceRunId": manifest.get("currentSourceRunId"),
+            "changes": changes,
+            "changedCount": len(changed),
+            "unchangedCount": len(changes) - len(changed),
+            "summary": {
+                "restore": sum(1 for item in changed if item["change"] == "restore"),
+                "remove": sum(1 for item in changed if item["change"] == "remove"),
+                "versionChange": sum(1 for item in changed if item["change"] == "version-change"),
+            },
+            "exposesBusinessRows": False,
+        }
+
     def _restore_duckdb(self, snapshot_path: Path | None, current_physical: list[str]) -> dict[str, Any]:
         if not self.duckdb_path.exists() and snapshot_path is None:
             return {"changed": False, "restoredReplicas": 0, "removedReplicas": 0}
@@ -1944,6 +2000,14 @@ def workspace_recovery_inspect_command(args: argparse.Namespace, **dependencies:
         workspace_id = _resolve_command_workspace(args, open_db=dependencies["open_db"], active_workspace_id=dependencies["active_workspace_id"])
         service = _command_service(**{key: dependencies[key] for key in ("open_db", "sqlite_path", "duckdb_path", "recovery_root")})
         return service.inspect(workspace_id, str(args.recovery_point), verify=True)
+    return _run_recovery_command(run)
+
+
+def workspace_recovery_compare_command(args: argparse.Namespace, **dependencies: Any) -> dict[str, Any]:
+    def run() -> dict[str, Any]:
+        workspace_id = _resolve_command_workspace(args, open_db=dependencies["open_db"], active_workspace_id=dependencies["active_workspace_id"])
+        service = _command_service(**{key: dependencies[key] for key in ("open_db", "sqlite_path", "duckdb_path", "recovery_root")})
+        return service.compare(workspace_id, str(args.recovery_point))
     return _run_recovery_command(run)
 
 

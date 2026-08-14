@@ -25,7 +25,13 @@ export type {
   ImportJob,
   ImportPolicy,
   ImportPreview,
+  ImportSchemaChangeImpactItem,
+  ImportSchemaChangePreview,
   MetricDefinition,
+  MetricContract,
+  MetricContractPlan,
+  MetricContractReplay,
+  MetricContractScenario,
   RelationshipPreviewPayload,
   RelationshipRecommendation,
   RelationshipRecord,
@@ -42,7 +48,8 @@ export type {
   WorkbenchTable,
 } from "./typesSource";
 export type { QueryRuntimeStatus, SelectionConfidence, SourceRunSummary, WorkspaceRecord, WorkspaceStatus } from "./typesWorkspace";
-export type { AnalysisRunsPayload, ConfirmedPlanMemory, ConfirmedPlansPayload, ConfirmedQueriesPayload, ConfirmedQuery, ContextPackPayload, ContextRule, ContextTerm, KnowledgeSource, QueryReceiptsPayload, RecallCandidate, RecallReceipt, RecallReceiptsPayload, SemanticPatchCollectionPayload, SemanticPatchProposal } from "./typesTrust";
+export type { AnalysisRunsPayload, ConfirmedPlanMemory, ConfirmedPlansPayload, ConfirmedQueriesPayload, ConfirmedQuery, ContextPackPayload, ContextRule, ContextTerm, KnowledgeSource, KnowledgeSourceAdapter, QueryReceiptsPayload, RecallCandidate, RecallReceipt, RecallReceiptsPayload, SemanticPatchCollectionPayload, SemanticPatchProposal, SemanticRelease, SemanticReleasePlan, SemanticReleasesPayload } from "./typesTrust";
 export type { BusinessFieldProfile, BusinessFieldProfileCollection, BusinessFieldProfileStatus, RuntimeCatalogSummary, WorkspaceManifestSummary } from "./typesWorkspaceContext";
-export type { WorkspaceRecoveryFileSummary, WorkspaceRecoveryOperation, WorkspaceRecoveryPayload, WorkspaceRecoveryPlan, WorkspaceRecoveryPoint } from "./typesWorkspaceRecovery";
+export type { WorkspaceRecoveryComparison, WorkspaceRecoveryFileSummary, WorkspaceRecoveryOperation, WorkspaceRecoveryPayload, WorkspaceRecoveryPlan, WorkspaceRecoveryPoint } from "./typesWorkspaceRecovery";
+export type { WorkflowRecipe, WorkflowRecipeInstantiation, WorkflowRecipePlan, WorkflowRecipeStage } from "./typesWorkflowRecipe";
 export type { EvidenceLedgerVerification, ReviewedPublication, ReviewedPublicationDriftReason, ReviewedPublicationExport, ReviewedPublicationPayload, ReviewedPublicationStatus } from "./typesReviewedPublication";

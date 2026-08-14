@@ -97,6 +97,50 @@ export async function handleWorkflowApi({ cli, request, response, url }: Workflo
     return true;
   }
 
+  if (url.pathname === "/api/workflow/recipes" && request.method === "GET") {
+    const requestedLimit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const result = await cli(["workflow-recipes", "--limit", String(Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50)]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if ((url.pathname === "/api/workflow/recipes/preview" || url.pathname === "/api/workflow/recipes/publish") && request.method === "POST") {
+    const body = await readBody(request);
+    const requestKey = nonEmpty(body.requestKey);
+    const name = nonEmpty(body.name);
+    const stages = Array.isArray(body.stages) ? body.stages : [];
+    const publish = url.pathname.endsWith("/publish");
+    const expectedPlan = nonEmpty(body.expectedPlanFingerprint);
+    if (requestKey.length < 8 || requestKey.length > 200 || !name || name.length > 160 || stages.length < 1 || stages.length > 12 || stages.some((stage) => !stage || typeof stage !== "object" || Array.isArray(stage) || !nonEmpty((stage as Record<string, unknown>).command))) {
+      sendJson(response, 400, { ok: false, code: "WORKFLOW_RECIPE_INPUT_INVALID", error: "Bounded requestKey, name, and 1-12 capability stages are required." });
+      return true;
+    }
+    if (publish && (body.confirm !== true || !/^[a-f0-9]{64}$/.test(expectedPlan))) {
+      sendJson(response, 400, { ok: false, code: "WORKFLOW_RECIPE_CONFIRMATION_REQUIRED", error: "Publish requires confirm=true and the exact preview fingerprint." });
+      return true;
+    }
+    const args = [publish ? "workflow-recipe-publish" : "workflow-recipe-preview", "--request-key", requestKey, "--name", name];
+    if (body.description) args.push("--description", String(body.description));
+    for (const stage of stages) args.push("--stage-json", JSON.stringify(stage));
+    if (publish) args.push("--expected-plan", expectedPlan, "--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/workflow/recipes/plan" && request.method === "POST") {
+    const body = await readBody(request);
+    const recipeKey = nonEmpty(body.recipeKey);
+    const bindings = body.bindings && typeof body.bindings === "object" && !Array.isArray(body.bindings) ? body.bindings : {};
+    if (!/^recipe_[a-f0-9]{20}$/.test(recipeKey) || JSON.stringify(bindings).length > 8_000) {
+      sendJson(response, 400, { ok: false, code: "WORKFLOW_RECIPE_PLAN_INPUT_INVALID", error: "A valid recipe and bounded bindings are required." });
+      return true;
+    }
+    const result = await cli(["workflow-recipe-plan", "--recipe", recipeKey, "--bindings-json", JSON.stringify(bindings)]);
+    sendJson(response, result.ok === false && !Array.isArray(result.stages) ? 409 : 200, result);
+    return true;
+  }
+
   if (url.pathname === "/api/context/budget" && request.method === "POST") {
     const body = await readBody(request);
     if (!Array.isArray(body.segments)) {

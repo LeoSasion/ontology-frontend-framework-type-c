@@ -210,15 +210,23 @@ def _run_legacy_import_job(
         expected_plan=frozen_plan,
     )
     path_value = getattr(args, "file", None) if import_kind == "single" else getattr(args, "path", None)
+    stage_bindings = {
+        str(item.get("fileIdentity") or ""): str(item.get("stageKey") or "")
+        for item in (plan.get("items") or [])
+        if isinstance(item, dict) and item.get("fileIdentity") and item.get("stageKey")
+    }
     created = _create_legacy_import_job_with_boundary(argparse.Namespace(
         workspace=workspace_id,
         import_kind=import_kind,
         path=str(path_value or ""),
         request_key=request_key,
         expected_plan=frozen_plan,
+        stage_key=str(plan.get("stageKey") or ""),
+        stage_bindings=stage_bindings,
         table=getattr(args, "table", None),
         name=getattr(args, "name", None),
         mode=str(execution_mode or getattr(args, "mode", "") or "create"),
+        confirm_schema_change=bool(getattr(args, "confirm_schema_change", False)),
         unique_fields=getattr(args, "unique_fields", None),
         conflict_rule=getattr(args, "conflict_rule", None),
         no_recursive=bool(getattr(args, "no_recursive", False)),
@@ -245,55 +253,30 @@ def _run_legacy_import_job(
 def legacy_import_commit_command(args: argparse.Namespace) -> dict:
     """Run the confirmed legacy single-file command through W1/W3."""
     workspace_id = _legacy_import_workspace(args)
+    execution_mode = str(getattr(args, "mode", "") or "create")
     with legacy_import_preview_boundary():
         plan = preview_import_command(argparse.Namespace(
             workspace=workspace_id,
             file=args.file,
             table=getattr(args, "table", None),
+            mode=execution_mode,
             unique_fields=getattr(args, "unique_fields", None),
             conflict_rule=getattr(args, "conflict_rule", None),
         ))
     preview_builder = build_import_preview
-    execution_mode = str(getattr(args, "mode", "") or "create")
     expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
-    # Before durable imports existed, unbound create/replace both performed a
-    # full table replacement. Preserve that exact legacy behavior by freezing
-    # a create plan, while leaving explicit preview fingerprints untouched.
-    if not expected_plan and execution_mode in {"create", "replace"} and isinstance(plan.get("matchedTable"), dict):
-        def replacement_preview_builder(*preview_args, **preview_kwargs):
-            preview = build_import_preview(*preview_args, **preview_kwargs)
-            merge_preview = preview.get("mergePolicyPreview") if isinstance(preview.get("mergePolicyPreview"), dict) else {}
-            return {
-                **preview,
-                "matchedTable": None,
-                "mergePolicyPreview": {**merge_preview, "mode": "create"},
-            }
-
-        preview_builder = replacement_preview_builder
-        execution_mode = "create"
-        with legacy_import_preview_boundary():
-            with open_db() as connection:
-                workspace = connection.execute(
-                    "SELECT current_source_run_id FROM workspaces WHERE id = ?",
-                    (workspace_id,),
-                ).fetchone()
-                if workspace is None:
-                    raise ValueError(f"Unknown workspace: {workspace_id}")
-                replacement_preview = preview_builder(
-                    connection,
-                    args.file,
-                    getattr(args, "table", None),
-                    getattr(args, "unique_fields", None),
-                    getattr(args, "conflict_rule", None),
-                    workspace_id=workspace_id,
-                )
-                if str(replacement_preview.get("workspaceId") or "") != workspace_id:
-                    raise RuntimeError("Legacy replacement preview escaped the requested workspace.")
-                plan = bind_single_import_plan(
-                    replacement_preview,
-                    Path(args.file),
-                    current_source_run_id=str(workspace["current_source_run_id"] or "") or None,
-                )
+    plan_options = plan.get("commitOptions") if isinstance(plan.get("commitOptions"), dict) else {}
+    # A response-loss replay runs after the original import has already made
+    # the target table visible.  That fresh preview may now suggest ``merge``
+    # even though the frozen, owner-confirmed plan was ``create``.  Preserve
+    # the caller's confirmed mode whenever an exact plan fingerprint is
+    # supplied so the same request key resolves to the same durable job.
+    execution_mode = str(
+        (getattr(args, "mode", "") if expected_plan else plan_options.get("mode"))
+        or execution_mode
+        or plan_options.get("mode")
+        or "create"
+    )
     final_job, public_result = _run_legacy_import_job(
         args,
         import_kind="single",

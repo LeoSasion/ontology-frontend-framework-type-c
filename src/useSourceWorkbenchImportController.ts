@@ -47,9 +47,11 @@ export function useSourceWorkbenchImportController({
   const [uniqueFields, setUniqueFields] = useState("");
   const [conflictRule, setConflictRule] = useState("overwrite");
   const [folderImportPlan, setFolderImportPlan] = useState<Awaited<ReturnType<typeof onPreviewFolderImport>> | null>(null);
-  const [singleImportBinding, setSingleImportBinding] = useState<{ filePath: string; planFingerprint: string } | null>(null);
+  const [singleImportBinding, setSingleImportBinding] = useState<{ filePath: string; planFingerprint: string; stageKey: string } | null>(null);
   const [importOperationReceipt, setImportOperationReceipt] = useState<WorkbenchOperationReceipt | null>(null);
+  const [schemaChangeAcknowledged, setSchemaChangeAcknowledged] = useState(false);
   const [activeImportJob, setActiveImportJob] = useState<AnalysisJob | null>(null);
+  const [recentImportPaths, setRecentImportPaths] = useState<string[]>([]);
   const completedJobKeysRef = useRef(new Set<string>());
   const importJobCompletedRef = useRef(onImportJobCompleted);
   importJobCompletedRef.current = onImportJobCompleted;
@@ -61,20 +63,29 @@ export function useSourceWorkbenchImportController({
   const previewReadable = Boolean(preview.ok && preview.profile.rowCount > 0 && preview.profile.columnCount > 0);
   const previewSummary = buildImportPreviewSummary({ preview, previewReadable, targetName });
   const previewCommitOptions = preview.commitOptions;
+  const schemaChangeConfirmationRequired = preview.schemaChange?.confirmationRequired === true;
   const normalizedUniqueFields = uniqueFields.split(",").map((field) => field.trim()).filter(Boolean);
   const singleImportPlanReady = Boolean(
     singleImportBinding?.planFingerprint
+    && singleImportBinding.stageKey
     && singleImportBinding.filePath === filePath.trim()
     && previewCommitOptions
     && targetTable.trim() === previewCommitOptions.table
+    && targetName.trim() === previewCommitOptions.name
     && importMode === previewCommitOptions.mode
     && conflictRule === previewCommitOptions.conflictRule
-    && normalizedUniqueFields.join("\u0000") === previewCommitOptions.uniqueFields.join("\u0000"),
+    && normalizedUniqueFields.join("\u0000") === previewCommitOptions.uniqueFields.join("\u0000")
+    && preview.readyToCommit !== false,
   );
   const importJobActive = Boolean(activeImportJob && !["succeeded", "failed", "canceled", "needs_attention"].includes(activeImportJob.status));
 
   useEffect(() => {
+    setSchemaChangeAcknowledged(false);
+  }, [conflictRule, filePath, importMode, targetName, targetTable, uniqueFields]);
+
+  useEffect(() => {
     setActiveImportJob(null);
+    setSchemaChangeAcknowledged(false);
     completedJobKeysRef.current = new Set();
     importRequestRef.current = null;
     createInFlightRef.current = null;
@@ -113,6 +124,18 @@ export function useSourceWorkbenchImportController({
   }, [onFetchImportJob, onListImportJobs, workspaceId]);
 
   useEffect(() => {
+    const storageKey = `aibi-c:recent-import-paths:v1:${workspaceId}`;
+    try {
+      const stored = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
+      setRecentImportPaths(Array.isArray(stored)
+        ? stored.filter((value): value is string => typeof value === "string" && Boolean(value.trim())).slice(0, 5)
+        : []);
+    } catch {
+      setRecentImportPaths([]);
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
     const storageKey = `aibi-c:import-job:${workspaceId}`;
     if (activeImportJob?.workspaceId === workspaceId) {
       try {
@@ -146,9 +169,9 @@ export function useSourceWorkbenchImportController({
             setImportOperationReceipt({
               tone: "warn",
               title: biText("导入已完成，正在重试界面刷新", "Import completed; retrying interface refresh"),
-              detail: error instanceof Error ? error.message : String(error),
+              detail: biText("已提交结果仍在，界面暂时没有完成重新载入。", "The committed result is intact, but the interface has not finished reloading it yet."),
               nextStep: biText("无需重复导入；界面会自动读取已提交结果。", "Do not import again; the interface will automatically reload the committed result."),
-              technical: `job=${job.jobKey}; retry=${attempt}; delayMs=${delayMs}`,
+              technical: `job=${job.jobKey}; retry=${attempt}; delayMs=${delayMs}; captured=${error instanceof Error ? "exception" : "unknown"}`,
             });
           },
           schedule: (task, delayMs) => {
@@ -171,9 +194,9 @@ export function useSourceWorkbenchImportController({
         setImportOperationReceipt({
           tone: "warn",
           title: biText("暂时无法读取导入进度", "Import progress is temporarily unavailable"),
-          detail: error instanceof Error ? error.message : String(error),
+          detail: biText("后台任务不会因此被重复执行，界面会继续尝试读取当前状态。", "The background job will not be duplicated; the interface will keep trying to read its current status."),
           nextStep: biText("任务会在后台继续；稍后重新打开数据源页。", "The job continues in the background; reopen Sources shortly."),
-          technical: `job=${job.jobKey}`,
+          technical: `job=${job.jobKey}; captured=${error instanceof Error ? "exception" : "unknown"}`,
         });
       },
       schedule: (task, delayMs) => {
@@ -205,12 +228,24 @@ export function useSourceWorkbenchImportController({
     return createInFlightRef.current;
   }
 
-  function importOptions(confirm = false) {
+  function rememberImportPath(value: string) {
+    const normalized = value.trim();
+    if (!normalized) return;
+    const paths = [normalized, ...recentImportPaths.filter((item) => item !== normalized)].slice(0, 5);
+    setRecentImportPaths(paths);
+    try {
+      window.localStorage.setItem(`aibi-c:recent-import-paths:v1:${workspaceId}`, JSON.stringify(paths));
+    } catch {
+      // Recent paths are only a convenience; import remains available without browser storage.
+    }
+  }
+
+  function importOptions(confirm = false, modeOverride?: string) {
     const options = buildImportOptions({
       filePath,
       targetTable,
       targetName,
-      importMode,
+      importMode: modeOverride ?? importMode,
       uniqueFields,
       conflictRule,
       confirm,
@@ -223,20 +258,23 @@ export function useSourceWorkbenchImportController({
     };
   }
 
-  async function runImportPreviewAction() {
-    const result = await onPreview(importOptions(false));
+  async function runImportPreviewAction(modeOverride?: string) {
+    const effectiveMode = modeOverride ?? importMode;
+    const result = await onPreview(importOptions(false, effectiveMode));
+    setSchemaChangeAcknowledged(false);
     importRequestRef.current = null;
-    setSingleImportBinding(result.planFingerprint ? { filePath: filePath.trim(), planFingerprint: result.planFingerprint } : null);
+    const stageKey = String(result.stageKey || result.importStage?.stageKey || "");
+    setSingleImportBinding(result.planFingerprint && stageKey ? { filePath: filePath.trim(), planFingerprint: result.planFingerprint, stageKey } : null);
     setFolderImportPlan(null);
     let receiptTargetTable = targetTable;
-    let receiptImportMode = importMode;
+    let receiptImportMode = effectiveMode;
     let receiptUniqueFields = uniqueFields;
     if (result.ok && result.matchedTable) {
       receiptTargetTable = result.matchedTable.table_key;
-      receiptImportMode = "merge";
+      receiptImportMode = String(result.commitOptions?.mode || result.mergePolicyPreview.mode || "merge");
       setTargetTable(result.matchedTable.table_key);
       setTargetName(result.matchedTable.display_name);
-      setImportMode("merge");
+      setImportMode(receiptImportMode);
     } else if (result.ok) {
       const suggestedTable = String(result.suggestedTableKey || "").trim();
       const suggestedName = String(result.suggestedDisplayName || suggestedTable).trim();
@@ -249,6 +287,7 @@ export function useSourceWorkbenchImportController({
       receiptImportMode = "create";
     }
     if (result.ok) {
+      rememberImportPath(filePath);
       const suggestedUniqueFields = result.mergePolicyPreview.uniqueFields;
       if (!uniqueFields.trim() && suggestedUniqueFields.length) {
         receiptUniqueFields = suggestedUniqueFields.join(", ");
@@ -271,15 +310,17 @@ export function useSourceWorkbenchImportController({
     }
     if (!singleImportBinding?.planFingerprint) throw new Error(biText("请先重新检查来源。", "Check the source again first."));
     const options = importOptions(true);
-    const requestFingerprint = `single:${workspaceId}:${singleImportBinding.planFingerprint}:${options.filePath}:${options.table}:${options.mode}:${(options.uniqueFields ?? []).join("\u0000")}:${options.conflictRule}`;
+    const requestFingerprint = `single:${workspaceId}:${singleImportBinding.planFingerprint}:${singleImportBinding.stageKey}:${options.filePath}:${options.table}:${options.mode}:${(options.uniqueFields ?? []).join("\u0000")}:${options.conflictRule}:schema=${schemaChangeAcknowledged}`;
     const job = await createImportJobOnce({
       requestKey: stableRequestKey(requestFingerprint),
       expectedPlan: singleImportBinding.planFingerprint,
       importKind: "single",
       path: options.filePath,
+      stageKey: singleImportBinding.stageKey,
       table: options.table,
       name: options.name,
       mode: options.mode,
+      confirmSchemaChange: schemaChangeAcknowledged,
       uniqueFields: options.uniqueFields,
       conflictRule: options.conflictRule,
     });
@@ -303,8 +344,10 @@ export function useSourceWorkbenchImportController({
       uniqueFields: selectedUniqueFields,
       conflictRule,
     });
+    if (result.fileCount > 0) rememberImportPath(filePath);
     importRequestRef.current = null;
     setFolderImportPlan(result);
+    setSchemaChangeAcknowledged(false);
     setSingleImportBinding(null);
     const firstGroup = result.groups[0];
     if (firstGroup) {
@@ -334,12 +377,14 @@ export function useSourceWorkbenchImportController({
     if (confirm) {
       if (!folderImportPlan?.planFingerprint) throw new Error(biText("请先重新检查文件夹。", "Check the folder again first."));
       const folderUniqueFields = uniqueFields.split(",").map((field) => field.trim()).filter(Boolean);
-      const requestFingerprint = `folder:${workspaceId}:${folderImportPlan.planFingerprint}:${filePath.trim()}:${folderUniqueFields.join("\u0000")}:${conflictRule}`;
+      const stageBindings = Object.fromEntries(folderImportPlan.items.flatMap((item) => item.fileIdentity && item.stageKey ? [[item.fileIdentity, item.stageKey]] : []));
+      const requestFingerprint = `folder:${workspaceId}:${folderImportPlan.planFingerprint}:${JSON.stringify(stageBindings)}:${filePath.trim()}:${folderUniqueFields.join("\u0000")}:${conflictRule}`;
       const job = await createImportJobOnce({
         requestKey: stableRequestKey(requestFingerprint),
         expectedPlan: folderImportPlan.planFingerprint,
         importKind: "folder",
         path: filePath,
+        stageBindings,
         uniqueFields: folderUniqueFields,
         conflictRule,
         recursive: true,
@@ -389,14 +434,18 @@ export function useSourceWorkbenchImportController({
     importOperationReceipt,
     folderImportPlan,
     singleImportPlanReady,
+    schemaChangeAcknowledged,
+    schemaChangeConfirmationRequired,
     activeImportJob,
     importJobActive,
+    recentImportPaths,
     setFilePath,
     setTargetTable,
     setTargetName,
     setImportMode,
     setUniqueFields,
     setConflictRule,
+    setSchemaChangeAcknowledged,
     runImportPreviewAction,
     runImportCommitAction,
     runFolderImportPreviewAction,

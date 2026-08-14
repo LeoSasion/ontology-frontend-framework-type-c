@@ -45,6 +45,7 @@ export function previewImport(filePath = "") {
 export function previewImportWithOptions(options: {
   filePath: string;
   table?: string;
+  mode?: string;
   uniqueFields?: string[];
   conflictRule?: string;
 }) {

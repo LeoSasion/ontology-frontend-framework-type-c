@@ -19,14 +19,14 @@ from aibi_runtime.registry import build_command_registry  # noqa: E402
 
 
 checks: list[dict[str, object]] = []
-EXPECTED_COMMAND_COUNT = 204
+EXPECTED_COMMAND_COUNT = 217
 EXPECTED_GROUP_SIZES = {
-    "control": 42,
+    "control": 51,
     "analysis": 51,
-    "data": 80,
+    "data": 84,
     "delivery": 31,
 }
-EXPECTED_DISPATCH_FINGERPRINT = "ed2f93255f5859dbef8e5fbd28c2a3777d591970bda0af8c44f6b19215363aa7"
+EXPECTED_DISPATCH_FINGERPRINT = "5d9ce7bd86d7265edaa2096ef11aafafba67b4af92592a294b9f88b7ad765622"
 EXPECTED_USE_CASE_MODULES = {
     "agent_interaction.py",
     "analysis.py",

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import sqlite3
 import uuid
 from pathlib import Path
@@ -25,6 +26,7 @@ from job_runtime_service import (
     update_job_progress,
 )
 from query_runtime import sync_table_to_duckdb
+from import_stage_service import validate_import_stage_for_confirmation
 from source_activation_journal_service import (
     PHASE_COMMIT_STARTED,
     PHASE_FINALIZED,
@@ -110,6 +112,8 @@ def _build_current_plan(
             private_input.get("uniqueFields") or None,
             private_input.get("conflictRule") or None,
             workspace_id=workspace_id,
+            mode_value=private_input.get("mode") or None,
+            stage_key=private_input.get("stageKey") or None,
         )
         plan = bind_single_import_plan(
             preview,
@@ -129,6 +133,7 @@ def _build_current_plan(
         unique_fields_value=private_input.get("uniqueFields") or None,
         conflict_rule_value=private_input.get("conflictRule") or None,
         workspace_id=workspace_id,
+        stage_bindings=private_input.get("stageBindings") if isinstance(private_input.get("stageBindings"), dict) else None,
         build_import_preview=build_import_preview,
         read_table_file=read_table_file,
         active_workspace_id=active_workspace_id,
@@ -163,6 +168,29 @@ def _validate_single_commit_binding(private_input: dict[str, Any], plan: dict[st
         )
 
 
+def _stage_bindings_from_args(args: argparse.Namespace) -> dict[str, str]:
+    raw = getattr(args, "stage_bindings", "")
+    if not raw:
+        return {}
+    if isinstance(raw, dict):
+        candidate = raw
+    else:
+        try:
+            candidate = json.loads(str(raw))
+        except json.JSONDecodeError as error:
+            raise ValueError("Import stage bindings must be a JSON object.") from error
+    if not isinstance(candidate, dict):
+        raise ValueError("Import stage bindings must be a JSON object.")
+    bindings: dict[str, str] = {}
+    for identity, stage_key in candidate.items():
+        normalized_identity = str(identity or "").strip().replace("\\", "/")
+        normalized_stage = str(stage_key or "").strip()
+        if not normalized_identity or not normalized_stage.startswith("stage_"):
+            raise ValueError("Import stage binding is invalid.")
+        bindings[normalized_identity] = normalized_stage
+    return bindings
+
+
 def _public_job_input(
     *,
     import_kind: str,
@@ -171,6 +199,8 @@ def _public_job_input(
     request_key: str,
 ) -> dict[str, Any]:
     table_keys = _plan_table_keys(plan, import_kind)
+    schema_change = plan.get("schemaChange") if isinstance(plan.get("schemaChange"), dict) else None
+    import_stage = plan.get("importStage") if isinstance(plan.get("importStage"), dict) else None
     return {
         "schema": IMPORT_JOB_SCHEMA,
         "workspaceId": str(plan.get("workspaceId") or ""),
@@ -181,6 +211,25 @@ def _public_job_input(
         "tableKeys": table_keys,
         "planFingerprint": str(plan.get("planFingerprint") or ""),
         "parentSourceRunId": plan.get("parentSourceRunId"),
+        "schemaChange": ({
+            "schema": schema_change.get("schema"),
+            "targetTableKey": schema_change.get("targetTableKey"),
+            "addedFieldCount": len(schema_change.get("addedFields") or []),
+            "removedFieldCount": len(schema_change.get("removedFields") or []),
+            "orderChanged": schema_change.get("orderChanged") is True,
+            "confirmationRequired": schema_change.get("confirmationRequired") is True,
+        } if schema_change else None),
+        "importStage": ({
+            "schema": import_stage.get("schema"),
+            "stageKey": import_stage.get("stageKey"),
+            "contentHash": import_stage.get("contentHash"),
+            "contentFingerprint": import_stage.get("contentFingerprint"),
+            "parserVersion": import_stage.get("parserVersion"),
+            "rowCount": import_stage.get("rowCount"),
+            "columnCount": import_stage.get("columnCount"),
+            "expiresAt": import_stage.get("expiresAt"),
+            "sealed": import_stage.get("sealed") is True,
+        } if import_stage else None),
         "requestKeyFingerprint": hashlib.sha256(request_key.encode("utf-8")).hexdigest(),
     }
 
@@ -203,6 +252,7 @@ def import_job_create_command(
     expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
     if not expected_plan:
         raise ValueError("Import job requires the fingerprint from the latest confirmed preview.")
+    confirm_schema_change = bool(getattr(args, "confirm_schema_change", False))
     private_input = {
         "workspaceId": "",
         "importKind": import_kind,
@@ -215,7 +265,11 @@ def import_job_create_command(
         "recursive": not bool(getattr(args, "no_recursive", False)),
         "limit": max(1, min(int(getattr(args, "limit", 200) or 200), 200)),
         "expectedPlan": expected_plan,
+        "stageKey": str(getattr(args, "stage_key", "") or "") or None,
+        "stageBindings": _stage_bindings_from_args(args),
     }
+    if confirm_schema_change:
+        private_input["confirmSchemaChange"] = True
     with open_db() as connection:
         ensure_activation_journal_schema(connection)
         workspace_id = _workspace_id(connection, args, active_workspace_id)
@@ -234,6 +288,12 @@ def import_job_create_command(
                 job_key=str(existing["job_key"]),
             )
             stored_private = stored.get("private") if isinstance(stored.get("private"), dict) else None
+            if (
+                stored_private
+                and private_input.get("stageKey") is None
+                and stored_private.get("stageKey")
+            ):
+                private_input["stageKey"] = stored_private.get("stageKey")
             if stored_private != private_input:
                 raise ValueError("requestKey is already bound to different job input.")
             return {
@@ -247,6 +307,16 @@ def import_job_create_command(
                     event_limit=200,
                 ),
             }
+        if private_input.get("stageKey"):
+            validate_import_stage_for_confirmation(
+                stage_key=str(private_input["stageKey"]),
+                workspace_id=workspace_id,
+            )
+        for stage_key in (private_input.get("stageBindings") or {}).values():
+            validate_import_stage_for_confirmation(
+                stage_key=str(stage_key),
+                workspace_id=workspace_id,
+            )
         plan = _build_current_plan(
             connection,
             private_input=private_input,
@@ -255,9 +325,24 @@ def import_job_create_command(
             read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
+        planned_stage_key = str(plan.get("stageKey") or ((plan.get("importStage") or {}).get("stageKey") if isinstance(plan.get("importStage"), dict) else "") or "")
+        if import_kind == "single":
+            if private_input.get("stageKey") and str(private_input["stageKey"]) != planned_stage_key:
+                raise ValueError("Import stage changed after preview; run the preview again.")
+            private_input["stageKey"] = planned_stage_key or None
         if expected_plan != str(plan.get("planFingerprint") or ""):
             raise ValueError("Import plan changed after preview; run the preview again.")
         _validate_single_commit_binding(private_input, plan)
+        schema_change = plan.get("schemaChange") if isinstance(plan.get("schemaChange"), dict) else None
+        if (
+            import_kind == "single"
+            and schema_change
+            and schema_change.get("confirmationRequired") is True
+            and private_input.get("confirmSchemaChange") is not True
+        ):
+            raise ValueError("IMPORT_SCHEMA_CHANGE_CONFIRMATION_REQUIRED: review the field impact and confirm schema change.")
+        if import_kind == "single" and plan.get("readyToCommit") is False:
+            raise ValueError(f"Single-file import plan is blocked: {', '.join(plan.get('blockers') or ['owner-review-required'])}")
         if import_kind == "folder" and plan.get("readyToCommit") is not True:
             raise ValueError(f"Folder import plan is blocked: {', '.join(plan.get('blockers') or ['owner-review-required'])}")
         public_input = _public_job_input(
@@ -668,6 +753,7 @@ def import_job_run_command(
                     private_input.get("uniqueFields"),
                     private_input.get("conflictRule"),
                     workspace_id=workspace_id,
+                    stage_key=private_input.get("stageKey") or None,
                 )
             else:
                 raw_result = execute_folder_import_plan(

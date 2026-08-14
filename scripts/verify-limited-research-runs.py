@@ -77,7 +77,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-limited-research-") as temp_dir:
     with closing(sqlite3.connect(db_path)) as connection:
         version = int(connection.execute("PRAGMA user_version").fetchone()[0])
         tables = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()}
-    check("schema-v16-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 16 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
+    check("schema-v17-initializes-research-ledger", initialized.get("ok") is True and imported.get("committed") is True and version == 17 and {"research_runs", "research_plan_revisions", "research_observations", "research_run_events"}.issubset(tables), {"version": version, "tables": sorted(tables)})
 
     root_turn, root_run, root_unit = create_result(env, "请将net_sales按channel合计并生成柱状图")
     session_key = str((root_turn.get("session") or {}).get("sessionKey") or "")

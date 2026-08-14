@@ -68,6 +68,21 @@ test("Recovery inspect rejects path traversal before CLI dispatch", async () => 
   assert.equal(capture.result().body.code, "RECOVERY_POINT_KEY_INVALID");
 });
 
+test("Recovery comparison is read-only and precedes generic inspect routing", async () => {
+  const capture = responseCapture();
+  let cliArgs: string[] = [];
+  const handled = await handleWorkspaceRecoveryApi({
+    authorize: async (capability) => capability === "workspace-recovery:read",
+    cli: async (args) => { cliArgs = args; return { ok: true, schema: "aibi-workspace-recovery-comparison/v1", exposesBusinessRows: false }; },
+    request: { method: "GET", headers: {} } as IncomingMessage,
+    response: capture.response,
+    url: new URL("http://127.0.0.1/api/workspace-recovery/rp_1234567890abcdef12345678/compare"),
+  });
+  assert.equal(handled, true);
+  assert.equal(capture.result().statusCode, 200);
+  assert.deepEqual(cliArgs, ["workspace-recovery-compare", "--recovery-point", "rp_1234567890abcdef12345678"]);
+});
+
 test("Recovery create preview forwards only bounded contract fields", async () => {
   const capture = responseCapture();
   let cliArgs: string[] = [];

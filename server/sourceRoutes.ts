@@ -56,6 +56,7 @@ export async function handleSourceApi(options: SourceRoutesOptions) {
     const filePath = String(body.filePath ?? "");
     const table = body.table ? String(body.table) : undefined;
     const args = ["preview-import", filePath, ...(table ? ["--table", table] : [])];
+    if (body.mode) args.push("--mode", String(body.mode));
     if (Array.isArray(body.uniqueFields) && body.uniqueFields.length) args.push("--unique-fields", body.uniqueFields.map(String).join(","));
     if (body.conflictRule) args.push("--conflict-rule", String(body.conflictRule));
     const result = await cli(args);

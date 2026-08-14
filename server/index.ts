@@ -92,7 +92,10 @@ const cli = (args: string[]) => runCli(root, args);
 
 // A read through the deterministic CLI is the startup compatibility gate.
 // New databases are initialized here; legacy or future schemas stop before the API binds.
-await cli(["status"]);
+const startupCompatibility = await cli(["status"]);
+if (startupCompatibility.ok !== true) {
+  throw new Error("AIBI-C startup compatibility check failed; run `python tools/aibi_cli.py --json status` for the guarded recovery or migration action.");
+}
 const workspaceRecovery = await cli(["workspace-recovery-reconcile", "--all"]);
 if (workspaceRecovery.ok !== true || (Array.isArray(workspaceRecovery.needsAttention) && workspaceRecovery.needsAttention.length > 0)) {
   throw new Error("Workspace recovery reconciliation failed; API startup is fenced until recovery succeeds.");

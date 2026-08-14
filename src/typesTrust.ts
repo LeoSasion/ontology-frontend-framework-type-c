@@ -93,6 +93,17 @@ export type KnowledgeSource = {
   locatorRef: string;
   contentFingerprint: string;
   status: string;
+  snapshot?: { counts?: { terms?: number; rules?: number; fieldSemantics?: number }; rawDocumentStored?: false; rawRowsStored?: false };
+  createdAt?: string;
+};
+
+export type KnowledgeSourceAdapter = {
+  adapterId: string;
+  label: string;
+  extensions: string[];
+  sourceTypes: string[];
+  limits: { maxBytes: number; maxEntries: number };
+  permissions: { network: false; sql: false; code: false; rawRows: false };
 };
 
 export type SemanticPatchProposal = {
@@ -122,4 +133,50 @@ export type SemanticPatchCollectionPayload = {
   proposal?: SemanticPatchProposal;
   count: number;
   counts: Record<string, number>;
+};
+
+export type SemanticReleasePlan = {
+  schema: string;
+  workspaceId: string;
+  requestKeyFingerprint: string;
+  label: string;
+  proposalKeys: string[];
+  changes: Array<{
+    proposalKey: string;
+    patchType: string;
+    operation: string;
+    targetRef: string;
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown>;
+    sourceKey: string;
+  }>;
+  blockers: string[];
+  planFingerprint: string;
+  readyToPublish: boolean;
+};
+
+export type SemanticRelease = {
+  schema: string;
+  releaseKey: string;
+  workspaceId: string;
+  requestKeyFingerprint?: string;
+  label: string;
+  status: "published" | "rolled_back" | "stale" | string;
+  storedStatus: string;
+  proposalKeys: string[];
+  proposalCount: number;
+  planFingerprint: string;
+  current: boolean;
+  freshness: { status: string; mismatches: string[]; currentFingerprint: string; publishedFingerprint: string };
+  createdAt: string;
+  publishedAt: string;
+  rolledBackAt?: string | null;
+};
+
+export type SemanticReleasesPayload = {
+  ok: boolean;
+  workspaceId: string;
+  releases: SemanticRelease[];
+  release?: SemanticRelease;
+  count: number;
 };

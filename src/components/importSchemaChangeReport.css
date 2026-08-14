@@ -1,0 +1,130 @@
+.schemaChangeReport {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 44%, var(--bi-border));
+  border-radius: 9px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--warning) 9%, transparent), transparent 48%), var(--surface);
+  padding: 14px;
+}
+
+.schemaChangeLead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.schemaChangeLead > div { min-width: 0; }
+.schemaChangeLead h4 { margin: 0 0 4px; color: var(--text); font-size: 15px; line-height: 1.3; }
+.schemaChangeLead p,
+.schemaChangeDependencies p,
+.schemaChangeBoundary { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+.schemaChangeMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schemaChangeMetrics article,
+.schemaChangeColumns article,
+.schemaChangeImpactGroups article {
+  min-width: 0;
+  border: 1px solid var(--bi-border-soft);
+  border-radius: 8px;
+  background: var(--surface-2);
+  padding: 10px;
+}
+
+.schemaChangeMetrics span,
+.schemaChangeMetrics small { display: block; color: var(--muted); font-size: 11px; }
+.schemaChangeMetrics strong { display: block; margin: 3px 0; color: var(--text); font-size: 19px; line-height: 1; }
+.schemaChangeMetrics .added strong,
+.schemaChangeColumns .added > strong { color: var(--success); }
+.schemaChangeMetrics .removed strong,
+.schemaChangeColumns .removed > strong { color: var(--warning); }
+
+.schemaChangeColumns,
+.schemaChangeImpactGroups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.schemaChangeColumns article > strong,
+.schemaChangeDependencies > strong { display: block; margin-bottom: 7px; color: var(--text); font-size: 12px; }
+.schemaChangeListBlock { display: grid; gap: 8px; justify-items: start; min-width: 0; }
+.schemaChangeFieldList { display: flex; flex-wrap: wrap; gap: 6px; }
+.schemaChangeFieldList span,
+.schemaChangeFieldList em {
+  max-width: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  color: var(--text);
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  padding: 4px 8px;
+}
+.schemaChangeEmpty { color: var(--muted); }
+.schemaChangeOrder {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--bi-border));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+  color: var(--text);
+  font-size: 12px;
+  padding: 8px 10px;
+}
+
+.schemaChangeDependencies { border-top: 1px solid var(--bi-border-soft); padding-top: 11px; }
+.schemaChangeDependencyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.schemaChangeDependencyHeader > strong { color: var(--text); font-size: 12px; }
+.schemaChangeImpactGroups { margin-top: 8px; }
+.schemaChangeImpactGroups article > span { color: var(--text); font-size: 12px; font-weight: 760; }
+.schemaChangeImpactGroups ul { display: grid; gap: 5px; margin: 8px 0 0; padding: 0; list-style: none; }
+.schemaChangeImpactGroups li { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 12px; }
+.schemaChangeImpactGroups li strong { min-width: 0; color: var(--text); overflow-wrap: anywhere; }
+.schemaChangeImpactGroups li span { flex: 0 1 auto; overflow-wrap: anywhere; text-align: right; }
+.schemaChangeToggle { min-width: 0; }
+
+.schemaChangeAcknowledgement {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-height: 44px;
+  border: 1px solid color-mix(in srgb, var(--warning) 34%, var(--bi-border));
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 10px 11px;
+}
+.schemaChangeAcknowledgement input { flex: 0 0 auto; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+
+@container viewport-stage (max-width: 720px) {
+  .schemaChangeMetrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .schemaChangeColumns,
+  .schemaChangeImpactGroups { grid-template-columns: 1fr; }
+  .schemaChangeDependencyHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .schemaChangeDependencyHeader > button,
+  .schemaChangeToggle { width: 100%; min-height: 44px; }
+}
+
+@container viewport-stage (max-height: 720px) and (min-width: 721px) {
+  .schemaChangeReport { gap: 9px; padding: 11px; }
+  .schemaChangeMetrics article,
+  .schemaChangeColumns article,
+  .schemaChangeImpactGroups article { padding: 8px; }
+}

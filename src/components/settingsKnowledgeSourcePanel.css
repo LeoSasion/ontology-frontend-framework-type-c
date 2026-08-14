@@ -1,0 +1,12 @@
+.knowledgeSourcePanel { display:grid; gap:12px; }
+.knowledgeGuardrails { display:flex; flex-wrap:wrap; gap:7px; }
+.knowledgeGuardrails span { padding:5px 8px; border:1px solid var(--border-soft); border-radius:999px; color:var(--text-muted); font-size:12px; }
+.knowledgeSourceForm { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; padding-top:10px; }
+.knowledgeSourceForm label { display:grid; gap:5px; }
+.knowledgeSourceForm .wide { grid-column:1/-1; }
+.knowledgeSourceForm input,.knowledgeSourceForm select { width:100%; min-width:0; box-sizing:border-box; }
+.knowledgeConfirmation { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.knowledgeSourceList { display:grid; gap:7px; }
+.knowledgeSourceList > div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:3px 10px; padding:9px 0; border-top:1px solid var(--border-soft); }
+.knowledgeSourceList small { grid-column:1/-1; color:var(--text-muted); }
+@container viewport-stage (max-width:760px) { .knowledgeSourcePanel button,.knowledgeSourcePanel input,.knowledgeSourcePanel select { min-height:44px; } .knowledgeSourceForm { grid-template-columns:minmax(0,1fr); } .knowledgeSourceForm .wide,.knowledgeConfirmation { grid-column:auto; } .knowledgeSourceList > div { grid-template-columns:minmax(0,1fr); } }

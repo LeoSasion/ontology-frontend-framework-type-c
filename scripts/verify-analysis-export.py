@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook
+from docx import Document
+from pptx import Presentation
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -202,6 +204,40 @@ try:
         if isinstance(cell.value, str) and cell.value.startswith("=")
     ]
     check("workbook-does-not-introduce-recalculation-formulas", formulas == [], formulas)
+
+    office_path = VERIFY_DIR / "exports" / "analysis-office.zip"
+    office = run("office-export", [
+        "export-analysis", "--receipt", str(receipt.get("receiptKey")), "--unit", str(unit.get("unitKey")),
+        "--format", "docx", "--format", "pptx", "--output", str(office_path),
+    ])["parsed"] or {}
+    with zipfile.ZipFile(office_path, "r") as office_archive:
+        office_names = set(office_archive.namelist())
+        docx_bytes = office_archive.read("result.docx")
+        pptx_bytes = office_archive.read("result.pptx")
+        office_manifest = json.loads(office_archive.read("manifest.json").decode("utf-8"))
+    docx_path = VERIFY_DIR / "result.docx"
+    pptx_path = VERIFY_DIR / "result.pptx"
+    docx_path.write_bytes(docx_bytes)
+    pptx_path.write_bytes(pptx_bytes)
+    document = Document(docx_path)
+    presentation = Presentation(pptx_path)
+    with zipfile.ZipFile(docx_path, "r") as document_archive, zipfile.ZipFile(pptx_path, "r") as presentation_archive:
+        office_xml = b"\n".join(document_archive.read(name) for name in document_archive.namelist()) + b"\n" + b"\n".join(presentation_archive.read(name) for name in presentation_archive.namelist())
+    check(
+        "docx-and-pptx-are-native-verified-artifacts",
+        office_names == {"gaps.json", "manifest.json", "result.docx", "result.pptx", "snapshots/analysis-unit.json", "snapshots/chart-adapter.json", "snapshots/query-receipt.json"}
+        and len(document.paragraphs) > 4
+        and len(presentation.slides) == 4
+        and office_manifest.get("formats") == ["docx", "pptx"]
+        and office.get("analysisExport", {}).get("formats") == ["docx", "pptx"],
+        {"names": sorted(office_names), "paragraphs": len(document.paragraphs), "slides": len(presentation.slides)},
+    )
+    check(
+        "office-artifacts-preserve-the-same-redaction-boundary",
+        secret_value.encode("utf-8") not in office_xml
+        and b"C:\\Users\\Example\\private.csv" not in office_xml
+        and str(VERIFY_DIR).encode("utf-8") not in office_xml,
+    )
 
     second = run("second-query", [
         "query", "--table", "orders", "--measure", "net_sales", "--agg", "sum", "--request", "净销售额指标卡",

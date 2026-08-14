@@ -1,0 +1,103 @@
+.metricContractPanel {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-soft));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface-raised) 94%, var(--accent) 6%);
+}
+
+.metricContractHeader,
+.metricContractActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.metricContractHeader > div,
+.metricContractConfirmation,
+.metricContractReplay {
+  display: grid;
+  gap: 3px;
+}
+
+.metricContractHeader span,
+.metricContractHeader small,
+.metricContractConfirmation small,
+.metricContractBoundary,
+.metricContractReplay span,
+.metricContractReplay small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.metricContractStatus {
+  padding: 5px 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+}
+
+.metricContractStatus.current,
+.metricContractReplay.passed {
+  color: var(--success-text);
+}
+
+.metricContractStatus.stale,
+.metricContractReplay.changed,
+.metricContractReplay.blocked {
+  color: var(--warning-text, var(--text-muted));
+}
+
+.metricContractFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 9px;
+}
+
+.metricContractFields label {
+  display: grid;
+  gap: 5px;
+}
+
+.metricContractFields input,
+.metricContractFields select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.metricContractActions {
+  justify-content: flex-start;
+}
+
+.metricContractReplay {
+  padding: 10px 12px;
+  border-left: 3px solid currentColor;
+  background: var(--surface-soft);
+}
+
+.metricContractNotice,
+.metricContractBoundary {
+  margin: 0;
+}
+
+@container viewport-stage (max-width: 760px) {
+  .metricContractPanel button,
+  .metricContractPanel input,
+  .metricContractPanel select {
+    min-height: 44px;
+  }
+
+  .metricContractHeader,
+  .metricContractActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .metricContractFields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

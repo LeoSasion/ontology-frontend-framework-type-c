@@ -42,6 +42,23 @@ export interface WorkspaceRecoveryPlan {
   invalidationKeys: string[];
 }
 
+export interface WorkspaceRecoveryComparison {
+  ok: boolean;
+  schema: "aibi-workspace-recovery-comparison/v1";
+  workspaceId: string;
+  recoveryPointKey: string;
+  verified: boolean;
+  currentWorkspaceStateFingerprint: string;
+  targetWorkspaceStateFingerprint: string;
+  currentSourceRunId: string | null;
+  targetSourceRunId: string | null;
+  changes: Array<{ tableKey: string; change: "restore" | "remove" | "version-change" | "unchanged"; currentDataVersion: number | null; targetDataVersion: number | null }>;
+  changedCount: number;
+  unchangedCount: number;
+  summary: { restore: number; remove: number; versionChange: number };
+  exposesBusinessRows: false;
+}
+
 export interface WorkspaceRecoveryPayload {
   ok: boolean;
   schema?: "aibi-workspace-recovery-points/v1";

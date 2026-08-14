@@ -302,6 +302,18 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
     mutate_workspace_a(sqlite_path, duckdb_path, suffix="2", amount=200.0)
     changed_a = service._state("workspace-a")
     check("fixture-mutates-the-target-workspace", changed_a["fingerprint"] != before_a["fingerprint"], changed_a)
+    comparison = service.compare("workspace-a", point_key)
+    changed_tables = [item for item in comparison.get("changes", []) if item.get("change") != "unchanged"]
+    check(
+        "comparison-verifies-the-point-and-exposes-only-table-version-impact",
+        comparison.get("schema") == "aibi-workspace-recovery-comparison/v1"
+        and comparison.get("verified") is True
+        and comparison.get("exposesBusinessRows") is False
+        and comparison.get("changedCount") == 1
+        and changed_tables == [{"tableKey": "orders", "change": "version-change", "currentDataVersion": 2, "targetDataVersion": 1}],
+        comparison,
+    )
+    check("comparison-exposes-no-local-path-or-business-row", str(temp) not in json.dumps(comparison, ensure_ascii=False) and "changed-customer" not in json.dumps(comparison, ensure_ascii=False), comparison)
     restore_preview = service.restore("workspace-a", point_key, "restore-baseline")
     check("restore-preview-declares-safety-point", restore_preview["recoveryPlan"]["requiresSafetyPoint"] is True and restore_preview.get("dryRun") is True, restore_preview)
     restored = service.restore(

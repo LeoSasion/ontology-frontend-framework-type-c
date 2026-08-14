@@ -47,6 +47,7 @@ from import_table_writer_service import (
     merge_import_into_table as merge_import_into_table_service,
     update_table_metadata_after_write as update_table_metadata_after_write_service,
 )
+from import_stage_service import read_import_stage
 from query_runtime import SAFE_AGGREGATIONS
 
 def read_csv(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
@@ -178,6 +179,7 @@ def import_csv_as_table(
     display_name: str | None = None,
     mode: str = "create",
     workspace_id: str | None = None,
+    stage_key: str | None = None,
 ) -> dict[str, Any]:
     return import_csv_as_table_service(
         connection,
@@ -186,7 +188,9 @@ def import_csv_as_table(
         display_name=display_name,
         mode=mode,
         workspace_id=workspace_id,
+        stage_key=stage_key,
         read_table_file=read_table_file,
+        read_import_stage=read_import_stage,
         profile_rows=profile_rows,
         active_workspace_id=active_workspace_id,
         physical_table_for_workspace=physical_table_for_workspace,
@@ -281,6 +285,7 @@ def merge_import_into_table(
     conflict_rule: str,
     display_name: str | None = None,
     workspace_id: str | None = None,
+    stage_key: str | None = None,
 ) -> dict[str, Any]:
     return merge_import_into_table_service(
         connection,
@@ -290,8 +295,10 @@ def merge_import_into_table(
         conflict_rule=conflict_rule,
         display_name=display_name,
         workspace_id=workspace_id,
+        stage_key=stage_key,
         registry_for_table=registry_for_table,
         read_table_file=read_table_file,
+        read_import_stage=read_import_stage,
         table_columns=table_columns,
         profile_rows=profile_rows,
         active_workspace_id=active_workspace_id,

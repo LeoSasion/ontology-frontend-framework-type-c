@@ -359,5 +359,54 @@ export async function handleModelApi(options: ModelRoutesOptions) {
     return true;
   }
 
+  if (url.pathname === "/api/metric-contracts" && request.method === "GET") {
+    const requestedLimit = Number.parseInt(url.searchParams.get("limit") ?? "50", 10);
+    const args = ["metric-contracts", "--limit", String(Number.isFinite(requestedLimit) ? Math.min(100, Math.max(1, requestedLimit)) : 50)];
+    const metric = url.searchParams.get("metric");
+    const contract = url.searchParams.get("contract");
+    if (metric) args.push("--metric", metric);
+    if (contract) args.push("--contract", contract);
+    const result = await cli(args);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if (url.pathname === "/api/metric-contracts/replay" && request.method === "GET") {
+    const contract = String(url.searchParams.get("contract") ?? "");
+    if (!/^metric_contract_[a-f0-9]{20}$/.test(contract)) {
+      sendJson(response, 400, { ok: false, code: "METRIC_CONTRACT_KEY_INVALID", error: "A valid Metric Contract key is required." });
+      return true;
+    }
+    const result = await cli(["metric-contract-replay", "--contract", contract]);
+    sendJson(response, result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
+  if ((url.pathname === "/api/metric-contracts/preview" || url.pathname === "/api/metric-contracts/publish") && request.method === "POST") {
+    const body = await readBody(request);
+    const metric = String(body.metric ?? "").trim();
+    const requestKey = String(body.requestKey ?? "").trim();
+    const scenarios = Array.isArray(body.scenarios) ? body.scenarios : [];
+    if (!metric || metric.length > 200 || requestKey.length < 8 || requestKey.length > 200 || scenarios.length > 12 || scenarios.some((scenario) => !scenario || typeof scenario !== "object" || Array.isArray(scenario))) {
+      sendJson(response, 400, { ok: false, code: "METRIC_CONTRACT_INPUT_INVALID", error: "Metric, bounded requestKey, and bounded scenarios are required." });
+      return true;
+    }
+    const publish = url.pathname.endsWith("/publish");
+    const expectedPlan = String(body.expectedPlanFingerprint ?? "").trim();
+    if (publish && (body.confirm !== true || !/^[a-f0-9]{64}$/.test(expectedPlan))) {
+      sendJson(response, 400, { ok: false, code: "METRIC_CONTRACT_CONFIRMATION_REQUIRED", error: "Publish requires confirm=true and the exact preview fingerprint." });
+      return true;
+    }
+    const args = [publish ? "metric-contract-publish" : "metric-contract-preview", "--metric", metric, "--request-key", requestKey];
+    for (const [key, flag] of [["label", "--label"], ["population", "--population"], ["grain", "--grain"], ["unit", "--unit"], ["nullPolicy", "--null-policy"], ["dedupKey", "--dedup-key"], ["direction", "--direction"], ["owner", "--owner"]] as const) {
+      if (body[key] !== undefined && String(body[key]).trim()) args.push(flag, String(body[key]).trim());
+    }
+    for (const scenario of scenarios) args.push("--scenario-json", JSON.stringify(scenario));
+    if (publish) args.push("--expected-plan", expectedPlan, "--yes");
+    const result = await cli(args);
+    sendJson(response, result.requiresConfirmation ? 202 : result.ok === false ? 409 : 200, result);
+    return true;
+  }
+
   return false;
 }

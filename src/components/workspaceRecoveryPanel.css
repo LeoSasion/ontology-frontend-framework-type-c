@@ -171,6 +171,41 @@
   color: var(--warning);
 }
 
+.workspaceRecoveryComparison {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--bi-accent) 42%, var(--bi-border));
+  border-radius: var(--bi-radius);
+  background: color-mix(in srgb, var(--bi-accent) 7%, transparent);
+}
+
+.workspaceRecoveryComparison > div,
+.workspaceRecoveryComparison li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.workspaceRecoveryComparison ul,
+.workspaceRecoveryComparison p {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.workspaceRecoveryComparison small,
+.workspaceRecoveryComparison li span {
+  color: var(--bi-muted);
+}
+
+.workspaceRecoveryComparison .textButton {
+  justify-self: start;
+}
+
 @container (max-width: 720px) {
   .workspaceRecoveryHeading,
   .workspaceRecoveryConfirmation {
@@ -183,6 +218,11 @@
   }
 
   .workspaceRecoveryCreate {
+    grid-template-columns: 1fr;
+  }
+
+  .workspaceRecoveryComparison > div,
+  .workspaceRecoveryComparison li {
     grid-template-columns: 1fr;
   }
 }

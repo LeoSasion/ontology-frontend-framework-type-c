@@ -37,11 +37,12 @@ def bind_single_import_plan(
     """Bind a single-file preview to the exact bytes and workspace parent version."""
     resolved_path = path.resolve()
     merge_preview = preview.get("mergePolicyPreview") if isinstance(preview.get("mergePolicyPreview"), dict) else {}
+    import_stage = preview.get("importStage") if isinstance(preview.get("importStage"), dict) else {}
     matched_table = preview.get("matchedTable") if isinstance(preview.get("matchedTable"), dict) else None
     commit_options = {
         "table": str((matched_table or {}).get("table_key") or preview.get("suggestedTableKey") or ""),
         "name": str((matched_table or {}).get("display_name") or preview.get("suggestedDisplayName") or ""),
-        "mode": "merge" if matched_table else "create",
+        "mode": str(merge_preview.get("mode") or ("merge" if matched_table else "create")),
         "uniqueFields": list(merge_preview.get("uniqueFields") or []),
         "conflictRule": str(merge_preview.get("conflictRule") or "overwrite"),
     }
@@ -50,7 +51,10 @@ def bind_single_import_plan(
         "kind": "single-file",
         "workspaceId": str(preview.get("workspaceId") or ""),
         "file": resolved_path.as_posix(),
-        "contentHash": file_content_hash(resolved_path),
+        "contentHash": str(import_stage.get("contentHash") or file_content_hash(resolved_path)),
+        "stageKey": str(import_stage.get("stageKey") or ""),
+        "stageFingerprint": str(import_stage.get("contentFingerprint") or ""),
+        "parserVersion": str(import_stage.get("parserVersion") or "legacy-direct-read"),
         "parentSourceRunId": current_source_run_id,
         "commitOptions": commit_options,
         "schemaDecision": [
@@ -62,12 +66,14 @@ def bind_single_import_plan(
             for field in (preview.get("profile") or {}).get("fields") or []
             if isinstance(field, dict)
         ],
+        "schemaChange": preview.get("schemaChange"),
         "rowImpact": merge_preview.get("mergePlan"),
     }
     return {
         **preview,
         "schema": ATOMIC_IMPORT_PLAN_SCHEMA,
         "contentHash": fingerprint_material["contentHash"],
+        "stageKey": fingerprint_material["stageKey"] or None,
         "parentSourceRunId": current_source_run_id,
         "commitOptions": commit_options,
         "planFingerprint": _canonical_fingerprint(fingerprint_material),
@@ -181,9 +187,13 @@ def enrich_atomic_import_plan(
             "skipRows": 0,
             "afterRowsEstimate": int(item.get("rowCount") or 0),
         }
+        import_stage = preview.get("importStage") if isinstance(preview.get("importStage"), dict) else {}
         item.update({
             "fileIdentity": _source_identity(path, root if root.is_dir() else root.parent),
-            "contentHash": file_content_hash(path),
+            "contentHash": str(import_stage.get("contentHash") or file_content_hash(path)),
+            "stageKey": str(import_stage.get("stageKey") or "") or None,
+            "stageFingerprint": str(import_stage.get("contentFingerprint") or "") or None,
+            "parserVersion": str(import_stage.get("parserVersion") or "legacy-direct-read"),
             "schemaDecision": {
                 "headers": headers,
                 "fieldProfiles": [
@@ -252,6 +262,9 @@ def enrich_atomic_import_plan(
             {
                 "fileIdentity": item["fileIdentity"],
                 "contentHash": item["contentHash"],
+                "stageKey": item.get("stageKey"),
+                "stageFingerprint": item.get("stageFingerprint"),
+                "parserVersion": item.get("parserVersion"),
                 "tableKey": item["tableKey"],
                 "mode": item["mode"],
                 "schemaDecision": item["schemaDecision"],

@@ -1,10 +1,22 @@
 import { useEffect, useState } from "react";
-import { getConfirmedPlans, getConfirmedQueries, getContextPack, getRecallReceipts, getSemanticPatches, proposeSemanticPatch, reviewSemanticPatch } from "../apiTrust";
-import type { ConfirmedPlanMemory, ConfirmedQuery, ContextPackPayload, RecallReceipt, SemanticPatchProposal } from "../types";
+import { getConfirmedPlans, getConfirmedQueries, getContextPack, getRecallReceipts, getSemanticPatches, getSemanticReleases, previewSemanticRelease, proposeSemanticPatch, publishSemanticRelease, reviewSemanticPatch, rollbackSemanticRelease } from "../apiTrust";
+import type { ConfirmedPlanMemory, ConfirmedQuery, ContextPackPayload, RecallReceipt, SemanticPatchProposal, SemanticRelease, SemanticReleasePlan } from "../types";
 import { Bilingual, biText } from "./Bilingual";
 import "../styles/trustContext.css";
 
 type ReviewDraft = { proposalKey: string; decision: "accept" | "reject" } | null;
+type ReleaseDraft = { requestKey: string; label: string; proposalKeys: string[]; plan: SemanticReleasePlan } | null;
+type RollbackDraft = { releaseKey: string; requestKey: string; planFingerprint: string } | null;
+
+function stableReleaseRequestKey(prefix: string, values: string[]) {
+  let hash = 2166136261;
+  const input = `${prefix}:${values.slice().sort().join(":")}`;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${prefix}-${(hash >>> 0).toString(16).padStart(8, "0")}`;
+}
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error || biText("操作失败", "Operation failed"));
@@ -32,6 +44,7 @@ export function TrustContextSettingsPanel() {
   const [plans, setPlans] = useState<ConfirmedPlanMemory[]>([]);
   const [recallReceipts, setRecallReceipts] = useState<RecallReceipt[]>([]);
   const [proposals, setProposals] = useState<SemanticPatchProposal[]>([]);
+  const [releases, setReleases] = useState<SemanticRelease[]>([]);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [termName, setTermName] = useState("");
@@ -44,6 +57,8 @@ export function TrustContextSettingsPanel() {
   const [ruleStatement, setRuleStatement] = useState("");
   const [rulePreviewed, setRulePreviewed] = useState(false);
   const [reviewDraft, setReviewDraft] = useState<ReviewDraft>(null);
+  const [releaseDraft, setReleaseDraft] = useState<ReleaseDraft>(null);
+  const [rollbackDraft, setRollbackDraft] = useState<RollbackDraft>(null);
   const visibleQueries = queries.filter((item) => item.status === "confirmed" || item.status === "stale");
   const reviewProposals = proposals
     .slice()
@@ -55,12 +70,13 @@ export function TrustContextSettingsPanel() {
   }, {});
 
   async function refresh() {
-    const [result, queryResult, planResult, recallResult, patchResult] = await Promise.all([getContextPack(), getConfirmedQueries(), getConfirmedPlans(), getRecallReceipts(), getSemanticPatches()]);
+    const [result, queryResult, planResult, recallResult, patchResult, releaseResult] = await Promise.all([getContextPack(), getConfirmedQueries(), getConfirmedPlans(), getRecallReceipts(), getSemanticPatches(), getSemanticReleases()]);
     setPack(result.contextPack);
     setQueries(queryResult.confirmedQueries);
     setPlans(planResult.confirmedPlans ?? []);
     setRecallReceipts(recallResult.recallReceipts ?? []);
     setProposals(patchResult.proposals ?? []);
+    setReleases(releaseResult.releases ?? []);
   }
 
   useEffect(() => { void refresh().catch((error) => setMessage(errorMessage(error))); }, []);
@@ -165,6 +181,89 @@ export function TrustContextSettingsPanel() {
     }
   }
 
+  async function previewRelease() {
+    const proposalKeys = proposals.filter((proposal) => proposal.status === "pending").map((proposal) => proposal.proposalKey).sort();
+    if (!proposalKeys.length) return;
+    const label = biText("工作区语义发布", "Workspace semantic release");
+    const requestKey = stableReleaseRequestKey("semantic-release-ui", proposalKeys);
+    setBusy("release-preview");
+    setMessage("");
+    try {
+      const result = await previewSemanticRelease({ requestKey, label, proposalKeys });
+      setReleaseDraft({ requestKey, label, proposalKeys, plan: result.releasePlan });
+      setMessage(result.releasePlan.readyToPublish
+        ? biText("发布影响已预演；确认后会一次性切换当前受信语义。", "Release impact is previewed. Confirmation switches trusted semantics atomically.")
+        : biText("本次发布存在冲突或漂移，请先处理阻断项。", "This release has conflicts or drift. Resolve blockers first."));
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function confirmRelease() {
+    if (!releaseDraft?.plan.readyToPublish) return;
+    setBusy("release-publish");
+    setMessage("");
+    try {
+      await publishSemanticRelease({
+        requestKey: releaseDraft.requestKey,
+        label: releaseDraft.label,
+        proposalKeys: releaseDraft.proposalKeys,
+        expectedPlanFingerprint: releaseDraft.plan.planFingerprint,
+      });
+      setReleaseDraft(null);
+      setMessage(biText("语义版本已原子发布，并保留可核对的版本与回滚边界。", "The semantic version was published atomically with reviewable version and rollback boundaries."));
+      await refresh();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function previewRollback(release: SemanticRelease) {
+    const requestKey = stableReleaseRequestKey("semantic-rollback-ui", [release.releaseKey]);
+    setBusy(`rollback-${release.releaseKey}`);
+    setMessage("");
+    try {
+      const result = await rollbackSemanticRelease({ releaseKey: release.releaseKey, requestKey, confirm: false });
+      const plan = result.rollbackPlan && typeof result.rollbackPlan === "object" ? result.rollbackPlan as Record<string, unknown> : null;
+      if (!plan || typeof plan.planFingerprint !== "string") throw new Error(biText("回滚预演没有返回有效绑定。", "Rollback preview did not return a valid binding."));
+      if (plan.readyToRollback !== true) {
+        setMessage(biText("当前语义已经漂移，不能覆盖式回滚；请先核对差异。", "Current semantics drifted, so overwrite rollback is blocked. Review the differences first."));
+        return;
+      }
+      setRollbackDraft({ releaseKey: release.releaseKey, requestKey, planFingerprint: plan.planFingerprint });
+      setMessage(biText("回滚影响已预演；确认后恢复发布前语义。", "Rollback impact is previewed. Confirmation restores pre-release semantics."));
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function confirmRollback() {
+    if (!rollbackDraft) return;
+    setBusy(`rollback-${rollbackDraft.releaseKey}`);
+    setMessage("");
+    try {
+      await rollbackSemanticRelease({
+        releaseKey: rollbackDraft.releaseKey,
+        requestKey: rollbackDraft.requestKey,
+        expectedPlanFingerprint: rollbackDraft.planFingerprint,
+        confirm: true,
+      });
+      setRollbackDraft(null);
+      setMessage(biText("已恢复发布前语义；发布与回滚事件均已保留。", "Pre-release semantics were restored; publish and rollback events are preserved."));
+      await refresh();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    } finally {
+      setBusy("");
+    }
+  }
+
   return (
     <section className="trustContextPanel" data-testid="trust-context-settings">
       <div className="trustContextLead">
@@ -180,6 +279,52 @@ export function TrustContextSettingsPanel() {
           <span><strong>{proposalCounts.stale ?? 0}</strong><small>{biText("已过期", "stale")}</small></span>
         </div>
       </div>
+
+      <section className="semanticReleasePanel" aria-labelledby="semantic-release-title" data-testid="semantic-release-panel">
+        <div className="semanticReviewHeader">
+          <div>
+            <span className="storyMode"><Bilingual zh="Semantic Release" en="Semantic Release" /></span>
+            <h4 id="semantic-release-title"><Bilingual zh="成组预演、原子发布、可控回滚" en="Grouped preview, atomic publish, controlled rollback" /></h4>
+          </div>
+          <span className="semanticGuardrail"><Bilingual zh="提案不等于当前口径" en="Proposals are not current semantics" /></span>
+        </div>
+        <p className="quietText"><Bilingual zh="把仍然新鲜的待审提案合成一个版本；只有同一预演指纹被确认后才一次生效。" en="Bundle current pending proposals into one version. They take effect together only after the exact preview is confirmed." /></p>
+        <div className="semanticReleaseActions">
+          <span>{proposalCounts.pending ?? 0} {biText("项待发布", "pending for release")}</span>
+          {!releaseDraft ? (
+            <button className="primaryButton" disabled={!proposalCounts.pending || Boolean(busy)} onClick={() => void previewRelease()} type="button">
+              {busy === "release-preview" ? biText("预演中…", "Previewing…") : biText("预演语义版本", "Preview semantic version")}
+            </button>
+          ) : (
+            <div className="semanticReleaseConfirmation" data-testid="semantic-release-confirmation">
+              <strong>{releaseDraft.plan.changes.length} {biText("项变更", "changes")}</strong>
+              <span>{releaseDraft.plan.blockers.length ? releaseDraft.plan.blockers.join(" · ") : biText("无冲突，可原子发布", "No conflicts; ready for atomic publish")}</span>
+              <button className="primaryButton" disabled={!releaseDraft.plan.readyToPublish || busy === "release-publish"} onClick={() => void confirmRelease()} type="button">
+                {busy === "release-publish" ? biText("发布中…", "Publishing…") : biText("确认发布当前版本", "Confirm version publish")}
+              </button>
+              <button className="secondaryButton" disabled={Boolean(busy)} onClick={() => setReleaseDraft(null)} type="button"><Bilingual zh="取消" en="Cancel" /></button>
+            </div>
+          )}
+        </div>
+        {releases.length ? (
+          <div className="semanticReleaseList" data-testid="semantic-release-list">
+            {releases.slice(0, 6).map((release) => (
+              <article className={`semanticReleaseItem status-${release.status}`} key={release.releaseKey}>
+                <div><strong>{release.label}</strong><span>{release.proposalCount} {biText("项提案", "proposals")} · {release.status}</span></div>
+                <small>{release.current ? biText("当前生效", "Current") : release.status === "stale" ? biText("已漂移，禁止覆盖回滚", "Drifted; overwrite rollback blocked") : biText("历史版本", "Historical version")}</small>
+                {release.current ? (
+                  rollbackDraft?.releaseKey === release.releaseKey ? (
+                    <div className="semanticRollbackActions">
+                      <button className="dangerButton" disabled={busy === `rollback-${release.releaseKey}`} onClick={() => void confirmRollback()} type="button"><Bilingual zh="确认回滚" en="Confirm rollback" /></button>
+                      <button className="secondaryButton" onClick={() => setRollbackDraft(null)} type="button"><Bilingual zh="取消" en="Cancel" /></button>
+                    </div>
+                  ) : <button className="secondaryButton" disabled={Boolean(busy)} onClick={() => void previewRollback(release)} type="button"><Bilingual zh="预演回滚" en="Preview rollback" /></button>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : <div className="semanticInboxEmpty"><strong><Bilingual zh="尚无语义版本" en="No semantic versions yet" /></strong><span><Bilingual zh="先提交并核对提案，再成组发布。" en="Submit and review proposals before publishing them as a group." /></span></div>}
+      </section>
 
       <section className="semanticReviewInbox" aria-labelledby="semantic-review-title" data-testid="semantic-review-inbox">
         <div className="semanticReviewHeader">

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  compareWorkspaceRecoveryPoint,
   getWorkspaceRecoveryPoints,
   inspectWorkspaceRecoveryPoint,
   mutateWorkspaceRecovery,
   type WorkspaceRecoveryMutation,
 } from "../apiWorkspaceRecovery";
-import type { WorkspaceRecoveryOperation, WorkspaceRecoveryPlan, WorkspaceRecoveryPoint } from "../typesWorkspaceRecovery";
+import type { WorkspaceRecoveryComparison, WorkspaceRecoveryOperation, WorkspaceRecoveryPlan, WorkspaceRecoveryPoint } from "../typesWorkspaceRecovery";
 import { Bilingual, biText } from "./Bilingual";
 import "./workspaceRecoveryPanel.css";
 
@@ -50,6 +51,7 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
   const [pending, setPending] = useState<PendingRecovery | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState("");
+  const [comparison, setComparison] = useState<WorkspaceRecoveryComparison | null>(null);
   const requestRef = useRef<{ id: number; controller: AbortController } | null>(null);
   const workspaceRef = useRef(workspaceId);
   workspaceRef.current = workspaceId;
@@ -88,6 +90,7 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
     setTotalCount(0);
     setExpanded(false);
     setPending(null);
+    setComparison(null);
     setMessage("");
     void load({ limit: 5 });
     return () => requestRef.current?.controller.abort();
@@ -116,6 +119,7 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
       if (payload.workspaceId !== expectedWorkspace || !payload.recoveryPlan) {
         throw new Error(biText("恢复预演没有返回当前工作区的计划。", "Recovery preview did not return a plan for the active workspace."));
       }
+      setComparison((current) => operation === "restore" && current?.recoveryPointKey === payload.recoveryPlan!.recoveryPointKey ? current : null);
       setPending({ input, plan: payload.recoveryPlan });
     } catch (error) {
       if (workspaceRef.current !== expectedWorkspace) return;
@@ -182,6 +186,26 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
     }
   }
 
+  async function comparePoint(point: WorkspaceRecoveryPoint) {
+    const expectedWorkspace = workspaceId;
+    setBusy(`compare-${point.recoveryPointKey}`);
+    setMessage("");
+    try {
+      const payload = await compareWorkspaceRecoveryPoint(point.recoveryPointKey);
+      if (workspaceRef.current !== expectedWorkspace) return;
+      if (payload.workspaceId !== expectedWorkspace || payload.verified !== true || payload.exposesBusinessRows !== false) {
+        throw new Error(biText("恢复点差异对比未通过边界校验。", "Recovery comparison failed its trust-boundary checks."));
+      }
+      setComparison(payload);
+      setMessage(payload.changedCount ? biText("已列出恢复后会变化的数据表。", "Tables affected by restore are now listed.") : biText("当前数据版本与该恢复点一致。", "Current data versions match this recovery point."));
+    } catch (error) {
+      if (workspaceRef.current !== expectedWorkspace) return;
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      if (workspaceRef.current === expectedWorkspace) setBusy(null);
+    }
+  }
+
   async function loadAll() {
     setExpanded(true);
     await load({ limit: 50 });
@@ -225,6 +249,15 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
         </div>
       ) : null}
 
+      {comparison ? (
+        <div className="workspaceRecoveryComparison" data-testid="workspace-recovery-comparison">
+          <div><strong>{biText("恢复影响", "Restore impact")} · {comparison.recoveryPointKey}</strong><span>{comparison.changedCount} {biText("项变化", "changes")}</span></div>
+          {comparison.changes.some((item) => item.change !== "unchanged") ? <ul>{comparison.changes.filter((item) => item.change !== "unchanged").map((item) => <li key={item.tableKey}><strong>{item.tableKey}</strong><span>{item.change}</span><code>{item.currentDataVersion ?? "—"} → {item.targetDataVersion ?? "—"}</code></li>)}</ul> : <p>{biText("没有表级版本变化。", "No table-level version changes.")}</p>}
+          <small>{biText("仅比较版本与指纹，不读取或展示业务行。", "Only versions and fingerprints are compared; no business rows are read or shown.")}</small>
+          <button className="textButton" onClick={() => setComparison(null)} type="button">{biText("关闭", "Close")}</button>
+        </div>
+      ) : null}
+
       <div className="workspaceRecoveryList" data-testid="workspace-recovery-list">
         {visiblePoints.length ? visiblePoints.map((point) => (
           <article key={point.recoveryPointKey}>
@@ -240,6 +273,7 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
             </dl>
             <div className="workspaceRecoveryActions">
               <button className="secondaryButton" disabled={busy !== null} onClick={() => void verifyPoint(point)} type="button">{biText("校验", "Verify")}</button>
+              <button className="secondaryButton" disabled={busy !== null} onClick={() => void comparePoint(point)} type="button">{biText("对比影响", "Compare impact")}</button>
               <button className="secondaryButton" disabled={busy !== null} onClick={() => void preview("restore", point.recoveryPointKey)} type="button">{biText("预演恢复", "Preview restore")}</button>
               <button className="secondaryButton danger" disabled={busy !== null} onClick={() => void preview("delete", point.recoveryPointKey)} type="button">{biText("预演删除", "Preview delete")}</button>
             </div>

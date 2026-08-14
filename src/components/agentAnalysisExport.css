@@ -1,0 +1,24 @@
+.agentAnalysisExportFormat {
+  display: grid;
+  grid-template-columns: auto minmax(9rem, 1fr);
+  gap: 0.4rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.agentAnalysisExportFormat select {
+  min-height: 2.25rem;
+  max-width: 13rem;
+}
+
+@container viewport-stage (max-width: 760px) {
+  .agentAnalysisExportFormat {
+    grid-template-columns: 1fr;
+  }
+
+  .agentAnalysisExportFormat select,
+  .agentAnalysisUnitExport button {
+    min-height: 44px;
+  }
+}

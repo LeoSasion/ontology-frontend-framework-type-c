@@ -31,7 +31,7 @@ from source_activation_journal_service import ensure_activation_journal_schema
 from sqlserver_snapshot_commands import SQLSERVER_SNAPSHOT_METADATA_DDL
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 16
+CURRENT_SQLITE_SCHEMA_VERSION = 17
 CURRENT_DUCKDB_SCHEMA_VERSION = 1
 
 
@@ -782,6 +782,95 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON semantic_patch_proposals(workspace_id, status, created_at);
         CREATE INDEX IF NOT EXISTS idx_semantic_patch_workspace_source
           ON semantic_patch_proposals(workspace_id, source_key, proposal_key);
+        CREATE TABLE IF NOT EXISTS semantic_releases (
+          release_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          request_key TEXT NOT NULL,
+          label TEXT NOT NULL,
+          status TEXT NOT NULL,
+          proposal_keys_json TEXT NOT NULL,
+          plan_json TEXT NOT NULL,
+          plan_fingerprint TEXT NOT NULL,
+          previous_snapshot_json TEXT NOT NULL,
+          published_snapshot_json TEXT NOT NULL,
+          published_fingerprint TEXT NOT NULL,
+          rollback_request_key TEXT,
+          rollback_plan_fingerprint TEXT,
+          created_at TEXT NOT NULL,
+          published_at TEXT NOT NULL,
+          rolled_back_at TEXT,
+          PRIMARY KEY(workspace_id, release_key),
+          UNIQUE(workspace_id, request_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_semantic_releases_workspace_status
+          ON semantic_releases(workspace_id, status, published_at);
+        CREATE TABLE IF NOT EXISTS semantic_release_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          release_key TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          status TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_semantic_release_events_release
+          ON semantic_release_events(workspace_id, release_key, event_sequence);
+        CREATE TABLE IF NOT EXISTS metric_contract_versions (
+          contract_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          metric_key TEXT NOT NULL,
+          version INTEGER NOT NULL,
+          request_key TEXT NOT NULL,
+          label TEXT NOT NULL,
+          status TEXT NOT NULL,
+          definition_json TEXT NOT NULL,
+          definition_fingerprint TEXT NOT NULL,
+          binding_json TEXT NOT NULL,
+          binding_fingerprint TEXT NOT NULL,
+          scenarios_json TEXT NOT NULL,
+          plan_fingerprint TEXT NOT NULL,
+          published_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, contract_key),
+          UNIQUE(workspace_id, metric_key, version),
+          UNIQUE(workspace_id, request_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_metric_contract_versions_metric
+          ON metric_contract_versions(workspace_id, metric_key, version DESC);
+        CREATE TABLE IF NOT EXISTS metric_contract_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          contract_key TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_metric_contract_events_contract
+          ON metric_contract_events(workspace_id, contract_key, event_sequence);
+        CREATE TABLE IF NOT EXISTS workflow_recipes (
+          recipe_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT NOT NULL,
+          version INTEGER NOT NULL,
+          request_key TEXT NOT NULL,
+          status TEXT NOT NULL,
+          stages_json TEXT NOT NULL,
+          plan_fingerprint TEXT NOT NULL,
+          published_at TEXT NOT NULL,
+          PRIMARY KEY(workspace_id, recipe_key),
+          UNIQUE(workspace_id, name, version),
+          UNIQUE(workspace_id, request_key)
+        );
+        CREATE TABLE IF NOT EXISTS workflow_recipe_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          recipe_key TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_workflow_recipe_events_recipe
+          ON workflow_recipe_events(workspace_id, recipe_key, event_sequence);
         CREATE TABLE IF NOT EXISTS query_plan_receipts (
           receipt_key TEXT NOT NULL,
           workspace_id TEXT NOT NULL,

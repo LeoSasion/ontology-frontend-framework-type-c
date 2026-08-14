@@ -1,6 +1,6 @@
 import { fetchJson, fetchJsonStrict } from "./apiClient";
 import { emptyFormulaPreview } from "./emptyWorkspaceData";
-import type { FormulaMutationPayload, FormulaPreviewPayload, QueryResult } from "./types";
+import type { FormulaMutationPayload, FormulaPreviewPayload, MetricContract, MetricContractPlan, MetricContractReplay, QueryResult } from "./types";
 
 export function updateFieldConfig(options: {
   table: string;
@@ -83,6 +83,37 @@ export function runSemanticQuery(options: { prompt: string; table?: string; limi
     method: "POST",
     body: JSON.stringify(options),
   });
+}
+
+export type MetricContractMutation = {
+  metric: string;
+  requestKey: string;
+  label?: string;
+  population?: string;
+  grain?: string;
+  unit?: string;
+  nullPolicy?: "exclude" | "zero" | "error";
+  dedupKey?: string;
+  direction?: "neutral" | "increase" | "decrease";
+  owner?: string;
+  scenarios?: Array<{ name: string; groups?: string[]; filters?: Array<{ field: string; operator: string; value?: string }>; limit?: number }>;
+};
+
+export function getMetricContracts(metric = "") {
+  const suffix = metric ? `?metric=${encodeURIComponent(metric)}` : "";
+  return fetchJsonStrict<{ ok: boolean; metricContracts: MetricContract[]; count: number }>(`/api/metric-contracts${suffix}`);
+}
+
+export function previewMetricContract(options: MetricContractMutation) {
+  return fetchJsonStrict<{ ok: boolean; dryRun: true; metricContractPlan: MetricContractPlan }>("/api/metric-contracts/preview", { method: "POST", body: JSON.stringify(options) });
+}
+
+export function publishMetricContract(options: MetricContractMutation & { expectedPlanFingerprint: string }) {
+  return fetchJsonStrict<{ ok: boolean; metricContract: MetricContract }>("/api/metric-contracts/publish", { method: "POST", body: JSON.stringify({ ...options, confirm: true }) });
+}
+
+export function replayMetricContract(contractKey: string) {
+  return fetchJsonStrict<MetricContractReplay & { ok: boolean }>(`/api/metric-contracts/replay?contract=${encodeURIComponent(contractKey)}`);
 }
 
 export function recommendRelationships(options: { limit?: number } = {}) {
