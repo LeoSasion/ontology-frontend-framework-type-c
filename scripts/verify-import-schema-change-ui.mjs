@@ -105,7 +105,7 @@ const checks = [
       && sourceCoreStyles.includes('input:not([type="checkbox"])')
       && sourceCoreStyles.includes("min-height: 44px")
       && sourceCoreStyles.includes(".workbenchGrid > .workbenchPanel,")
-      && sourceCoreStyles.includes(".sourceSecondaryGrid {\n    grid-template-columns: minmax(0, 1fr);")
+      && /\.sourceSecondaryGrid\s*\{\s*grid-template-columns:\s*minmax\(0,\s*1fr\);/.test(sourceCoreStyles)
       && !/(?:^|[;{]\s*)width:\s*\d{3,}px/m.test(styles),
   },
 ];
