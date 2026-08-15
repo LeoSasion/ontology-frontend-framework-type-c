@@ -164,7 +164,7 @@ function typographyMetrics() {
       pageTitle: measure(".workspaceHomeIntro h1"),
       pageBody: measure(".workspaceHomeIntro p"),
       summaryValue: measure(".workspaceFacts dd"),
-      taskTitle: measure(".workspaceTaskEmpty h3"),
+      taskTitle: measure(".workspaceTaskEmpty h2"),
       taskBody: measure(".workspaceTaskEmpty p"),
       navigationLabel: measure(".workspaceNavItem > span"),
     },

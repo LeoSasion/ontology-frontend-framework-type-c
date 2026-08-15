@@ -200,7 +200,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
     {
         label: "frontend-production-copy-and-prioritized-roadmap-contract",
         ok: productAcceptanceMatrixDocSource.includes("- `npm run preflight`") &&
-          dashboardCanvasSource.includes('name: biText("未命名看板", "Untitled dashboard")') &&
+          dashboardCanvasSource.includes('name: biText("尚未创建看板", "No dashboard yet")') &&
           !dashboardCanvasSource.includes("临时看板") &&
           !dashboardCanvasSource.includes("Temporary dashboard") &&
           dashboardBusinessTaskStripSource.includes("描述指标、维度、时间范围或想比较的对象") &&

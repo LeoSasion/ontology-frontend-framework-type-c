@@ -103,6 +103,7 @@ export function SourceWorkbenchView({
   latestSourceProfile,
   connectedRowCount,
   connectedFieldCount,
+  sourceProfileAvailable,
   sourceProfileComplete,
   sourceProfileRunning,
   sourceProfileRunningLabel,
@@ -178,7 +179,7 @@ export function SourceWorkbenchView({
 
         {hasData ? <Suspense fallback={null}><SourceJobRuntimePanel /></Suspense> : null}
 
-        {hasData && !sourceProfileComplete ? <div className="importSuccessNextStep" data-testid="import-success-next-step">
+        {hasData && !sourceProfileAvailable ? <div className="importSuccessNextStep" data-testid="import-success-next-step">
           <Icon name={sourceProfileError || sourceProfileRunning ? "evidence" : "check"} />
           <div>
             <strong>{sourceProfileError
@@ -204,6 +205,7 @@ export function SourceWorkbenchView({
             recommendedPrimaryAction={recommendedPrimaryAction}
             beginnerPlan={beginnerPlan}
             sourceProfileRunning={sourceProfileRunning}
+            sourceProfileAvailable={sourceProfileAvailable}
             sourceProfileComplete={sourceProfileComplete}
             latestSourceProfile={latestSourceProfile}
             showAdvanced={showAdvanced}

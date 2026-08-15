@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { AgentAskResult, SourceIntelligenceRunSummary, WorkbenchPayload, WorkspaceStatus } from "../src/types";
+import type { AgentAskResult, ImportPreview, SourceIntelligenceRunSummary, WorkbenchPayload, WorkspaceStatus } from "../src/types";
 import type { AnalysisJob } from "../src/typesJobs";
+import { buildSourceWorkbenchGuidance } from "../src/sourceWorkbenchGuidanceModel";
 import { buildWorkspaceJourney, sourceIntelligenceInputs } from "../src/workspaceJourneyModel";
 import { buildTrustedAnswerCoordinator } from "../src/trustedAnswerCoordinator";
 
@@ -153,6 +154,33 @@ test("usable evidence moves directly to asking and retains source inputs", () =>
   assert.equal(journey.phase, "ask");
   assert.equal(journey.understanding.state, "ready");
   assert.deepEqual(sourceIntelligenceInputs(workbench({ hasData: true, runs: [run()] })), ["C:\\data\\orders.xlsx"]);
+});
+
+test("usable partial evidence stays analyzable while refresh remains suggested", () => {
+  const partialRun = run();
+  partialRun.fileCoverage = { complete: false } as SourceIntelligenceRunSummary["fileCoverage"];
+  const currentWorkbench = workbench({ hasData: true, runs: [partialRun] });
+  const journey = buildWorkspaceJourney({
+    status: status(1),
+    workbench: currentWorkbench,
+    agent: agent(),
+  });
+  const guidance = buildSourceWorkbenchGuidance({
+    busy: null,
+    preview: {
+      ok: false,
+      profile: { rowCount: 0, columnCount: 0 },
+    } as ImportPreview,
+    tables: currentWorkbench.tables,
+    fields: currentWorkbench.fields,
+    latestSourceProfile: partialRun,
+  });
+
+  assert.equal(journey.hasCurrentEvidence, true);
+  assert.equal(guidance.sourceProfileAvailable, true);
+  assert.equal(guidance.sourceProfileComplete, false);
+  assert.equal(guidance.recommendedPrimaryAction, "start-analysis");
+  assert.match(guidance.beginnerPlan.find((item) => item.key === "profile")?.state ?? "", /建议更新|refresh suggested/i);
 });
 
 test("a completed answer moves to review, while a pending write takes confirmation priority", () => {

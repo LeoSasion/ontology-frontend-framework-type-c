@@ -136,9 +136,15 @@ export function HomeOverview({
       <ol className="workspaceJourney" data-testid="workspace-journey" aria-label={biText("可信分析流程", "Trusted analysis flow")}>
         {workflowSteps.map((step, index) => {
           const state = journey.stepStates[index];
+          const stateLabel = state === "complete"
+            ? biText("已完成", "Complete")
+            : state === "current"
+              ? biText("当前步骤", "Current step")
+              : biText("尚未开始", "Not started");
           return (
             <li className={state} key={step.key}>
               <button
+                aria-label={`${step.label} · ${step.detail} · ${stateLabel}`}
                 aria-current={state === "current" ? "step" : undefined}
                 disabled={state === "upcoming"}
                 onClick={() => onOpenSection(step.section)}
@@ -166,7 +172,7 @@ export function HomeOverview({
             aria-valuenow={journey.activeJob ? journey.understanding.progress : undefined}
             role={journey.activeJob ? "progressbar" : "status"}
           >
-            <h3>
+            <h2>
               {journey.understanding.state === "ready"
                 ? biText("数据理解已就绪", "Data understanding is ready")
                 : journey.understanding.state === "failed"
@@ -174,7 +180,7 @@ export function HomeOverview({
                   : journey.understanding.state === "stale"
                     ? biText("数据已变化，正在等待重新理解", "Data changed and is waiting to be understood again")
                     : biText("系统正在自动理解数据", "The system is understanding the data automatically")}
-            </h3>
+            </h2>
             <p>
               {latestUsableRun
                 ? biText(
@@ -200,16 +206,18 @@ export function HomeOverview({
         data-recommended-action={recommendation.actionKey}
         data-testid="workspace-primary-task"
       >
-        <div className="workspaceRecommendation" data-testid="workspace-recommendation" role="status">
-          <span><Bilingual zh="推荐下一步" en="Recommended next" /></span>
-          <strong>{recommendation.label}</strong>
-          <small>{recommendation.detail}</small>
-        </div>
+        {recommendation.actionKey === "ask-question" ? null : (
+          <div className="workspaceRecommendation" data-testid="workspace-recommendation" role="status">
+            <span><Bilingual zh="推荐下一步" en="Recommended next" /></span>
+            <strong>{recommendation.label}</strong>
+            <small>{recommendation.detail}</small>
+          </div>
+        )}
         {!journey.hasData ? (
           <div className="workspaceTaskEmpty">
             <span className="workspaceTaskIcon"><Icon name="source" /></span>
             <div>
-              <h3><Bilingual zh="先接入一份真实数据" en="Connect one real dataset first" /></h3>
+              <h2><Bilingual zh="先接入一份真实数据" en="Connect one real dataset first" /></h2>
               <p><Bilingual zh="支持本地 CSV、Excel、文件夹或已配置的 Connector。系统会先预检，不会直接写入。" en="Use a local CSV, Excel file, folder, or configured connector. The system previews before any write." /></p>
             </div>
             <button className="primaryButton" data-testid="workspace-connect-data" onClick={() => onOpenSection("sources")} type="button">
@@ -220,11 +228,11 @@ export function HomeOverview({
           <div className="workspaceTaskEmpty">
             <span className="workspaceTaskIcon"><Icon name="evidence" /></span>
             <div>
-              <h3>
+              <h2>
                 {journey.activeJob
                   ? biText("系统正在理解数据，完成后即可提问", "The system is understanding the data; questions unlock when it finishes")
                   : biText("系统理解需要处理", "System understanding needs attention")}
-              </h3>
+              </h2>
               <p>
                 {journey.understanding.state === "failed"
                   ? biText("后台任务没有改写原始数据。可以检查路径后安全重试。", "The background job did not alter source data. Check the path and retry safely.")
@@ -243,7 +251,7 @@ export function HomeOverview({
           <div className="workspaceTaskEmpty">
             <span className="workspaceTaskIcon"><Icon name="check" /></span>
             <div>
-              <h3><Bilingual zh="核对等待确认的修改" en="Review the pending change" /></h3>
+              <h2><Bilingual zh="核对等待确认的修改" en="Review the pending change" /></h2>
               <p><Bilingual zh="确认前不会写入数据、关系、视图或看板；也可以直接拒绝草案。" en="Nothing writes to data, relationships, views, or boards before approval. You can also reject the draft." /></p>
             </div>
             <button className="primaryButton" data-testid="workspace-review-draft" onClick={() => onOpenSection("agent")} type="button">
@@ -254,11 +262,11 @@ export function HomeOverview({
           <div className="workspaceTaskEmpty">
             <span className="workspaceTaskIcon"><Icon name="evidence" /></span>
             <div>
-              <h3>
+              <h2>
                 {journey.resultState === "blocked"
                   ? <Bilingual zh="分析需要补充一个条件" en="The analysis needs one more condition" />
                   : <Bilingual zh="可信结果已经生成" en="A trusted result is ready" />}
-              </h3>
+              </h2>
               <p>
                 {journey.resultState === "blocked"
                   ? <Bilingual zh="系统没有发布未经证实的数字。请先处理结果中最高价值的澄清，再继续分析。" en="The system did not publish an unverified number. Resolve the highest-value clarification in the result before continuing." />
@@ -274,7 +282,7 @@ export function HomeOverview({
             <div className="workspaceQuestionLead">
               <span className="workspaceTaskIcon"><Icon name="agent" /></span>
               <div>
-                <h3><Bilingual zh="你想从数据里知道什么？" en="What do you want to know from the data?" /></h3>
+                <h2><Bilingual zh="你想从数据里知道什么？" en="What do you want to know from the data?" /></h2>
                 <p>
                   {biText(
                     `系统会在当前工作区的 ${workbench.tables.length} 张表中匹配证据；字段或关系不明确时会一次列出候选。`,

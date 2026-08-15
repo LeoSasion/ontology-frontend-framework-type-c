@@ -9,6 +9,7 @@ type SourceWorkbenchActionPanelProps = {
   recommendedPrimaryAction: RecommendedPrimaryAction;
   beginnerPlan: BeginnerPlanItem[];
   sourceProfileRunning: boolean;
+  sourceProfileAvailable: boolean;
   sourceProfileComplete: boolean;
   latestSourceProfile?: SourceIntelligenceRunSummary;
   showAdvanced: boolean;
@@ -48,6 +49,7 @@ export function SourceWorkbenchActionPanel(props: SourceWorkbenchActionPanelProp
     recommendedPrimaryAction,
     beginnerPlan,
     sourceProfileRunning,
+    sourceProfileAvailable,
     sourceProfileComplete,
     latestSourceProfile,
     showAdvanced,
@@ -70,7 +72,11 @@ export function SourceWorkbenchActionPanel(props: SourceWorkbenchActionPanelProp
     <article className="workbenchPanel simpleGuide" data-testid="beginner-import-plan">
       <div className="tileHeader">
         <h3><Bilingual zh="下一步" en="Next step" /></h3>
-        <span>{sourceProfileComplete ? biText("可分析", "Ready") : biText("需准备", "Prepare")}</span>
+        <span>{sourceProfileComplete
+          ? biText("可分析", "Ready")
+          : sourceProfileAvailable
+            ? biText("可分析 · 建议更新", "Ready · refresh suggested")
+            : biText("需准备", "Prepare")}</span>
       </div>
 
       <div className="beginnerPlanLead">
@@ -101,26 +107,31 @@ export function SourceWorkbenchActionPanel(props: SourceWorkbenchActionPanelProp
         </button>
       ) : null}
 
-      {sourceProfileComplete ? (
+      {sourceProfileAvailable ? (
         <button className="primaryButton compactAction sourcePrimaryNext" data-testid="source-next-analysis" onClick={onOpenAnalysis} type="button">
           <Icon name="agent" />
           <Bilingual zh="开始分析" en="Start analysis" />
         </button>
       ) : null}
 
-      <div className={sourceProfileComplete ? "beginnerImportGuard ok" : "beginnerImportGuard warn"} data-testid="beginner-evidence-guard">
-        <Icon name={sourceProfileComplete ? "check" : "evidence"} />
+      <div className={sourceProfileAvailable ? "beginnerImportGuard ok" : "beginnerImportGuard warn"} data-testid="beginner-evidence-guard">
+        <Icon name={sourceProfileAvailable ? "check" : "evidence"} />
         <span>
           {sourceProfileComplete
             ? biText(
-              `证据摘要可用${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} 个候选问题可执行` : ""}`,
-              `Evidence is ready${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} candidate questions executable` : ""}`,
+              `证据摘要完整${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} 个候选问题可执行` : ""}`,
+              `Evidence is complete${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} candidate questions executable` : ""}`,
             )
+            : sourceProfileAvailable
+              ? biText(
+                `当前证据可用于分析${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} 个候选问题可执行` : ""}；文件覆盖不完整，可按需更新。`,
+                `Current evidence can be analyzed${latestSourceProfile ? ` · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} candidate questions executable` : ""}; file coverage is incomplete, so refresh when needed.`,
+              )
             : biText("生成证据摘要后再进入分析与看板。", "Prepare evidence before analysis and dashboards.")}
         </span>
       </div>
 
-      {sourceProfileComplete ? (
+      {sourceProfileAvailable ? (
         <details className="sourceGuideDetails" data-testid="source-guide-details">
           <summary>{biText("其他数据动作", "Other data actions")}</summary>
           <div className="sourceGuideCompactActions">

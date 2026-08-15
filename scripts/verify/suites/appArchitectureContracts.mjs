@@ -528,9 +528,11 @@ export function appendAppArchitectureContractChecks(context) {
         ok: homeOverviewSource.includes('className="workspaceJourney"') &&
           homeOverviewSource.includes('aria-label={biText("可信分析流程", "Trusted analysis flow")}') &&
           ["data", "evidence", "question", "review"].every((key) => homeOverviewSource.includes(`{ key: "${key}"`)) &&
+          homeOverviewSource.includes('aria-label={`${step.label} · ${step.detail} · ${stateLabel}`}') &&
           homeOverviewSource.includes('aria-current={state === "current" ? "step" : undefined}') &&
           homeOverviewSource.includes('disabled={state === "upcoming"}') &&
           homeOverviewSource.includes('data-testid="workspace-primary-task"') &&
+          homeOverviewSource.includes('recommendation.actionKey === "ask-question" ? null') &&
           !homeOverviewSource.includes("HomeWorkspaceStartGuide") &&
           !homeOverviewSource.includes("buildHomeGuideSteps"),
       },

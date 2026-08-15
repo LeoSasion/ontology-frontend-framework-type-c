@@ -53,7 +53,7 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
   const requestedDashboardMissing = activeDashboardKey !== "default" && !requestedDashboard;
   const dashboard = requestedDashboard ?? dashboardPages[0] ?? {
     dashboard_key: "fallback",
-    name: biText("未命名看板", "Untitled dashboard"),
+    name: biText("尚未创建看板", "No dashboard yet"),
     workspace_id: "default",
     default_table_key: focusedTableKey || query.query?.table || workbench.tables[0]?.table_key || "",
     created_by: "fallback",

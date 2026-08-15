@@ -294,7 +294,7 @@ export function appendSourceContractChecks(context) {
     {
         label: "source-workbench-dashboard-next-action",
         ok: sourceWorkbenchActionPanelSource.includes('data-testid="source-next-analysis"') &&
-          sourceWorkbenchActionPanelSource.includes("{sourceProfileComplete ? (") &&
+          sourceWorkbenchActionPanelSource.includes("{sourceProfileAvailable ? (") &&
           sourceWorkbenchActionPanelSource.includes('onClick={onOpenAnalysis}') &&
           sourceWorkbenchActionPanelSource.includes('zh="开始分析" en="Start analysis"') &&
           sourceWorkbenchActionPanelSource.includes('data-testid="source-guide-details"') &&
@@ -384,9 +384,13 @@ export function appendSourceContractChecks(context) {
           sourceWorkbenchImportControllerSource.includes("const previewSummary = buildImportPreviewSummary") &&
           sourceWorkbenchImportControllerSource.includes("...previewSummary") &&
           sourceWorkbenchGuidanceModelSource.includes("const recommendedPrimaryAction") &&
-          /hasImportedTables\s*\?\s*sourceProfileComplete/.test(sourceWorkbenchGuidanceModelSource) &&
+          /hasImportedTables\s*\?\s*sourceProfileAvailable/.test(sourceWorkbenchGuidanceModelSource) &&
           sourceWorkbenchGuidanceModelSource.includes('"start-analysis"') &&
+          sourceWorkbenchGuidanceModelSource.includes("sourceProfileAvailable") &&
           sourceWorkbenchGuidanceModelSource.includes("sourceProfileComplete") &&
+          sourceWorkbenchActionPanelSource.includes("可分析 · 建议更新") &&
+          sourceWorkbenchActionPanelSource.includes("当前证据可用于分析") &&
+          sourceWorkbenchSource.includes("hasData && !sourceProfileAvailable") &&
           sourceWorkbenchGuidanceModelSource.includes("previewReadable") &&
           sourceWorkbenchGuidanceModelSource.includes("hasImportedTables") &&
           !sourceWorkbenchGuidanceModelSource.includes("measureFields") &&

@@ -25,13 +25,14 @@ export function buildSourceWorkbenchGuidance({
   fields,
   latestSourceProfile,
 }: BuildSourceWorkbenchGuidanceOptions) {
+  const sourceProfileAvailable = Boolean(latestSourceProfile);
   const sourceProfileComplete = Boolean(latestSourceProfile?.fileCoverage?.complete);
   const previewReadable = Boolean(preview.ok && preview.profile.rowCount > 0 && preview.profile.columnCount > 0);
   const hasImportedTables = tables.length > 0;
   const sourceProfileRunning = busy === "source-intelligence";
   const sourceProfileRunningLabel = biText("正在只读扫描本地路径", "Scanning local paths read-only");
   const recommendedPrimaryAction: RecommendedPrimaryAction = hasImportedTables
-    ? sourceProfileComplete
+    ? sourceProfileAvailable
       ? "start-analysis"
       : "refresh-profile"
     : previewReadable
@@ -56,7 +57,11 @@ export function buildSourceWorkbenchGuidance({
     },
     {
       key: "profile",
-      state: sourceProfileComplete ? biText("证据完整", "Evidence ready") : biText("建议更新", "Refresh suggested"),
+      state: sourceProfileComplete
+        ? biText("证据完整", "Evidence complete")
+        : sourceProfileAvailable
+          ? biText("可分析 · 建议更新", "Ready · refresh suggested")
+          : biText("尚需准备", "Preparation needed"),
       title: biText("证据摘要", "Evidence profile"),
       detail: latestSourceProfile
         ? `${latestSourceProfile.source_count} ${biText("文件", "files")} · ${latestSourceProfile.relationship_count} ${biText("关系", "relations")} · ${latestSourceProfile.metric_sql_executable_count}/${latestSourceProfile.metric_sql_plan_count} ${biText("可执行问题", "answerable questions")}`
@@ -64,6 +69,7 @@ export function buildSourceWorkbenchGuidance({
     },
   ];
   return {
+    sourceProfileAvailable,
     sourceProfileComplete,
     sourceProfileRunning,
     sourceProfileRunningLabel,

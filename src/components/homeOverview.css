@@ -187,7 +187,7 @@
 
 .workspaceRecommendation span {
   color: var(--accent-strong);
-  font-size: var(--ui-font-caption);
+  font-size: var(--ui-font-label);
   font-weight: 760;
 }
 
@@ -199,7 +199,7 @@
 .workspaceRecommendation small {
   min-width: 0;
   color: var(--muted);
-  font-size: var(--ui-font-caption);
+  font-size: var(--ui-font-label);
   overflow-wrap: anywhere;
 }
 
@@ -227,8 +227,8 @@
   height: 20px;
 }
 
-.workspaceTaskEmpty h3,
-.workspaceQuestionLead h3 {
+.workspaceTaskEmpty h2,
+.workspaceQuestionLead h2 {
   margin: 0;
   color: var(--text);
   font-size: var(--ui-font-card-title);
@@ -304,7 +304,7 @@
 
 .workspaceQuestionForm > small {
   color: var(--soft);
-  font-size: 11px;
+  font-size: var(--ui-font-label);
   line-height: 1.4;
 }
 

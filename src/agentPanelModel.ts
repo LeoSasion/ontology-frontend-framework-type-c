@@ -127,7 +127,7 @@ export function confidenceText(value?: string) {
 }
 
 export function llmModeText(configured: boolean) {
-  return configured ? biText("模型回答", "Model answer") : biText("本地规则回答", "Local rule answer");
+  return configured ? biText("模型辅助回答", "Model-assisted answer") : biText("本地可核对回答", "Locally verified answer");
 }
 
 export function confidenceClass(value?: string) {
