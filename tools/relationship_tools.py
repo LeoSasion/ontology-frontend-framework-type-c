@@ -7,47 +7,111 @@ from query_runtime import cursor_rows
 
 
 QuoteIdentifier = Callable[[str], str]
+MAX_RELATIONSHIP_SAMPLE_ROWS = 500
 
 
-def clean(value: Any) -> str:
-    return "" if value is None else str(value).strip()
+def _preview_text_expression(alias: str, field: str, quote_identifier: QuoteIdentifier) -> str:
+    return f"COALESCE(TRIM(CAST({alias}.{quote_identifier(field)} AS VARCHAR)), '')"
 
 
-def relationship_key(row: dict[str, Any], mappings: list[dict[str, str]], side: str) -> str | None:
+def _preview_numeric_expression(alias: str, field: str, quote_identifier: QuoteIdentifier) -> str:
+    text = _preview_text_expression(alias, field, quote_identifier)
+    return f"COALESCE(TRY_CAST(NULLIF(REPLACE({text}, ',', ''), '') AS DOUBLE), 0)"
+
+
+def _preview_filter_sql(
+    filters: list[dict[str, Any]],
+    alias: str,
+    quote_identifier: QuoteIdentifier,
+) -> tuple[str, list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    for item in filters:
+        text = _preview_text_expression(alias, str(item["field"]), quote_identifier)
+        numeric = _preview_numeric_expression(alias, str(item["field"]), quote_identifier)
+        operator = str(item["operator"])
+        value = item.get("value", "")
+        if operator == "empty":
+            clauses.append(f"{text} = ''")
+        elif operator == "notEmpty":
+            clauses.append(f"{text} <> ''")
+        elif operator == "equals":
+            clauses.append(f"{text} = ?")
+            params.append(str(value))
+        elif operator == "notEquals":
+            clauses.append(f"{text} <> ?")
+            params.append(str(value))
+        elif operator == "contains":
+            clauses.append(f"{text} LIKE '%' || ? || '%'")
+            params.append(str(value))
+        elif operator == "in":
+            values = parse_filter_values(value)
+            if values:
+                clauses.append(f"{text} IN ({', '.join('?' for _ in values)})")
+                params.extend(values)
+        elif operator == "between":
+            start, end = parse_range_values(value)
+            if start:
+                clauses.append(f"{numeric} >= ?")
+                params.append(numeric_value(start))
+            if end:
+                clauses.append(f"{numeric} <= ?")
+                params.append(numeric_value(end))
+        else:
+            comparison = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[operator]
+            clauses.append(f"{numeric} {comparison} ?")
+            params.append(numeric_value(value))
+    return " AND ".join(clauses) or "TRUE", params
+
+
+def _key_expressions(
+    alias: str,
+    mappings: list[dict[str, str]],
+    side: str,
+    quote_identifier: QuoteIdentifier,
+) -> list[str]:
     field_key = "leftField" if side == "left" else "rightField"
-    values = [clean(row.get(mapping[field_key], "")) for mapping in mappings]
-    # A composite key is only usable when every component is present. Treating
-    # partially empty keys as values lets unrelated rows match on the remaining
-    # empty components and creates false fan-out evidence.
-    if not values or any(value == "" for value in values):
-        return None
-    return json.dumps(values, ensure_ascii=False, separators=(",", ":"))
+    return [
+        f"NULLIF({_preview_text_expression(alias, mapping[field_key], quote_identifier)}, '')"
+        for mapping in mappings
+    ]
 
 
-def rows_for_table(connection: Any, table_name: str, columns: list[str], quote_identifier: QuoteIdentifier) -> list[dict[str, Any]]:
-    select_sql = ", ".join(quote_identifier(column) for column in columns)
-    return cursor_rows(connection.execute(f"SELECT {select_sql} FROM {quote_identifier(table_name)}"))
+def _projected_columns(
+    alias: str,
+    columns: list[str],
+    quote_identifier: QuoteIdentifier,
+) -> str:
+    return ", ".join(
+        f"{alias}.{quote_identifier(column)} AS {quote_identifier(column)}"
+        for column in columns
+    )
 
 
-def key_stats(rows: list[dict[str, Any]], mappings: list[dict[str, str]], side: str) -> dict[str, Any]:
-    counts: dict[str, int] = {}
-    empty_rows = 0
-    for row in rows:
-        key = relationship_key(row, mappings, side)
-        if key is None:
-            empty_rows += 1
-            continue
-        counts[key] = counts.get(key, 0) + 1
-    duplicate_groups = sum(1 for count in counts.values() if count > 1)
-    duplicate_rows = sum(count - 1 for count in counts.values() if count > 1)
-    return {
-        "rows": len(rows),
-        "distinctKeys": len(counts),
-        "emptyKeyRows": empty_rows,
-        "duplicateKeyGroups": duplicate_groups,
-        "duplicateRows": duplicate_rows,
-        "counts": counts,
-    }
+def _preaggregate_sql(
+    source_name: str,
+    config: dict[str, Any],
+    quote_identifier: QuoteIdentifier,
+) -> str:
+    group_fields = list(config["groupFields"])
+    select_parts = [f"r.{quote_identifier(field)} AS {quote_identifier(field)}" for field in group_fields]
+    for item in config["measures"]:
+        field = str(item["field"])
+        aggregation = str(item["aggregation"])
+        text = _preview_text_expression("r", field, quote_identifier)
+        numeric = _preview_numeric_expression("r", field, quote_identifier)
+        if aggregation == "count":
+            expression = "COUNT(*)"
+        elif aggregation == "count-distinct":
+            expression = f"COUNT(DISTINCT NULLIF({text}, ''))"
+        else:
+            expression = f"{aggregation.upper()}({numeric})"
+        select_parts.append(f"{expression} AS {quote_identifier(field)}")
+    group_sql = ", ".join(f"r.{quote_identifier(field)}" for field in group_fields)
+    return (
+        f"SELECT {', '.join(select_parts)} FROM {source_name} AS r "
+        f"GROUP BY {group_sql}"
+    )
 
 
 def build_relationship_preview(
@@ -74,8 +138,6 @@ def build_relationship_preview(
         if mapping["rightField"] not in right_columns:
             raise ValueError(f"右表字段不存在：{mapping['rightField']}")
 
-    raw_left_rows = rows_for_table(connection, left_table_name, left_columns, quote_identifier)
-    raw_right_rows = rows_for_table(connection, right_table_name, right_columns, quote_identifier)
     normalized_filters = [
         item
         for item in (
@@ -84,67 +146,201 @@ def build_relationship_preview(
         )
         if item is not None
     ]
-    left_rows = [
-        row for row in raw_left_rows
-        if all(
-            relationship_filter_matches(row, item)
-            for item in normalized_filters
-            if item["phase"] == "pre" and item["side"] == "left"
-        )
-    ]
-    right_rows = [
-        row for row in raw_right_rows
-        if all(
-            relationship_filter_matches(row, item)
-            for item in normalized_filters
-            if item["phase"] == "pre" and item["side"] == "right"
-        )
-    ]
     normalized_preaggregation = normalize_relationship_preaggregation(preaggregation, right_columns, mappings)
-    if normalized_preaggregation:
-        right_rows = preaggregate_relationship_rows(right_rows, normalized_preaggregation)
-    left_stats = key_stats(left_rows, mappings, "left")
-    right_stats = key_stats(right_rows, mappings, "right")
-    left_keys = set(left_stats["counts"].keys())
-    right_keys = set(right_stats["counts"].keys())
-    overlap = left_keys & right_keys
-    matched_left_rows = sum(left_stats["counts"][key] for key in overlap)
-    matched_right_rows = sum(right_stats["counts"][key] for key in overlap)
-    unmatched_left_rows = len(left_rows) - matched_left_rows
-    unmatched_right_rows = len(right_rows) - matched_right_rows
-    joined_rows = sum(left_stats["counts"][key] * right_stats["counts"][key] for key in overlap)
+    left_pre = [item for item in normalized_filters if item["phase"] == "pre" and item["side"] == "left"]
+    right_pre = [item for item in normalized_filters if item["phase"] == "pre" and item["side"] == "right"]
+    left_predicate, left_params = _preview_filter_sql(left_pre, "l", quote_identifier)
+    right_predicate, right_params = _preview_filter_sql(right_pre, "r", quote_identifier)
+    left_needed = list(dict.fromkeys([
+        *[item["leftField"] for item in mappings],
+        *left_columns[:8],
+    ]))
+    right_needed = list(dict.fromkeys([
+        *[item["rightField"] for item in mappings],
+        *right_columns[:8],
+        *(
+            [*normalized_preaggregation["groupFields"], *[item["field"] for item in normalized_preaggregation["measures"]]]
+            if normalized_preaggregation
+            else []
+        ),
+    ]))
+    left_projection = _projected_columns("l", left_needed, quote_identifier)
+    right_projection = _projected_columns("r", right_needed, quote_identifier)
+    right_effective_name = "right_effective" if normalized_preaggregation else "right_filtered"
+    right_effective_cte = (
+        ", right_effective AS MATERIALIZED ("
+        + _preaggregate_sql("right_filtered", normalized_preaggregation, quote_identifier)
+        + ")"
+        if normalized_preaggregation
+        else ""
+    )
+    left_key_exprs = _key_expressions("l", mappings, "left", quote_identifier)
+    right_key_exprs = _key_expressions("r", mappings, "right", quote_identifier)
+    left_key_select = ", ".join(
+        f"{expression} AS {quote_identifier(f'__key_{index}')}"
+        for index, expression in enumerate(left_key_exprs)
+    )
+    right_key_select = ", ".join(
+        f"{expression} AS {quote_identifier(f'__key_{index}')}"
+        for index, expression in enumerate(right_key_exprs)
+    )
+    left_usable = " AND ".join(f"{expression} IS NOT NULL" for expression in left_key_exprs)
+    right_usable = " AND ".join(f"{expression} IS NOT NULL" for expression in right_key_exprs)
+    key_names = [quote_identifier(f"__key_{index}") for index in range(len(mappings))]
+    key_join = " AND ".join(f"l.{name} = r.{name}" for name in key_names)
+    safe_sample_limit = max(1, min(int(sample_limit or 1), MAX_RELATIONSHIP_SAMPLE_ROWS))
+    effective_right_columns = set(
+        [*normalized_preaggregation["groupFields"], *[item["field"] for item in normalized_preaggregation["measures"]]]
+        if normalized_preaggregation
+        else right_columns
+    )
+    sample_select = [
+        *[
+            f"l.{quote_identifier(column)} AS {quote_identifier(f'left.{column}')}"
+            for column in left_columns[:8]
+        ],
+        *[
+            (
+                f"r.{quote_identifier(column)}"
+                if column in effective_right_columns
+                else "NULL"
+            ) + f" AS {quote_identifier(f'right.{column}')}"
+            for column in right_columns[:8]
+        ],
+    ]
+    representative_columns = [column for column in right_needed if column in effective_right_columns]
+    representative_order = "hash(" + ", ".join(
+        f"COALESCE(CAST(r.{quote_identifier(column)} AS VARCHAR), '')"
+        for column in representative_columns
+    ) + ")"
+    right_representatives = ", ".join(
+        f"first(r.{quote_identifier(column)} ORDER BY {representative_order}) AS {quote_identifier(column)}"
+        for column in representative_columns
+    )
+    right_sample_select = f"{right_key_select}, {right_representatives}" if right_representatives else right_key_select
+    sampled_key_join = " AND ".join(
+        f"{right_key_exprs[index]} = k.{key_names[index]}"
+        for index in range(len(key_names))
+    )
+    preview_key_join = " AND ".join(f"l.{name} = r.{name}" for name in key_names)
+    sample_join = "JOIN" if join_type == "inner" else "LEFT JOIN"
+    metric_sql = f"""
+        WITH
+        left_filtered AS MATERIALIZED (
+          SELECT {left_projection}
+          FROM {quote_identifier(left_table_name)} AS l
+          WHERE {left_predicate}
+        ),
+        right_filtered AS MATERIALIZED (
+          SELECT {right_projection}
+          FROM {quote_identifier(right_table_name)} AS r
+          WHERE {right_predicate}
+        )
+        {right_effective_cte},
+        left_key_counts AS (
+          SELECT {left_key_select}, COUNT(*)::BIGINT AS row_count
+          FROM left_filtered AS l
+          WHERE {left_usable}
+          GROUP BY {', '.join(left_key_exprs)}
+        ),
+        right_key_counts AS (
+          SELECT {right_key_select}, COUNT(*)::BIGINT AS row_count
+          FROM {right_effective_name} AS r
+          WHERE {right_usable}
+          GROUP BY {', '.join(right_key_exprs)}
+        ),
+        matched AS (
+          SELECT l.row_count AS left_count, r.row_count AS right_count
+          FROM left_key_counts AS l
+          JOIN right_key_counts AS r ON {key_join}
+        ),
+        matched_ranked AS (
+          SELECT *,
+            ROW_NUMBER() OVER (ORDER BY right_count) AS right_rank,
+            ROW_NUMBER() OVER (ORDER BY left_count) AS left_rank,
+            COUNT(*) OVER () AS overlap_count
+          FROM matched
+        ),
+        matched_summary AS (
+          SELECT
+            COUNT(*)::BIGINT AS overlap_keys,
+            COALESCE(SUM(left_count), 0)::BIGINT AS matched_left_rows,
+            COALESCE(SUM(right_count), 0)::BIGINT AS matched_right_rows,
+            COALESCE(SUM(left_count * right_count), 0)::BIGINT AS joined_rows,
+            COALESCE(MAX(right_count), 0)::BIGINT AS max_right_rows_per_key,
+            COALESCE(MAX(left_count), 0)::BIGINT AS max_left_rows_per_key,
+            COALESCE(MAX(CASE WHEN right_rank = CAST(FLOOR(overlap_count * 0.95) AS BIGINT) + 1 THEN right_count END), 0)::BIGINT AS p95_right_rows_per_key,
+            COALESCE(MAX(CASE WHEN left_rank = CAST(FLOOR(overlap_count * 0.95) AS BIGINT) + 1 THEN left_count END), 0)::BIGINT AS p95_left_rows_per_key
+          FROM matched_ranked
+        ),
+        left_sample AS MATERIALIZED (
+          SELECT l.*, {left_key_select}
+          FROM left_filtered AS l
+          WHERE {left_usable}
+          LIMIT ?
+        ),
+        sample_keys AS (
+          SELECT DISTINCT {', '.join(key_names)}
+          FROM left_sample
+        ),
+        right_sample AS MATERIALIZED (
+          SELECT {right_sample_select}
+          FROM {right_effective_name} AS r
+          JOIN sample_keys AS k ON {sampled_key_join}
+          WHERE {right_usable}
+          GROUP BY {', '.join(right_key_exprs)}
+        ),
+        preview_rows AS (
+          SELECT 1 AS __sample_present, {', '.join(sample_select)}
+          FROM left_sample AS l
+          {sample_join} right_sample AS r ON {preview_key_join}
+        ),
+        metric_values AS (
+          SELECT
+            (SELECT COUNT(*) FROM {quote_identifier(left_table_name)})::BIGINT AS left_rows_before_filters,
+            (SELECT COUNT(*) FROM {quote_identifier(right_table_name)})::BIGINT AS right_rows_before_filters,
+            (SELECT COUNT(*) FROM left_filtered)::BIGINT AS left_rows,
+            (SELECT COUNT(*) FROM {right_effective_name})::BIGINT AS right_rows,
+            (SELECT COUNT(*) FROM left_key_counts)::BIGINT AS left_distinct_keys,
+            (SELECT COUNT(*) FROM right_key_counts)::BIGINT AS right_distinct_keys,
+            (SELECT COUNT(*) FROM left_key_counts WHERE row_count > 1)::BIGINT AS left_duplicate_key_groups,
+            (SELECT COUNT(*) FROM right_key_counts WHERE row_count > 1)::BIGINT AS right_duplicate_key_groups,
+            (SELECT COUNT(*) FROM left_filtered) - COALESCE((SELECT SUM(row_count) FROM left_key_counts), 0) AS left_empty_key_rows,
+            (SELECT COUNT(*) FROM {right_effective_name}) - COALESCE((SELECT SUM(row_count) FROM right_key_counts), 0) AS right_empty_key_rows,
+            matched_summary.*
+          FROM matched_summary
+        )
+        SELECT metric_values.*, preview_rows.*
+        FROM metric_values
+        LEFT JOIN preview_rows ON TRUE
+    """
+    combined_rows = cursor_rows(connection.execute(
+        metric_sql,
+        [*left_params, *right_params, safe_sample_limit],
+    ))
+    metric_row = combined_rows[0]
+    sample_rows = [
+        {key: value for key, value in row.items() if key.startswith(("left.", "right."))}
+        for row in combined_rows
+        if row.get("__sample_present") is not None
+    ]
+    left_rows = int(metric_row["left_rows"] or 0)
+    right_rows = int(metric_row["right_rows"] or 0)
+    left_distinct_keys = int(metric_row["left_distinct_keys"] or 0)
+    right_distinct_keys = int(metric_row["right_distinct_keys"] or 0)
+    overlap_keys = int(metric_row["overlap_keys"] or 0)
+    matched_left_rows = int(metric_row["matched_left_rows"] or 0)
+    matched_right_rows = int(metric_row["matched_right_rows"] or 0)
+    unmatched_left_rows = left_rows - matched_left_rows
+    unmatched_right_rows = right_rows - matched_right_rows
+    joined_rows = int(metric_row["joined_rows"] or 0)
     output_rows = joined_rows + (unmatched_left_rows if join_type == "left" else 0)
-    row_expansion = output_rows / max(1, len(left_rows))
     reverse_output_rows = joined_rows + (unmatched_right_rows if join_type == "left" else 0)
-    reverse_row_expansion = reverse_output_rows / max(1, len(right_rows))
+    row_expansion = output_rows / max(1, left_rows)
+    reverse_row_expansion = reverse_output_rows / max(1, right_rows)
     matched_row_expansion = joined_rows / max(1, matched_left_rows)
     reverse_matched_row_expansion = joined_rows / max(1, matched_right_rows)
-    right_fanouts = sorted(right_stats["counts"].get(key, 0) for key in overlap)
-    left_fanouts = sorted(left_stats["counts"].get(key, 0) for key in overlap)
-    right_p95_index = max(0, min(len(right_fanouts) - 1, int(len(right_fanouts) * 0.95))) if right_fanouts else 0
-    left_p95_index = max(0, min(len(left_fanouts) - 1, int(len(left_fanouts) * 0.95))) if left_fanouts else 0
-    confidence = len(overlap) / max(1, min(len(left_keys), len(right_keys)))
-
-    right_by_key: dict[str, dict[str, Any]] = {}
-    for row in right_rows:
-        key = relationship_key(row, mappings, "right")
-        if key and key not in right_by_key:
-            right_by_key[key] = row
-    sample_rows: list[dict[str, Any]] = []
-    for left_row in left_rows:
-        key = relationship_key(left_row, mappings, "left")
-        if not key:
-            continue
-        right_row = right_by_key.get(key)
-        if not right_row and join_type == "inner":
-            continue
-        merged = {
-            **{f"left.{column}": left_row.get(column) for column in left_columns[:8]},
-            **({f"right.{column}": right_row.get(column) for column in right_columns[:8]} if right_row else {}),
-        }
-        sample_rows.append(merged)
-        if len(sample_rows) >= sample_limit:
-            break
+    confidence = overlap_keys / max(1, min(left_distinct_keys, right_distinct_keys))
 
     return {
         "joinType": join_type,
@@ -152,13 +348,13 @@ def build_relationship_preview(
         "filters": normalized_filters,
         "preaggregation": normalized_preaggregation,
         "metrics": {
-            "leftRowsBeforeFilters": len(raw_left_rows),
-            "rightRowsBeforeFilters": len(raw_right_rows),
-            "leftRows": len(left_rows),
-            "rightRows": len(right_rows),
-            "leftDistinctKeys": len(left_keys),
-            "rightDistinctKeys": len(right_keys),
-            "overlapKeys": len(overlap),
+            "leftRowsBeforeFilters": int(metric_row["left_rows_before_filters"] or 0),
+            "rightRowsBeforeFilters": int(metric_row["right_rows_before_filters"] or 0),
+            "leftRows": left_rows,
+            "rightRows": right_rows,
+            "leftDistinctKeys": left_distinct_keys,
+            "rightDistinctKeys": right_distinct_keys,
+            "overlapKeys": overlap_keys,
             "matchedLeftRows": matched_left_rows,
             "matchedRightRows": matched_right_rows,
             "unmatchedLeftRows": unmatched_left_rows,
@@ -170,25 +366,25 @@ def build_relationship_preview(
             "reverseOutputRows": reverse_output_rows,
             "reverseRowExpansion": round(reverse_row_expansion, 4),
             "reverseMatchedRowExpansion": round(reverse_matched_row_expansion, 4),
-            "maxRightRowsPerKey": max(right_fanouts, default=0),
-            "p95RightRowsPerKey": right_fanouts[right_p95_index] if right_fanouts else 0,
-            "maxLeftRowsPerKey": max(left_fanouts, default=0),
-            "p95LeftRowsPerKey": left_fanouts[left_p95_index] if left_fanouts else 0,
-            "leftDuplicateKeyGroups": left_stats["duplicateKeyGroups"],
-            "rightDuplicateKeyGroups": right_stats["duplicateKeyGroups"],
-            "leftEmptyKeyRows": left_stats["emptyKeyRows"],
-            "rightEmptyKeyRows": right_stats["emptyKeyRows"],
+            "maxRightRowsPerKey": int(metric_row["max_right_rows_per_key"] or 0),
+            "p95RightRowsPerKey": int(metric_row["p95_right_rows_per_key"] or 0),
+            "maxLeftRowsPerKey": int(metric_row["max_left_rows_per_key"] or 0),
+            "p95LeftRowsPerKey": int(metric_row["p95_left_rows_per_key"] or 0),
+            "leftDuplicateKeyGroups": int(metric_row["left_duplicate_key_groups"] or 0),
+            "rightDuplicateKeyGroups": int(metric_row["right_duplicate_key_groups"] or 0),
+            "leftEmptyKeyRows": int(metric_row["left_empty_key_rows"] or 0),
+            "rightEmptyKeyRows": int(metric_row["right_empty_key_rows"] or 0),
             "confidence": round(confidence, 4),
         },
         "warnings": [
             *(
                 ["左键存在重复组，关系可能放大明细行。"]
-                if left_stats["duplicateKeyGroups"]
+                if int(metric_row["left_duplicate_key_groups"] or 0)
                 else []
             ),
             *(
                 ["右键存在重复组，lookup 关系可能不稳定。"]
-                if right_stats["duplicateKeyGroups"]
+                if int(metric_row["right_duplicate_key_groups"] or 0)
                 else []
             ),
             *(
@@ -361,38 +557,6 @@ def normalize_relationship_filter(
     }
 
 
-def relationship_filter_matches(row: dict[str, Any], filter_rule: dict[str, Any]) -> bool:
-    value = row.get(filter_rule["field"])
-    text = clean(value)
-    operator = filter_rule["operator"]
-    expected = filter_rule.get("value", "")
-    if operator == "empty":
-        return text == ""
-    if operator == "notEmpty":
-        return text != ""
-    if operator == "equals":
-        return text == str(expected)
-    if operator == "notEquals":
-        return text != str(expected)
-    if operator == "contains":
-        return str(expected) in text
-    if operator == "in":
-        return text in parse_filter_values(expected)
-    if operator == "between":
-        start, end = parse_range_values(expected)
-        number = numeric_value(value)
-        return (not start or number >= numeric_value(start)) and (not end or number <= numeric_value(end))
-    number = numeric_value(value)
-    target = numeric_value(expected)
-    if operator == "gt":
-        return number > target
-    if operator == "gte":
-        return number >= target
-    if operator == "lt":
-        return number < target
-    return number <= target
-
-
 def numeric_value(value: Any) -> float:
     try:
         return float(str(value or "0").replace(",", "").strip() or "0")
@@ -439,35 +603,6 @@ def normalize_relationship_preaggregation(
     if not measures:
         raise ValueError("右表预聚合至少需要一个指标字段。")
     return {"side": "right", "groupFields": group_fields, "measures": measures}
-
-
-def preaggregate_relationship_rows(rows: list[dict[str, Any]], config: dict[str, Any]) -> list[dict[str, Any]]:
-    grouped: dict[tuple[str, ...], list[dict[str, Any]]] = {}
-    group_fields = config["groupFields"]
-    for row in rows:
-        key = tuple(clean(row.get(field)) for field in group_fields)
-        grouped.setdefault(key, []).append(row)
-    result: list[dict[str, Any]] = []
-    for key, members in grouped.items():
-        output = {field: key[index] for index, field in enumerate(group_fields)}
-        for measure in config["measures"]:
-            field = measure["field"]
-            aggregation = measure["aggregation"]
-            values = [numeric_value(member.get(field)) for member in members]
-            if aggregation == "count":
-                output[field] = len(members)
-            elif aggregation == "count-distinct":
-                output[field] = len({clean(member.get(field)) for member in members if clean(member.get(field))})
-            elif aggregation == "sum":
-                output[field] = sum(values)
-            elif aggregation == "avg":
-                output[field] = sum(values) / max(1, len(values))
-            elif aggregation == "min":
-                output[field] = min(values) if values else 0
-            else:
-                output[field] = max(values) if values else 0
-        result.append(output)
-    return result
 
 
 def build_relationship_filter_sql(

@@ -88,6 +88,7 @@ export const emptyQueryResult: QueryResult = {
 export const emptyTableQuery: TableQueryPayload = {
   ok: true,
   tableQuery: {
+    workspaceId: "",
     mode: "detail",
     tableKey: "",
     tableName: "",
@@ -96,7 +97,6 @@ export const emptyTableQuery: TableQueryPayload = {
     totalRows: 0,
     filteredRows: 0,
     limit: 50,
-    offset: 0,
     page: 1,
     pageCount: 0,
     filters: [],

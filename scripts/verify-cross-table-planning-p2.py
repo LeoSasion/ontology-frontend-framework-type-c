@@ -4,7 +4,10 @@ import json
 import sqlite3
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
+
+import duckdb
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,18 +23,90 @@ from semantic_query_execution import (  # noqa: E402
 )
 from semantic_query_planner import (  # noqa: E402
     build_semantic_query_plan,
-    build_workspace_semantic_plan,
+    build_workspace_semantic_plan as _build_workspace_semantic_plan,
     semantic_query_prompt_directives,
 )
-from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
+from query_runtime_test_support import (  # noqa: E402
+    FixtureTable,
+    fixture_table_columns,
+    initialize_fixture_control_plane,
+    publish_fixture_tables_to_duckdb,
+)
 
 
 TEST_REPLICA_ROOT = tempfile.TemporaryDirectory(prefix="aibi-c-cross-table-plan-")
 TEST_REPLICA_PATH = Path(TEST_REPLICA_ROOT.name) / "analysis.duckdb"
+FIXTURE_STATES: dict[int, dict[str, FixtureTable]] = {}
+
+
+INITIAL_FIXTURES = (
+    FixtureTable(
+        workspace_id="default",
+        table_key="regions",
+        physical_table="regions",
+        columns=(("region_id", "VARCHAR"), ("region_name", "VARCHAR")),
+        rows=(("R1", "North"), ("R2", "South")),
+        display_name="Regions",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="sites",
+        physical_table="sites",
+        columns=(("site_id", "VARCHAR"), ("region_id", "VARCHAR")),
+        rows=(("S1", "R1"), ("S2", "R1"), ("S3", "R2")),
+        display_name="Sites",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="assets",
+        physical_table="assets",
+        columns=(("asset_id", "VARCHAR"), ("site_id", "VARCHAR"), ("asset_type", "VARCHAR")),
+        rows=(("A1", "S1", "sensor"), ("A2", "S2", "pump"), ("A3", "S3", "sensor")),
+        display_name="Assets",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="observations",
+        physical_table="observations",
+        columns=(("asset_id", "VARCHAR"), ("event_id", "VARCHAR"), ("status", "VARCHAR"), ("value", "DOUBLE")),
+        rows=(("A1", "E1", "valid", 10.0), ("A1", "E2", "valid", 8.0), ("A1", "E3", "invalid", 100.0), ("A2", "E4", "valid", 40.0), ("A3", "E5", "valid", 20.0), ("A3", "E6", "valid", 6.0)),
+        display_name="Observations",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="owners",
+        physical_table="owners",
+        columns=(("owner_id", "VARCHAR"), ("owner_quota", "DOUBLE")),
+        rows=(("O1", 100.0), ("O2", 200.0)),
+        display_name="Owners",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="devices",
+        physical_table="devices",
+        columns=(("device_id", "VARCHAR"), ("owner_id", "VARCHAR"), ("device_type", "VARCHAR")),
+        rows=(("D1", "O1", "sensor"), ("D2", "O2", "pump")),
+        display_name="Devices",
+    ),
+)
+
+
+def fixture_tables(connection: sqlite3.Connection) -> list[FixtureTable]:
+    return list(FIXTURE_STATES[id(connection)].values())
+
+
+def replace_fixture_rows(connection: sqlite3.Connection, table_key: str, rows: tuple[tuple[object, ...], ...]) -> None:
+    current = FIXTURE_STATES[id(connection)][table_key]
+    FIXTURE_STATES[id(connection)][table_key] = replace(current, rows=rows)
+
+
+def build_workspace_semantic_plan(connection: sqlite3.Connection, *args: object, **kwargs: object) -> dict[str, object]:
+    kwargs.setdefault("table_columns", fixture_table_columns)
+    return _build_workspace_semantic_plan(connection, *args, **kwargs)
 
 
 def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: object, **kwargs: object) -> dict[str, object]:
-    publish_sqlite_fixture_to_duckdb(connection, TEST_REPLICA_PATH)
+    publish_fixture_tables_to_duckdb(connection, TEST_REPLICA_PATH, fixture_tables(connection), reset=True)
     return execute_workspace_semantic_query_runtime(
         connection,
         *args,
@@ -41,7 +116,7 @@ def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: obje
 
 
 def columns(connection: sqlite3.Connection, table: str) -> list[str]:
-    return [str(row[1]) for row in connection.execute(f'PRAGMA table_info("{table}")')]
+    return fixture_table_columns(connection, table)
 
 
 def quote(value: str) -> str:
@@ -56,73 +131,51 @@ def validation(versions: dict[str, int], metrics: dict[str, object]) -> str:
     )
 
 
+def insert_metric(
+    connection: sqlite3.Connection,
+    metric_key: str,
+    table_key: str,
+    label: str,
+    measure: str,
+    aggregation: str,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO metric_definitions(
+          metric_key, workspace_id, label, table_key, measure, aggregation,
+          dimension, time_field, value_format, created_at
+        ) VALUES (?, 'default', ?, ?, ?, ?, NULL, NULL, 'number', '2026-07-16T00:00:00Z')
+        """,
+        (metric_key, label, table_key, measure, aggregation),
+    )
+
+
 def create_connection() -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
-    connection.row_factory = sqlite3.Row
+    initialize_fixture_control_plane(connection)
     connection.executescript(
         """
-        CREATE TABLE table_registry(
-          workspace_id TEXT, table_key TEXT, display_name TEXT, physical_table TEXT,
-          data_version INTEGER, updated_at TEXT DEFAULT '', row_count INTEGER DEFAULT 0,
-          column_count INTEGER DEFAULT 0
-        );
-        CREATE TABLE field_semantics(
-          workspace_id TEXT, table_key TEXT, field_name TEXT, role TEXT, confidence REAL,
-          usage TEXT DEFAULT '', tags_json TEXT DEFAULT '[]', usage_json TEXT DEFAULT '{}', source TEXT DEFAULT 'auto'
-        );
-        CREATE TABLE metric_definitions(
-          workspace_id TEXT, table_key TEXT, label TEXT, measure TEXT,
-          aggregation TEXT, dimension TEXT, time_field TEXT
-        );
-        CREATE TABLE relationships(
-          workspace_id TEXT, relation_key TEXT, left_table_key TEXT, right_table_key TEXT,
-          left_field TEXT, right_field TEXT, mappings_json TEXT DEFAULT '[]', join_type TEXT,
-          confidence REAL, validation_json TEXT DEFAULT '{}', filters_json TEXT DEFAULT '[]',
-          preaggregation_json TEXT DEFAULT '{}', updated_at TEXT DEFAULT ''
-        );
-        CREATE TABLE regions(region_id TEXT, region_name TEXT);
-        CREATE TABLE sites(site_id TEXT, region_id TEXT);
-        CREATE TABLE assets(asset_id TEXT, site_id TEXT, asset_type TEXT);
-        CREATE TABLE observations(asset_id TEXT, event_id TEXT, status TEXT, value REAL);
-        CREATE TABLE owners(owner_id TEXT, owner_quota REAL);
-        CREATE TABLE devices(device_id TEXT, owner_id TEXT, device_type TEXT);
-        INSERT INTO regions VALUES ('R1','North'),('R2','South');
-        INSERT INTO sites VALUES ('S1','R1'),('S2','R1'),('S3','R2');
-        INSERT INTO assets VALUES ('A1','S1','sensor'),('A2','S2','pump'),('A3','S3','sensor');
-        INSERT INTO observations VALUES
-          ('A1','E1','valid',10),('A1','E2','valid',8),('A1','E3','invalid',100),
-          ('A2','E4','valid',40),('A3','E5','valid',20),('A3','E6','valid',6);
-        INSERT INTO owners VALUES ('O1',100),('O2',200);
-        INSERT INTO devices VALUES ('D1','O1','sensor'),('D2','O2','pump');
-        INSERT INTO table_registry(workspace_id,table_key,display_name,physical_table,data_version,row_count,column_count) VALUES
-          ('default','regions','Regions','regions',1,2,2),
-          ('default','sites','Sites','sites',1,3,2),
-          ('default','assets','Assets','assets',1,3,3),
-          ('default','observations','Observations','observations',1,6,4),
-          ('default','owners','Owners','owners',1,2,2),
-          ('default','devices','Devices','devices',1,2,3);
-        INSERT INTO field_semantics(workspace_id,table_key,field_name,role,confidence) VALUES
-          ('default','regions','region_id','identity_key',0.99),
-          ('default','regions','region_name','dimension',0.99),
-          ('default','sites','site_id','identity_key',0.99),
-          ('default','sites','region_id','foreign_key',0.99),
-          ('default','assets','asset_id','identity_key',0.99),
-          ('default','assets','site_id','foreign_key',0.99),
-          ('default','assets','asset_type','dimension',0.99),
-          ('default','observations','asset_id','foreign_key',0.99),
-          ('default','observations','event_id','identity_key',0.99),
-          ('default','observations','status','status',0.99),
-          ('default','observations','value','measure',0.99),
-          ('default','owners','owner_id','identity_key',0.99),
-          ('default','owners','owner_quota','measure',0.99),
-          ('default','devices','device_id','identity_key',0.99),
-          ('default','devices','owner_id','foreign_key',0.99),
-          ('default','devices','device_type','dimension',0.99);
-        INSERT INTO metric_definitions VALUES
-          ('default','observations','observation_value','value','sum',NULL,NULL),
-          ('default','owners','quota','owner_quota','sum',NULL,NULL);
+        INSERT INTO field_semantics(workspace_id,table_key,field_name,role,usage,confidence) VALUES
+          ('default','regions','region_id','identity_key','fixture',0.99),
+          ('default','regions','region_name','dimension','fixture',0.99),
+          ('default','sites','site_id','identity_key','fixture',0.99),
+          ('default','sites','region_id','foreign_key','fixture',0.99),
+          ('default','assets','asset_id','identity_key','fixture',0.99),
+          ('default','assets','site_id','foreign_key','fixture',0.99),
+          ('default','assets','asset_type','dimension','fixture',0.99),
+          ('default','observations','asset_id','foreign_key','fixture',0.99),
+          ('default','observations','event_id','identity_key','fixture',0.99),
+          ('default','observations','status','status','fixture',0.99),
+          ('default','observations','value','measure','fixture',0.99),
+          ('default','owners','owner_id','identity_key','fixture',0.99),
+          ('default','owners','owner_quota','measure','fixture',0.99),
+          ('default','devices','device_id','identity_key','fixture',0.99),
+          ('default','devices','owner_id','foreign_key','fixture',0.99),
+          ('default','devices','device_type','dimension','fixture',0.99);
         """
     )
+    insert_metric(connection, "observation-value", "observations", "observation_value", "value", "sum")
+    insert_metric(connection, "owner-quota", "owners", "quota", "owner_quota", "sum")
     relationships = [
         (
             "regions-sites", "regions", "sites", "region_id", "region_id",
@@ -181,14 +234,20 @@ def create_connection() -> sqlite3.Connection:
     for relation_key, left, right, left_field, right_field, mapping, snapshot, filters, preaggregation in relationships:
         connection.execute(
             """
-            INSERT INTO relationships VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
+            INSERT INTO relationships(
+              relation_key, workspace_id, name, left_table_key, right_table_key,
+              left_field, right_field, mappings_json, join_type, confidence,
+              validation_json, filters_json, preaggregation_json, created_at, updated_at
+            ) VALUES(?, 'default', ?, ?, ?, ?, ?, ?, 'inner', 0.99, ?, ?, ?,
+                     '2026-07-16T00:00:00Z', '2026-07-16T00:00:00Z')
             """,
             (
-                "default", relation_key, left, right, left_field, right_field,
-                json.dumps([mapping]), "inner", 0.99, snapshot,
-                json.dumps(filters), json.dumps(preaggregation), "2026-07-16T00:00:00Z",
+                relation_key, relation_key, left, right, left_field, right_field,
+                json.dumps([mapping]), snapshot, json.dumps(filters), json.dumps(preaggregation),
             ),
         )
+    FIXTURE_STATES[id(connection)] = {table.table_key: table for table in INITIAL_FIXTURES}
+    publish_fixture_tables_to_duckdb(connection, TEST_REPLICA_PATH, fixture_tables(connection), reset=True)
     return connection
 
 
@@ -201,9 +260,8 @@ def check(label: str, ok: bool, detail: object = "") -> None:
 
 connection = create_connection()
 
-null_semantics = sqlite3.connect(":memory:")
-null_semantics.row_factory = sqlite3.Row
-null_semantics.executescript(
+null_semantics = duckdb.connect(":memory:")
+null_semantics.execute(
     "CREATE TABLE samples(group_key TEXT, value REAL);"
     "INSERT INTO samples VALUES ('missing',NULL),('zero',0),('positive',2);"
 )
@@ -229,8 +287,8 @@ count_source, count_source_params, _ = _build_base_source(
     quote_identifier=quote,
 )
 partial_counts = {
-    str(row["group_key"]): int(row["value"])
-    for row in null_semantics.execute(f"SELECT * FROM {count_source}", count_source_params)
+    str(row[0]): int(row[1])
+    for row in null_semantics.execute(f"SELECT * FROM {count_source}", count_source_params).fetchall()
 }
 check(
     "preaggregated-count-preserves-source-row-count-contract",
@@ -261,9 +319,8 @@ check(
     count_projection,
 )
 
-direct_null = sqlite3.connect(":memory:")
-direct_null.row_factory = sqlite3.Row
-direct_null.executescript(
+direct_null = duckdb.connect(":memory:")
+direct_null.execute(
     "CREATE TABLE dimensions(item_id TEXT, group_key TEXT);"
     "CREATE TABLE facts(item_id TEXT, value REAL);"
     "INSERT INTO dimensions VALUES ('missing','unmatched');"
@@ -365,13 +422,10 @@ check(
 )
 
 post_filter_fd_connection = create_connection()
-post_filter_fd_connection.executescript(
-    "DELETE FROM regions; DELETE FROM sites; DELETE FROM assets; DELETE FROM observations;"
-    "INSERT INTO regions VALUES ('R1','active'),('R1','available');"
-    "INSERT INTO sites VALUES ('S1','R1');"
-    "INSERT INTO assets VALUES ('A1','S1','sensor');"
-    "INSERT INTO observations VALUES ('A1','E1','valid',10);"
-)
+replace_fixture_rows(post_filter_fd_connection, "regions", (("R1", "active"), ("R1", "available")))
+replace_fixture_rows(post_filter_fd_connection, "sites", (("S1", "R1"),))
+replace_fixture_rows(post_filter_fd_connection, "assets", (("A1", "S1", "sensor"),))
+replace_fixture_rows(post_filter_fd_connection, "observations", (("A1", "E1", "valid", 10.0),))
 post_filter_fd_connection.execute(
     "UPDATE relationships SET filters_json = ? WHERE relation_key = 'regions-sites'",
     (json.dumps([{
@@ -456,7 +510,11 @@ check(
 )
 
 orphan_connection = create_connection()
-orphan_connection.execute("INSERT INTO observations VALUES ('A4','E7','valid',50)")
+replace_fixture_rows(
+    orphan_connection,
+    "observations",
+    (("A1", "E1", "valid", 10.0), ("A1", "E2", "valid", 8.0), ("A1", "E3", "invalid", 100.0), ("A2", "E4", "valid", 40.0), ("A3", "E5", "valid", 20.0), ("A3", "E6", "valid", 6.0), ("A4", "E7", "valid", 50.0)),
+)
 orphan = execute_workspace_semantic_query(
     orphan_connection,
     "default",
@@ -475,9 +533,13 @@ check(
 )
 
 intermediate_orphan_connection = create_connection()
-intermediate_orphan_connection.execute("INSERT INTO sites VALUES ('S4','R404')")
-intermediate_orphan_connection.execute("INSERT INTO assets VALUES ('A4','S4','sensor')")
-intermediate_orphan_connection.execute("INSERT INTO observations VALUES ('A4','E7','valid',50)")
+replace_fixture_rows(intermediate_orphan_connection, "sites", (("S1", "R1"), ("S2", "R1"), ("S3", "R2"), ("S4", "R404")))
+replace_fixture_rows(intermediate_orphan_connection, "assets", (("A1", "S1", "sensor"), ("A2", "S2", "pump"), ("A3", "S3", "sensor"), ("A4", "S4", "sensor")))
+replace_fixture_rows(
+    intermediate_orphan_connection,
+    "observations",
+    (("A1", "E1", "valid", 10.0), ("A1", "E2", "valid", 8.0), ("A1", "E3", "invalid", 100.0), ("A2", "E4", "valid", 40.0), ("A3", "E5", "valid", 20.0), ("A3", "E6", "valid", 6.0), ("A4", "E7", "valid", 50.0)),
+)
 intermediate_orphan = execute_workspace_semantic_query(
     intermediate_orphan_connection,
     "default",
@@ -502,10 +564,12 @@ check(
 )
 
 count_connection = create_connection()
-count_connection.execute(
-    "INSERT INTO metric_definitions VALUES ('default','observations','event_count','event_id','count',NULL,NULL)"
+insert_metric(count_connection, "event-count", "observations", "event_count", "event_id", "count")
+replace_fixture_rows(
+    count_connection,
+    "observations",
+    (("A1", "E1", "valid", 10.0), ("A1", "E2", "valid", 8.0), ("A1", "E3", "invalid", 100.0), ("A2", "E4", "valid", 40.0), ("A3", "E5", "valid", 20.0), ("A3", "E6", "valid", 6.0), ("A1", None, "valid", 1.0)),
 )
-count_connection.execute("INSERT INTO observations VALUES ('A1',NULL,'valid',1)")
 count_connection.execute(
     "UPDATE relationships SET preaggregation_json = ? WHERE relation_key = 'assets-observations'",
     (json.dumps({
@@ -537,8 +601,13 @@ check(
 )
 
 unsafe_average_connection = create_connection()
-unsafe_average_connection.execute(
-    "INSERT INTO metric_definitions VALUES ('default','observations','observation_average','value','avg',NULL,NULL)"
+insert_metric(
+    unsafe_average_connection,
+    "observation-average",
+    "observations",
+    "observation_average",
+    "value",
+    "avg",
 )
 unsafe_average_connection.execute(
     "UPDATE relationships SET preaggregation_json = ? WHERE relation_key = 'assets-observations'",
@@ -570,11 +639,13 @@ check(
 )
 
 left_count_connection = create_connection()
-left_count_connection.execute(
-    "INSERT INTO metric_definitions VALUES ('default','observations','event_count','event_id','count',NULL,NULL)"
+insert_metric(left_count_connection, "event-count", "observations", "event_count", "event_id", "count")
+replace_fixture_rows(left_count_connection, "assets", (("A1", "S1", "sensor"), ("A2", "S2", "pump"), ("A3", "S3", "sensor"), ("A4", "S3", "idle")))
+replace_fixture_rows(
+    left_count_connection,
+    "observations",
+    (("A1", "E1", "valid", 10.0), ("A1", "E2", "valid", 8.0), ("A1", "E3", "invalid", 100.0), ("A2", "E4", "valid", 40.0), ("A3", "E5", "valid", 20.0), ("A3", "E6", "valid", 6.0), ("A1", None, "valid", 1.0)),
 )
-left_count_connection.execute("INSERT INTO assets VALUES ('A4','S3','idle')")
-left_count_connection.execute("INSERT INTO observations VALUES ('A1',NULL,'valid',1)")
 left_count_connection.execute(
     "UPDATE relationships SET join_type = 'left', filters_json = '[]', preaggregation_json = '{}' "
     "WHERE relation_key = 'assets-observations'"

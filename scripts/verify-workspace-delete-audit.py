@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sqlite3
 import sys
 import tempfile
 from contextlib import closing
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
+
+import duckdb  # type: ignore
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +27,7 @@ from reviewed_publication_service import (  # noqa: E402
     stable_json,
 )
 from workspace_command_service import workspace_delete_command  # noqa: E402
+import workspace_command_service  # noqa: E402
 from workspace_recovery_service import (  # noqa: E402
     SQLITE_ARTIFACT,
     WorkspaceRecoveryError,
@@ -31,6 +36,7 @@ from workspace_recovery_service import (  # noqa: E402
     _workspace_state,
     unfinished_recovery_fences,
 )
+from query_runtime_test_support import FixtureTable, publish_fixture_tables_to_duckdb  # noqa: E402
 
 
 NOW = "2026-08-13T12:00:00+00:00"
@@ -109,8 +115,9 @@ class Fixture:
         self.sqlite_path = root / "runtime.sqlite"
         self.duckdb_path = root / "runtime.duckdb"
         self.recovery_root = root / "workspace-recovery"
+        os.environ["AIBI_DATASET_OBJECT_ROOT"] = str(root / "runtime-dataset-objects-v2")
         self._build_sqlite()
-        self._build_duckdb()
+        self._build_data_plane()
         self.service = WorkspaceRecoveryService(
             open_db=self.open_db,
             sqlite_path=self.sqlite_path,
@@ -136,16 +143,12 @@ class Fixture:
                 "INSERT INTO workspaces(id, name, current_source_run_id, created_at) VALUES(?, ?, NULL, ?)",
                 (OTHER, "Delete Control", NOW),
             )
-            connection.execute("CREATE TABLE target_physical(order_id TEXT PRIMARY KEY, amount REAL)")
-            connection.execute("INSERT INTO target_physical VALUES('t-1', 10), ('t-2', 20)")
-            connection.execute("CREATE TABLE control_physical(order_id TEXT PRIMARY KEY, amount REAL)")
-            connection.execute("INSERT INTO control_physical VALUES('c-1', 99)")
             connection.execute(
                 """
                 INSERT INTO table_registry(
                   table_key, workspace_id, display_name, physical_table, source_file,
                   row_count, column_count, created_at, data_version, updated_at
-                ) VALUES('orders', ?, 'Orders', 'target_physical', 'redacted', 2, 2, ?, 1, ?)
+                ) VALUES('orders', ?, 'Orders', 'target_physical', 'typed-fixture', 2, 2, ?, 1, ?)
                 """,
                 (TARGET, NOW, NOW),
             )
@@ -154,32 +157,38 @@ class Fixture:
                 INSERT INTO table_registry(
                   table_key, workspace_id, display_name, physical_table, source_file,
                   row_count, column_count, created_at, data_version, updated_at
-                ) VALUES('orders', ?, 'Orders', 'control_physical', 'redacted', 1, 2, ?, 1, ?)
+                ) VALUES('orders', ?, 'Orders', 'control_physical', 'typed-fixture', 1, 2, ?, 1, ?)
                 """,
                 (OTHER, NOW, NOW),
             )
             connection.commit()
             add_publication(connection, TARGET, "publication-delete-audit")
 
-    def _build_duckdb(self) -> None:
-        import duckdb  # type: ignore
-
-        with duckdb.connect(str(self.duckdb_path)) as connection:
-            connection.execute("CREATE TABLE __aibi_schema_metadata(key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)")
-            connection.execute("INSERT INTO __aibi_schema_metadata VALUES ('schema_version', '1')")
-            connection.execute(
-                "CREATE TABLE __aibi_replica_manifest("
-                "logical_table VARCHAR PRIMARY KEY, source_version VARCHAR NOT NULL, replica_table VARCHAR NOT NULL, "
-                "row_count BIGINT NOT NULL, published_at VARCHAR NOT NULL)"
+    def _build_data_plane(self) -> None:
+        with closing(self.open_db()) as connection:
+            publish_fixture_tables_to_duckdb(
+                connection,
+                self.duckdb_path,
+                [
+                    FixtureTable(
+                        workspace_id=TARGET,
+                        table_key="orders",
+                        physical_table="target_physical",
+                        columns=(("order_id", "VARCHAR"), ("amount", "DOUBLE")),
+                        rows=(("t-1", 10.0), ("t-2", 20.0)),
+                        display_name="Orders",
+                    ),
+                    FixtureTable(
+                        workspace_id=OTHER,
+                        table_key="orders",
+                        physical_table="control_physical",
+                        columns=(("order_id", "VARCHAR"), ("amount", "DOUBLE")),
+                        rows=(("c-1", 99.0),),
+                        display_name="Orders",
+                    ),
+                ],
+                reset=True,
             )
-            connection.execute("CREATE TABLE target_replica(order_id VARCHAR, amount DOUBLE)")
-            connection.execute("INSERT INTO target_replica VALUES ('t-1', 10), ('t-2', 20)")
-            connection.execute("CREATE VIEW target_physical AS SELECT * FROM target_replica")
-            connection.execute("INSERT INTO __aibi_replica_manifest VALUES ('target_physical', '1', 'target_replica', 2, ?)", [NOW])
-            connection.execute("CREATE TABLE control_replica(order_id VARCHAR, amount DOUBLE)")
-            connection.execute("INSERT INTO control_replica VALUES ('c-1', 99)")
-            connection.execute("CREATE VIEW control_physical AS SELECT * FROM control_replica")
-            connection.execute("INSERT INTO __aibi_replica_manifest VALUES ('control_physical', '1', 'control_replica', 1, ?)", [NOW])
 
     def args(self, *, request_key: str, yes: bool = False, expected_plan: str = "", fail_at: str = "") -> argparse.Namespace:
         return argparse.Namespace(
@@ -248,7 +257,26 @@ def run_success_case(root: Path) -> None:
         and not fixture.recovery_root.exists(),
         preview,
     )
+    unrelated_point = (
+        fixture.recovery_root
+        / _workspace_bucket("unrelated-legacy-workspace")
+        / ("rp_" + "1" * 24)
+    )
+    unrelated_point.mkdir(parents=True)
+    with duckdb.connect(str(unrelated_point / "analytics.duckdb")) as legacy_catalog:
+        legacy_catalog.execute("CREATE TABLE __aibi_schema_metadata(key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)")
+        legacy_catalog.execute("INSERT INTO __aibi_schema_metadata VALUES ('schema_version', '1')")
+        legacy_catalog.execute(
+            "CREATE TABLE __aibi_replica_manifest("
+            "logical_table VARCHAR, source_version VARCHAR, replica_table VARCHAR, row_count BIGINT, published_at VARCHAR)"
+        )
     confirmed = fixture.command(fixture.args(request_key="delete-success", yes=True, expected_plan=plan_fingerprint))
+    check(
+        "workspace-delete-cas-protection-is-workspace-scoped",
+        confirmed.get("datasetObjectGc", {}).get("retainedCount") == 1
+        and (unrelated_point / "analytics.duckdb").is_file(),
+        confirmed.get("datasetObjectGc"),
+    )
     recovery_point_key = str(confirmed.get("auditRecoveryPoint", {}).get("recoveryPointKey") or "")
     snapshot = fixture.recovery_root / _workspace_bucket(TARGET) / recovery_point_key / SQLITE_ARTIFACT
     with closing(sqlite3.connect(snapshot)) as connection:
@@ -366,12 +394,65 @@ def run_reconcile_case(root: Path, fail_at: str) -> None:
     )
 
 
+def run_final_gc_attention_recovery_case(root: Path) -> None:
+    fixture = Fixture(root)
+    request_key = "delete-final-gc-attention"
+    preview = fixture.command(fixture.args(request_key=request_key))
+    try:
+        fixture.command(fixture.args(
+            request_key=request_key,
+            yes=True,
+            expected_plan=str(preview["deletePlan"]["planFingerprint"]),
+            fail_at="after_sqlite_deleted",
+        ))
+    except RuntimeError:
+        pass
+    else:
+        check("workspace-delete-final-gc-setup-interrupts", False, "operation unexpectedly completed")
+        return
+
+    sharing_error = PermissionError(13, "Parquet reader still owns the file")
+    sharing_error.winerror = 32
+    with patch.object(
+        workspace_command_service,
+        "collect_unreferenced_dataset_objects",
+        side_effect=sharing_error,
+    ):
+        first_reconcile = fixture.service.reconcile_unfinished_restores()
+    first_fences = unfinished_recovery_fences(fixture.recovery_root)
+    second_reconcile = fixture.service.reconcile_unfinished_restores()
+    second_fences = unfinished_recovery_fences(fixture.recovery_root)
+    replay = fixture.command(fixture.args(
+        request_key=request_key,
+        yes=True,
+        expected_plan=str(preview["deletePlan"]["planFingerprint"]),
+    ))
+    check(
+        "workspace-delete-final-gc-needs-attention-is-resumable",
+        first_reconcile.get("ok") is False
+        and any(item.get("status") == "workspace_delete_needs_attention" for item in first_reconcile.get("needsAttention", []))
+        and any(item.get("workspaceId") == TARGET and item.get("status") == "needs_attention" for item in first_fences)
+        and second_reconcile.get("ok") is True
+        and replay.get("recoveredFromNeedsAttention") is True
+        and replay.get("lifecycleStatus") == "completed"
+        and not second_fences,
+        {
+            "firstReconcile": first_reconcile,
+            "firstFences": first_fences,
+            "secondReconcile": second_reconcile,
+            "secondFences": second_fences,
+            "replay": replay,
+        },
+    )
+
+
 with tempfile.TemporaryDirectory(prefix="aibi-workspace-delete-audit-") as temporary:
     base = Path(temporary)
     run_success_case(base / "success")
     run_bad_ledger_case(base / "bad-ledger")
     for index, fail_at in enumerate(("after_prepared", "after_duckdb_deleted", "after_sqlite_deleted"), start=1):
         run_reconcile_case(base / f"reconcile-{index}", fail_at)
+    run_final_gc_attention_recovery_case(base / "final-gc-attention")
 
 
 failed = [item for item in checks if not item["ok"]]

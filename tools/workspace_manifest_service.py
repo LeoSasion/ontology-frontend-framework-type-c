@@ -23,7 +23,7 @@ from relationship_command_service import relationship_record_payload
 WORKSPACE_MANIFEST_SCHEMA = "aibi-workspace-manifest/v1"
 RUNTIME_CATALOG_SCHEMA = "aibi-runtime-catalog/v1"
 BUSINESS_FIELD_PROFILE_SCHEMA = "aibi-business-field-profile/v1"
-PROFILE_ALGORITHM_VERSION = "1.1.0"
+PROFILE_ALGORITHM_VERSION = "2.0.0"
 PROFILE_SAMPLE_LIMIT = 500
 
 _NUMBER_PATTERN = re.compile(r"^-?(?:\d+(?:\.\d+)?|\.\d+)$")
@@ -209,6 +209,23 @@ def _logical_type(values: list[str]) -> tuple[str, dict[str, int], list[datetime
     return "mixed", counts, parsed_times
 
 
+def _sealed_logical_type(storage_type: str) -> str:
+    normalized = " ".join(str(storage_type or "VARCHAR").upper().split())
+    if normalized == "BOOLEAN":
+        return "boolean"
+    if normalized.startswith(("DATE", "TIME", "TIMESTAMP")):
+        return "datetime"
+    if normalized.startswith((
+        "TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
+        "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT",
+        "DECIMAL", "NUMERIC", "REAL", "FLOAT", "DOUBLE",
+    )):
+        return "number"
+    if normalized in {"BLOB", "BYTEA"}:
+        return "binary"
+    return "string"
+
+
 def _sensitivity(field_name: str, values: list[str]) -> dict[str, Any]:
     normalized = re.sub(r"[\s.\-]+", "_", field_name.casefold())
     name_rules = {
@@ -246,64 +263,67 @@ def _sensitivity(field_name: str, values: list[str]) -> dict[str, Any]:
     }
 
 
-def _table_columns(connection: sqlite3.Connection, physical_table: str) -> list[dict[str, Any]]:
-    return [
-        {
-            "field": str(row["name"]),
-            "storageType": str(row["type"] or "TEXT").upper(),
-            "notNull": bool(row["notnull"]),
-            "primaryKey": bool(row["pk"]),
-        }
-        for row in connection.execute(f"PRAGMA table_info({_quoted_identifier(physical_table)})").fetchall()
-    ]
+def _table_columns(schema_json: Any) -> list[dict[str, Any]]:
+    parsed = _json_value(schema_json, [])
+    columns: list[dict[str, Any]] = []
+    for item in parsed if isinstance(parsed, list) else []:
+        if isinstance(item, str):
+            name = item
+            storage_type = "VARCHAR"
+            internal = name.startswith("__aibi_")
+            not_null = False
+        elif isinstance(item, dict):
+            name = str(item.get("name") or item.get("field") or "")
+            storage_type = str(item.get("type") or item.get("physicalType") or "VARCHAR").upper()
+            internal = bool(item.get("internal")) or name.startswith("__aibi_")
+            not_null = bool(item.get("notNull") or item.get("notnull"))
+        else:
+            continue
+        if name and not internal:
+            columns.append({
+                "field": name,
+                "storageType": storage_type,
+                "notNull": not_null,
+                "primaryKey": False,
+            })
+    return columns
 
 
-def _sample_table_values(
-    connection: sqlite3.Connection,
-    physical_table: str,
-    field_names: list[str],
-    limit: int = PROFILE_SAMPLE_LIMIT,
-) -> dict[str, list[str]]:
-    if not field_names:
-        return {}
-    table = _quoted_identifier(physical_table)
-    selection = ", ".join(_quoted_identifier(field_name) for field_name in field_names)
-    rows = connection.execute(
-        f"SELECT {selection} FROM {table} LIMIT ?",
-        (limit,),
-    ).fetchall()
-    return {
-        field_name: [
-            normalized[:512]
-            for row in rows
-            if (normalized := _normalized_scalar(row[field_name]))
-        ]
-        for field_name in field_names
-    }
-
-
-def _latest_source_profile(
+def _latest_source_profiles(
     connection: sqlite3.Connection,
     workspace_id: str,
-    table_key: str,
-) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    table_keys: list[str],
+) -> dict[str, tuple[dict[str, Any], dict[str, Any]]]:
     if not _table_exists(connection, "source_runs"):
-        return {}, None
-    row = connection.execute(
-        """
-        SELECT id, status, row_count, column_count, profile_json, created_at
-        FROM source_runs
-        WHERE workspace_id = ? AND table_key = ?
-        ORDER BY created_at DESC
-        LIMIT 1
+        return {}
+    normalized_keys = sorted({str(value) for value in table_keys if str(value)})
+    if not normalized_keys:
+        return {}
+    placeholders = ", ".join("?" for _ in normalized_keys)
+    rows = connection.execute(
+        f"""
+        WITH ranked AS (
+          SELECT table_key, id, status, row_count, column_count, profile_json, created_at,
+                 ROW_NUMBER() OVER (
+                   PARTITION BY table_key ORDER BY created_at DESC, id DESC
+                 ) AS source_rank
+          FROM source_runs
+          WHERE workspace_id = ? AND table_key IN ({placeholders})
+        )
+        SELECT table_key, id, status, row_count, column_count, profile_json, created_at
+        FROM ranked
+        WHERE source_rank = 1
+        ORDER BY table_key
         """,
-        (workspace_id, table_key),
-    ).fetchone()
-    if not row:
-        return {}, None
-    payload = dict(row)
-    profile = _json_value(payload.pop("profile_json"), {})
-    return profile, payload
+        (workspace_id, *normalized_keys),
+    ).fetchall()
+    latest: dict[str, tuple[dict[str, Any], dict[str, Any]]] = {}
+    for row in rows:
+        payload = dict(row)
+        current_table_key = str(payload.pop("table_key"))
+        profile = _json_value(payload.pop("profile_json"), {})
+        latest[current_table_key] = (profile, payload)
+    return latest
 
 
 def _field_profile_lookup(source_profile: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -373,7 +393,8 @@ def build_business_field_profiles(
         params.append(table_key)
     registries = connection.execute(
         f"""
-        SELECT table_key, display_name, physical_table, row_count, column_count, data_version, updated_at
+        SELECT table_key, display_name, physical_table, row_count, column_count, data_version, updated_at,
+               active_version_id, schema_json, schema_fingerprint, content_fingerprint
         FROM table_registry
         WHERE {where}
         ORDER BY table_key
@@ -381,25 +402,25 @@ def build_business_field_profiles(
         tuple(params),
     ).fetchall()
     metric_bindings, relationship_bindings, formula_bindings = _field_bindings(connection, workspace_id)
+    registry_keys = [str(registry["table_key"]) for registry in registries]
+    source_profiles = _latest_source_profiles(connection, workspace_id, registry_keys)
+    semantics_by_table: dict[str, dict[str, dict[str, Any]]] = {}
+    if registry_keys and _table_exists(connection, "field_semantics"):
+        placeholders = ", ".join("?" for _ in registry_keys)
+        semantic_rows = connection.execute(
+            f"SELECT * FROM field_semantics WHERE workspace_id = ? "
+            f"AND table_key IN ({placeholders}) ORDER BY table_key, field_name",
+            (workspace_id, *registry_keys),
+        ).fetchall()
+        for row in semantic_rows:
+            semantics_by_table.setdefault(str(row["table_key"]), {})[str(row["field_name"])] = dict(row)
     profiles: list[dict[str, Any]] = []
     for registry in registries:
         current_table_key = str(registry["table_key"])
-        physical_table = str(registry["physical_table"])
-        columns = _table_columns(connection, physical_table)
-        table_samples = _sample_table_values(
-            connection,
-            physical_table,
-            [str(column["field"]) for column in columns],
-        )
-        source_profile, source_run = _latest_source_profile(connection, workspace_id, current_table_key)
+        columns = _table_columns(registry["schema_json"])
+        source_profile, source_run = source_profiles.get(current_table_key, ({}, None))
         source_fields = _field_profile_lookup(source_profile)
-        semantics = {
-            str(row["field_name"]): dict(row)
-            for row in connection.execute(
-                "SELECT * FROM field_semantics WHERE workspace_id = ? AND table_key = ? ORDER BY field_name",
-                (workspace_id, current_table_key),
-            ).fetchall()
-        } if _table_exists(connection, "field_semantics") else {}
+        semantics = semantics_by_table.get(current_table_key, {})
         source_shape_current = bool(
             source_run
             and int(source_run.get("row_count") or 0) == int(registry["row_count"] or 0)
@@ -411,8 +432,10 @@ def build_business_field_profiles(
                 continue
             semantic = semantics.get(current_field, {})
             imported = source_fields.get(current_field, {})
-            values = table_samples.get(current_field, [])
-            logical_type, type_counts, parsed_times = _logical_type(values)
+            raw_samples = imported.get("sampleValues") if isinstance(imported.get("sampleValues"), list) else []
+            values = [normalized[:512] for value in raw_samples[:100] if (normalized := _normalized_scalar(value))]
+            sampled_type, type_counts, parsed_times = _logical_type(values)
+            logical_type = _sealed_logical_type(column["storageType"])
             sensitivity = _sensitivity(current_field, values)
             row_count = int(registry["row_count"] or 0)
             non_null = int(imported.get("nonEmpty") if imported.get("nonEmpty") is not None else len(values))
@@ -452,7 +475,7 @@ def build_business_field_profiles(
                 warnings.append("business-meaning-unreviewed")
             elif not confirmed:
                 warnings.append("business-meaning-candidate-only")
-            if logical_type == "mixed":
+            if sampled_type == "mixed":
                 warnings.append("mixed-value-types")
             if sensitivity["level"] != "none":
                 warnings.append("sensitive-field-statistics-only")
@@ -481,6 +504,9 @@ def build_business_field_profiles(
                 },
                 "tableLabel": str(registry["display_name"]),
                 "dataVersion": int(registry["data_version"] or 1),
+                "activeVersionId": str(registry["active_version_id"] or ""),
+                "schemaFingerprint": str(registry["schema_fingerprint"] or ""),
+                "contentFingerprint": str(registry["content_fingerprint"] or ""),
                 "observedShape": {
                     "storageType": column["storageType"],
                     "logicalType": logical_type,

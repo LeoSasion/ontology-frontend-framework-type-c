@@ -35,7 +35,7 @@ type ViewWorkspaceProps = {
     filters?: Array<{ field: string; operator: string; value?: string }>;
     sort?: Array<{ field: string; direction?: string }>;
     search?: string;
-    offset?: number;
+    cursor?: string;
     limit?: number;
   }) => Promise<void>;
   onSaveView: (options: {
@@ -72,7 +72,6 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
     totalRows: 0,
     filteredRows: 0,
     limit: 50,
-    offset: 0,
     page: 1,
     pageCount: 1,
     filters: [],
@@ -143,7 +142,6 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
   async function runViewQueryAction(label: string, options: Parameters<typeof onRunTableQuery>[0], selectedView = activeView) {
     await onRunTableQuery(options);
     const selectedName = viewName(selectedView, activeTableName);
-    const offsetText = typeof options.offset === "number" ? `${options.offset}` : `${query.offset ?? 0}`;
     setViewOperationReceipt({
       title: label,
       detail: biText(
@@ -153,7 +151,7 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
       nextStep: viewCanFeedDashboard
         ? biText("这份视图已经能作为看板组件来源。", "This view can already feed a dashboard widget.")
         : biText("如果没有结果，先放宽搜索或检查视图字段。", "If no rows appear, loosen the search or check view fields."),
-      technical: `view=${selectedView?.view_key ?? "-"}; table=${options.table ?? "-"}; limit=${options.limit ?? query.limit ?? 50}; offset=${offsetText}; search=${options.search ?? ""}`,
+      technical: `view=${selectedView?.view_key ?? "-"}; table=${options.table ?? "-"}; limit=${options.limit ?? query.limit ?? 50}; cursor=${options.cursor ? "set" : "first-page"}; search=${options.search ?? ""}`,
       tone: viewCanFeedDashboard ? "ok" : "warn",
     });
   }
@@ -458,16 +456,16 @@ export function ViewWorkspace({ workbench, tableQuery, activeViewKey, onSelectVi
             <div className="buttonRow tight">
               <button
                 className="miniButton"
-                disabled={!activeView || (query.offset ?? 0) <= 0 || busy === "prev"}
-                onClick={() => runBusy("prev", () => runViewQueryAction(biText("上一页已读取", "Previous page loaded"), { ...queryOptions, offset: Math.max(0, (query.offset ?? 0) - (query.limit || 50)) }))}
+                disabled={!activeView || !query.previousCursor || busy === "prev"}
+                onClick={() => runBusy("prev", () => runViewQueryAction(biText("上一页已读取", "Previous page loaded"), { ...queryOptions, cursor: query.previousCursor ?? undefined }))}
                 type="button"
               >
                 {biText("上一页", "Prev")}
               </button>
               <button
                 className="miniButton"
-                disabled={!activeView || currentPage >= pageCount || busy === "next"}
-                onClick={() => runBusy("next", () => runViewQueryAction(biText("下一页已读取", "Next page loaded"), { ...queryOptions, offset: (query.offset ?? 0) + (query.limit || 50) }))}
+                disabled={!activeView || !query.nextCursor || busy === "next"}
+                onClick={() => runBusy("next", () => runViewQueryAction(biText("下一页已读取", "Next page loaded"), { ...queryOptions, cursor: query.nextCursor ?? undefined }))}
                 type="button"
               >
                 {biText("下一页", "Next")}

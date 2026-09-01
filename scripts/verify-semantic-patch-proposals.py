@@ -33,6 +33,9 @@ def main() -> None:
             **os.environ,
             "AIBI_HYBRID_DB_PATH": str(sqlite_path),
             "AIBI_HYBRID_DUCKDB_PATH": str(duckdb_path),
+            "AIBI_DATASET_OBJECT_ROOT": str(temp_root / "dataset-objects-v2"),
+            "AIBI_IMPORT_STAGE_ROOT": str(temp_root / "import-stages-v2"),
+            "AIBI_EVIDENCE_BUNDLE_ROOT": str(temp_root / "evidence"),
             "AIBI_WORKSPACE_RECOVERY_ROOT": str(temp_root / "workspace-recovery"),
             "AIBI_AGENT_PROVIDER": "deterministic",
             "DEEPSEEK_API_KEY": "",
@@ -62,16 +65,51 @@ def main() -> None:
                 raise RuntimeError(f"CLI failed ({status}): {' '.join(arguments)}\n{json.dumps(payload, ensure_ascii=False)}")
             return payload
 
+        sales_path = temp_root / "sales.csv"
+        sales_path.write_text(
+            "order_id,amount,status\n"
+            "o1,10.5,paid\n"
+            "o2,7.0,refunded\n",
+            encoding="utf-8",
+        )
         status = cli(["status"])
+        imported = cli([
+            "import-commit",
+            str(sales_path),
+            "--table",
+            "sales",
+            "--name",
+            "Sales",
+            "--mode",
+            "create",
+            "--yes",
+        ])
         with closing(sqlite3.connect(sqlite_path)) as connection:
             schema_version = int(connection.execute("PRAGMA user_version").fetchone()[0])
-            connection.execute('CREATE TABLE "sales_physical" ("order_id" TEXT, "amount" REAL, "status" TEXT)')
-            connection.executemany('INSERT INTO "sales_physical" VALUES(?, ?, ?)', [("o1", 10.5, "paid"), ("o2", 7.0, "refunded")])
-            connection.execute(
-                "INSERT INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at) VALUES('sales', 'default', 'Sales', 'sales_physical', 'fixture.csv', 2, 3, '2026-01-01T00:00:00+00:00', 1, '2026-01-01T00:00:00+00:00')"
+            registry = connection.execute(
+                "SELECT row_count, column_count, active_version_id, schema_json "
+                "FROM table_registry WHERE workspace_id = 'default' AND table_key = 'sales'"
+            ).fetchone()
+            sqlite_business_table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sales_physical'"
+            ).fetchone()
+            baseline_authority_counts = (
+                connection.execute("SELECT COUNT(*) FROM context_terms").fetchone()[0],
+                connection.execute("SELECT COUNT(*) FROM context_rules").fetchone()[0],
+                connection.execute("SELECT COUNT(*) FROM field_semantics").fetchone()[0],
             )
-            connection.commit()
-        check("schema-v17-bootstrap", status.get("ok") is True and schema_version == 17, schema_version)
+        check(
+            "schema-v18-bootstrap",
+            status.get("ok") is True
+            and imported.get("ok") is True
+            and schema_version == 18
+            and registry is not None
+            and registry[0:2] == (2, 3)
+            and bool(registry[2])
+            and len(json.loads(registry[3])) == 3
+            and sqlite_business_table is None,
+            {"schemaVersion": schema_version, "registry": list(registry) if registry else None},
+        )
 
         adapters_one = cli(["knowledge-source-adapters"])
         adapters_two = cli(["knowledge-source-adapters"])
@@ -102,7 +140,17 @@ def main() -> None:
                 connection.execute("SELECT COUNT(*) FROM context_rules").fetchone()[0],
                 connection.execute("SELECT COUNT(*) FROM field_semantics").fetchone()[0],
             )
-        check("confirmed-ingest-persists-only-pending-proposals", persisted.get("inserted") == 3 and set(by_type) == {"term", "rule", "field-semantic"} and all(item["status"] == "pending" for item in proposals) and authority_counts == (0, 0, 0), {"authorityCounts": authority_counts})
+        check(
+            "confirmed-ingest-persists-only-pending-proposals",
+            persisted.get("inserted") == 3
+            and set(by_type) == {"term", "rule", "field-semantic"}
+            and all(item["status"] == "pending" for item in proposals)
+            and authority_counts == baseline_authority_counts,
+            {
+                "baselineAuthorityCounts": baseline_authority_counts,
+                "authorityCounts": authority_counts,
+            },
+        )
 
         term_key = by_type["term"]["proposalKey"]
         accept_preview = cli(["semantic-patch-review", "--proposal", term_key, "--decision", "accept"])
@@ -160,9 +208,24 @@ def main() -> None:
 
         schema_drift_created = cli(["semantic-patch-propose", "--kind", "field-semantic", "--table", "sales", "--field", "status", "--role", "status", "--yes"])
         schema_drift_key = schema_drift_created["proposals"][0]["proposalKey"]
-        with closing(sqlite3.connect(sqlite_path)) as connection:
-            connection.execute('ALTER TABLE "sales_physical" ADD COLUMN "region" TEXT')
-            connection.commit()
+        sales_path.write_text(
+            "order_id,amount,status,region\n"
+            "o1,10.5,paid,east\n"
+            "o2,7.0,refunded,north\n",
+            encoding="utf-8",
+        )
+        cli([
+            "import-commit",
+            str(sales_path),
+            "--table",
+            "sales",
+            "--name",
+            "Sales",
+            "--mode",
+            "replace",
+            "--confirm-schema-change",
+            "--yes",
+        ])
         schema_stale = cli(["semantic-patch-proposals", "--proposal", schema_drift_key])["proposal"]
         check("workspace-schema-drift-invalidates-pending-proposal", schema_stale["status"] == "stale" and "workspace-schema-changed" in schema_stale["freshness"]["mismatches"], schema_stale["freshness"])
         cli(["semantic-patch-review", "--proposal", schema_drift_key, "--decision", "reject", "--yes"])

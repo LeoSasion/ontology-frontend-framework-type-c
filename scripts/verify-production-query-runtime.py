@@ -22,6 +22,10 @@ from platform_analytics_knowledge import execute_platform_knowledge  # noqa: E40
 
 
 checks: list[dict[str, Any]] = []
+SCHEMA_HASH = "a" * 64
+CONTENT_HASH = "b" * 64
+OBJECT_HASH = "c" * 64
+VERSION_ID = "version_fixture_v2"
 
 
 def check(label: str, ok: bool, detail: Any = "") -> None:
@@ -41,7 +45,10 @@ def create_replica(path: Path, *, view: bool = True, physical: bool = True, mani
 
     with duckdb.connect(str(path)) as connection:
         connection.execute(
-            "CREATE TABLE __aibi_replica_manifest(logical_table VARCHAR PRIMARY KEY, source_version VARCHAR, replica_table VARCHAR, row_count BIGINT, published_at TIMESTAMP)"
+            "CREATE TABLE __aibi_replica_manifest("
+            "manifest_version INTEGER, logical_table VARCHAR PRIMARY KEY, source_version VARCHAR, version_id VARCHAR, "
+            "object_keys_json VARCHAR, object_paths_json VARCHAR, object_hashes_json VARCHAR, schema_fingerprint VARCHAR, "
+            "content_fingerprint VARCHAR, row_count BIGINT, published_at TIMESTAMP)"
         )
         if physical:
             connection.execute("CREATE TABLE __aibi_replica_fixture(label VARCHAR, value VARCHAR)")
@@ -50,15 +57,27 @@ def create_replica(path: Path, *, view: bool = True, physical: bool = True, mani
         if view and physical:
             connection.execute("CREATE VIEW fixture AS SELECT * FROM __aibi_replica_fixture")
         connection.execute(
-            "INSERT INTO __aibi_replica_manifest VALUES ('fixture', 'default:fixture:1:2', '__aibi_replica_fixture', ?, current_timestamp)",
-            [manifest_rows],
+            "INSERT INTO __aibi_replica_manifest VALUES (2, 'fixture', 'default:fixture:1:2', ?, ?, ?, ?, ?, ?, ?, current_timestamp)",
+            [VERSION_ID, json.dumps([f"workspaces/test/objects/cc/{OBJECT_HASH}.parquet"]), json.dumps(["private.parquet"]), json.dumps([OBJECT_HASH]), SCHEMA_HASH, CONTENT_HASH, manifest_rows],
         )
+
+
+def expectation(*, source_version: str = "default:fixture:1:2", row_count: int = 2, content_hash: str = CONTENT_HASH) -> ReplicaExpectation:
+    return ReplicaExpectation(
+        logical_table="fixture",
+        source_version=source_version,
+        version_id=VERSION_ID,
+        content_fingerprint=content_hash,
+        schema_fingerprint=SCHEMA_HASH,
+        row_count=row_count,
+        object_hashes=(OBJECT_HASH,),
+    )
 
 
 with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
     root = Path(temp_dir)
     missing_path = root / "missing.duckdb"
-    expectation = ReplicaExpectation("fixture", "default:fixture:1:2", 2)
+    current_expectation = expectation()
     status = duckdb_status(missing_path)
     check(
         "missing-database-status-is-blocked-without-fallback",
@@ -69,7 +88,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
     )
     check(
         "missing-replica-database-fails-closed",
-        error_code(lambda: open_validated_duckdb_query(missing_path, [expectation]).__enter__()) == "replica-database-missing",
+        error_code(lambda: open_validated_duckdb_query(missing_path, [current_expectation]).__enter__()) == "replica-database-missing",
     )
 
     manifest_missing = root / "manifest-missing.duckdb"
@@ -79,14 +98,14 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
         connection.execute("CREATE TABLE fixture(label VARCHAR)")
     check(
         "missing-manifest-fails-closed",
-        error_code(lambda: open_validated_duckdb_query(manifest_missing, [expectation]).__enter__()) == "replica-manifest-missing",
+        error_code(lambda: open_validated_duckdb_query(manifest_missing, [current_expectation]).__enter__()) == "replica-manifest-missing",
     )
 
     half_published = root / "half-published.duckdb"
     create_replica(half_published, view=False)
     check(
         "half-published-view-fails-closed",
-        error_code(lambda: open_validated_duckdb_query(half_published, [expectation]).__enter__())
+        error_code(lambda: open_validated_duckdb_query(half_published, [current_expectation]).__enter__())
         == "replica-view-not-published:fixture",
     )
 
@@ -94,19 +113,19 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
     create_replica(physical_missing, view=False, physical=False)
     check(
         "missing-physical-replica-fails-closed",
-        error_code(lambda: open_validated_duckdb_query(physical_missing, [expectation]).__enter__())
-        == "replica-table-missing:fixture",
+        error_code(lambda: open_validated_duckdb_query(physical_missing, [current_expectation]).__enter__())
+        == "replica-view-not-published:fixture",
     )
 
     stale = root / "stale.duckdb"
     create_replica(stale)
-    stale_expectation = ReplicaExpectation("fixture", "default:fixture:2:2", 2)
+    stale_expectation = expectation(source_version="default:fixture:2:2")
     check(
         "stale-version-fails-closed",
         error_code(lambda: open_validated_duckdb_query(stale, [stale_expectation]).__enter__())
-        == "replica-version-stale:fixture",
+        == "replica-source-version-stale:fixture",
     )
-    row_drift_expectation = ReplicaExpectation("fixture", "default:fixture:1:2", 3)
+    row_drift_expectation = expectation(row_count=3)
     check(
         "registry-manifest-row-drift-fails-closed",
         error_code(lambda: open_validated_duckdb_query(stale, [row_drift_expectation]).__enter__())
@@ -116,9 +135,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
     content_drift = root / "content-drift.duckdb"
     create_replica(content_drift, manifest_rows=2, physical_rows=1)
     check(
-        "manifest-content-drift-fails-closed",
-        error_code(lambda: open_validated_duckdb_query(content_drift, [expectation]).__enter__())
-        == "replica-content-drift:fixture",
+        "manifest-content-fingerprint-drift-fails-closed-without-row-scan",
+        error_code(lambda: open_validated_duckdb_query(content_drift, [expectation(content_hash="d" * 64)]).__enter__())
+        == "replica-content-fingerprint-drift:fixture",
     )
 
     secrets = ["buyer@example.com", "token-super-secret", r"C:\private\customer-data.csv"]
@@ -130,7 +149,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
         ],
         dialect="duckdb",
     )
-    with open_validated_duckdb_query(stale, [expectation]) as query:
+    with open_validated_duckdb_query(stale, [current_expectation]) as query:
         runtime = query.runtime(compiled_sql=filter_sql, params=filter_params)
         read_rows = query.rows("SELECT label, value FROM fixture ORDER BY label")
         write_error = error_code(lambda: query.execute("CREATE TABLE forbidden_write(value INTEGER)"))
@@ -173,6 +192,10 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-production-query-") as temp_dir:
                     "physical_table": "fixture",
                     "data_version": 1,
                     "row_count": 2,
+                    "active_version_id": VERSION_ID,
+                    "content_fingerprint": CONTENT_HASH,
+                    "schema_fingerprint": SCHEMA_HASH,
+                    "object_hashes": [OBJECT_HASH],
                 }
             },
         },
@@ -223,7 +246,6 @@ required_routing_markers = {
     "platform_analytics_knowledge.py": "open_validated_duckdb_query",
     "apparel_analytics_service.py": "open_validated_duckdb_query",
     "apparel_entity_mapping_service.py": "open_validated_duckdb_query",
-    "aibi_runtime/use_cases/agent_interaction.py": "open_validated_duckdb_query",
 }
 check(
     "production-business-row-consumers-use-validated-reader",

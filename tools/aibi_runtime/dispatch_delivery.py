@@ -22,6 +22,7 @@ COMMANDS = frozenset({
     'list-relationships',
     'list-views',
     'query',
+    'query-table-batch',
     'query-relationship',
     'query-table',
     'recommend-indexes',
@@ -43,6 +44,8 @@ def dispatch(args, parser):
         result = runtime.query_command(args)
     elif args.command == 'query-table':
         result = runtime.query_table_command(args)
+    elif args.command == 'query-table-batch':
+        result = runtime.query_table_batch_command(args)
     elif args.command == 'list-views':
         result = runtime.list_views_command(args)
     elif args.command == 'save-view':

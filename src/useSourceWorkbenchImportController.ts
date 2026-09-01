@@ -43,7 +43,7 @@ export function useSourceWorkbenchImportController({
   const [filePath, setFilePath] = useState("");
   const [targetTable, setTargetTable] = useState("");
   const [targetName, setTargetName] = useState("");
-  const [importMode, setImportMode] = useState("merge");
+  const [importMode, setImportMode] = useState("auto");
   const [uniqueFields, setUniqueFields] = useState("");
   const [conflictRule, setConflictRule] = useState("overwrite");
   const [folderImportPlan, setFolderImportPlan] = useState<Awaited<ReturnType<typeof onPreviewFolderImport>> | null>(null);
@@ -278,13 +278,14 @@ export function useSourceWorkbenchImportController({
     } else if (result.ok) {
       const suggestedTable = String(result.suggestedTableKey || "").trim();
       const suggestedName = String(result.suggestedDisplayName || suggestedTable).trim();
+      const resolvedImportMode = String(result.commitOptions?.mode || result.mergePolicyPreview.mode || effectiveMode);
       if (suggestedTable) {
         setTargetTable(suggestedTable);
         receiptTargetTable = suggestedTable;
       }
       if (suggestedName) setTargetName(suggestedName);
-      setImportMode("create");
-      receiptImportMode = "create";
+      setImportMode(resolvedImportMode);
+      receiptImportMode = resolvedImportMode;
     }
     if (result.ok) {
       rememberImportPath(filePath);

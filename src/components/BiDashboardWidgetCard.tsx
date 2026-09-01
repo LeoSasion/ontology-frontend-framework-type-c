@@ -15,6 +15,8 @@ import type { DrilldownPointFilter } from "./BiDashboardDrilldownSheet";
 export type SlicerSelections = Record<string, string[]>;
 
 type BiDashboardWidgetCardProps = {
+  workspaceId: string;
+  cacheGeneration: string;
   widget: BiDashboardWidget;
   query: QueryResult;
   dashboardFilters: BiDashboardFilterRule[];
@@ -25,6 +27,8 @@ type BiDashboardWidgetCardProps = {
 };
 
 export function BiDashboardWidgetCard({
+  workspaceId,
+  cacheGeneration,
   widget,
   query,
   dashboardFilters,
@@ -103,7 +107,7 @@ export function BiDashboardWidgetCard({
     return () => {
       controller.abort();
     };
-  }, [filtersForWidget, widget]);
+  }, [filtersForWidget, widget, workspaceId]);
 
   useEffect(() => {
     if (!widgetQueryRequest) {
@@ -114,7 +118,7 @@ export function BiDashboardWidgetCard({
     setWidgetQueryState("loading");
     setWidgetQuery(null);
     let active = true;
-    const subscription = subscribeTableQuery(widgetQueryRequest);
+    const subscription = subscribeTableQuery({ workspaceId, generation: cacheGeneration }, widgetQueryRequest);
     void subscription.promise.then((result) => {
       if (!active) return;
       setWidgetQuery(tableQueryToQueryResult(result, widget));
@@ -126,7 +130,7 @@ export function BiDashboardWidgetCard({
       active = false;
       subscription.release();
     };
-  }, [widget, widgetQueryRequest]);
+  }, [cacheGeneration, widget, widgetQueryRequest, workspaceId]);
 
   const sourceQuery = widget.dataMode === "relationship"
     ? relationshipQuery ?? emptyWidgetQuery(widget)

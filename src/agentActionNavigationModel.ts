@@ -48,7 +48,7 @@ function sectionFromReceipt(result: Record<string, unknown>): AppSection | undef
   ) return "dashboards";
   if (["createdViewKey", "savedViewKey", "viewKey", "savedView"].some((key) => Object.hasOwn(result, key))) return "views";
   if (
-    ["createdIndex", "importResult", "relationshipPreview", "savedFormula", "savedMetric", "savedRelationship", "semantic"]
+    ["optimizedDataset", "importResult", "relationshipPreview", "savedFormula", "savedMetric", "savedRelationship", "semantic"]
       .some((key) => Object.hasOwn(result, key))
   ) return "sources";
   return undefined;
@@ -77,7 +77,7 @@ export function confirmedActionNavigationTarget(
     ?? objectRecord(result.savedFormula)
     ?? objectRecord(result.savedMetric)
     ?? objectRecord(result.semantic)
-    ?? objectRecord(result.createdIndex);
+    ?? objectRecord(result.optimizedDataset);
   const isDeletedDashboard = result.operation === "delete" || draft?.kind === "dashboard.delete";
   const dashboardKey = isDeletedDashboard ? undefined : firstString(
     result.createdDashboardKey,

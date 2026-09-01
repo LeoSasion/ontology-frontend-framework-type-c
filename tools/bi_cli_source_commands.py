@@ -7,14 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from aibi_contracts import source_pipeline_contract
-from bi_cli_core import DUCKDB_PATH, now_iso, quote_identifier, source_label, unique_key
+from bi_cli_core import DUCKDB_PATH, now_iso, source_label, unique_key
 from bi_cli_evidence_bundles import artifact_ref, write_evidence_bundle
 from bi_cli_io_services import (
     import_csv_as_table,
     load_connectors,
     merge_import_into_table,
-    profile_rows,
-    read_table_file,
     rows_to_dicts,
     saved_import_policy,
 )
@@ -55,9 +53,6 @@ from import_job_command_service import (
     set_import_policy_command as set_import_policy_command_service,
 )
 from import_policy import (
-    analyze_unique_key_quality,
-    normalize_records_for_columns,
-    preview_merge_plan,
     sanitize_unique_fields,
 )
 from preferences_theme_command_service import (
@@ -359,11 +354,8 @@ def sync_connector_command(args: argparse.Namespace) -> dict[str, Any]:
     return sync_connector_command_service(
         args,
         open_db=open_db,
-        read_table_file=read_table_file,
         registry_for_table=registry_for_table,
         saved_import_policy=saved_import_policy,
-        merge_import_into_table=merge_import_into_table,
-        import_csv_as_table=import_csv_as_table,
     )
 
 
@@ -437,17 +429,10 @@ def build_import_preview(
         workspace_id=workspace_id,
         mode_value=mode_value,
         stage_key=stage_key,
-        read_table_file=read_table_file,
-        profile_rows=profile_rows,
-        normalize_records_for_columns=normalize_records_for_columns,
-        analyze_unique_key_quality=analyze_unique_key_quality,
         active_workspace_id=active_workspace_id,
         saved_import_policy=saved_import_policy,
-        table_columns=table_columns,
         registry_for_table=registry_for_table,
-        preview_merge_plan=preview_merge_plan,
         sanitize_unique_fields=sanitize_unique_fields,
-        quote_identifier=quote_identifier,
         source_pipeline_contract=source_pipeline_contract,
     )
 
@@ -515,12 +500,12 @@ def import_commit_command(args: argparse.Namespace) -> dict[str, Any]:
         # Compatibility-only path: every confirmed import must share the
         # durable job + activation journal lifecycle. The import is lazy to
         # avoid a module cycle in the composition layer.
-        from import_job_commands import legacy_import_commit_command
+        from import_job_commands import direct_import_commit_command
 
-        return legacy_import_commit_command(args)
-    from import_job_commands import legacy_import_preview_boundary
+        return direct_import_commit_command(args)
+    from import_job_commands import import_preview_boundary
 
-    with legacy_import_preview_boundary():
+    with import_preview_boundary():
         return import_commit_command_service(
             args,
             open_db=open_db,
@@ -534,25 +519,23 @@ def preview_import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
         args,
         open_db=open_db,
         build_import_preview=build_import_preview,
-        read_table_file=read_table_file,
         active_workspace_id=active_workspace_id,
     )
 
 
 def import_folder_command(args: argparse.Namespace) -> dict[str, Any]:
     if bool(getattr(args, "yes", False)):
-        from import_job_commands import legacy_import_folder_command
+        from import_job_commands import direct_import_folder_command
 
-        return legacy_import_folder_command(args)
-    from import_job_commands import legacy_import_preview_boundary
+        return direct_import_folder_command(args)
+    from import_job_commands import import_preview_boundary
 
-    with legacy_import_preview_boundary():
+    with import_preview_boundary():
         return import_folder_command_service(
             args,
             open_db=open_db,
             build_import_preview=build_import_preview,
             execute_import_commit=execute_import_commit,
-            read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
 

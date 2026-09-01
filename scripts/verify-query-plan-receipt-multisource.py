@@ -34,6 +34,10 @@ connection.executescript(
       data_version INTEGER,
       row_count INTEGER,
       column_count INTEGER,
+      active_version_id TEXT NOT NULL,
+      schema_json TEXT NOT NULL,
+      schema_fingerprint TEXT NOT NULL,
+      content_fingerprint TEXT NOT NULL,
       updated_at TEXT,
       PRIMARY KEY(workspace_id, table_key)
     );
@@ -77,20 +81,27 @@ connection.executescript(
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
-    CREATE TABLE orders(order_id TEXT, channel TEXT);
-    CREATE TABLE refunds(order_id TEXT, amount REAL);
     """
 )
 connection.executemany(
     """
     INSERT INTO table_registry(
       workspace_id, table_key, display_name, physical_table, data_version,
-      row_count, column_count, updated_at
-    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
+      row_count, column_count, active_version_id, schema_json,
+      schema_fingerprint, content_fingerprint, updated_at
+    ) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
     [
-        ("default", "orders", "Orders", "orders", 1, 2, 2, "2026-07-16T08:00:00Z"),
-        ("default", "refunds", "Refunds", "refunds", 1, 1, 2, "2026-07-16T08:00:00Z"),
+        (
+            "default", "orders", "Orders", "orders", 1, 2, 2, "orders-v1",
+            json.dumps([{"name": "order_id", "type": "VARCHAR"}, {"name": "channel", "type": "VARCHAR"}]),
+            "1" * 64, "2" * 64, "2026-07-16T08:00:00Z",
+        ),
+        (
+            "default", "refunds", "Refunds", "refunds", 1, 1, 2, "refunds-v1",
+            json.dumps([{"name": "order_id", "type": "VARCHAR"}, {"name": "amount", "type": "DOUBLE"}]),
+            "3" * 64, "4" * 64, "2026-07-16T08:00:00Z",
+        ),
     ],
 )
 connection.execute(
@@ -118,9 +129,9 @@ connection.execute(
     ),
 )
 
-legacy_schema_fingerprint = workspace_schema_fingerprint(connection, "default", "orders")
-legacy_data_fingerprint = workspace_data_fingerprint(connection, "default", "orders")
-legacy = create_query_plan_receipt(
+single_schema_fingerprint = workspace_schema_fingerprint(connection, "default", "orders")
+single_data_fingerprint = workspace_data_fingerprint(connection, "default", "orders")
+single = create_query_plan_receipt(
     connection,
     workspace_id="default",
     request_text="按渠道统计订单",
@@ -132,17 +143,17 @@ legacy = create_query_plan_receipt(
     domain_packs=[],
     now_iso=lambda: "2026-07-16T08:01:00Z",
 )
-check("legacy-single-table-key-is-preserved", legacy["source"]["tableKey"] == "orders", legacy["source"])
-check("legacy-single-table-list-is-added", legacy["source"]["tableKeys"] == ["orders"], legacy["source"])
+check("single-table-key-is-preserved", single["source"]["tableKey"] == "orders", single["source"])
+check("single-table-list-is-added", single["source"]["tableKeys"] == ["orders"], single["source"])
 check(
-    "legacy-single-table-schema-fingerprint-is-unchanged",
-    legacy["source"]["schemaFingerprint"] == legacy_schema_fingerprint,
-    legacy["source"],
+    "single-table-schema-fingerprint-is-unchanged",
+    single["source"]["schemaFingerprint"] == single_schema_fingerprint,
+    single["source"],
 )
 check(
-    "legacy-single-table-data-fingerprint-is-unchanged",
-    legacy["source"]["dataFingerprint"] == legacy_data_fingerprint,
-    legacy["source"],
+    "single-table-data-fingerprint-is-unchanged",
+    single["source"]["dataFingerprint"] == single_data_fingerprint,
+    single["source"],
 )
 
 relationship_proof = [{
@@ -330,10 +341,11 @@ before_data_fingerprint = multi["source"]["dataFingerprint"]
 connection.execute(
     """
     UPDATE table_registry
-    SET data_version = data_version + 1, row_count = row_count + 1, updated_at = ?
+    SET data_version = data_version + 1, row_count = row_count + 1,
+        active_version_id = 'refunds-v2', content_fingerprint = ?, updated_at = ?
     WHERE workspace_id = ? AND table_key = ?
     """,
-    ("2026-07-16T08:04:00Z", "default", "refunds"),
+    ("5" * 64, "2026-07-16T08:04:00Z", "default", "refunds"),
 )
 refreshed_relationship_proof = [{
     **relationship_proof[0],

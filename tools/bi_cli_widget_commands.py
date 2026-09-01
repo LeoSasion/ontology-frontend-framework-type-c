@@ -59,7 +59,6 @@ from relationship_command_service import (
     recommend_relationships_for_connection as recommend_relationships_for_connection_service,
     relation_candidate_fields as relation_candidate_fields_service,
     relationship_name_score as relationship_name_score_service,
-    sample_field_values as sample_field_values_service,
     saved_relationship_signatures as saved_relationship_signatures_service,
 )
 from relationship_tools import build_relationship_preview
@@ -76,7 +75,6 @@ def recommend_relationships_for_connection(connection: sqlite3.Connection, limit
         build_relationship_preview=build_relationship_preview,
         relation_candidate_fields=lambda conn, registry: relation_candidate_fields_service(conn, registry, active_workspace_id=active_workspace_id, table_columns=table_columns),
         relationship_name_score=relationship_name_score_service,
-        sample_field_values=lambda conn, physical_table, field, limit=300: sample_field_values_service(conn, physical_table, field, limit, quote_identifier=quote_identifier),
         saved_relationship_signatures=lambda conn: saved_relationship_signatures_service(conn, active_workspace_id=active_workspace_id),
     )
 

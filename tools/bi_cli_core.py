@@ -1,20 +1,27 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import itertools
 import json
 import os
 import re
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, time as datetime_time, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATA_DIR = ROOT / "data" / "local"
-DB_PATH = Path(os.environ.get("AIBI_HYBRID_DB_PATH", DEFAULT_DATA_DIR / "aibi_hybrid.sqlite"))
-DUCKDB_PATH = Path(os.environ.get("AIBI_HYBRID_DUCKDB_PATH", DEFAULT_DATA_DIR / "aibi_hybrid.duckdb"))
+# Storage generation 2 is intentionally a clean break.  Keeping new defaults
+# prevents an older mixed SQLite/DuckDB data plane from being opened or
+# rewritten implicitly; operators may still bind isolated test paths through
+# the existing environment variables.
+DB_PATH = Path(os.environ.get("AIBI_HYBRID_DB_PATH", DEFAULT_DATA_DIR / "aibi_control_v2.sqlite"))
+DUCKDB_PATH = Path(os.environ.get("AIBI_HYBRID_DUCKDB_PATH", DEFAULT_DATA_DIR / "aibi_catalog_v2.duckdb"))
 _UNIQUE_COUNTER = itertools.count()
 
 
@@ -26,8 +33,26 @@ def unique_key(prefix: str) -> str:
     return f"{prefix}_{time.time_ns()}_{os.getpid()}_{next(_UNIQUE_COUNTER)}"
 
 
+def json_default(value: Any) -> Any:
+    """Encode values returned by typed analytical queries as JSON scalars."""
+
+    if isinstance(value, (datetime, date, datetime_time)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        # Keep decimal precision at the protocol boundary instead of silently
+        # converting a potentially large value to a binary floating point.
+        return format(value, "f")
+    if isinstance(value, timedelta):
+        return str(value)
+    if isinstance(value, (bytes, bytearray, memoryview)):
+        return "base64:" + base64.b64encode(bytes(value)).decode("ascii")
+    if isinstance(value, (Path, UUID)):
+        return str(value)
+    return str(value)
+
+
 def dump(value: Any) -> None:
-    print(json.dumps(value, ensure_ascii=False, indent=2))
+    print(json.dumps(value, ensure_ascii=False, indent=2, default=json_default))
 
 
 def quote_identifier(name: str) -> str:

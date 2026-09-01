@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-import time
+from functools import lru_cache
 from typing import Any, Iterable
 
 from bi_cli_core import DB_PATH, DUCKDB_PATH, now_iso, quote_identifier, slug
@@ -27,13 +27,91 @@ from workspace_command_service import (
 from decision_framework_service import ensure_decision_framework_schema
 from evidence_retrieval_service import ensure_evidence_retrieval_schema
 from reviewed_publication_service import ensure_reviewed_publication_schema
-from source_activation_journal_service import ensure_activation_journal_schema
 from sqlserver_snapshot_commands import SQLSERVER_SNAPSHOT_METADATA_DDL
 
 
-CURRENT_SQLITE_SCHEMA_VERSION = 17
-CURRENT_DUCKDB_SCHEMA_VERSION = 1
+CURRENT_SQLITE_SCHEMA_VERSION = 18
+CURRENT_DUCKDB_SCHEMA_VERSION = 2
 
+# The control database is a versioned v18 artifact.  It is initialized once
+# from an empty file and then opened read-only with respect to schema state;
+# feature tables are intentionally listed here so a partially-created v18
+# file fails closed instead of being repaired implicitly on a hot path.
+REQUIRED_CONTROL_TABLES = frozenset(
+    {
+        "workspaces",
+        "system_flags",
+        "table_registry",
+        "dataset_versions",
+        "dataset_version_files",
+        "navigation_modules",
+        "source_runs",
+        "field_semantics",
+        "metric_definitions",
+        "calculated_fields",
+        "relationships",
+        "dashboards",
+        "dashboard_widgets",
+        "saved_views",
+        "import_jobs",
+        "import_policies",
+        "data_connectors",
+        "user_preferences",
+        "theme_palettes",
+        "action_drafts",
+        "source_intelligence_runs",
+        "source_run_tables",
+        "workspace_domain_packs",
+        "analytical_skills",
+        "workspace_analytical_skills",
+        "context_terms",
+        "context_rules",
+        "knowledge_sources",
+        "semantic_patch_proposals",
+        "semantic_releases",
+        "semantic_release_events",
+        "metric_contract_versions",
+        "metric_contract_events",
+        "workflow_recipes",
+        "workflow_recipe_events",
+        "query_plan_receipts",
+        "confirmed_queries",
+        "confirmed_plan_memories",
+        "recall_receipts",
+        "analysis_runs",
+        "analysis_units",
+        "analysis_snapshots",
+        "metric_monitors",
+        "metric_monitor_evaluations",
+        "analysis_jobs",
+        "analysis_job_events",
+        "agent_sessions",
+        "agent_turns",
+        "agent_turn_events",
+        "agent_context_snapshots",
+        "workspace_agent_runtime_profiles",
+        "agent_provider_evaluations",
+        "plan_quality_scorecards",
+        "exploration_threads",
+        "exploration_anchors",
+        "exploration_board_items",
+        "research_runs",
+        "research_plan_revisions",
+        "research_observations",
+        "research_run_events",
+        "source_activation_journals",
+        "import_workspace_leases",
+        "source_activation_journal_events",
+        "reviewed_publications",
+        "evidence_ledger_entries",
+        "evidence_retrieval_receipts",
+        "retrieval_evaluation_runs",
+        "decision_frameworks",
+        "sqlserver_snapshot_catalogs",
+        "sqlserver_snapshot_plans",
+        "sqlserver_snapshot_receipts",
+    }
+)
 
 def sqlite_schema_version(connection: sqlite3.Connection) -> int:
     row = connection.execute("PRAGMA user_version").fetchone()
@@ -42,12 +120,23 @@ def sqlite_schema_version(connection: sqlite3.Connection) -> int:
 
 def assert_sqlite_schema_compatible(connection: sqlite3.Connection) -> int:
     version = sqlite_schema_version(connection)
-    if version > CURRENT_SQLITE_SCHEMA_VERSION:
+    if version != CURRENT_SQLITE_SCHEMA_VERSION:
+        qualifier = "newer than" if version > CURRENT_SQLITE_SCHEMA_VERSION else "not the current"
         raise RuntimeError(
-            f"AIBI-C metadata schema v{version} is newer than this runtime "
-            f"(max v{CURRENT_SQLITE_SCHEMA_VERSION}); no changes were made."
+            f"AIBI-C metadata schema v{version} is {qualifier} clean "
+            f"v{CURRENT_SQLITE_SCHEMA_VERSION}; no migration or repair is performed. "
+            "Initialize a fresh v18 control database instead."
         )
     return version
+
+
+def _control_database_state(connection: sqlite3.Connection) -> tuple[int, bool]:
+    """Return the user_version and whether the file contains user tables."""
+    version = sqlite_schema_version(connection)
+    has_user_tables = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1"
+    ).fetchone() is not None
+    return version, has_user_tables
 
 
 def duckdb_schema_version(path=DUCKDB_PATH) -> int | None:
@@ -71,10 +160,11 @@ def duckdb_schema_version(path=DUCKDB_PATH) -> int | None:
 
 def assert_duckdb_schema_compatible(path=DUCKDB_PATH) -> int | None:
     version = duckdb_schema_version(path)
-    if version is not None and version > CURRENT_DUCKDB_SCHEMA_VERSION:
+    if version is not None and version != CURRENT_DUCKDB_SCHEMA_VERSION:
         raise RuntimeError(
-            f"AIBI-C analytics schema v{version} is newer than this runtime "
-            f"(max v{CURRENT_DUCKDB_SCHEMA_VERSION}); no changes were made."
+            f"AIBI-C analytics storage v{version} is incompatible with the clean "
+            f"v{CURRENT_DUCKDB_SCHEMA_VERSION} data plane; no changes were made. "
+            "Start with the v2 storage paths instead of migrating business rows."
         )
     return version
 
@@ -90,273 +180,105 @@ def table_exists(connection: sqlite3.Connection, table_name: str) -> bool:
     return row is not None
 
 
+def _control_columns_by_table(connection: sqlite3.Connection) -> dict[str, frozenset[str]]:
+    """Read every control-table column in one SQLite catalogue query."""
+
+    columns: dict[str, set[str]] = {}
+    for row in connection.execute(
+        """
+        SELECT schema_table.name AS table_name, table_column.name AS column_name
+        FROM sqlite_master AS schema_table
+        JOIN pragma_table_info(schema_table.name) AS table_column
+        WHERE schema_table.type = 'table'
+          AND schema_table.name NOT LIKE 'sqlite_%'
+        ORDER BY schema_table.name, table_column.cid
+        """
+    ):
+        table_name = str(row["table_name"] if isinstance(row, sqlite3.Row) else row[0])
+        column_name = str(row["column_name"] if isinstance(row, sqlite3.Row) else row[1])
+        columns.setdefault(table_name, set()).add(column_name)
+    return {table_name: frozenset(names) for table_name, names in columns.items()}
+
+
+@lru_cache(maxsize=1)
+def _canonical_control_columns() -> tuple[tuple[str, frozenset[str]], ...]:
+    """Derive the v18 contract once from the same initializer used for clean files."""
+
+    canonical = sqlite3.connect(":memory:")
+    try:
+        _initialize_schema(canonical)
+        columns = _control_columns_by_table(canonical)
+    finally:
+        canonical.close()
+    missing_tables = sorted(REQUIRED_CONTROL_TABLES - columns.keys())
+    if missing_tables:
+        raise RuntimeError(
+            "AIBI-C canonical v18 initializer is incomplete; missing tables: "
+            + ", ".join(missing_tables)
+        )
+    return tuple(
+        (table_name, columns[table_name]) for table_name in sorted(REQUIRED_CONTROL_TABLES)
+    )
+
+
+def assert_control_schema_invariants(connection: sqlite3.Connection) -> int:
+    """Validate the current control schema without writes or external storage access."""
+    version = assert_sqlite_schema_compatible(connection)
+    actual_columns = _control_columns_by_table(connection)
+    actual_tables = set(actual_columns)
+    missing_tables = sorted(REQUIRED_CONTROL_TABLES - actual_tables)
+    if missing_tables:
+        raise RuntimeError(
+            "AIBI-C clean v18 control schema is incomplete; missing tables: "
+            + ", ".join(missing_tables)
+        )
+    for table_name, required_columns in _canonical_control_columns():
+        missing_columns = sorted(required_columns - actual_columns[table_name])
+        if missing_columns:
+            raise RuntimeError(
+                f"AIBI-C clean v18 control schema is incomplete; {table_name} "
+                "is missing columns: "
+                + ", ".join(missing_columns)
+            )
+    if connection.execute("SELECT 1 FROM workspaces WHERE id = 'default' LIMIT 1").fetchone() is None:
+        raise RuntimeError("AIBI-C clean v18 control schema is missing the default workspace seed.")
+    if connection.execute("SELECT 1 FROM system_flags WHERE key = 'active_workspace_id' LIMIT 1").fetchone() is None:
+        raise RuntimeError("AIBI-C clean v18 control schema is missing the active workspace seed.")
+    return version
+
+
 def table_columns(connection: sqlite3.Connection, physical_table: str) -> list[str]:
-    return [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(physical_table)})")]
-
-
-def ensure_column(connection: sqlite3.Connection, table_name: str, column_name: str, definition: str) -> None:
-    if column_name not in table_columns(connection, table_name):
-        connection.execute(f"ALTER TABLE {quote_identifier(table_name)} ADD COLUMN {quote_identifier(column_name)} {definition}")
-
-
-def primary_key_columns(connection: sqlite3.Connection, table_name: str) -> list[str]:
-    rows = connection.execute(f"PRAGMA table_info({quote_identifier(table_name)})").fetchall()
-    return [row["name"] for row in sorted((row for row in rows if int(row["pk"] or 0)), key=lambda row: int(row["pk"]))]
-
-
-def has_unique_index(connection: sqlite3.Connection, table_name: str, columns: list[str]) -> bool:
-    expected = list(columns)
-    for index_row in connection.execute(f"PRAGMA index_list({quote_identifier(table_name)})").fetchall():
-        if not int(index_row["unique"] or 0):
+    row = connection.execute(
+        """
+        SELECT schema_json
+        FROM table_registry
+        WHERE physical_table = ? AND active_version_id <> ''
+        ORDER BY updated_at DESC
+        LIMIT 1
+        """,
+        (physical_table,),
+    ).fetchone()
+    if row is None:
+        raise ValueError(f"Dataset schema is unavailable for active relation: {physical_table}")
+    try:
+        schema = json.loads(str(row["schema_json"] or "[]"))
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise ValueError(f"Dataset schema metadata is invalid: {physical_table}") from error
+    columns: list[str] = []
+    for item in schema if isinstance(schema, list) else []:
+        if isinstance(item, str):
+            name = item
+            internal = name.startswith("__aibi_")
+        elif isinstance(item, dict):
+            name = str(item.get("name") or item.get("field") or "")
+            internal = bool(item.get("internal")) or name.startswith("__aibi_")
+        else:
             continue
-        index_name = str(index_row["name"])
-        actual = [row["name"] for row in connection.execute(f"PRAGMA index_info({quote_identifier(index_name)})").fetchall()]
-        if actual == expected:
-            return True
-    return False
-
-
-def rebuild_table(connection: sqlite3.Connection, table_name: str, create_sql: str) -> None:
-    legacy_name = f"{table_name}_legacy_{int(time.time() * 1000)}"
-    existing_columns = table_columns(connection, table_name)
-    connection.execute(f"ALTER TABLE {quote_identifier(table_name)} RENAME TO {quote_identifier(legacy_name)}")
-    connection.execute(create_sql)
-    next_columns = table_columns(connection, table_name)
-    common_columns = [column for column in next_columns if column in existing_columns]
-    if common_columns:
-        column_sql = ", ".join(quote_identifier(column) for column in common_columns)
-        connection.execute(
-            f"INSERT OR IGNORE INTO {quote_identifier(table_name)} ({column_sql}) "
-            f"SELECT {column_sql} FROM {quote_identifier(legacy_name)}"
-        )
-    connection.execute(f"DROP TABLE {quote_identifier(legacy_name)}")
-
-
-def migrate_workspace_scoped_constraints(connection: sqlite3.Connection) -> None:
-    desired_tables = {
-        "table_registry": (
-            ["workspace_id", "table_key"],
-            """
-            CREATE TABLE table_registry (
-              table_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              display_name TEXT NOT NULL,
-              physical_table TEXT NOT NULL,
-              source_file TEXT NOT NULL,
-              row_count INTEGER NOT NULL,
-              column_count INTEGER NOT NULL,
-              created_at TEXT NOT NULL,
-              data_version INTEGER NOT NULL DEFAULT 1,
-              updated_at TEXT NOT NULL DEFAULT '',
-              PRIMARY KEY(workspace_id, table_key)
-            )
-            """,
-        ),
-        "navigation_modules": (
-            ["workspace_id", "module_key"],
-            """
-            CREATE TABLE navigation_modules (
-              module_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              name TEXT NOT NULL,
-              module_type TEXT NOT NULL,
-              table_key TEXT,
-              dashboard_key TEXT,
-              sort_order INTEGER NOT NULL,
-              created_by TEXT NOT NULL,
-              agent_managed INTEGER NOT NULL,
-              enabled INTEGER NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              PRIMARY KEY(workspace_id, module_key)
-            )
-            """,
-        ),
-        "metric_definitions": (
-            ["workspace_id", "metric_key"],
-            """
-            CREATE TABLE metric_definitions (
-              metric_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              label TEXT NOT NULL,
-              table_key TEXT NOT NULL,
-              measure TEXT NOT NULL,
-              aggregation TEXT NOT NULL,
-              dimension TEXT,
-              time_field TEXT,
-              value_format TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              filters_json TEXT NOT NULL DEFAULT '[]',
-              description TEXT NOT NULL DEFAULT '',
-              source TEXT NOT NULL DEFAULT 'auto',
-              enabled INTEGER NOT NULL DEFAULT 1,
-              updated_at TEXT NOT NULL DEFAULT '',
-              formula_text TEXT NOT NULL DEFAULT '',
-              formula_ast_json TEXT NOT NULL DEFAULT '{}',
-              dependencies_json TEXT NOT NULL DEFAULT '[]',
-              metric_type TEXT NOT NULL DEFAULT 'basic',
-              PRIMARY KEY(workspace_id, metric_key)
-            )
-            """,
-        ),
-        "data_connectors": (
-            ["workspace_id", "connector_key"],
-            """
-            CREATE TABLE data_connectors (
-              connector_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              name TEXT NOT NULL,
-              connector_type TEXT NOT NULL,
-              provider TEXT NOT NULL,
-              status TEXT NOT NULL,
-              config_json TEXT NOT NULL,
-              schedule_json TEXT NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              last_sync_at TEXT,
-              last_sync_status TEXT,
-              last_sync_result_json TEXT,
-              PRIMARY KEY(workspace_id, connector_key)
-            )
-            """,
-        ),
-        "calculated_fields": (
-            ["workspace_id", "field_key"],
-            """
-            CREATE TABLE calculated_fields (
-              field_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              table_key TEXT NOT NULL,
-              name TEXT NOT NULL,
-              mode TEXT NOT NULL,
-              formula_text TEXT NOT NULL,
-              formula_ast_json TEXT NOT NULL,
-              dependencies_json TEXT NOT NULL,
-              value_format TEXT NOT NULL,
-              description TEXT NOT NULL,
-              source TEXT NOT NULL,
-              enabled INTEGER NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              PRIMARY KEY(workspace_id, field_key)
-            )
-            """,
-        ),
-        "relationships": (
-            ["workspace_id", "relation_key"],
-            """
-            CREATE TABLE relationships (
-              relation_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              name TEXT NOT NULL,
-              left_table_key TEXT NOT NULL,
-              right_table_key TEXT NOT NULL,
-              left_field TEXT NOT NULL,
-              right_field TEXT NOT NULL,
-              mappings_json TEXT NOT NULL DEFAULT '[]',
-              filters_json TEXT NOT NULL DEFAULT '[]',
-              preaggregation_json TEXT NOT NULL DEFAULT '{}',
-              join_type TEXT NOT NULL,
-              confidence REAL NOT NULL,
-              validation_json TEXT NOT NULL DEFAULT '{}',
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL DEFAULT '',
-              PRIMARY KEY(workspace_id, relation_key)
-            )
-            """,
-        ),
-        "import_policies": (
-            ["workspace_id", "table_key"],
-            """
-            CREATE TABLE import_policies (
-              table_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              unique_fields_json TEXT NOT NULL,
-              conflict_rule TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              PRIMARY KEY(workspace_id, table_key)
-            )
-            """,
-        ),
-        "saved_views": (
-            ["workspace_id", "view_key"],
-            """
-            CREATE TABLE saved_views (
-              view_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL,
-              name TEXT NOT NULL,
-              tag_name TEXT NOT NULL,
-              table_key TEXT NOT NULL,
-              config_json TEXT NOT NULL,
-              is_default INTEGER NOT NULL,
-              sort_order INTEGER NOT NULL,
-              created_by TEXT NOT NULL,
-              agent_managed INTEGER NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              PRIMARY KEY(workspace_id, view_key)
-            )
-            """,
-        ),
-        "dashboards": (
-            ["workspace_id", "dashboard_key"],
-            """
-            CREATE TABLE dashboards (
-              dashboard_key TEXT NOT NULL,
-              name TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              default_table_key TEXT,
-              layout_json TEXT NOT NULL,
-              created_by TEXT NOT NULL,
-              agent_managed INTEGER NOT NULL,
-              created_at TEXT NOT NULL,
-              updated_at TEXT NOT NULL,
-              PRIMARY KEY(workspace_id, dashboard_key)
-            )
-            """,
-        ),
-        "dashboard_widgets": (
-            ["workspace_id", "widget_key"],
-            """
-            CREATE TABLE dashboard_widgets (
-              widget_key TEXT NOT NULL,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              dashboard_key TEXT NOT NULL,
-              widget_type TEXT NOT NULL,
-              title TEXT NOT NULL,
-              table_key TEXT,
-              config_json TEXT NOT NULL,
-              sort_order INTEGER NOT NULL,
-              PRIMARY KEY(workspace_id, widget_key)
-            )
-            """,
-        ),
-    }
-    for table_name, (pk_columns, create_sql) in desired_tables.items():
-        if primary_key_columns(connection, table_name) != pk_columns:
-            rebuild_table(connection, table_name, create_sql)
-    if not has_unique_index(connection, "field_semantics", ["workspace_id", "table_key", "field_name"]):
-        rebuild_table(
-            connection,
-            "field_semantics",
-            """
-            CREATE TABLE field_semantics (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              workspace_id TEXT NOT NULL DEFAULT 'default',
-              table_key TEXT NOT NULL,
-              field_name TEXT NOT NULL,
-              role TEXT NOT NULL,
-              usage TEXT NOT NULL,
-              confidence REAL NOT NULL,
-              tags_json TEXT NOT NULL DEFAULT '[]',
-              usage_json TEXT NOT NULL DEFAULT '{}',
-              source TEXT NOT NULL DEFAULT 'auto',
-              note TEXT NOT NULL DEFAULT '',
-              updated_at TEXT NOT NULL DEFAULT '',
-              UNIQUE(workspace_id, table_key, field_name)
-            )
-            """,
-        )
+        if name and not internal and name not in columns:
+            columns.append(name)
+    if not columns:
+        raise ValueError(f"Dataset schema has no public columns: {physical_table}")
+    return columns
 
 
 def physical_table_for_workspace(workspace_id: str, table_key: str) -> str:
@@ -396,24 +318,15 @@ def all_available_fields(connection: sqlite3.Connection, table_key: str | None =
 
 
 def open_db() -> sqlite3.Connection:
-    database_existed = DB_PATH.exists()
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(DB_PATH)
     connection.row_factory = sqlite3.Row
     try:
-        version = assert_sqlite_schema_compatible(connection)
-        existing_tables = int(connection.execute(
-            "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'"
-        ).fetchone()[0])
-        if database_existed and existing_tables and version < CURRENT_SQLITE_SCHEMA_VERSION:
-            raise RuntimeError(
-                f"AIBI-C metadata schema v{version} requires a guarded migration to "
-                f"v{CURRENT_SQLITE_SCHEMA_VERSION}. Stop local services, run `npm run migrate:local`, "
-                "review the preview, then rerun with `-- --confirm`."
-            )
-        assert_duckdb_schema_compatible()
-        ensure_schema(connection)
-        ensure_navigation_modules(connection)
+        version, has_user_tables = _control_database_state(connection)
+        if version == 0 and not has_user_tables:
+            initialize_schema(connection)
+        else:
+            assert_control_schema_invariants(connection)
     except Exception:
         connection.close()
         raise
@@ -436,8 +349,7 @@ def workspace_records(connection: sqlite3.Connection) -> list[dict[str, Any]]:
     return workspace_records_service(connection, rows_to_dicts=rows_to_dicts)
 
 
-def ensure_schema(connection: sqlite3.Connection) -> None:
-    previous_version = assert_sqlite_schema_compatible(connection)
+def _initialize_schema(connection: sqlite3.Connection) -> None:
     connection.executescript(
         """
         CREATE TABLE IF NOT EXISTS workspaces (
@@ -462,7 +374,36 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           created_at TEXT NOT NULL,
           data_version INTEGER NOT NULL DEFAULT 1,
           updated_at TEXT NOT NULL DEFAULT '',
+          active_version_id TEXT NOT NULL DEFAULT '',
+          schema_json TEXT NOT NULL DEFAULT '[]',
+          schema_fingerprint TEXT NOT NULL DEFAULT '',
+          content_fingerprint TEXT NOT NULL DEFAULT '',
           PRIMARY KEY(workspace_id, table_key)
+        );
+        CREATE TABLE IF NOT EXISTS dataset_versions (
+          version_id TEXT PRIMARY KEY,
+          workspace_id TEXT NOT NULL,
+          table_key TEXT NOT NULL,
+          row_count INTEGER NOT NULL,
+          column_count INTEGER NOT NULL,
+          schema_json TEXT NOT NULL,
+          schema_fingerprint TEXT NOT NULL,
+          content_fingerprint TEXT NOT NULL,
+          source_file TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          UNIQUE(workspace_id, table_key, content_fingerprint)
+        );
+        CREATE INDEX IF NOT EXISTS idx_dataset_versions_workspace_table_created
+          ON dataset_versions(workspace_id, table_key, created_at);
+        CREATE TABLE IF NOT EXISTS dataset_version_files (
+          version_id TEXT NOT NULL,
+          ordinal INTEGER NOT NULL,
+          object_key TEXT NOT NULL,
+          object_hash TEXT NOT NULL,
+          row_count INTEGER NOT NULL,
+          byte_size INTEGER NOT NULL,
+          PRIMARY KEY(version_id, ordinal),
+          FOREIGN KEY(version_id) REFERENCES dataset_versions(version_id) ON DELETE RESTRICT
         );
         CREATE TABLE IF NOT EXISTS navigation_modules (
           module_key TEXT NOT NULL,
@@ -500,6 +441,11 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           role TEXT NOT NULL,
           usage TEXT NOT NULL,
           confidence REAL NOT NULL,
+          tags_json TEXT NOT NULL DEFAULT '[]',
+          usage_json TEXT NOT NULL DEFAULT '{}',
+          source TEXT NOT NULL DEFAULT 'auto',
+          note TEXT NOT NULL DEFAULT '',
+          updated_at TEXT NOT NULL DEFAULT '',
           UNIQUE(workspace_id, table_key, field_name)
         );
         CREATE TABLE IF NOT EXISTS metric_definitions (
@@ -513,6 +459,15 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           time_field TEXT,
           value_format TEXT NOT NULL,
           created_at TEXT NOT NULL,
+          filters_json TEXT NOT NULL DEFAULT '[]',
+          description TEXT NOT NULL DEFAULT '',
+          source TEXT NOT NULL DEFAULT 'auto',
+          enabled INTEGER NOT NULL DEFAULT 1,
+          updated_at TEXT NOT NULL DEFAULT '',
+          formula_text TEXT NOT NULL DEFAULT '',
+          formula_ast_json TEXT NOT NULL DEFAULT '{}',
+          dependencies_json TEXT NOT NULL DEFAULT '[]',
+          metric_type TEXT NOT NULL DEFAULT 'basic',
           PRIMARY KEY(workspace_id, metric_key)
         );
         CREATE TABLE IF NOT EXISTS calculated_fields (
@@ -1061,6 +1016,7 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           parent_job_key TEXT,
           kind TEXT NOT NULL,
           capability_id TEXT NOT NULL DEFAULT '',
+          request_key TEXT NOT NULL DEFAULT '',
           label TEXT NOT NULL,
           status TEXT NOT NULL,
           progress INTEGER NOT NULL,
@@ -1102,6 +1058,56 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
           ON analysis_job_events(workspace_id, event_sequence);
         CREATE INDEX IF NOT EXISTS idx_analysis_job_events_job_sequence
           ON analysis_job_events(workspace_id, job_key, event_sequence);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_jobs_workspace_kind_request
+          ON analysis_jobs(workspace_id, kind, request_key)
+          WHERE request_key <> '';
+        CREATE TABLE IF NOT EXISTS source_activation_journals (
+          journal_key TEXT NOT NULL,
+          workspace_id TEXT NOT NULL,
+          job_key TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          plan_fingerprint TEXT NOT NULL,
+          parent_source_run_id TEXT,
+          target_source_run_id TEXT,
+          table_keys_json TEXT NOT NULL,
+          expected_manifest_json TEXT NOT NULL,
+          rollback_manifest_json TEXT NOT NULL,
+          outcome TEXT NOT NULL,
+          warning_json TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          finalized_at TEXT,
+          PRIMARY KEY(workspace_id, journal_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_source_activation_workspace_phase
+          ON source_activation_journals(workspace_id, phase, updated_at);
+        CREATE INDEX IF NOT EXISTS idx_source_activation_workspace_job
+          ON source_activation_journals(workspace_id, job_key, created_at);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_source_activation_one_active_workspace
+          ON source_activation_journals(workspace_id)
+          WHERE phase <> 'finalized';
+        CREATE TABLE IF NOT EXISTS import_workspace_leases (
+          workspace_id TEXT PRIMARY KEY,
+          job_key TEXT NOT NULL UNIQUE,
+          lease_token TEXT NOT NULL DEFAULT '',
+          lease_epoch INTEGER NOT NULL DEFAULT 0,
+          active INTEGER NOT NULL DEFAULT 1,
+          acquired_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          released_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS source_activation_journal_events (
+          event_sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+          workspace_id TEXT NOT NULL,
+          journal_key TEXT NOT NULL,
+          job_key TEXT NOT NULL,
+          phase TEXT NOT NULL,
+          event_type TEXT NOT NULL,
+          payload_json TEXT NOT NULL,
+          created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_source_activation_events_journal
+          ON source_activation_journal_events(workspace_id, journal_key, event_sequence);
         CREATE TABLE IF NOT EXISTS agent_sessions (
           session_key TEXT PRIMARY KEY,
           workspace_id TEXT NOT NULL,
@@ -1332,114 +1338,40 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     )
     connection.execute(
         """
-        UPDATE workspaces
-        SET name = 'AIBI-C 工作区'
-        WHERE id = 'default' AND name IN ('AIBI Hybrid Workspace', 'AIBI 工作区')
-        """
-    )
-    connection.execute(
-        """
-        INSERT OR IGNORE INTO confirmed_plan_memories(
-          memory_key, workspace_id, query_key, query_receipt_key, question, status,
-          plan_json, signature_json, binding_fingerprint, evidence_json,
-          created_at, updated_at, confirmed_at, stale_reason
-        )
-        SELECT
-          'plan_memory_' || substr(query_key, 17), q.workspace_id, q.query_key,
-          q.query_receipt_key, q.question, q.status, r.plan_json, '{}',
-          q.schema_fingerprint, q.evidence_json, q.created_at, q.updated_at,
-          q.confirmed_at, q.stale_reason
-        FROM confirmed_queries AS q
-        JOIN query_plan_receipts AS r
-          ON r.workspace_id = q.workspace_id AND r.receipt_key = q.query_receipt_key
-        WHERE q.status IN ('confirmed', 'stale')
-           OR (q.status = 'deprecated' AND q.confirmed_at IS NOT NULL)
-        """
-    )
-    connection.execute(
-        """
         INSERT OR IGNORE INTO system_flags(key, value, updated_at)
         VALUES('active_workspace_id', 'default', ?)
         """,
         (now_iso(),),
     )
-    connection.execute(
-        """
-        UPDATE action_drafts
-        SET status = 'read-only-legacy'
-        WHERE kind = 'analysis.plan' AND status = 'draft'
-        """
-    )
-    ensure_column(connection, "field_semantics", "tags_json", "TEXT NOT NULL DEFAULT '[]'")
-    ensure_column(connection, "table_registry", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "table_registry", "data_version", "INTEGER NOT NULL DEFAULT 1")
-    ensure_column(connection, "table_registry", "updated_at", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "field_semantics", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "field_semantics", "usage_json", "TEXT NOT NULL DEFAULT '{}'")
-    ensure_column(connection, "field_semantics", "source", "TEXT NOT NULL DEFAULT 'auto'")
-    ensure_column(connection, "field_semantics", "note", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "field_semantics", "updated_at", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "metric_definitions", "filters_json", "TEXT NOT NULL DEFAULT '[]'")
-    ensure_column(connection, "metric_definitions", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "metric_definitions", "description", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "metric_definitions", "source", "TEXT NOT NULL DEFAULT 'auto'")
-    ensure_column(connection, "metric_definitions", "enabled", "INTEGER NOT NULL DEFAULT 1")
-    ensure_column(connection, "metric_definitions", "updated_at", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "metric_definitions", "formula_text", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "metric_definitions", "formula_ast_json", "TEXT NOT NULL DEFAULT '{}'")
-    ensure_column(connection, "metric_definitions", "dependencies_json", "TEXT NOT NULL DEFAULT '[]'")
-    ensure_column(connection, "metric_definitions", "metric_type", "TEXT NOT NULL DEFAULT 'basic'")
-    ensure_column(connection, "calculated_fields", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "relationships", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "relationships", "mappings_json", "TEXT NOT NULL DEFAULT '[]'")
-    ensure_column(connection, "relationships", "filters_json", "TEXT NOT NULL DEFAULT '[]'")
-    ensure_column(connection, "relationships", "preaggregation_json", "TEXT NOT NULL DEFAULT '{}'")
-    ensure_column(connection, "relationships", "validation_json", "TEXT NOT NULL DEFAULT '{}'")
-    ensure_column(connection, "relationships", "updated_at", "TEXT NOT NULL DEFAULT ''")
-    ensure_column(connection, "navigation_modules", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "dashboards", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "dashboard_widgets", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "import_jobs", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "import_policies", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    connector_workspace_missing = "workspace_id" not in table_columns(connection, "data_connectors")
-    ensure_column(connection, "data_connectors", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    if connector_workspace_missing:
-        connection.execute("UPDATE data_connectors SET workspace_id = ?", (active_workspace_id(connection),))
-    ensure_column(connection, "action_drafts", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "source_intelligence_runs", "workspace_id", "TEXT NOT NULL DEFAULT 'default'")
-    ensure_column(connection, "analysis_jobs", "capability_id", "TEXT NOT NULL DEFAULT ''")
-    ensure_activation_journal_schema(connection)
     ensure_reviewed_publication_schema(connection)
     ensure_evidence_retrieval_schema(connection)
     ensure_decision_framework_schema(connection)
     connection.executescript(SQLSERVER_SNAPSHOT_METADATA_DDL)
-    ensure_column(connection, "metric_monitors", "semantic_fingerprint", "TEXT NOT NULL DEFAULT ''")
-    migrate_workspace_scoped_constraints(connection)
-    for relationship in connection.execute(
-        """
-        SELECT workspace_id, relation_key, left_field, right_field
-        FROM relationships
-        WHERE mappings_json IS NULL OR mappings_json = '' OR mappings_json = '[]'
-        """
-    ).fetchall():
-        connection.execute(
-            "UPDATE relationships SET mappings_json = ? WHERE workspace_id = ? AND relation_key = ?",
-            (
-                json.dumps(
-                    [{"leftField": str(relationship["left_field"]), "rightField": str(relationship["right_field"])}],
-                    ensure_ascii=False,
-                ),
-                relationship["workspace_id"],
-                relationship["relation_key"],
-            ),
-        )
-    connection.execute("UPDATE relationships SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''")
-    connection.execute("UPDATE table_registry SET data_version = 1 WHERE data_version IS NULL OR data_version < 1")
-    connection.execute("UPDATE table_registry SET updated_at = created_at WHERE updated_at IS NULL OR updated_at = ''")
     ensure_default_preferences_and_themes(connection)
-    if previous_version < CURRENT_SQLITE_SCHEMA_VERSION:
-        connection.execute(f"PRAGMA user_version = {CURRENT_SQLITE_SCHEMA_VERSION}")
+    connection.execute(f"PRAGMA user_version = {CURRENT_SQLITE_SCHEMA_VERSION}")
     connection.commit()
+
+
+def initialize_schema(connection: sqlite3.Connection) -> None:
+    """Initialize a clean v18 control database; never migrate a populated file."""
+    version, has_user_tables = _control_database_state(connection)
+    if version != 0 or has_user_tables:
+        raise RuntimeError(
+            "AIBI-C control schema initialization requires an empty database; "
+            "legacy and partial files are not migrated."
+        )
+    _initialize_schema(connection)
+    assert_control_schema_invariants(connection)
+
+
+def ensure_schema(connection: sqlite3.Connection) -> None:
+    """Compatibility name for explicit fixtures, with no populated-file repair."""
+    version, has_user_tables = _control_database_state(connection)
+    if version == 0 and not has_user_tables:
+        _initialize_schema(connection)
+        assert_control_schema_invariants(connection)
+        return
+    assert_control_schema_invariants(connection)
 
 
 def normalize_user_preferences(value: Any) -> dict[str, Any]:

@@ -14,7 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
 if str(TOOLS) not in sys.path:
     sys.path.insert(0, str(TOOLS))
-from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
+from query_runtime_test_support import (  # noqa: E402
+    FixtureTable,
+    publish_fixture_tables_to_duckdb,
+)
 
 
 checks: list[dict[str, object]] = []
@@ -26,21 +29,34 @@ def check(label: str, ok: bool, detail: object = "") -> None:
     checks.append({"label": label, "ok": bool(ok), "detail": "" if ok else detail})
 
 
-def setup_query_fixture(connection: sqlite3.Connection) -> None:
+def setup_query_fixture(connection: sqlite3.Connection, duckdb_path: Path) -> None:
     from bi_cli_schema import ensure_schema
 
     ensure_schema(connection)
-    connection.execute('CREATE TABLE "fixture_orders" ("style_spu" TEXT, "merchant_sku" TEXT, "sales_amount" TEXT, "channel" TEXT, "paid_at" TEXT)')
     rows = [
-        (f"SPU-{index:02d}", f"SKU-{index:02d}-M", str(1300 - index * 70), "抖音" if index <= 10 else "天猫", f"2026-05-{index:02d} 12:00:00")
+        (f"SPU-{index:02d}", f"SKU-{index:02d}-M", float(1300 - index * 70), "抖音" if index <= 10 else "天猫", f"2026-05-{index:02d} 12:00:00")
         for index in range(1, 13)
     ]
-    connection.executemany('INSERT INTO "fixture_orders" VALUES(?, ?, ?, ?, ?)', rows)
     connection.execute(
         """
-        INSERT INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at)
-        VALUES('orders', 'default', '订单', 'fixture_orders', 'fixture.csv', 12, 5, '2026-07-19', 1, '2026-07-19')
+        INSERT INTO table_registry(
+          table_key, workspace_id, display_name, physical_table, source_file,
+          row_count, column_count, created_at, data_version, updated_at
+        ) VALUES('orders', 'default', '订单', 'fixture_orders', 'typed-fixture', 12, 5, '2026-07-19', 1, '2026-07-19')
         """
+    )
+    publish_fixture_tables_to_duckdb(
+        connection,
+        duckdb_path,
+        [FixtureTable(
+            workspace_id="default",
+            table_key="orders",
+            physical_table="fixture_orders",
+            columns=(("style_spu", "VARCHAR"), ("merchant_sku", "VARCHAR"), ("sales_amount", "DOUBLE"), ("channel", "VARCHAR"), ("paid_at", "TIMESTAMP")),
+            rows=tuple(rows),
+            display_name="订单",
+            source_file="typed-fixture",
+        )],
     )
     for field, role in (
         ("style_spu", "identity_key"),
@@ -101,9 +117,11 @@ def typed_intent(
 
 with tempfile.TemporaryDirectory(prefix="query-", dir=TEST_TMP_ROOT) as temp_dir:
     metadata_path = Path(temp_dir) / "trusted.sqlite"
+    query_duckdb_path = Path(temp_dir) / "trusted.duckdb"
+    os.environ["AIBI_DATASET_OBJECT_ROOT"] = str(Path(temp_dir) / "trusted-dataset-objects-v2")
     connection = sqlite3.connect(metadata_path)
     connection.row_factory = sqlite3.Row
-    setup_query_fixture(connection)
+    setup_query_fixture(connection, query_duckdb_path)
 
     ranking_intent = typed_intent(
         connection,
@@ -125,8 +143,6 @@ with tempfile.TemporaryDirectory(prefix="query-", dir=TEST_TMP_ROOT) as temp_dir
     from apparel_analytics_service import execute_apparel_method
 
     registry = connection.execute("SELECT * FROM table_registry WHERE workspace_id = 'default' AND table_key = 'orders'").fetchone()
-    query_duckdb_path = Path(temp_dir) / "trusted.duckdb"
-    publish_sqlite_fixture_to_duckdb(connection, query_duckdb_path)
     ranking_result = execute_apparel_method(connection, registry=registry, columns=["style_spu", "merchant_sku", "sales_amount", "channel", "paid_at"], query_intent=ranking_intent, duckdb_path=query_duckdb_path)
     check("ranking-executes-with-stable-key-and-tie-rule", bool(ranking_result and ranking_result["executed"] and ranking_result["rows"][0]["businessKey"] and ranking_result["evidence"]["tieRule"]), ranking_result)
     check("filter-and-time-are-pushed-to-sql", "channel" in ranking_result["runtime"]["compiledSql"] and "paid_at" in ranking_result["runtime"]["compiledSql"], ranking_result["runtime"])
@@ -168,28 +184,31 @@ with tempfile.TemporaryDirectory(prefix="import-", dir=TEST_TMP_ROOT) as temp_di
     (source_dir / "orders-2026-06.csv").write_text("order_id,amount\nA-2,25\nA-3,30\n", encoding="utf-8")
     os.environ["AIBI_HYBRID_DB_PATH"] = str(root / "atomic.sqlite")
     os.environ["AIBI_HYBRID_DUCKDB_PATH"] = str(root / "atomic.duckdb")
+    os.environ["AIBI_IMPORT_STAGE_ROOT"] = str(root / "import-staging-v2")
 
     # The query fixture imported schema modules already, so exercise the atomic
     # planner directly here and verify the commit boundary through its canonical
     # plan material. CLI end-to-end coverage runs in the repository gate below.
     from atomic_import_plan_service import enrich_atomic_import_plan
-    from bi_cli_io_services import read_table_file
+    from import_stage_service import create_import_stage
 
     base_items = []
     for path in sorted(source_dir.glob("*.csv")):
-        headers, rows = read_table_file(path)
+        import_stage = create_import_stage(source_path=path, workspace_id="default")
+        headers = [str(field["name"]) for field in import_stage["schemaFields"]]
         base_items.append({
             "file": path.name,
             "absolutePath": str(path),
             "tableKey": "orders",
             "displayName": "orders",
             "mode": "create" if not base_items else "merge",
-            "rowCount": len(rows),
+            "rowCount": int(import_stage["rowCount"]),
             "columnCount": len(headers),
             "uniqueFields": ["order_id"],
             "keyAuthority": "owner_confirmed",
             "_preview": {
                 "profile": {"fields": []},
+                "importStage": import_stage,
                 "uniqueKeyQuality": {"emptyKeyRows": 0, "partialEmptyKeyRows": 0, "duplicateRowsInFile": 0},
                 "mergePolicyPreview": {"conflictRule": "overwrite", "savedPolicy": {"uniqueFields": ["order_id"]}},
             },
@@ -198,6 +217,7 @@ with tempfile.TemporaryDirectory(prefix="import-", dir=TEST_TMP_ROOT) as temp_di
         "ok": True,
         "dryRun": True,
         "requiresConfirmation": False,
+        "workspaceId": "default",
         "path": str(source_dir),
         "fileCount": 2,
         "tableCount": 1,
@@ -215,13 +235,19 @@ with tempfile.TemporaryDirectory(prefix="import-", dir=TEST_TMP_ROOT) as temp_di
         }],
         "willWrite": False,
     }
-    atomic_plan = enrich_atomic_import_plan(base_plan, read_table_file=read_table_file, current_source_run_id="parent-run")
+    atomic_plan = enrich_atomic_import_plan(base_plan, current_source_run_id="parent-run")
     check("atomic-plan-is-owner-confirmed-and-committable", atomic_plan["readyToCommit"] and atomic_plan["groups"][0]["keyDecision"]["authority"] == "owner_confirmed", atomic_plan["blockers"])
     check("atomic-plan-captures-cross-file-duplicates", atomic_plan["groups"][0]["crossFileKeyQuality"]["duplicateRowsAcrossFiles"] == 1, atomic_plan["groups"][0]["crossFileKeyQuality"])
     old_fingerprint = atomic_plan["planFingerprint"]
     (source_dir / "orders-2026-06.csv").write_text("order_id,amount\nA-2,25\nA-3,31\n", encoding="utf-8")
-    changed_plan = enrich_atomic_import_plan(base_plan, read_table_file=read_table_file, current_source_run_id="parent-run")
-    check("content-change-invalidates-plan-fingerprint", changed_plan["planFingerprint"] != old_fingerprint, {"before": old_fingerprint, "after": changed_plan["planFingerprint"]})
+    bound_plan = enrich_atomic_import_plan(base_plan, current_source_run_id="parent-run")
+    check("sealed-stage-keeps-bound-plan-stable-after-source-change", bound_plan["planFingerprint"] == old_fingerprint, {"before": old_fingerprint, "after": bound_plan["planFingerprint"]})
+    base_items[1]["_preview"]["importStage"] = create_import_stage(
+        source_path=source_dir / "orders-2026-06.csv",
+        workspace_id="default",
+    )
+    changed_plan = enrich_atomic_import_plan(base_plan, current_source_run_id="parent-run")
+    check("restaged-content-invalidates-plan-fingerprint", changed_plan["planFingerprint"] != old_fingerprint, {"before": old_fingerprint, "after": changed_plan["planFingerprint"]})
 
     cli_env = os.environ.copy()
     cli_env["AIBI_HYBRID_DB_PATH"] = str(root / "cli-atomic.sqlite")
@@ -301,36 +327,56 @@ with tempfile.TemporaryDirectory(prefix="proof-", dir=TEST_TMP_ROOT) as temp_dir
     proof_connection = sqlite3.connect(Path(temp_dir) / "proof.sqlite")
     proof_connection.row_factory = sqlite3.Row
     ensure_schema(proof_connection)
+    proof_duckdb_path = Path(temp_dir) / "proof.duckdb"
+    os.environ["AIBI_DATASET_OBJECT_ROOT"] = str(Path(temp_dir) / "proof-dataset-objects-v2")
     proof_connection.execute(
         "INSERT INTO workspace_domain_packs(workspace_id, pack_id, version, enabled, enabled_at, updated_at) "
         "VALUES('default', 'platform-commerce', '1.0.0', 1, '2026-07-19', '2026-07-19')"
     )
     for table_key in ("orders", "inventory"):
-        physical = f"proof_{table_key}"
-        proof_connection.execute(f'CREATE TABLE "{physical}" ("style_spu" TEXT, "shop" TEXT, "event_at" TEXT)')
-        proof_connection.executemany(f'INSERT INTO "{physical}" VALUES(?, ?, ?)', [("SPU-1", "抖音", "2026-05-01"), ("SPU-2", "抖音", "2026-05-02")])
         proof_connection.execute(
-            "INSERT INTO table_registry(table_key, workspace_id, display_name, physical_table, source_file, row_count, column_count, created_at, data_version, updated_at) VALUES(?, 'default', ?, ?, 'fixture', 2, 3, '2026-07-19', 1, '2026-07-19')",
-            (table_key, table_key, physical),
+            """
+            INSERT INTO table_registry(
+              table_key, workspace_id, display_name, physical_table, source_file,
+              row_count, column_count, created_at, data_version, updated_at
+            ) VALUES(?, 'default', ?, ?, 'typed-fixture', 2, 3, '2026-07-19', 1, '2026-07-19')
+            """,
+            (table_key, table_key, f"proof_{table_key}"),
         )
+    publish_fixture_tables_to_duckdb(
+        proof_connection,
+        proof_duckdb_path,
+        [
+            FixtureTable(
+                workspace_id="default",
+                table_key=table_key,
+                physical_table=f"proof_{table_key}",
+                columns=(("style_spu", "VARCHAR"), ("shop", "VARCHAR"), ("event_at", "DATE")),
+                rows=(("SPU-1", "抖音", "2026-05-01"), ("SPU-2", "抖音", "2026-05-02")),
+                display_name=table_key,
+            )
+            for table_key in ("orders", "inventory")
+        ],
+    )
+    for table_key in ("orders", "inventory"):
         proof_connection.execute("INSERT INTO field_semantics(workspace_id, table_key, field_name, role, usage, confidence) VALUES('default', ?, 'event_at', 'event_time', 'verified', 1)", (table_key,))
     proof_connection.execute("INSERT INTO source_runs(id, workspace_id, table_key, name, status, source_file, row_count, column_count, profile_json, evidence_json, created_at) VALUES('proof-batch', 'default', '__batch__', 'proof', 'ready', 'fixture', 4, 6, '{}', '[]', '2026-07-19')")
     for table_key in ("orders", "inventory"):
         proof_connection.execute("INSERT INTO source_run_tables(source_run_id, workspace_id, table_key, data_version, row_count, created_at) VALUES('proof-batch', 'default', ?, 1, 2, '2026-07-19')", (table_key,))
     proof_connection.execute("UPDATE workspaces SET current_source_run_id = 'proof-batch' WHERE id = 'default'")
-    proof_duckdb_path = Path(temp_dir) / "proof.duckdb"
-    publish_sqlite_fixture_to_duckdb(proof_connection, proof_duckdb_path)
-    relationship_preview = build_relationship_preview(
-        proof_connection,
-        "proof_orders",
-        "proof_inventory",
-        ["style_spu", "shop", "event_at"],
-        ["style_spu", "shop", "event_at"],
-        [{"leftField": "style_spu", "rightField": "style_spu"}],
-        join_type="left",
-        sample_limit=5,
-        quote_identifier=quote_identifier,
-    )
+    import duckdb  # type: ignore
+    with duckdb.connect(str(proof_duckdb_path), read_only=True) as proof_query:
+        relationship_preview = build_relationship_preview(
+            proof_query,
+            "proof_orders",
+            "proof_inventory",
+            ["style_spu", "shop", "event_at"],
+            ["style_spu", "shop", "event_at"],
+            [{"leftField": "style_spu", "rightField": "style_spu"}],
+            join_type="left",
+            sample_limit=5,
+            quote_identifier=quote_identifier,
+        )
     proof = build_apparel_entity_mapping_proof(
         proof_connection,
         workspace_id="default",

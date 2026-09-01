@@ -11,7 +11,7 @@
 完成后，用户应获得以下结果：
 
 1. 大文件或文件夹导入成为可查询、可取消、可恢复、可核对的持久任务。
-2. SQLite 控制面与 DuckDB 分析副本在公式、关系和查询语义上有可重复的等价性门禁。
+2. SQLite 元数据控制面、Parquet 数据版本与 DuckDB 目录视图在公式、关系和查询语义上有可重复的等价性门禁。
 3. 危险写入前可以创建、验证和恢复工作区恢复点，而不是只依赖隐藏备份文件。
 4. 跨 SQLite、DuckDB 和文件 manifest 的来源激活具备明确阶段、崩溃对账和单写者约束。
 5. 经人工审核的计划或决策制品能证明其证据链未被篡改，并能解释输入为何已经漂移。
@@ -33,7 +33,7 @@
 ### 2.2 产品与数据不变量
 
 - SQLite 继续保存控制面、元数据、Job、审核状态和幂等回执。
-- DuckDB 继续保存版本化分析副本；不迁移成“全工作区 DuckDB”，不引入长期双写或隐式 SQLite 回退。
+- 业务事实只保存为内容寻址 Parquet 版本，DuckDB 维护版本化目录视图；SQLite 不保存业务行，不引入长期双写或隐式回退。
 - 每个写动作只能通过一个确认面进入单写者队列；重复点击和响应丢失不得重复提交。
 - 任何任务、恢复点、连接器、证据和决策制品都必须绑定 `workspaceId`。
 - 原始业务行、密码、连接串、访问令牌、绝对路径和未脱敏自由文本不得进入 Provider、Trace、公开 Receipt 或 Git。
@@ -78,12 +78,12 @@ flowchart LR
 | --- | --- |
 | `aibi-import-job/v1` | 文件/文件夹导入任务、阶段、进度、取消与结果 |
 | `aibi-source-activation-journal/v1` | 跨存储发布阶段、回滚材料和恢复结果 |
-| `aibi-workspace-recovery-point/v1` | 工作区恢复点清单、完整性和生命周期 |
+| `aibi-workspace-recovery-point/v2` | 工作区恢复点清单、完整性和生命周期 |
 | `aibi-reviewed-publication/v1` | 经审核制品的内容、输入合同和漂移状态 |
 | `aibi-evidence-ledger/v1` | 追加式证据条目及前序哈希 |
 | `aibi-decision-framework/v1` | 证据绑定的 SWOT 或流程图制品 |
 | `aibi-evidence-retrieval-receipt/v1` | 召回通道、分数、降级原因和语料指纹 |
-| `aibi-sqlserver-snapshot-plan/v1` | SQL Server 目录选择、边界、水位线和快照计划 |
+| `aibi-sqlserver-snapshot-plan/v2` | SQL Server 目录选择、边界、水位线和有界批量 typed Parquet 快照计划 |
 
 所有公共对象都包含 `schema`、`workspaceId`、自身 key、`createdAt` 或 `updatedAt`、输入/内容指纹和适用状态。前端类型不得在 `server/` 中反向导入。
 
@@ -121,7 +121,7 @@ flowchart LR
 
 #### 用户结果
 
-同一已确认来源版本，无论数据由 SQLite 写入路径还是 DuckDB 分析副本读取，关键经营结果和 Receipt 绑定保持一致。
+同一已确认来源版本从 typed Parquet 发布到 DuckDB 目录视图后，关键经营结果与 Receipt 版本绑定必须保持一致。
 
 #### 实现范围
 
@@ -233,7 +233,7 @@ prepared
 
 - `prepared` 保存旧/新来源版本、目标表、计划指纹、回滚材料和预期 DuckDB manifest。
 - `commit_started` 之后禁止另一个同工作区激活进入写区。
-- `replica_published` 证明新分析副本已完整校验，但尚不代表 current 已切换。
+- `replica_published` 是内部历史 phase 名，证明新数据集目录视图已完整校验，但尚不代表 active pointer 已切换。
 - `source_selection_committed` 证明 SQLite current 指针已提交。
 - `finalized` 清理暂存与旧 journal；清理失败只产生 maintenance warning，不改变提交事实。
 
@@ -461,7 +461,7 @@ Capability Contract、调用者边界和 mutation runtime token 必须先于 han
 
 - W0–W6 全部实现并通过专项门禁；W7 至少完成接口、隐私门禁、离线评测和安全降级，只有达到质量门槛才允许默认之外的显式启用。
 - 生产 API 不为新增长任务创建无约束同步写流程；所有写入仍进入唯一单写者边界。
-- SQLite 控制面与 DuckDB 分析副本职责不变，没有长期双写和隐式 engine fallback。
+- SQLite 元数据控制面、Parquet 业务事实与 DuckDB 目录视图职责固定，没有业务行双写和隐式 engine fallback。
 - UI 保持一个当前主任务，高级功能惰性加载，720 像素短边验收通过。
 - `docs/implementation-status.md` 只记录实际交付能力和仍存在的限制；本文完成项不再在路线图重复维护。
 - 工作树经过主审查者确认，完整验证通过，最终只在 `main` 集成；不保留临时分支、额外 worktree、真实用户数据、日志或测试数据库。

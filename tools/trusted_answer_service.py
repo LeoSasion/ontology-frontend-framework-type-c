@@ -8,7 +8,8 @@ from bi_cli_core import DUCKDB_PATH
 from bi_cli_schema import active_workspace_id, table_columns
 from bi_cli_source_commands import resolve_table_registry
 from apparel_analytics_service import execute_apparel_method
-from query_runtime import quote_identifier, run_duckdb_aggregate_query
+from dataset_version_store import schema_field_types
+from query_runtime import quote_identifier, replica_source_version, run_duckdb_aggregate_query
 from trusted_query_service import build_execution_coverage, build_trusted_query_intent, trusted_result_state
 
 
@@ -132,7 +133,7 @@ def _answer_table_columns(
     ).fetchone()
     if not registry:
         return None, []
-    columns = [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(registry['physical_table'])})")]
+    columns = table_columns(connection, str(registry["physical_table"]))
     return registry, columns
 
 
@@ -165,8 +166,12 @@ def _safe_answer_aggregate(
         aggregation=aggregation,
         limit=limit,
         filters=filters,
-        source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
+        source_version=replica_source_version(registry),
+        version_id=str(registry["active_version_id"]),
+        content_fingerprint=str(registry["content_fingerprint"]),
+        schema_fingerprint=str(registry["schema_fingerprint"]),
         expected_row_count=int(registry["row_count"] or 0),
+        field_types=schema_field_types(registry["schema_json"]),
     )
     fallback_reason = None
     rows = runtime.pop("rows")

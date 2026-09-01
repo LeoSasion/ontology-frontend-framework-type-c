@@ -141,7 +141,7 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
         "--yes",
     )
     check(
-        "legacy-confirmed-retry-replays-the-same-durable-job",
+        "confirmed-retry-replays-the-same-durable-job",
         replayed.get("durableJob", {}).get("jobKey") == committed.get("durableJob", {}).get("jobKey")
         and replayed.get("activationJournalKey") == committed.get("activationJournalKey"),
         {
@@ -158,10 +158,10 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     second_runtime = (second_query.get("query") or {}).get("runtime") or {}
     check(
         "durable-activation-publishes-and-read-query-reuses-version",
-        first_runtime.get("replicaStatus") == "current"
-        and int(first_runtime.get("syncedRows") or 0) == 0
-        and second_runtime.get("replicaStatus") == "current"
-        and int(second_runtime.get("syncedRows") or 0) == 0
+        first_runtime.get("catalogStatus") == "current"
+        and int(first_runtime.get("datasetRowCount") or 0) > 0
+        and second_runtime.get("catalogStatus") == "current"
+        and int(second_runtime.get("datasetRowCount") or 0) > 0
         and first_runtime.get("sourceVersion") == second_runtime.get("sourceVersion"),
         {"first": first_runtime, "second": second_runtime},
     )
@@ -178,12 +178,12 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
     third_query = cli(env, *query_args)
     third_runtime = (third_query.get("query") or {}).get("runtime") or {}
     check(
-        "new-data-version-atomically-publishes-new-replica",
+        "new-data-version-atomically-publishes-new-catalog-view",
         (replaced.get("result") or {}).get("dataVersion") == 2
         and bool(replaced.get("activationJournalKey"))
         and replaced.get("durableJob", {}).get("status") == "succeeded"
-        and third_runtime.get("replicaStatus") == "current"
-        and int(third_runtime.get("syncedRows") or 0) == 0
+        and third_runtime.get("catalogStatus") == "current"
+        and int(third_runtime.get("datasetRowCount") or 0) > 0
         and third_runtime.get("sourceVersion") != second_runtime.get("sourceVersion"),
         {"replace": replaced, "runtime": third_runtime},
     )
@@ -196,15 +196,17 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
                 "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '__aibi_replica_manifest'"
             ).fetchone()[0]
             if manifest_exists:
-                manifest_rows = connection.execute("SELECT logical_table, source_version, replica_table FROM __aibi_replica_manifest").fetchall()
+                manifest_rows = connection.execute(
+                    "SELECT logical_table, source_version, version_id FROM __aibi_replica_manifest"
+                ).fetchall()
                 current_relation = connection.execute(
                     "SELECT table_type FROM information_schema.tables WHERE table_name = ?",
                     [str(manifest_rows[0][0]) if manifest_rows else ""],
                 ).fetchone()
     check(
-        "duckdb-manifest-points-at-versioned-physical-copy",
+        "duckdb-manifest-points-at-versioned-parquet-view",
         len(manifest_rows) == 1
-        and str(manifest_rows[0][2]).startswith("__aibi_replica_")
+        and bool(str(manifest_rows[0][2]))
         and current_relation is not None
         and str(current_relation[0]) == "VIEW",
         {"manifest": manifest_rows, "relation": current_relation, "duckdbExists": duck_path.is_file(), "runtime": third_runtime},
@@ -234,11 +236,11 @@ with tempfile.TemporaryDirectory(prefix="aibi-runtime-hardening-") as temp_name:
                 [str(manifest_rows[0][0]) if manifest_rows else ""],
             ).fetchall()
             remaining_manifest = connection.execute(
-                "SELECT logical_table, replica_table FROM __aibi_replica_manifest WHERE logical_table = ?",
+                "SELECT logical_table, version_id FROM __aibi_replica_manifest WHERE logical_table = ?",
                 [str(manifest_rows[0][0]) if manifest_rows else ""],
             ).fetchall()
     check(
-        "workspace-delete-removes-logical-view-and-versioned-replica",
+        "workspace-delete-removes-logical-view-and-dataset-binding",
         selected_default.get("workspace", {}).get("id") == "default"
         and deleted_workspace.get("confirmed") is True
         and not remaining_manifest

@@ -93,7 +93,9 @@ def main() -> None:
                 "sealed-stage-is-independent-from-later-source-changes",
                 headers == ["id", "amount"]
                 and staged_rows == [{"id": "1", "amount": "10"}, {"id": "2", "amount": "20"}]
-                and staged_profile == profile
+                and staged_profile.get("rowCount") == profile["rowCount"]
+                and staged_profile.get("columnCount") == profile["columnCount"]
+                and [item.get("field") for item in staged_profile.get("fields") or []] == ["id", "amount"]
                 and replay_summary["contentFingerprint"] == stage["contentFingerprint"],
                 staged_rows,
             )
@@ -146,9 +148,8 @@ def main() -> None:
             )[1]
             check(checks, "already-bound-job-can-still-read-an-expired-stage", expired_rows == [{"id": "1"}], expired_rows)
 
-            bucket = next(path for path in stage_root.iterdir() if path.is_dir())
-            database = bucket / f"{stage['stageKey']}.sqlite"
-            with database.open("ab") as stream:
+            parquet = next(stage_root.rglob(f"{stage['stageKey']}/data.parquet"))
+            with parquet.open("ab") as stream:
                 stream.write(b"tamper")
             tamper_blocked = False
             try:
@@ -188,7 +189,7 @@ def main() -> None:
                 expanded_quota_blocked = "quota" in str(error).lower()
             check(
                 checks,
-                "stage-quota-covers-expanded-sqlite-size-and-cleans-temporaries",
+                "stage-quota-covers-expanded-parquet-size-and-cleans-temporaries",
                 expanded_quota_blocked and not list(stage_root.rglob("*.tmp")),
                 list(stage_root.rglob("*.tmp")),
             )

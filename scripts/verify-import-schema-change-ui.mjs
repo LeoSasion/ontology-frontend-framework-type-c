@@ -65,10 +65,18 @@ const checks = [
     ok: panel.includes('preview.blockers?.includes("merge-schema-mismatch")')
       && panel.includes("preview.readyToCommit === false")
       && panel.includes("字段不同，不能合并")
-      && panel.includes("if (mergeSchemaBlocked) setRulesOpen(true)")
+      && panel.includes("if (mergeSchemaBlocked || mergeTargetMissingBlocked) setRulesOpen(true)")
       && panel.includes('data-testid="import-switch-replace-and-recheck"')
       && panel.includes('runImportPreviewAction("replace")')
       && controller.includes("preview.readyToCommit !== false"),
+  },
+  {
+    label: "missing-merge-target-offers-create-recovery-without-silent-mode-change",
+    ok: panel.includes('preview.blockers?.includes("merge-target-missing")')
+      && panel.includes('data-testid="import-switch-create-and-recheck"')
+      && panel.includes('runImportPreviewAction("create")')
+      && panel.includes("目标表不存在，不能执行合并")
+      && controller.includes("setImportMode(resolvedImportMode)"),
   },
   {
     label: "import-failures-render-inline-stage-aware-recovery-without-raw-error-details",
@@ -88,7 +96,7 @@ const checks = [
   },
   {
     label: "path-entry-gives-concrete-examples-and-workspace-scoped-recent-sources",
-    ok: panel.includes("支持 CSV、XLSX、XLSM")
+    ok: panel.includes("支持 CSV、Parquet、XLSX、XLSM")
       && panel.includes('data-testid="recent-import-paths"')
       && panel.includes("recentImportPaths.map")
       && controller.includes("aibi-c:recent-import-paths:v1:${workspaceId}")

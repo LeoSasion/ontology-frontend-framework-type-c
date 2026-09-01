@@ -436,6 +436,7 @@ export interface SavedView {
 export interface TableQueryPayload {
   ok: boolean;
   tableQuery: {
+    workspaceId: string;
     mode: "detail" | "aggregate" | string;
     tableKey: string;
     tableName?: string;
@@ -446,7 +447,15 @@ export interface TableQueryPayload {
     totalRows: number;
     filteredRows: number;
     limit: number;
-    offset?: number;
+    nextCursor?: string | null;
+    previousCursor?: string | null;
+    hasNextPage?: boolean;
+    hasPreviousPage?: boolean;
+    sourceVersion?: string;
+    queryFingerprint?: string;
+    rowBytes?: number;
+    responseBytes?: number;
+    truncatedByBytes?: boolean;
     page?: number;
     pageCount?: number;
     filters?: Array<Record<string, unknown>>;
@@ -457,6 +466,14 @@ export interface TableQueryPayload {
       engine: string;
       compiledSql: string;
       params?: unknown[];
+      replicas?: Array<{
+        logicalTable?: string;
+        versionId?: string;
+        objectHashes?: string[];
+        contentFingerprint?: string;
+        schemaFingerprint?: string;
+        rowCount?: number;
+      }>;
     };
   };
 }

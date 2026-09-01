@@ -40,7 +40,15 @@ const checks = [
   },
   {
     label: "relationship-preview-exposes-quality-and-expansion",
-    ok: ["duplicateKeyGroups", "emptyKeyRows", "unmatchedLeftRows", "outputRows", "rowExpansion"]
+    ok: [
+      "leftDuplicateKeyGroups",
+      "rightDuplicateKeyGroups",
+      "leftEmptyKeyRows",
+      "rightEmptyKeyRows",
+      "unmatchedLeftRows",
+      "outputRows",
+      "rowExpansion",
+    ]
       .every((field) => relationship.includes(`\"${field}\"`)),
   },
   {

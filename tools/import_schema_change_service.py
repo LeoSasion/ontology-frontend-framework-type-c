@@ -5,6 +5,8 @@ import json
 import sqlite3
 from typing import Any
 
+from dataset_version_store import schema_columns
+
 
 SCHEMA_CHANGE_SCHEMA = "aibi-import-schema-change/v1"
 
@@ -149,12 +151,12 @@ def build_import_schema_change_preview(
     incoming_fields: list[str],
 ) -> dict[str, Any] | None:
     registry = connection.execute(
-        "SELECT table_key, display_name, physical_table FROM table_registry WHERE workspace_id = ? AND table_key = ?",
+        "SELECT table_key, display_name, physical_table, schema_json FROM table_registry WHERE workspace_id = ? AND table_key = ?",
         (workspace_id, table_key),
     ).fetchone()
     if registry is None:
         return None
-    current_fields = _table_columns(connection, str(registry["physical_table"]))
+    current_fields = schema_columns(registry["schema_json"])
     incoming = [str(field) for field in incoming_fields]
     current_set = set(current_fields)
     incoming_set = set(incoming)

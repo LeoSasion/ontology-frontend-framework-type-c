@@ -30,19 +30,15 @@ function waitForServiceClose(timeoutMs = 5_000) {
   });
 }
 
-async function terminateWindowsProcessTree(pid) {
-  const killer = spawn("taskkill", ["/PID", String(pid), "/T", "/F"], {
-    windowsHide: true,
-    stdio: ["ignore", "ignore", "pipe"],
+function requestServiceShutdown() {
+  if (!service || service.exitCode !== null || service.signalCode !== null) return Promise.resolve();
+  if (!service.connected) return Promise.reject(new Error("Isolated API IPC channel is not connected."));
+  return new Promise((resolveRequest, rejectRequest) => {
+    service.send({ type: "aibi-runtime-shutdown" }, (error) => {
+      if (error) rejectRequest(error);
+      else resolveRequest();
+    });
   });
-  let stderr = "";
-  killer.stderr.setEncoding("utf8");
-  killer.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4_000); });
-  const result = await new Promise((resolveResult, rejectResult) => {
-    killer.once("error", rejectResult);
-    killer.once("close", (code) => resolveResult({ code, stderr }));
-  });
-  return result;
 }
 
 async function freePort() {
@@ -92,7 +88,7 @@ if (!apiBaseUrl) {
       AIBI_EVIDENCE_BUNDLE_ROOT: join(tempRoot, "evidence"),
       PYTHONIOENCODING: "utf-8",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe", "ipc"],
     windowsHide: true,
   });
   service.stdout.setEncoding("utf8");
@@ -231,38 +227,43 @@ try {
   console.log(JSON.stringify(receipt, null, 2));
   if (failedChecks.length) process.exitCode = 1;
 } finally {
+  let cleanupError = null;
   if (service) {
-    let closePromise = waitForServiceClose(10_000);
-    let treeKillResult = null;
+    let gracefulShutdownError = null;
     if (service.exitCode === null) {
-      if (process.platform === "win32") {
-        if (!service.pid) throw new Error("Isolated API process does not expose a PID for tree cleanup.");
-        treeKillResult = await terminateWindowsProcessTree(service.pid);
-      } else {
-        service.kill("SIGTERM");
+      try {
+        await requestServiceShutdown();
+      } catch (error) {
+        gracefulShutdownError = error;
       }
     }
-    let closed = await closePromise;
-    if (!closed && service.exitCode === null && process.platform !== "win32") {
-      closePromise = waitForServiceClose();
-      service.kill("SIGKILL");
-      closed = await closePromise;
+    let closed = await waitForServiceClose(10_000);
+    if (!closed && service.exitCode === null) {
+      const killed = service.kill("SIGKILL");
+      closed = await waitForServiceClose(5_000);
+      gracefulShutdownError ??= new Error(`Isolated API did not complete graceful shutdown; direct termination requested=${killed}.`);
     }
     if (!closed) {
       service.stdout?.destroy();
       service.stderr?.destroy();
-      const treeKillDetail = treeKillResult
-        ? `\ntaskkill exit=${treeKillResult.code}: ${treeKillResult.stderr}`
-        : "";
-      throw new Error(`Isolated API did not close its process pipes before cleanup.${treeKillDetail}\n${serviceLogs}`);
+      cleanupError = new Error(`Isolated API did not close its process pipes before cleanup.\n${serviceLogs}`);
+    } else if (gracefulShutdownError) {
+      cleanupError = new Error(`Isolated API required forced cleanup: ${gracefulShutdownError instanceof Error ? gracefulShutdownError.message : String(gracefulShutdownError)}\n${serviceLogs}`);
+    } else if (service.exitCode !== 0) {
+      cleanupError = new Error(`Isolated API exited with ${service.exitCode ?? service.signalCode} during graceful cleanup.\n${serviceLogs}`);
     }
   }
   if (tempRoot) {
-    rmSync(tempRoot, {
-      recursive: true,
-      force: true,
-      maxRetries: 10,
-      retryDelay: 200,
-    });
+    try {
+      rmSync(tempRoot, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200,
+      });
+    } catch (error) {
+      cleanupError ??= error;
+    }
   }
+  if (cleanupError) throw cleanupError;
 }

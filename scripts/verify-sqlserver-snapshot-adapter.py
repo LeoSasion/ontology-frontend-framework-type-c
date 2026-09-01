@@ -384,14 +384,14 @@ try:
     )
     snapshot_text = json.dumps(snapshot, ensure_ascii=False)
     manifests = list(verify_root.rglob("manifest.json"))
-    staged_csv = list(verify_root.rglob("*.csv"))
+    staged_parquet = list(verify_root.rglob("*.parquet"))
     check(
         "snapshot-is-stable-bounded-and-staged-before-activation",
         snapshot["capability"] == CAPABILITY_READY_FOR_SNAPSHOT
         and snapshot["totalRows"] == 4
         and snapshot["activation"]["status"] == "pending"
         and len(manifests) == 1
-        and len(staged_csv) == 2
+        and len(staged_parquet) == 2
         and all(item["sha256"] for item in snapshot["tables"])
         and str(verify_root) not in snapshot_text
         and "VIP Alice" not in snapshot_text
@@ -439,7 +439,7 @@ try:
         created_at="2026-08-13T00:01:30Z",
     )
     expect_error(
-        "byte-budget-is-enforced-while-streaming",
+        "byte-budget-is-enforced-on-sealed-parquet",
         "SQLSERVER_BYTE_BUDGET_EXCEEDED",
         lambda: snapshot_to_staging(
             CONFIG,
@@ -453,7 +453,7 @@ try:
     )
     check("over-byte-budget-snapshot-leaves-no-artifact", not any(path.name == byte_plan["staging"]["artifactKey"] for path in verify_root.rglob("*")))
 
-    staged_csv[0].write_bytes(staged_csv[0].read_bytes() + b"tampered\n")
+    staged_parquet[0].write_bytes(staged_parquet[0].read_bytes() + b"tampered\n")
     expect_error(
         "idempotent-replay-revalidates-manifest-and-file-hashes",
         "SQLSERVER_ARTIFACT_INTEGRITY_FAILED",

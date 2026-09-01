@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import base64
-import csv
 import hashlib
 import importlib.util
-import io
 import ipaddress
 import json
 import os
@@ -15,17 +13,17 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from datetime import date, datetime
+from datetime import date, datetime, time as datetime_time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Callable, Iterator, Mapping, Protocol, Sequence
 
 
 ADAPTER_SCHEMA = "aibi-connector-adapter/v1"
-PLAN_SCHEMA = "aibi-sqlserver-snapshot-plan/v1"
+PLAN_SCHEMA = "aibi-sqlserver-snapshot-plan/v2"
 CATALOG_SCHEMA = "aibi-sqlserver-catalog/v1"
-RECEIPT_SCHEMA = "aibi-sqlserver-snapshot-receipt/v1"
-ADAPTER_ID = "sqlserver-snapshot/v1"
+RECEIPT_SCHEMA = "aibi-sqlserver-snapshot-receipt/v2"
+ADAPTER_ID = "sqlserver-snapshot/v2"
 
 CAPABILITY_UNAVAILABLE = "unavailable"
 CAPABILITY_READY_FOR_TEST = "ready_for_test"
@@ -118,7 +116,7 @@ class SqlServerSession(Protocol):
         cancelled: Callable[[], bool],
     ) -> Sequence[Mapping[str, Any]]: ...
 
-    def iter_snapshot(
+    def iter_snapshot_batches(
         self,
         selection: Mapping[str, Any],
         *,
@@ -126,7 +124,7 @@ class SqlServerSession(Protocol):
         page_size: int,
         deadline: float,
         cancelled: Callable[[], bool],
-    ) -> Iterator[Mapping[str, Any]]: ...
+    ) -> Iterator[Sequence[Mapping[str, Any]]]: ...
 
     def close(self) -> None: ...
 
@@ -570,11 +568,17 @@ def _normalize_catalog(resources: Sequence[Mapping[str, Any]], *, max_tables: in
             if not _IDENTIFIER_RE.fullmatch(column_name) or not data_type or column_name in column_names:
                 raise SqlServerAdapterError("SQLSERVER_CATALOG_INVALID", "SQL Server returned an invalid catalog column.")
             column_names.add(column_name)
+            max_length = column.get("maxLength")
+            precision = column.get("precision")
+            scale = column.get("scale")
             columns.append({
                 "name": column_name,
                 "dataType": data_type,
                 "nullable": bool(column.get("nullable", True)),
                 "ordinal": int(column.get("ordinal") or index + 1),
+                "maxLength": int(max_length) if max_length is not None else None,
+                "precision": int(precision) if precision is not None else None,
+                "scale": int(scale) if scale is not None else None,
             })
         key_candidates: list[list[str]] = []
         for candidate in resource.get("keyCandidates") or []:
@@ -764,6 +768,72 @@ def _safe_scalar(value: Any) -> str | int | float | bool | None:
     return str(value)
 
 
+def _duckdb_type_for_sqlserver(column: Mapping[str, Any]) -> str:
+    data_type = str(column.get("dataType") or "").strip().casefold()
+    if data_type == "bigint":
+        return "BIGINT"
+    if data_type == "int":
+        return "INTEGER"
+    if data_type == "smallint":
+        return "SMALLINT"
+    if data_type == "tinyint":
+        return "UTINYINT"
+    if data_type == "bit":
+        return "BOOLEAN"
+    if data_type in {"decimal", "numeric"}:
+        precision = max(1, min(38, int(column.get("precision") or 38)))
+        scale = max(0, min(precision, int(column.get("scale") if column.get("scale") is not None else 10)))
+        return f"DECIMAL({precision},{scale})"
+    if data_type == "money":
+        return "DECIMAL(19,4)"
+    if data_type == "smallmoney":
+        return "DECIMAL(10,4)"
+    if data_type == "float":
+        return "DOUBLE"
+    if data_type == "real":
+        return "FLOAT"
+    if data_type == "date":
+        return "DATE"
+    if data_type == "time":
+        return "TIME"
+    if data_type in {"datetime", "datetime2", "smalldatetime"}:
+        return "TIMESTAMP"
+    if data_type == "datetimeoffset":
+        return "TIMESTAMPTZ"
+    if data_type in {"binary", "varbinary", "image", "rowversion", "timestamp"}:
+        return "BLOB"
+    if data_type in {
+        "char", "varchar", "text", "nchar", "nvarchar", "ntext", "xml", "uniqueidentifier", "json",
+    }:
+        return "VARCHAR"
+    raise SqlServerAdapterError(
+        "SQLSERVER_COLUMN_TYPE_UNSUPPORTED",
+        f"SQL Server type {data_type or '<empty>'} cannot be sealed into the typed Parquet contract.",
+        details={"column": str(column.get("name") or ""), "dataType": data_type},
+    )
+
+
+def _selected_schema(resource: Mapping[str, Any], columns: Sequence[str]) -> list[dict[str, Any]]:
+    available = {str(item.get("name") or ""): item for item in resource.get("columns") or []}
+    result: list[dict[str, Any]] = []
+    for name in columns:
+        column = available.get(str(name))
+        if column is None:
+            raise SqlServerAdapterError("SQLSERVER_SELECTION_COLUMNS_INVALID", "A selected SQL Server column is no longer available.")
+        if str(name).startswith("__aibi_"):
+            raise SqlServerAdapterError(
+                "SQLSERVER_RESERVED_COLUMN_INVALID",
+                "SQL Server snapshot columns cannot use the reserved __aibi_ namespace.",
+            )
+        result.append({
+            "name": str(name),
+            "type": _duckdb_type_for_sqlserver(column),
+            "nullable": bool(column.get("nullable", True)),
+            "sqlServerType": str(column.get("dataType") or "").casefold(),
+        })
+    return result
+
+
 def _normalized_budget(raw: Mapping[str, Any] | None) -> dict[str, int]:
     source = dict(raw or {})
     budget: dict[str, int] = {}
@@ -833,6 +903,7 @@ def _selection_for_plan(raw: Mapping[str, Any], resource: Mapping[str, Any], bud
     estimated_rows = int(raw.get("estimatedRows") or resource.get("rowEstimate") or 0)
     if estimated_rows > budget["maxRowsPerTable"]:
         raise SqlServerAdapterError("SQLSERVER_ROW_BUDGET_EXCEEDED", "A selected SQL Server resource exceeds the row budget.")
+    schema_fields = _selected_schema(resource, columns)
     return {
         "resourceKey": resource_key,
         "resourceType": resource.get("type"),
@@ -842,6 +913,7 @@ def _selection_for_plan(raw: Mapping[str, Any], resource: Mapping[str, Any], bud
         "watermark": watermark_payload,
         "targetTableKey": target_table,
         "estimatedRows": max(0, estimated_rows),
+        "schemaFields": schema_fields,
         "resourceContractFingerprint": stable_fingerprint({key: value for key, value in resource.items() if key != "rowEstimate"}),
     }
 
@@ -888,7 +960,7 @@ def build_snapshot_plan(
         "networkBindingFingerprint": str(catalog.get("networkBindingFingerprint") or ""),
         "selections": normalized_selections,
         "budget": normalized_budget,
-        "staging": {"format": "csv-utf8", "artifactKey": ""},
+        "staging": {"format": "parquet-v2", "artifactKey": ""},
         "activation": {"required": True, "boundary": "durable-import-and-source-activation-journal"},
     }
     artifact_key = f"sqlsnap_{stable_fingerprint({key: value for key, value in body.items() if key != 'staging'})[:24]}"
@@ -900,6 +972,8 @@ def build_snapshot_plan(
 def verify_snapshot_plan(plan: Mapping[str, Any]) -> None:
     if plan.get("schema") != PLAN_SCHEMA:
         raise SqlServerAdapterError("SQLSERVER_PLAN_SCHEMA_INVALID", "The SQL Server snapshot plan schema is invalid.")
+    if (plan.get("staging") or {}).get("format") != "parquet-v2":
+        raise SqlServerAdapterError("SQLSERVER_PLAN_SCHEMA_INVALID", "The SQL Server snapshot plan does not use typed Parquet staging.")
     public = {key: value for key, value in plan.items() if key not in {"ok", "planFingerprint"}}
     expected = stable_fingerprint(public)
     if str(plan.get("planFingerprint") or "") != expected:
@@ -961,14 +1035,192 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def _csv_line(columns: Sequence[str], row: Mapping[str, Any] | None = None) -> bytes:
-    buffer = io.StringIO(newline="")
-    writer = csv.DictWriter(buffer, fieldnames=list(columns), extrasaction="raise", lineterminator="\n")
-    if row is None:
-        writer.writeheader()
-    else:
-        writer.writerow(row)
-    return buffer.getvalue().encode("utf-8")
+def _quote_identifier(value: str) -> str:
+    return '"' + str(value).replace('"', '""') + '"'
+
+
+def _sql_literal(value: str | Path) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _parquet_scalar(value: Any, data_type: str) -> Any:
+    if value is None:
+        return None
+    if data_type == "VARCHAR":
+        safe = _safe_scalar(value)
+        return None if safe is None else str(safe)
+    if data_type == "BLOB":
+        if isinstance(value, (bytes, bytearray, memoryview)):
+            return bytes(value)
+        raise SqlServerAdapterError(
+            "SQLSERVER_SNAPSHOT_VALUE_INVALID",
+            "SQL Server returned a non-binary value for a binary snapshot column.",
+        )
+    if isinstance(value, (str, int, float, bool, Decimal, date, datetime, datetime_time)):
+        return value
+    return str(value)
+
+
+def _write_snapshot_parquet(
+    session: SqlServerSession,
+    selection: Mapping[str, Any],
+    *,
+    schema_fields: Sequence[Mapping[str, Any]],
+    output_path: Path,
+    max_rows: int,
+    page_size: int,
+    deadline: float,
+    cancelled: Callable[[], bool],
+) -> tuple[int, Any]:
+    """Consume driver pages in bounded frames and seal one typed Parquet object."""
+
+    try:
+        import duckdb  # type: ignore
+        import pandas as pd  # type: ignore
+    except ImportError as error:  # pragma: no cover - deployment contract
+        raise SqlServerAdapterError(
+            "SQLSERVER_PARQUET_RUNTIME_UNAVAILABLE",
+            "DuckDB and pandas are required for typed SQL Server snapshot staging.",
+        ) from error
+    columns = [str(item["name"]) for item in schema_fields]
+    type_by_column = {str(item["name"]): str(item["type"]) for item in schema_fields}
+    database_path = output_path.with_name(f".{output_path.stem}.{uuid.uuid4().hex}.duckdb")
+    connection = duckdb.connect(str(database_path))
+    row_count = 0
+    watermark_end: Any = None
+    table_name = "__aibi_sqlserver_snapshot"
+    definitions = [f'{_quote_identifier("__aibi_row_id")} BIGINT'] + [
+        f"{_quote_identifier(name)} {type_by_column[name]}" for name in columns
+    ]
+    try:
+        connection.execute(f"CREATE TABLE {table_name} ({', '.join(definitions)})")
+        for raw_batch in session.iter_snapshot_batches(
+            selection,
+            max_rows=max_rows + 1,
+            page_size=page_size,
+            deadline=deadline,
+            cancelled=cancelled,
+        ):
+            _check_runtime(deadline, cancelled)
+            if (
+                not isinstance(raw_batch, Sequence)
+                or isinstance(raw_batch, (str, bytes, bytearray))
+                or len(raw_batch) > page_size
+            ):
+                raise SqlServerAdapterError(
+                    "SQLSERVER_SNAPSHOT_BATCH_INVALID",
+                    "The SQL Server driver returned an invalid or unbounded snapshot batch.",
+                )
+            records: list[dict[str, Any]] = []
+            for raw_row in raw_batch:
+                row_count += 1
+                if row_count > max_rows:
+                    raise SqlServerAdapterError(
+                        "SQLSERVER_ROW_BUDGET_EXCEEDED",
+                        "A SQL Server snapshot exceeded the approved row budget.",
+                    )
+                if not isinstance(raw_row, Mapping) or set(map(str, raw_row)) != set(columns):
+                    raise SqlServerAdapterError(
+                        "SQLSERVER_SNAPSHOT_ROW_INVALID",
+                        "The SQL Server driver returned a row outside the selected schema.",
+                    )
+                record: dict[str, Any] = {"__aibi_row_id": row_count}
+                for name in columns:
+                    record[name] = _parquet_scalar(raw_row.get(name), type_by_column[name])
+                records.append(record)
+                watermark = selection.get("watermark")
+                if isinstance(watermark, Mapping):
+                    watermark_end = _safe_scalar(raw_row.get(str(watermark.get("column") or "")))
+            if not records:
+                continue
+            frame_columns = ["__aibi_row_id", *columns]
+            frame = pd.DataFrame({
+                name: pd.Series([record[name] for record in records], dtype="object")
+                for name in frame_columns
+            })
+            connection.register("__aibi_sqlserver_batch", frame)
+            try:
+                projection = [
+                    f"CAST({_quote_identifier('__aibi_row_id')} AS BIGINT)",
+                    *[
+                        f"CAST({_quote_identifier(name)} AS {type_by_column[name]})"
+                        for name in columns
+                    ],
+                ]
+                connection.execute(
+                    f"INSERT INTO {table_name} SELECT {', '.join(projection)} FROM __aibi_sqlserver_batch"
+                )
+            finally:
+                connection.unregister("__aibi_sqlserver_batch")
+        connection.execute(
+            f"""
+            COPY (
+              SELECT * FROM {table_name} ORDER BY {_quote_identifier('__aibi_row_id')}
+            ) TO {_sql_literal(output_path)}
+            (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 122880)
+            """
+        )
+        actual_count, minimum_row_id, maximum_row_id = connection.execute(
+            f"SELECT count(*), min({_quote_identifier('__aibi_row_id')}), max({_quote_identifier('__aibi_row_id')}) FROM {table_name}"
+        ).fetchone()
+        if int(actual_count) != row_count or (
+            row_count and (minimum_row_id != 1 or maximum_row_id != row_count)
+        ):
+            raise SqlServerAdapterError(
+                "SQLSERVER_PARQUET_INTEGRITY_FAILED",
+                "The typed SQL Server snapshot did not preserve its stable row contract.",
+            )
+    finally:
+        connection.close()
+        database_path.unlink(missing_ok=True)
+        database_path.with_name(database_path.name + ".wal").unlink(missing_ok=True)
+    _fsync_file(output_path)
+    return row_count, watermark_end
+
+
+def _verify_snapshot_parquet(path: Path, item: Mapping[str, Any]) -> None:
+    try:
+        import duckdb  # type: ignore
+    except ImportError as error:  # pragma: no cover - deployment contract
+        raise SqlServerAdapterError(
+            "SQLSERVER_PARQUET_RUNTIME_UNAVAILABLE",
+            "DuckDB is required to verify typed SQL Server snapshot staging.",
+        ) from error
+    expected_fields = [
+        {"name": "__aibi_row_id", "type": "BIGINT"},
+        *[
+            {"name": str(field.get("name") or ""), "type": str(field.get("type") or "").upper()}
+            for field in item.get("schemaFields") or []
+            if isinstance(field, Mapping)
+        ],
+    ]
+    connection = duckdb.connect(":memory:")
+    relation = f"read_parquet({_sql_literal(path)})"
+    try:
+        actual_fields = [
+            {"name": str(field[0]), "type": str(field[1]).upper()}
+            for field in connection.execute(f"DESCRIBE SELECT * FROM {relation}").fetchall()
+        ]
+        row_count, minimum_row_id, maximum_row_id = connection.execute(
+            f"SELECT count(*), min({_quote_identifier('__aibi_row_id')}), max({_quote_identifier('__aibi_row_id')}) FROM {relation}"
+        ).fetchone()
+    except Exception as error:
+        raise SqlServerAdapterError(
+            "SQLSERVER_ARTIFACT_INTEGRITY_FAILED",
+            "A staged SQL Server Parquet object is unreadable.",
+        ) from error
+    finally:
+        connection.close()
+    expected_count = int(item.get("rowCount") or 0)
+    if (
+        actual_fields != expected_fields
+        or int(row_count) != expected_count
+        or (expected_count and (minimum_row_id != 1 or maximum_row_id != expected_count))
+    ):
+        raise SqlServerAdapterError(
+            "SQLSERVER_ARTIFACT_INTEGRITY_FAILED",
+            "A staged SQL Server Parquet object does not match its typed manifest.",
+        )
 
 
 def _existing_snapshot(final_path: Path, plan: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -987,7 +1239,7 @@ def _existing_snapshot(final_path: Path, plan: Mapping[str, Any]) -> dict[str, A
     expected_files = {"manifest.json"}
     for item in manifest.get("tables") or []:
         file_name = str(item.get("file") or "")
-        if Path(file_name).name != file_name or not file_name.endswith(".csv"):
+        if Path(file_name).name != file_name or not file_name.endswith(".parquet"):
             raise SqlServerAdapterError("SQLSERVER_ARTIFACT_INTEGRITY_FAILED", "The staged SQL Server manifest contains an invalid file reference.")
         expected_files.add(file_name)
         artifact = (final_path / file_name).resolve()
@@ -999,6 +1251,7 @@ def _existing_snapshot(final_path: Path, plan: Mapping[str, Any]) -> dict[str, A
                 digest.update(chunk)
         if digest.hexdigest() != item.get("sha256"):
             raise SqlServerAdapterError("SQLSERVER_ARTIFACT_INTEGRITY_FAILED", "A staged SQL Server snapshot file failed integrity verification.")
+        _verify_snapshot_parquet(artifact, item)
     actual_files = {item.name for item in final_path.iterdir() if item.is_file()}
     if actual_files != expected_files or any(not item.is_file() or _is_link_like(item) for item in final_path.iterdir()):
         raise SqlServerAdapterError(
@@ -1130,43 +1383,32 @@ def snapshot_to_staging(
                 _check_runtime(deadline, cancelled)
                 columns = [str(item) for item in selection.get("columns") or []]
                 target_table = str(selection.get("targetTableKey") or "")
-                output_path = temporary_path / f"{target_table}.csv"
-                digest = hashlib.sha256()
-                row_count = 0
-                watermark_end: Any = None
-                with output_path.open("wb") as handle:
-                    header = _csv_line(columns)
-                    handle.write(header)
-                    digest.update(header)
-                    total_bytes += len(header)
-                    if total_bytes > budget["maxBytes"]:
-                        raise SqlServerAdapterError("SQLSERVER_BYTE_BUDGET_EXCEEDED", "The SQL Server snapshot exceeded the approved byte budget.")
-                    for raw_row in session.iter_snapshot(
-                        selection,
-                        max_rows=budget["maxRowsPerTable"] + 1,
-                        page_size=budget["pageSize"],
-                        deadline=deadline,
-                        cancelled=cancelled,
-                    ):
-                        _check_runtime(deadline, cancelled)
-                        row_count += 1
-                        if row_count > budget["maxRowsPerTable"]:
-                            raise SqlServerAdapterError("SQLSERVER_ROW_BUDGET_EXCEEDED", "A SQL Server snapshot exceeded the approved row budget.")
-                        if not isinstance(raw_row, Mapping) or any(str(key) not in columns for key in raw_row):
-                            raise SqlServerAdapterError("SQLSERVER_SNAPSHOT_ROW_INVALID", "The SQL Server driver returned a row outside the selected schema.")
-                        safe_row = {column: _safe_scalar(raw_row.get(column)) for column in columns}
-                        encoded = _csv_line(columns, safe_row)
-                        total_bytes += len(encoded)
-                        if total_bytes > budget["maxBytes"]:
-                            raise SqlServerAdapterError("SQLSERVER_BYTE_BUDGET_EXCEEDED", "The SQL Server snapshot exceeded the approved byte budget.")
-                        handle.write(encoded)
-                        digest.update(encoded)
-                        watermark = selection.get("watermark")
-                        if isinstance(watermark, Mapping):
-                            watermark_end = safe_row.get(str(watermark.get("column") or ""))
-                    handle.flush()
-                    os.fsync(handle.fileno())
+                current_resource = described_by_key[str(selection.get("resourceKey") or "")]
+                schema_fields = _selected_schema(current_resource, columns)
+                if list(selection.get("schemaFields") or []) != schema_fields:
+                    raise SqlServerAdapterError(
+                        "SQLSERVER_CATALOG_DRIFT",
+                        "A selected SQL Server typed schema changed after planning; create and confirm a fresh plan.",
+                    )
+                output_path = temporary_path / f"{target_table}.parquet"
+                row_count, watermark_end = _write_snapshot_parquet(
+                    session,
+                    selection,
+                    schema_fields=schema_fields,
+                    output_path=output_path,
+                    max_rows=budget["maxRowsPerTable"],
+                    page_size=budget["pageSize"],
+                    deadline=deadline,
+                    cancelled=cancelled,
+                )
                 bytes_written = output_path.stat().st_size
+                total_bytes += bytes_written
+                if total_bytes > budget["maxBytes"]:
+                    raise SqlServerAdapterError("SQLSERVER_BYTE_BUDGET_EXCEEDED", "The SQL Server snapshot exceeded the approved byte budget.")
+                digest = hashlib.sha256()
+                with output_path.open("rb") as handle:
+                    for chunk in iter(lambda: handle.read(4 * 1024 * 1024), b""):
+                        digest.update(chunk)
                 total_rows += row_count
                 table_receipts.append({
                     "resourceKey": selection.get("resourceKey"),
@@ -1175,6 +1417,8 @@ def snapshot_to_staging(
                     "rowCount": row_count,
                     "bytes": bytes_written,
                     "sha256": digest.hexdigest(),
+                    "schemaFields": schema_fields,
+                    "internalColumns": [{"name": "__aibi_row_id", "type": "BIGINT"}],
                     "watermarkEnd": watermark_end,
                     "watermarkEndFingerprint": stable_fingerprint(watermark_end) if watermark_end is not None else None,
                 })

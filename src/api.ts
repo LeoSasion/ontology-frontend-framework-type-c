@@ -48,7 +48,7 @@ export {
   setImportPolicy,
   syncConnector,
 } from "./apiSource";
-export { copyView, deleteView, runQuery, runTableQuery, saveView } from "./apiViews";
+export { copyView, deleteView, runQuery, runTableQuery, runTableQueryBatch, saveView } from "./apiViews";
 export { createWorkspace, deleteWorkspace, getDashboards, getWorkbenchData, getWorkspaceStatus, renameWorkspace, selectWorkspace } from "./apiWorkspace";
 
 export function getQualityDoctor() {

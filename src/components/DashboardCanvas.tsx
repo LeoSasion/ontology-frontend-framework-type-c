@@ -29,6 +29,7 @@ import { Bilingual, biText, translateName } from "./Bilingual";
 import { ProductActivationPanel } from "./ProductActivationPanel";
 
 type DashboardCanvasProps = {
+  workspaceId: string;
   dashboards: DashboardPayload;
   focusedTableKey?: string;
   query: QueryResult;
@@ -47,7 +48,7 @@ type DashboardCanvasProps = {
   onOpenBusinessStep: (step: BusinessPathStepKey) => void;
 };
 
-export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench, activeDashboardKey, onDashboardSelect, onAgentDraft, onAsk, onOpenEvidence, onDashboardOperation, onDashboardFilterOperation, onDashboardModulesSave, onBusinessDashboardOperation, onRelationshipSave, onDashboardWidgetOperation, onOpenBusinessStep }: DashboardCanvasProps) {
+export function DashboardCanvas({ workspaceId, dashboards, focusedTableKey, query, workbench, activeDashboardKey, onDashboardSelect, onAgentDraft, onAsk, onOpenEvidence, onDashboardOperation, onDashboardFilterOperation, onDashboardModulesSave, onBusinessDashboardOperation, onRelationshipSave, onDashboardWidgetOperation, onOpenBusinessStep }: DashboardCanvasProps) {
   const dashboardPages = Array.isArray(dashboards.dashboards) ? dashboards.dashboards : [];
   const requestedDashboard = dashboardPages.find((item) => item.dashboard_key === activeDashboardKey);
   const requestedDashboardMissing = activeDashboardKey !== "default" && !requestedDashboard;
@@ -249,7 +250,7 @@ export function DashboardCanvas({ dashboards, focusedTableKey, query, workbench,
       <div className="dashboardGrid">
         {dashboardWidgets.length ? (
           <DashboardDeferredBoundary>
-            <BiDashboardWidgetKit dashboard={{ ...dashboard, widgets: orderedWidgets }} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} />
+            <BiDashboardWidgetKit dashboard={{ ...dashboard, widgets: orderedWidgets }} dashboards={dashboards} onOpenEvidence={onOpenEvidence} query={query} workbench={workbench} workspaceId={workspaceId} />
           </DashboardDeferredBoundary>
         ) : (
           <section className="bDashboardKit wide dashboardWidgetEmptyState" data-testid="dashboard-widget-empty-state">

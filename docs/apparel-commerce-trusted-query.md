@@ -64,7 +64,7 @@ measure 不明确时不得选择首个字段；aggregation 不明确且会改变
 
 自动键只能用于预检。键未由 owner 确认、键质量不满足门槛或提交前 fingerprint 漂移时不得 commit。所有逻辑表必须在一个事务中完成；只有全部成功后才创建并切换 current sourceRun。
 
-SQLite schema v17 通过 `source_run_tables` 保存同一原子批次的全部逻辑表成员；查询请求的所有参与表都必须属于该 current sourceRun，不能用多个独立导入的“各自最新表”拼成伪 current 批次。
+SQLite schema v18 通过 `source_run_tables` 保存同一原子批次的全部逻辑表成员；查询请求的所有参与表都必须属于该 current sourceRun，不能用多个独立导入的“各自最新表”拼成伪 current 批次。
 
 ## M2｜Apparel Entity Mapping Proof
 

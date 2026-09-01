@@ -44,6 +44,7 @@ class RuntimeHostWorker {
     private readonly root: string,
     readonly label: string,
     private readonly workerScript: string,
+    private readonly role: "reader" | "writer",
   ) {}
 
   get ready() {
@@ -59,7 +60,7 @@ class RuntimeHostWorker {
     if (this.ready) return;
     const child = spawn(process.env.PYTHON || "python", [this.workerScript], {
       cwd: this.root,
-      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+      env: { ...process.env, AIBI_RUNTIME_HOST_ROLE: this.role, PYTHONIOENCODING: "utf-8" },
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
     });
@@ -132,7 +133,7 @@ class RuntimeHostWorker {
     this.pending.clear();
   }
 
-  request(op: "run" | "catalog" | "ping", args: string[] = [], deadlineMs = 120_000, traceId = "") {
+  request(op: "run" | "catalog" | "ping" | "invalidate-readers", args: string[] = [], deadlineMs = 120_000, traceId = "") {
     try {
       this.ensureStarted();
     } catch (error) {
@@ -189,6 +190,7 @@ export class RuntimeHostPool {
   private startPromise: Promise<void> | null = null;
   private writerTail: Promise<unknown> = Promise.resolve();
   private readerTails: Promise<unknown>[];
+  private readerBarrier: Promise<void> = Promise.resolve();
   private readerCursor = 0;
   private queued = 0;
   private closed = false;
@@ -196,6 +198,8 @@ export class RuntimeHostPool {
   private recoveryPromise: Promise<void> | null = null;
   private reconciledWriterGeneration = 0;
   private recoveryError = "";
+  private readerInvalidationRounds = 0;
+  private closedReaderConnections = 0;
   private readonly maxQueueDepth: number;
   private readonly deadlineMs: number;
   private readonly startupDeadlineMs: number;
@@ -205,10 +209,10 @@ export class RuntimeHostPool {
     this.maxQueueDepth = Math.max(1, Math.min(1_000, Math.trunc(options.maxQueueDepth ?? MAX_QUEUE_DEPTH)));
     this.deadlineMs = Math.max(25, Math.min(900_000, Math.trunc(options.deadlineMs ?? configuredDeadlineMs())));
     this.startupDeadlineMs = Math.max(25, Math.min(120_000, Math.trunc(options.startupDeadlineMs ?? 15_000)));
-    this.writer = new RuntimeHostWorker(root, "runtime-writer", workerScript);
+    this.writer = new RuntimeHostWorker(root, "runtime-writer", workerScript, "writer");
     this.readers = Array.from(
       { length: Math.max(2, Math.min(4, readerCount)) },
-      (_, index) => new RuntimeHostWorker(root, `runtime-reader-${index + 1}`, workerScript),
+      (_, index) => new RuntimeHostWorker(root, `runtime-reader-${index + 1}`, workerScript, "reader"),
     );
     this.readerTails = this.readers.map(() => Promise.resolve());
   }
@@ -229,38 +233,22 @@ export class RuntimeHostPool {
     return this.startPromise;
   }
 
-  private recordRecoveryResult(result: RuntimeResult) {
+  private assertWorkspaceRecoveryResult(result: RuntimeResult) {
     const needsAttention = Array.isArray(result.needsAttention) ? result.needsAttention.length : 0;
     if (result.ok !== true || needsAttention > 0) {
       throw new RuntimeHostUnavailableError("Workspace recovery reconciliation requires owner attention");
     }
+  }
+
+  private recordRecoveryReady() {
     this.reconciledWriterGeneration = this.writer.startCount;
     this.recoveryError = "";
   }
 
-  private ensureRecoveryReady() {
-    if (
-      this.writer.ready
+  private isRecoveryReady() {
+    return this.writer.ready
       && this.reconciledWriterGeneration === this.writer.startCount
-      && !this.recoveryError
-    ) return Promise.resolve();
-    if (this.recoveryPromise) return this.recoveryPromise;
-    this.recoveryPromise = (async () => {
-      try {
-        const result = await this.writer.request(
-          "run",
-          ["workspace-recovery-reconcile", "--all"],
-          this.startupDeadlineMs,
-        );
-        this.recordRecoveryResult(result);
-      } catch (error) {
-        this.recoveryError = error instanceof Error ? error.message : String(error);
-        throw error;
-      }
-    })().finally(() => {
-      this.recoveryPromise = null;
-    });
-    return this.recoveryPromise;
+      && !this.recoveryError;
   }
 
   private enqueue<T>(tail: Promise<unknown>, setTail: (next: Promise<unknown>) => void, task: () => Promise<T>) {
@@ -272,6 +260,82 @@ export class RuntimeHostPool {
     return next.finally(() => { this.queued -= 1; });
   }
 
+  private async invalidateReaders() {
+    const results = await Promise.all(
+      this.readers.map((worker) => worker.request("invalidate-readers", [], this.startupDeadlineMs)),
+    );
+    if (results.some((result) => result.ok !== true)) {
+      throw new RuntimeHostUnavailableError("Runtime Host reader invalidation failed");
+    }
+    this.readerInvalidationRounds += 1;
+    this.closedReaderConnections += results.reduce((total, result) => {
+      const closed = Number(result.closedConnections ?? 0);
+      return total + (Number.isFinite(closed) && closed > 0 ? Math.trunc(closed) : 0);
+    }, 0);
+  }
+
+  private enqueueWriterExclusive<T>(task: () => Promise<T>) {
+    const readerSnapshot = [...this.readerTails];
+    let releaseReaders: () => void = () => undefined;
+    const barrier = new Promise<void>((resolveBarrier) => {
+      releaseReaders = resolveBarrier;
+    });
+    this.readerBarrier = barrier;
+    const scheduled = this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, async () => {
+      await Promise.all(readerSnapshot);
+      await this.invalidateReaders();
+      return task();
+    });
+    void scheduled.then(releaseReaders, releaseReaders);
+    return scheduled;
+  }
+
+  private async finishWriterRecovery(workspaceResult: RuntimeResult) {
+    this.assertWorkspaceRecoveryResult(workspaceResult);
+    const importResult = await this.writer.request(
+      "run",
+      ["import-job-recover", "--all"],
+      this.startupDeadlineMs,
+    );
+    if (importResult.ok !== true) {
+      throw new RuntimeHostUnavailableError("Import activation reconciliation requires owner attention");
+    }
+    const sqlServerResult = await this.writer.request(
+      "run",
+      ["sqlserver-adapter-activation-finalize", "--all", "--yes"],
+      this.startupDeadlineMs,
+    );
+    if (sqlServerResult.ok !== true) {
+      throw new RuntimeHostUnavailableError("SQL Server activation reconciliation requires owner attention");
+    }
+    this.recordRecoveryReady();
+  }
+
+  private async reconcileWriterNow() {
+    try {
+      const workspaceResult = await this.writer.request(
+        "run",
+        ["workspace-recovery-reconcile", "--all"],
+        this.startupDeadlineMs,
+      );
+      await this.finishWriterRecovery(workspaceResult);
+    } catch (error) {
+      this.recoveryError = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
+  }
+
+  private ensureRecoveryReady() {
+    if (this.isRecoveryReady()) return Promise.resolve();
+    if (this.recoveryPromise) return this.recoveryPromise;
+    this.recoveryPromise = this.enqueueWriterExclusive(async () => {
+      await this.reconcileWriterNow();
+    }).finally(() => {
+      this.recoveryPromise = null;
+    });
+    return this.recoveryPromise;
+  }
+
   async run(args: string[], traceId = "") {
     await this.start();
     if (this.closed) throw new RuntimeHostUnavailableError("Runtime Host pool is shut down");
@@ -280,38 +344,58 @@ export class RuntimeHostPool {
     const isWrite = !capability || capability.permissions?.database !== "read-only";
     const deadlineMs = capability?.timeoutClass === "long" ? 900_000 : this.deadlineMs;
     if (command === "workspace-recovery-reconcile") {
-      return this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, async () => {
-        const result = await this.writer.request("run", args, deadlineMs, traceId);
-        this.recordRecoveryResult(result);
-        return result;
+      return this.enqueueWriterExclusive(async () => {
+        try {
+          const result = await this.writer.request("run", args, deadlineMs, traceId);
+          this.assertWorkspaceRecoveryResult(result);
+          const allWorkspaceResult = args.includes("--all")
+            ? result
+            : await this.writer.request(
+              "run",
+              ["workspace-recovery-reconcile", "--all"],
+              this.startupDeadlineMs,
+            );
+          await this.finishWriterRecovery(allWorkspaceResult);
+          return result;
+        } catch (error) {
+          this.recoveryError = error instanceof Error ? error.message : String(error);
+          throw error;
+        }
       });
     }
+    await this.ensureRecoveryReady();
     if (isWrite) {
-      return this.enqueue(this.writerTail, (next) => { this.writerTail = next; }, async () => {
+      return this.enqueueWriterExclusive(async () => {
         // Check the writer generation only after this request reaches the head
         // of the queue. An earlier queued command may have killed/restarted the
         // worker and left a persistent recovery journal behind.
-        await this.ensureRecoveryReady();
+        if (!this.isRecoveryReady()) await this.reconcileWriterNow();
         return this.writer.request("run", args, deadlineMs, traceId);
       });
     }
+    const readerBarrier = this.readerBarrier;
     const index = this.readerCursor++ % this.readers.length;
     return this.enqueue(this.readerTails[index], (next) => { this.readerTails[index] = next; }, async () => {
-      await this.ensureRecoveryReady();
+      await readerBarrier;
+      if (!this.isRecoveryReady()) {
+        throw new RuntimeHostUnavailableError("Workspace recovery reconciliation is not ready");
+      }
       return this.readers[index].request("run", args, deadlineMs, traceId);
     });
   }
 
   health() {
-    const recoveryReady = this.writer.ready
-      && this.reconciledWriterGeneration === this.writer.startCount
-      && !this.recoveryError;
+    const recoveryReady = this.isRecoveryReady();
     return {
       ok: Boolean(this.catalog) && recoveryReady && this.readers.every((worker) => worker.ready),
       schema: "aibi-runtime-host-health/v1",
       queueDepth: this.queued,
       writer: { ready: this.writer.ready, starts: this.writer.startCount },
       readers: this.readers.map((worker) => ({ ready: worker.ready, starts: worker.startCount })),
+      readerInvalidation: {
+        rounds: this.readerInvalidationRounds,
+        closedConnections: this.closedReaderConnections,
+      },
       recovery: {
         ready: recoveryReady,
         writerGeneration: this.writer.startCount,

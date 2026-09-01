@@ -14,7 +14,7 @@ function stageLabel(stage: string) {
   return ({
     validate_plan: biText("校验导入计划", "Validate plan"),
     stage_source: biText("暂存来源数据", "Stage source"),
-    publish_replica: biText("发布分析副本", "Publish replica"),
+    publish_replica: biText("发布数据集目录", "Publish dataset catalog"),
     switch_source_run: biText("切换当前来源", "Switch current source"),
     postprocess: biText("完成后处理", "Post-process"),
     reconcile: biText("核对中断状态", "Reconcile interrupted state"),

@@ -15,8 +15,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
+from dataset_version_store import (
+    collect_unreferenced_dataset_objects,
+    duckdb_manifest_object_references,
+    file_sha256,
+    resolve_object_key,
+    verify_duckdb_manifest_objects,
+)
 
-RECOVERY_POINT_SCHEMA = "aibi-workspace-recovery-point/v1"
+
+RECOVERY_POINT_SCHEMA = "aibi-workspace-recovery-point/v2"
 RECOVERY_PLAN_SCHEMA = "aibi-workspace-recovery-plan/v1"
 RECOVERY_COLLECTION_SCHEMA = "aibi-workspace-recovery-points/v1"
 RECOVERY_OPERATION_SCHEMA = "aibi-workspace-recovery-operation/v1"
@@ -43,11 +51,13 @@ RESTORABLE_WORKSPACE_TABLES = frozenset({
     "navigation_modules",
     "relationships",
     "saved_views",
+    "table_registry",
     "workspace_agent_runtime_profiles",
     "workspace_analytical_skills",
     "workspace_domain_packs",
 })
 RECOVERY_KEY_PATTERN = re.compile(r"^rp_[a-f0-9]{24}$")
+WORKSPACE_BUCKET_PATTERN = re.compile(r"^workspace_[a-f0-9]{24}$")
 MAX_REQUEST_KEY_LENGTH = 200
 MAX_REASON_LENGTH = 500
 MIN_FREE_BYTES = 8 * 1024 * 1024
@@ -302,6 +312,45 @@ def _workspace_root(root: Path, workspace_id: str, *, create: bool) -> Path:
     return directory
 
 
+def recovery_point_duckdb_catalogs(
+    recovery_root: Path,
+    *,
+    workspace_id: str | None = None,
+) -> list[Path]:
+    """Return persisted catalogues that can reference one workspace's CAS keys."""
+
+    root = _ensure_root(_absolute(recovery_root), create=False)
+    if not root.exists():
+        return []
+    catalogs: list[Path] = []
+    expected_bucket = _workspace_bucket(_workspace_id(workspace_id)) if workspace_id is not None else None
+    for workspace_directory in root.iterdir():
+        if not WORKSPACE_BUCKET_PATTERN.fullmatch(workspace_directory.name):
+            continue
+        if expected_bucket is not None and workspace_directory.name != expected_bucket:
+            continue
+        _assert_not_symlink(workspace_directory, label="Workspace recovery directory")
+        if not workspace_directory.is_dir():
+            raise WorkspaceRecoveryError(
+                "RECOVERY_WORKSPACE_DIRECTORY_INVALID",
+                "Workspace recovery entry is not a directory.",
+            )
+        for point_directory in workspace_directory.iterdir():
+            if not RECOVERY_KEY_PATTERN.fullmatch(point_directory.name):
+                continue
+            _assert_not_symlink(point_directory, label="Recovery point directory")
+            if not point_directory.is_dir():
+                raise WorkspaceRecoveryError(
+                    "RECOVERY_POINT_INVALID",
+                    "Recovery point entry is not a directory.",
+                )
+            catalog = _safe_child(point_directory, DUCKDB_ARTIFACT)
+            if catalog.exists():
+                _assert_regular_file(catalog)
+                catalogs.append(catalog)
+    return sorted(catalogs, key=lambda path: os.fspath(path).casefold())
+
+
 def _nearest_existing_parent(path: Path) -> Path:
     current = path
     while not current.exists() and current != current.parent:
@@ -401,7 +450,13 @@ def _hash_query_rows(digest: Any, cursor: sqlite3.Cursor) -> None:
 def _sqlite_workspace_fingerprint(connection: sqlite3.Connection, workspace_id: str) -> tuple[str, dict[str, int], list[str]]:
     _assert_workspace_exists(connection, workspace_id)
     physical_tables = _workspace_physical_tables(connection, workspace_id)
-    physical_set = set(physical_tables)
+    legacy_tables = [name for name in physical_tables if _table_exists(connection, name)]
+    if legacy_tables:
+        raise WorkspaceRecoveryError(
+            "RECOVERY_LEGACY_BUSINESS_STORAGE_UNSUPPORTED",
+            "Dataset v2 recovery does not snapshot business rows from SQLite.",
+            "Re-import the source into the Parquet data plane before creating a recovery point.",
+        )
     all_physical_tables = set(_all_physical_table_bindings(connection))
     digest = hashlib.sha256()
     row_counts: dict[str, int] = {}
@@ -412,7 +467,7 @@ def _sqlite_workspace_fingerprint(connection: sqlite3.Connection, workspace_id: 
             and table_name not in all_physical_tables
             and table_name in RESTORABLE_WORKSPACE_TABLES
         )
-        include = table_name == "workspaces" or table_name in physical_set or is_workspace_metadata
+        include = table_name == "workspaces" or is_workspace_metadata
         if not include:
             continue
         digest.update(table_name.encode("utf-8"))
@@ -438,7 +493,7 @@ def _duckdb_module() -> Any:
     except Exception as error:
         raise WorkspaceRecoveryError(
             "RECOVERY_DUCKDB_UNAVAILABLE",
-            "DuckDB is required to verify the workspace analytics replica.",
+            "DuckDB is required to verify the workspace dataset catalog.",
             "Install the reviewed local runtime dependency and retry.",
         ) from error
     return duckdb
@@ -452,9 +507,55 @@ def _duckdb_table_exists(connection: Any, table_name: str) -> bool:
     return row is not None
 
 
+def _duckdb_relation_kind(connection: Any, table_name: str, *, catalog: str | None = None) -> str | None:
+    catalog_clause = "AND table_catalog = ?" if catalog else "AND table_catalog = current_database()"
+    params = [table_name, catalog] if catalog else [table_name]
+    row = connection.execute(
+        "SELECT table_type FROM information_schema.tables "
+        f"WHERE table_schema = 'main' AND table_name = ? {catalog_clause}",
+        params,
+    ).fetchone()
+    return str(row[0]).upper() if row else None
+
+
+def _manifest_object_paths(object_keys_value: Any, object_hashes_value: Any) -> list[Path]:
+    try:
+        object_keys = json.loads(str(object_keys_value or "[]"))
+        object_hashes = json.loads(str(object_hashes_value or "[]"))
+    except json.JSONDecodeError as error:
+        raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "Dataset manifest object bindings are invalid.") from error
+    if not isinstance(object_keys, list) or not isinstance(object_hashes, list) or not object_keys or len(object_keys) != len(object_hashes):
+        raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "Dataset manifest object bindings are invalid.")
+    paths: list[Path] = []
+    for raw_key, raw_hash in zip(object_keys, object_hashes, strict=True):
+        object_hash = str(raw_hash).lower()
+        try:
+            path = resolve_object_key(str(raw_key))
+        except (PermissionError, ValueError) as error:
+            raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "Dataset manifest object key is invalid.") from error
+        if path.name != f"{object_hash}.parquet":
+            raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "Dataset manifest object key and hash disagree.")
+        if not path.is_file() or path.is_symlink():
+            raise WorkspaceRecoveryError("RECOVERY_DATASET_OBJECT_MISSING", "A versioned Parquet object required by recovery is unavailable.")
+        if file_sha256(path) != object_hash:
+            raise WorkspaceRecoveryError("RECOVERY_DATASET_OBJECT_DRIFT", "A versioned Parquet object failed its integrity check.")
+        paths.append(path)
+    return paths
+
+
+def _parquet_view_source(paths: list[Path]) -> str:
+    values = ", ".join(_quote_duckdb_literal(path.as_posix()) for path in paths)
+    return f"read_parquet([{values}], union_by_name = true)"
+
+
 def _duckdb_workspace_fingerprint(path: Path, physical_tables: list[str]) -> tuple[str | None, list[dict[str, Any]]]:
     if not path.exists():
-        return _fingerprint({"schema": "aibi-duckdb-workspace-replica/v1", "rows": []}), []
+        if physical_tables:
+            raise WorkspaceRecoveryError(
+                "RECOVERY_DUCKDB_MANIFEST_MISSING",
+                "Active dataset versions have not been published to the DuckDB catalog.",
+            )
+        return _fingerprint({"schema": "aibi-duckdb-workspace-datasets/v2", "rows": []}), []
     _assert_not_symlink(path, label="DuckDB database")
     duckdb = _duckdb_module()
     with duckdb.connect(str(path), read_only=True) as connection:
@@ -465,25 +566,35 @@ def _duckdb_workspace_fingerprint(path: Path, physical_tables: list[str]) -> tup
                     "RECOVERY_DUCKDB_MANIFEST_MISSING",
                     "DuckDB contains workspace relations without a replica manifest.",
                 )
-            return _fingerprint({"schema": "aibi-duckdb-workspace-replica/v1", "rows": []}), []
+            return _fingerprint({"schema": "aibi-duckdb-workspace-datasets/v2", "rows": []}), []
         description = [str(item[0]) for item in connection.execute("DESCRIBE __aibi_replica_manifest").fetchall()]
-        rows: list[dict[str, Any]] = []
-        for physical_table in physical_tables:
-            record = connection.execute(
-                "SELECT * FROM __aibi_replica_manifest WHERE logical_table = ?",
-                [physical_table],
-            ).fetchone()
-            if record is None:
-                continue
-            item = dict(zip(description, record, strict=True))
-            replica_table = str(item.get("replica_table") or "")
-            if not replica_table or not _duckdb_table_exists(connection, replica_table):
-                raise WorkspaceRecoveryError(
-                    "RECOVERY_DUCKDB_MANIFEST_DRIFT",
-                    "DuckDB replica manifest points to a missing workspace replica.",
-                )
-            rows.append(item)
-        return _fingerprint({"schema": "aibi-duckdb-workspace-replica/v1", "rows": rows}), rows
+        required = {
+            "manifest_version", "logical_table", "source_version", "version_id",
+            "object_keys_json", "object_paths_json", "object_hashes_json",
+            "schema_fingerprint", "content_fingerprint", "row_count", "published_at",
+        }
+        if not required.issubset(description):
+            raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_V2_REQUIRED", "DuckDB dataset manifest is not version 2.")
+        if not physical_tables:
+            return _fingerprint({"schema": "aibi-duckdb-workspace-datasets/v2", "rows": []}), []
+        placeholders = ", ".join("?" for _ in physical_tables)
+        records = connection.execute(
+            f"SELECT * FROM __aibi_replica_manifest WHERE logical_table IN ({placeholders}) ORDER BY logical_table",
+            physical_tables,
+        ).fetchall()
+        rows = [dict(zip(description, record, strict=True)) for record in records]
+        missing = sorted(set(physical_tables) - {str(item.get("logical_table") or "") for item in rows})
+        if missing:
+            raise WorkspaceRecoveryError(
+                "RECOVERY_DUCKDB_MANIFEST_DRIFT",
+                "DuckDB is missing an active dataset binding required by recovery.",
+            )
+        for item in rows:
+            logical_table = str(item.get("logical_table") or "")
+            if int(item.get("manifest_version") or 0) != 2 or _duckdb_relation_kind(connection, logical_table) != "VIEW":
+                raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "DuckDB dataset manifest points to a missing logical view.")
+            _manifest_object_paths(item.get("object_keys_json"), item.get("object_hashes_json"))
+        return _fingerprint({"schema": "aibi-duckdb-workspace-datasets/v2", "rows": rows}), rows
 
 
 def _workspace_state(connection: sqlite3.Connection, workspace_id: str, duckdb_path: Path) -> dict[str, Any]:
@@ -502,7 +613,7 @@ def _workspace_state(connection: sqlite3.Connection, workspace_id: str, duckdb_p
         "physicalTableCount": len(physical_tables),
         "replicaCount": len(replica_rows),
     }
-    payload["fingerprint"] = _fingerprint({"schema": "aibi-workspace-recovery-state/v1", **payload})
+    payload["fingerprint"] = _fingerprint({"schema": "aibi-workspace-recovery-state/v2", **payload})
     return payload
 
 
@@ -517,6 +628,12 @@ def _estimate_bytes(sqlite_path: Path, duckdb_path: Path) -> int:
 def _create_sqlite_snapshot(connection: sqlite3.Connection, target: Path, workspace_id: str) -> None:
     if target.exists():
         raise WorkspaceRecoveryError("RECOVERY_STAGING_COLLISION", "Recovery staging artifact already exists.")
+    legacy_tables = [name for name in _workspace_physical_tables(connection, workspace_id) if _table_exists(connection, name)]
+    if legacy_tables:
+        raise WorkspaceRecoveryError(
+            "RECOVERY_LEGACY_BUSINESS_STORAGE_UNSUPPORTED",
+            "Dataset v2 recovery cannot copy SQLite business tables.",
+        )
     target.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(target)) as snapshot:
         connection.backup(snapshot)
@@ -529,6 +646,11 @@ def _create_sqlite_snapshot(connection: sqlite3.Connection, target: Path, worksp
                     "A physical table is shared across workspaces; recovery cannot isolate it safely.",
                 )
         target_physical = {name for name, owners in bindings.items() if owners == {workspace_id}}
+        workspace_row = snapshot.execute(
+            "SELECT current_source_run_id FROM workspaces WHERE id = ?",
+            (workspace_id,),
+        ).fetchone()
+        current_source_run_id = str(workspace_row[0] or "") if workspace_row is not None else ""
         snapshot.execute("PRAGMA foreign_keys = OFF")
         snapshot.execute("BEGIN IMMEDIATE")
         for table_name in _table_names(snapshot):
@@ -536,6 +658,33 @@ def _create_sqlite_snapshot(connection: sqlite3.Connection, target: Path, worksp
                 snapshot.execute(f"DROP TABLE IF EXISTS {_quote_identifier(table_name)}")
                 continue
             if table_name in target_physical or table_name in {"workspaces", "system_flags"}:
+                continue
+            if table_name == "dataset_versions":
+                snapshot.execute(
+                    "DELETE FROM dataset_versions WHERE workspace_id <> ? OR version_id NOT IN ("
+                    "SELECT active_version_id FROM table_registry "
+                    "WHERE workspace_id = ? AND active_version_id <> ''"
+                    ")",
+                    (workspace_id, workspace_id),
+                )
+                continue
+            if table_name == "dataset_version_files":
+                snapshot.execute(
+                    "DELETE FROM dataset_version_files WHERE version_id NOT IN ("
+                    "SELECT active_version_id FROM table_registry "
+                    "WHERE workspace_id = ? AND active_version_id <> ''"
+                    ")",
+                    (workspace_id,),
+                )
+                continue
+            if table_name == "source_runs":
+                if current_source_run_id:
+                    snapshot.execute(
+                        "DELETE FROM source_runs WHERE workspace_id <> ? OR id <> ?",
+                        (workspace_id, current_source_run_id),
+                    )
+                else:
+                    snapshot.execute("DELETE FROM source_runs")
                 continue
             columns = _table_columns(snapshot, table_name)
             if "workspace_id" in columns:
@@ -579,7 +728,115 @@ def _validate_sqlite_snapshot(path: Path, workspace_id: str) -> None:
         workspaces = [str(row[0]) for row in connection.execute("SELECT id FROM workspaces ORDER BY id").fetchall()]
         if workspaces != [workspace_id]:
             raise WorkspaceRecoveryError("RECOVERY_WORKSPACE_MISMATCH", "SQLite recovery artifact is not isolated to the requested workspace.")
+        required_dataset_tables = {"dataset_versions", "dataset_version_files", "source_runs", "table_registry"}
+        if not all(_table_exists(connection, table_name) for table_name in required_dataset_tables):
+            raise WorkspaceRecoveryError(
+                "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                "Dataset v2 recovery snapshot is missing its version or lineage catalogue.",
+            )
+        dangling_active_version = connection.execute(
+            """
+            SELECT 1
+            FROM table_registry AS registry
+            LEFT JOIN dataset_versions AS version
+              ON version.version_id = registry.active_version_id
+             AND version.workspace_id = registry.workspace_id
+             AND version.table_key = registry.table_key
+            WHERE registry.workspace_id = ?
+              AND registry.active_version_id <> ''
+              AND version.version_id IS NULL
+            LIMIT 1
+            """,
+            (workspace_id,),
+        ).fetchone()
+        incomplete_version = connection.execute(
+            """
+            SELECT 1
+            FROM dataset_versions AS version
+            LEFT JOIN dataset_version_files AS file ON file.version_id = version.version_id
+            WHERE version.workspace_id = ?
+            GROUP BY version.version_id
+            HAVING COUNT(file.version_id) <> 1
+            LIMIT 1
+            """,
+            (workspace_id,),
+        ).fetchone()
+        orphan_file = connection.execute(
+            """
+            SELECT 1
+            FROM dataset_version_files AS file
+            LEFT JOIN dataset_versions AS version ON version.version_id = file.version_id
+            WHERE version.version_id IS NULL OR version.workspace_id <> ?
+            LIMIT 1
+            """,
+            (workspace_id,),
+        ).fetchone()
+        inactive_version = connection.execute(
+            """
+            SELECT 1
+            FROM dataset_versions AS version
+            LEFT JOIN table_registry AS registry
+              ON registry.workspace_id = version.workspace_id
+             AND registry.table_key = version.table_key
+             AND registry.active_version_id = version.version_id
+            WHERE version.workspace_id = ? AND registry.active_version_id IS NULL
+            LIMIT 1
+            """,
+            (workspace_id,),
+        ).fetchone()
+        if (
+            dangling_active_version is not None
+            or incomplete_version is not None
+            or orphan_file is not None
+            or inactive_version is not None
+        ):
+            raise WorkspaceRecoveryError(
+                "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                "Dataset v2 recovery snapshot contains an incomplete version manifest.",
+            )
+        for object_key, object_hash in connection.execute(
+            "SELECT object_key, object_hash FROM dataset_version_files ORDER BY version_id, ordinal"
+        ).fetchall():
+            expected_hash = str(object_hash or "").lower()
+            try:
+                object_path = resolve_object_key(str(object_key or ""))
+            except (PermissionError, ValueError) as error:
+                raise WorkspaceRecoveryError(
+                    "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                    "Dataset v2 recovery snapshot contains an invalid object binding.",
+                ) from error
+            if (
+                object_path.name != f"{expected_hash}.parquet"
+                or not object_path.is_file()
+                or object_path.is_symlink()
+                or file_sha256(object_path) != expected_hash
+            ):
+                raise WorkspaceRecoveryError(
+                    "RECOVERY_DATASET_OBJECT_INTEGRITY_FAILED",
+                    "Recovery snapshot references a missing or invalid immutable dataset object.",
+                )
+        workspace_row = connection.execute(
+            "SELECT current_source_run_id FROM workspaces WHERE id = ?",
+            (workspace_id,),
+        ).fetchone()
+        current_source_run_id = str(workspace_row[0] or "") if workspace_row is not None else ""
+        lineage_rows = connection.execute(
+            "SELECT id FROM source_runs WHERE workspace_id = ? ORDER BY id",
+            (workspace_id,),
+        ).fetchall()
+        lineage_ids = [str(row[0]) for row in lineage_rows]
+        expected_lineage_ids = [current_source_run_id] if current_source_run_id else []
+        if lineage_ids != expected_lineage_ids:
+            raise WorkspaceRecoveryError(
+                "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                "Recovery snapshot must contain exactly the current source lineage binding.",
+            )
         physical_tables = set(_workspace_physical_tables(connection, workspace_id))
+        if any(_table_exists(connection, table_name) for table_name in physical_tables):
+            raise WorkspaceRecoveryError(
+                "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                "Dataset v2 recovery snapshots must not contain business-row tables.",
+            )
         for table_name in _table_names(connection):
             columns = _table_columns(connection, table_name)
             if "workspace_id" not in columns or table_name in physical_tables:
@@ -628,22 +885,23 @@ def _create_duckdb_snapshot(source_path: Path, target: Path, physical_tables: li
             "SELECT * FROM source_db.main.__aibi_replica_manifest WHERE 1 = 0"
         )
         for logical_table in physical_tables:
-            row = connection.execute(
-                "SELECT replica_table FROM source_db.main.__aibi_replica_manifest WHERE logical_table = ?",
+            description = [str(item[0]) for item in connection.execute("DESCRIBE source_db.main.__aibi_replica_manifest").fetchall()]
+            record = connection.execute(
+                "SELECT * FROM source_db.main.__aibi_replica_manifest WHERE logical_table = ?",
                 [logical_table],
             ).fetchone()
-            if row is None:
-                continue
-            replica_table = str(row[0] or "")
-            if replica_table not in source_tables:
+            if record is None:
                 raise WorkspaceRecoveryError(
                     "RECOVERY_DUCKDB_MANIFEST_DRIFT",
-                    "DuckDB replica manifest points to a missing workspace replica.",
+                    "DuckDB is missing an active dataset binding required by recovery.",
                 )
-            connection.execute(
-                f"CREATE TABLE {_quote_identifier(replica_table)} AS "
-                f"SELECT * FROM source_db.main.{_quote_identifier(replica_table)}"
-            )
+            item = dict(zip(description, record, strict=True))
+            if int(item.get("manifest_version") or 0) != 2 or _duckdb_relation_kind(connection, logical_table, catalog="source_db") != "VIEW":
+                raise WorkspaceRecoveryError(
+                    "RECOVERY_DUCKDB_MANIFEST_DRIFT",
+                    "DuckDB dataset manifest points to a missing workspace view.",
+                )
+            paths = _manifest_object_paths(item.get("object_keys_json"), item.get("object_hashes_json"))
             connection.execute(
                 "INSERT INTO __aibi_replica_manifest "
                 "SELECT * FROM source_db.main.__aibi_replica_manifest WHERE logical_table = ?",
@@ -651,7 +909,7 @@ def _create_duckdb_snapshot(source_path: Path, target: Path, physical_tables: li
             )
             connection.execute(
                 f"CREATE VIEW {_quote_identifier(logical_table)} AS "
-                f"SELECT * FROM {_quote_identifier(replica_table)}"
+                f"SELECT * FROM {_parquet_view_source(paths)}"
             )
         connection.execute("DETACH source_db")
         connection.execute("CHECKPOINT")
@@ -887,12 +1145,20 @@ class WorkspaceRecoveryService:
                     continue
                 if status == "needs_attention":
                     result = receipt.get("result") if isinstance(receipt.get("result"), dict) else {}
-                    needs_attention.append({
-                        "workspaceId": workspace_id,
-                        "status": "workspace_delete_needs_attention",
-                        "errorCode": str(result.get("errorCode") or "WORKSPACE_DELETE_NEEDS_ATTENTION"),
-                    })
-                    continue
+                    resumable_final_gc = (
+                        str(result.get("resumeFromStatus") or "") == "sqlite_deleted"
+                        or (
+                            not result.get("resumeFromStatus")
+                            and isinstance(result.get("deletedCounts"), dict)
+                        )
+                    )
+                    if not resumable_final_gc:
+                        needs_attention.append({
+                            "workspaceId": workspace_id,
+                            "status": "workspace_delete_needs_attention",
+                            "errorCode": str(result.get("errorCode") or "WORKSPACE_DELETE_NEEDS_ATTENTION"),
+                        })
+                        continue
                 try:
                     from workspace_command_service import reconcile_workspace_delete_receipt
 
@@ -1022,6 +1288,12 @@ class WorkspaceRecoveryService:
         receipt_path: Path | None = None,
         fail_at: str = "",
     ) -> dict[str, Any]:
+        completed_result = dict(result)
+        gc_candidates = [
+            dict(item)
+            for item in completed_result.pop("_datasetObjectGcCandidates", [])
+            if isinstance(item, dict)
+        ]
         directory = self._point_directory(workspace_id, recovery_point_key, must_exist=False)
         tombstone = self._delete_tombstone(workspace_id, recovery_point_key, request_key_fingerprint)
         if directory.exists() and tombstone.exists():
@@ -1038,6 +1310,15 @@ class WorkspaceRecoveryService:
             _assert_not_symlink(tombstone, label="Recovery delete tombstone")
             shutil.rmtree(tombstone)
             _fsync_directory(tombstone.parent)
+        with closing(self.open_db()) as connection:
+            completed_result["datasetObjectGc"] = collect_unreferenced_dataset_objects(
+                connection,
+                candidates=gc_candidates,
+                duckdb_paths=[
+                    self.duckdb_path,
+                    *recovery_point_duckdb_catalogs(self.recovery_root, workspace_id=workspace_id),
+                ],
+            )
         if request_key is not None:
             self._write_operation(
                 workspace_id,
@@ -1045,7 +1326,7 @@ class WorkspaceRecoveryService:
                 request_key,
                 intent_fingerprint,
                 "completed",
-                result,
+                completed_result,
             )
         elif receipt_path is not None:
             self._write_operation_at(
@@ -1055,11 +1336,11 @@ class WorkspaceRecoveryService:
                 request_key_fingerprint=request_key_fingerprint,
                 intent_fingerprint=intent_fingerprint,
                 status="completed",
-                result=result,
+                result=completed_result,
             )
         else:
             raise WorkspaceRecoveryError("RECOVERY_DELETE_RECEIPT_MISSING", "Delete reconciliation receipt is missing.")
-        return result
+        return completed_result
 
     def _state(self, workspace_id: str) -> dict[str, Any]:
         with closing(self.open_db()) as connection:
@@ -1240,7 +1521,7 @@ class WorkspaceRecoveryService:
                     "Recovery artifacts do not match the workspace state frozen by the preview.",
                 )
             files: list[dict[str, Any]] = []
-            for kind, path in (("sqlite-control", sqlite_artifact), ("duckdb-replica", duckdb_artifact)):
+            for kind, path in (("sqlite-control", sqlite_artifact), ("duckdb-catalog", duckdb_artifact)):
                 if not path.exists():
                     continue
                 metadata = _assert_regular_file(path)
@@ -1256,7 +1537,7 @@ class WorkspaceRecoveryService:
                 "inputFingerprint": plan["inputFingerprint"],
                 "workspaceStateFingerprint": state["fingerprint"],
                 "sqliteSchemaVersion": state["sqliteSchemaVersion"],
-                "duckdbSchemaVersion": 1 if duckdb_created else None,
+                "duckdbSchemaVersion": 2 if duckdb_created else None,
                 "currentSourceRunId": state["currentSourceRunId"],
                 "sourceVersions": source_versions,
                 "files": files,
@@ -1341,7 +1622,7 @@ class WorkspaceRecoveryService:
                 kind = str(entry.get("kind") or "")
                 if name not in {SQLITE_ARTIFACT, DUCKDB_ARTIFACT} or name in seen or Path(name).name != name:
                     raise WorkspaceRecoveryError("RECOVERY_MANIFEST_INVALID", "Recovery manifest contains an unsupported artifact path.")
-                if kind not in {"sqlite-control", "duckdb-replica"}:
+                if kind not in {"sqlite-control", "duckdb-catalog"}:
                     raise WorkspaceRecoveryError("RECOVERY_MANIFEST_INVALID", "Recovery manifest contains an unsupported artifact kind.")
                 seen.add(name)
                 path = _safe_child(directory, name, must_exist=True)
@@ -1355,6 +1636,17 @@ class WorkspaceRecoveryService:
             if SQLITE_ARTIFACT not in seen:
                 raise WorkspaceRecoveryError("RECOVERY_MANIFEST_INVALID", "Recovery point is missing its SQLite control snapshot.")
             _validate_sqlite_snapshot(_safe_child(directory, SQLITE_ARTIFACT, must_exist=True), workspace_id)
+            if DUCKDB_ARTIFACT in seen:
+                try:
+                    verify_duckdb_manifest_objects(
+                        [_safe_child(directory, DUCKDB_ARTIFACT, must_exist=True)]
+                    )
+                except (FileNotFoundError, OSError, RuntimeError, ValueError) as error:
+                    raise WorkspaceRecoveryError(
+                        "RECOVERY_DATASET_OBJECT_INTEGRITY_FAILED",
+                        "Recovery point references a missing or invalid immutable dataset object.",
+                        "Use a different verified recovery point; do not confirm this restore.",
+                    ) from error
         manifest = dict(manifest)
         manifest["verified"] = bool(verify)
         manifest["totalBytes"] = sum(int(item.get("bytes") or 0) for item in files if isinstance(item, dict))
@@ -1469,7 +1761,7 @@ class WorkspaceRecoveryService:
 
     def _restore_duckdb(self, snapshot_path: Path | None, current_physical: list[str]) -> dict[str, Any]:
         if not self.duckdb_path.exists() and snapshot_path is None:
-            return {"changed": False, "restoredReplicas": 0, "removedReplicas": 0}
+            return {"changed": False, "restoredDatasets": 0, "removedDatasets": 0}
         duckdb = _duckdb_module()
         self.duckdb_path.parent.mkdir(parents=True, exist_ok=True)
         with duckdb.connect(str(self.duckdb_path)) as connection:
@@ -1492,10 +1784,6 @@ class WorkspaceRecoveryService:
                 manifest_exists = _duckdb_table_exists(connection, "__aibi_replica_manifest")
                 removed = 0
                 for logical_table in current_physical:
-                    replica_rows = connection.execute(
-                        "SELECT replica_table FROM __aibi_replica_manifest WHERE logical_table = ?",
-                        [logical_table],
-                    ).fetchall() if manifest_exists else []
                     relation = connection.execute(
                         "SELECT table_type FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?",
                         [logical_table],
@@ -1506,8 +1794,7 @@ class WorkspaceRecoveryService:
                         connection.execute(f"DROP TABLE {_quote_identifier(logical_table)}")
                     if manifest_exists:
                         connection.execute("DELETE FROM __aibi_replica_manifest WHERE logical_table = ?", [logical_table])
-                    for row in replica_rows:
-                        connection.execute(f"DROP TABLE IF EXISTS {_quote_identifier(str(row[0]))}")
+                    if relation:
                         removed += 1
                 restored = 0
                 if snapshot_path is not None:
@@ -1518,28 +1805,42 @@ class WorkspaceRecoveryService:
                                 "SELECT * FROM recovery_snapshot.main.__aibi_replica_manifest WHERE 1 = 0"
                             )
                             manifest_exists = True
+                        description = [
+                            str(item[0])
+                            for item in connection.execute(
+                                "DESCRIBE recovery_snapshot.main.__aibi_replica_manifest"
+                            ).fetchall()
+                        ]
+                        required = {
+                            "manifest_version", "logical_table", "source_version", "version_id",
+                            "object_keys_json", "object_paths_json", "object_hashes_json",
+                            "schema_fingerprint", "content_fingerprint", "row_count", "published_at",
+                        }
+                        if not required.issubset(description):
+                            raise WorkspaceRecoveryError(
+                                "RECOVERY_DUCKDB_MANIFEST_V2_REQUIRED",
+                                "Recovery DuckDB dataset manifest is not version 2.",
+                            )
                         rows = connection.execute(
-                            "SELECT logical_table, replica_table FROM recovery_snapshot.main.__aibi_replica_manifest ORDER BY logical_table"
+                            "SELECT * FROM recovery_snapshot.main.__aibi_replica_manifest ORDER BY logical_table"
                         ).fetchall()
-                        for logical_table, replica_table in rows:
-                            logical_name = str(logical_table)
-                            replica_name = str(replica_table)
-                            if replica_name not in snapshot_tables:
-                                raise WorkspaceRecoveryError("RECOVERY_DUCKDB_MANIFEST_DRIFT", "Recovery DuckDB manifest points to a missing replica.")
-                            collision = connection.execute(
-                                "SELECT logical_table FROM __aibi_replica_manifest "
-                                "WHERE replica_table = ? AND logical_table <> ? LIMIT 1",
-                                [replica_name, logical_name],
-                            ).fetchone() if manifest_exists else None
-                            if collision is not None:
+                        for raw_record in rows:
+                            record = dict(zip(description, raw_record, strict=True))
+                            logical_name = str(record.get("logical_table") or "")
+                            if int(record.get("manifest_version") or 0) != 2:
                                 raise WorkspaceRecoveryError(
-                                    "RECOVERY_DUCKDB_REPLICA_COLLISION",
-                                    "Recovery replica name is already owned by another logical table.",
+                                    "RECOVERY_DUCKDB_MANIFEST_V2_REQUIRED",
+                                    "Recovery DuckDB dataset manifest is not version 2.",
                                 )
-                            connection.execute(f"DROP TABLE IF EXISTS {_quote_identifier(replica_name)}")
+                            paths = _manifest_object_paths(record.get("object_keys_json"), record.get("object_hashes_json"))
+                            relation = _duckdb_relation_kind(connection, logical_name)
+                            if relation == "VIEW":
+                                connection.execute(f"DROP VIEW {_quote_identifier(logical_name)}")
+                            elif relation:
+                                connection.execute(f"DROP TABLE {_quote_identifier(logical_name)}")
                             connection.execute(
-                                f"CREATE TABLE {_quote_identifier(replica_name)} AS "
-                                f"SELECT * FROM recovery_snapshot.main.{_quote_identifier(replica_name)}"
+                                "DELETE FROM __aibi_replica_manifest WHERE logical_table = ?",
+                                [logical_name],
                             )
                             connection.execute(
                                 "INSERT INTO __aibi_replica_manifest "
@@ -1548,7 +1849,7 @@ class WorkspaceRecoveryService:
                             )
                             connection.execute(
                                 f"CREATE OR REPLACE VIEW {_quote_identifier(logical_name)} AS "
-                                f"SELECT * FROM {_quote_identifier(replica_name)}"
+                                f"SELECT * FROM {_parquet_view_source(paths)}"
                             )
                             restored += 1
                 connection.execute("COMMIT")
@@ -1563,7 +1864,7 @@ class WorkspaceRecoveryService:
                         pass
             connection.execute("CHECKPOINT")
         _fsync_file(self.duckdb_path)
-        return {"changed": True, "restoredReplicas": restored, "removedReplicas": removed}
+        return {"changed": True, "restoredDatasets": restored, "removedDatasets": removed}
 
     def _restore_sqlite(self, snapshot_path: Path, workspace_id: str) -> dict[str, Any]:
         _validate_sqlite_snapshot(snapshot_path, workspace_id)
@@ -1582,11 +1883,24 @@ class WorkspaceRecoveryService:
                         (workspace_id,),
                     ).fetchall()
                 ] if _table_exists(connection, "table_registry", "recovery_snapshot") else []
+                snapshot_dataset_version_ids = [
+                    str(row[0])
+                    for row in connection.execute(
+                        "SELECT version_id FROM recovery_snapshot.dataset_versions "
+                        "WHERE workspace_id = ? ORDER BY version_id",
+                        (workspace_id,),
+                    ).fetchall()
+                ]
+                snapshot_workspace = connection.execute(
+                    "SELECT current_source_run_id FROM recovery_snapshot.workspaces WHERE id = ?",
+                    (workspace_id,),
+                ).fetchone()
+                snapshot_source_run_id = str(snapshot_workspace[0] or "") if snapshot_workspace is not None else ""
                 physical_union = registered_physical | set(snapshot_physical)
                 connection.execute("BEGIN IMMEDIATE")
                 target_tables = _table_names(connection)
                 for table_name in target_tables:
-                    if table_name in physical_union:
+                    if table_name in physical_union or table_name in {"dataset_versions", "dataset_version_files", "source_runs"}:
                         continue
                     columns = _table_columns(connection, table_name)
                     if "workspace_id" in columns and table_name in RESTORABLE_WORKSPACE_TABLES:
@@ -1594,9 +1908,14 @@ class WorkspaceRecoveryService:
                             f"DELETE FROM main.{_quote_identifier(table_name)} WHERE workspace_id = ?",
                             (workspace_id,),
                         )
+                connection.execute(
+                    "DELETE FROM main.dataset_version_files WHERE version_id IN ("
+                    "SELECT version_id FROM main.dataset_versions WHERE workspace_id = ?"
+                    ")",
+                    (workspace_id,),
+                )
+                connection.execute("DELETE FROM main.dataset_versions WHERE workspace_id = ?", (workspace_id,))
                 connection.execute("DELETE FROM main.workspaces WHERE id = ?", (workspace_id,))
-                for physical_table in current_physical:
-                    connection.execute(f"DROP TABLE IF EXISTS main.{_quote_identifier(physical_table)}")
                 workspace_columns = _table_columns(connection, "workspaces")
                 snapshot_workspace_columns = _table_columns(connection, "workspaces", "recovery_snapshot")
                 shared_workspace_columns = [column for column in snapshot_workspace_columns if column in workspace_columns]
@@ -1607,8 +1926,50 @@ class WorkspaceRecoveryService:
                     (workspace_id,),
                 )
                 restored_metadata_rows = 0
+                for table_name in ("dataset_versions", "dataset_version_files"):
+                    destination_columns = _table_columns(connection, table_name)
+                    snapshot_columns = _table_columns(connection, table_name, "recovery_snapshot")
+                    if destination_columns != snapshot_columns:
+                        raise WorkspaceRecoveryError(
+                            "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                            "Dataset version catalogue schema does not match the active control database.",
+                        )
+                    columns_sql = ", ".join(_quote_identifier(column) for column in destination_columns)
+                    if table_name == "dataset_versions":
+                        where_sql = "workspace_id = ?"
+                    else:
+                        where_sql = (
+                            "version_id IN (SELECT version_id FROM recovery_snapshot.dataset_versions "
+                            "WHERE workspace_id = ?)"
+                        )
+                    cursor = connection.execute(
+                        f"INSERT INTO main.{_quote_identifier(table_name)} ({columns_sql}) "
+                        f"SELECT {columns_sql} FROM recovery_snapshot.{_quote_identifier(table_name)} WHERE {where_sql}",
+                        (workspace_id,),
+                    )
+                    restored_metadata_rows += max(0, int(cursor.rowcount or 0))
+                if snapshot_source_run_id:
+                    destination_columns = _table_columns(connection, "source_runs")
+                    snapshot_columns = _table_columns(connection, "source_runs", "recovery_snapshot")
+                    if destination_columns != snapshot_columns:
+                        raise WorkspaceRecoveryError(
+                            "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                            "Source lineage schema does not match the active control database.",
+                        )
+                    columns_sql = ", ".join(_quote_identifier(column) for column in destination_columns)
+                    cursor = connection.execute(
+                        f"INSERT OR IGNORE INTO main.source_runs ({columns_sql}) "
+                        f"SELECT {columns_sql} FROM recovery_snapshot.source_runs "
+                        "WHERE workspace_id = ? AND id = ?",
+                        (workspace_id, snapshot_source_run_id),
+                    )
+                    restored_metadata_rows += max(0, int(cursor.rowcount or 0))
                 for table_name in target_tables:
-                    if table_name in physical_union or not _table_exists(connection, table_name, "recovery_snapshot"):
+                    if (
+                        table_name in physical_union
+                        or table_name in {"dataset_versions", "dataset_version_files", "source_runs"}
+                        or not _table_exists(connection, table_name, "recovery_snapshot")
+                    ):
                         continue
                     destination_columns = _table_columns(connection, table_name)
                     if "workspace_id" not in destination_columns or table_name not in RESTORABLE_WORKSPACE_TABLES:
@@ -1624,20 +1985,41 @@ class WorkspaceRecoveryService:
                         (workspace_id,),
                     )
                     restored_metadata_rows += max(0, int(cursor.rowcount or 0))
-                restored_business_rows = 0
-                for physical_table in snapshot_physical:
-                    ddl_row = connection.execute(
-                        "SELECT sql FROM recovery_snapshot.sqlite_master WHERE type = 'table' AND name = ?",
-                        (physical_table,),
+                incomplete_binding = connection.execute(
+                    """
+                    SELECT 1
+                    FROM main.table_registry AS registry
+                    LEFT JOIN main.dataset_versions AS version
+                      ON version.version_id = registry.active_version_id
+                     AND version.workspace_id = registry.workspace_id
+                     AND version.table_key = registry.table_key
+                    LEFT JOIN main.dataset_version_files AS file ON file.version_id = version.version_id
+                    WHERE registry.workspace_id = ?
+                      AND registry.active_version_id <> ''
+                    GROUP BY registry.workspace_id, registry.table_key, registry.active_version_id
+                    HAVING version.version_id IS NULL OR COUNT(file.version_id) <> 1
+                    LIMIT 1
+                    """,
+                    (workspace_id,),
+                ).fetchone()
+                restored_source_run = (
+                    connection.execute(
+                        "SELECT 1 FROM main.source_runs WHERE workspace_id = ? AND id = ?",
+                        (workspace_id, snapshot_source_run_id),
                     ).fetchone()
-                    if not ddl_row or not str(ddl_row[0] or "").lstrip().upper().startswith("CREATE TABLE"):
-                        raise WorkspaceRecoveryError("RECOVERY_SQLITE_SNAPSHOT_INVALID", "Recovery snapshot is missing a physical table definition.")
-                    connection.execute(str(ddl_row[0]))
-                    cursor = connection.execute(
-                        f"INSERT INTO main.{_quote_identifier(physical_table)} "
-                        f"SELECT * FROM recovery_snapshot.{_quote_identifier(physical_table)}"
+                    if snapshot_source_run_id
+                    else True
+                )
+                if incomplete_binding is not None or restored_source_run is None:
+                    raise WorkspaceRecoveryError(
+                        "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                        "Recovery would leave a dataset version or current source lineage pointer incomplete.",
                     )
-                    restored_business_rows += max(0, int(cursor.rowcount or 0))
+                if any(_table_exists(connection, physical_table, "recovery_snapshot") for physical_table in snapshot_physical):
+                    raise WorkspaceRecoveryError(
+                        "RECOVERY_SQLITE_SNAPSHOT_INVALID",
+                        "Dataset v2 recovery snapshots must not contain business-row tables.",
+                    )
                 connection.commit()
             except Exception:
                 connection.rollback()
@@ -1650,8 +2032,9 @@ class WorkspaceRecoveryService:
         return {
             "changed": True,
             "restoredMetadataRows": restored_metadata_rows,
-            "restoredBusinessRows": restored_business_rows,
-            "restoredPhysicalTables": len(snapshot_physical),
+            "restoredDatasetPointers": len(snapshot_physical),
+            "restoredDatasetVersions": len(snapshot_dataset_version_ids),
+            "restoredCurrentSourceRun": bool(snapshot_source_run_id),
         }
 
     def _apply_point(self, workspace_id: str, manifest: dict[str, Any], *, fail_at: str = "") -> dict[str, Any]:
@@ -1869,7 +2252,7 @@ class WorkspaceRecoveryService:
             if prior.get("status") == "completed":
                 return {**prior_result, "changed": False, "idempotentReplay": True}
             if prior.get("status") == "prepared":
-                self._finish_prepared_delete(
+                completed = self._finish_prepared_delete(
                     workspace_id,
                     recovery_point_key,
                     request_key=request_key,
@@ -1877,7 +2260,7 @@ class WorkspaceRecoveryService:
                     intent_fingerprint=str(prior.get("intentFingerprint") or ""),
                     result=prior_result,
                 )
-                return {**prior_result, "changed": False, "idempotentReplay": True}
+                return {**completed, "changed": False, "idempotentReplay": True}
         manifest = self._load_manifest(workspace_id, recovery_point_key, verify=True)
         plan = self._plan("delete", workspace_id, request_key, manifest=manifest)
         if not confirm:
@@ -1895,6 +2278,7 @@ class WorkspaceRecoveryService:
         self._require_plan(expected_plan_fingerprint, plan)
         self._assert_no_active_import(workspace_id)
         self._point_directory(workspace_id, recovery_point_key, must_exist=True)
+        point_catalog = self._point_directory(workspace_id, recovery_point_key, must_exist=True) / DUCKDB_ARTIFACT
         result = {
             "ok": True,
             "confirmed": True,
@@ -1903,6 +2287,7 @@ class WorkspaceRecoveryService:
             "recoveryPlan": plan,
             "deletedRecoveryPointKey": recovery_point_key,
             "invalidationKeys": ["workspace-recovery"],
+            "_datasetObjectGcCandidates": duckdb_manifest_object_references([point_catalog]),
         }
         self._write_operation(workspace_id, "delete", request_key, str(plan["intentFingerprint"]), "prepared", result)
         return self._finish_prepared_delete(

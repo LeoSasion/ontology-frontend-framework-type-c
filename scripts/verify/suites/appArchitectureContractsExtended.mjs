@@ -227,7 +227,7 @@ export function appendAppArchitectureContractExtendedChecks(context) {
           implementationStatusSource.includes("| 跨引擎查询正确性 | 稳定门禁 |") &&
           implementationStatusSource.includes("| Connector Adapter | 稳定受控 / SQL Server 可选 |") &&
           implementationStatusSource.includes("fake-driver 已走完 stage → Durable Import → Journal → active") &&
-          implementationStatusSource.includes("SQLite schema v17") &&
+          implementationStatusSource.includes("SQLite schema v18") &&
           !developmentRoadmapDocSource.includes("### 1. 可验证 Analysis Unit 与 Chart Adapter") &&
           !developmentRoadmapDocSource.includes("Query Receipt 驱动的 Excel/报告导出") &&
           !developmentRoadmapDocSource.includes("P0-D：确定性 Plan Quality Scorecard") &&

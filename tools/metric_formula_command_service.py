@@ -7,6 +7,7 @@ import sqlite3
 from typing import Any, Callable
 
 from bi_cli_core import DUCKDB_PATH, slug
+from dataset_version_store import schema_field_types
 from query_runtime import ValidatedDuckDBQuery, cursor_rows, open_validated_duckdb_query, replica_expectation
 from saved_view_query_service import parse_query_filter
 
@@ -504,7 +505,17 @@ def build_formula_metric_query(
         if group not in columns:
             raise ValueError(f"Unknown group field: {group}")
     filters = normalize_filters(columns, [*parse_json_object(row["filters_json"], []), *metric_filters_from_cli(args.filter)])
-    where, params = where_sql(filters, [column for column in columns if column != "id"], "")
+    schema_json = None
+    try:
+        schema_json = row["schema_json"]
+    except (IndexError, KeyError):
+        pass
+    where, params = where_sql(
+        filters,
+        [column for column in columns if not column.startswith("__aibi_")],
+        "",
+        field_types=schema_field_types(schema_json),
+    )
     ast = parse_and_validate_formula(row["formula_text"], mode="aggregate", available_fields=set(columns))
     metric_sql = ast_to_sql(ast, mode="aggregate", resolve_field=quote_identifier)
     metric_name = "formula_value"
@@ -577,7 +588,8 @@ def query_metric_command(
         row = connection.execute(
             """
             SELECT m.*, COALESCE(t.display_name, m.table_key) AS table_name, t.physical_table,
-                   t.data_version, t.row_count
+                   t.data_version, t.row_count, t.active_version_id, t.schema_json,
+                   t.schema_fingerprint, t.content_fingerprint
             FROM metric_definitions m
             LEFT JOIN table_registry t
               ON t.table_key = m.table_key

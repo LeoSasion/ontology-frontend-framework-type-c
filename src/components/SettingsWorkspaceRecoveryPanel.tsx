@@ -217,7 +217,7 @@ export default function SettingsWorkspaceRecoveryPanel({ workspaceId, onInvalida
         <div>
           <span><Bilingual zh="本地 · 工作区隔离 · SHA-256" en="Local · workspace-scoped · SHA-256" /></span>
           <strong id="workspace-recovery-title"><Bilingual zh="工作区恢复" en="Workspace recovery" /></strong>
-          <small><Bilingual zh="危险写入前保留控制面和当前分析副本。默认只显示最近一项，恢复一定先预演并自动建立安全点。" en="Preserves the control plane and current analytics replica before risky writes. Only the latest point is shown by default; restore always starts with a preview and creates a safety point." /></small>
+          <small><Bilingual zh="危险写入前保留控制面和当前数据集目录。默认只显示最近一项，恢复一定先预演并自动建立安全点。" en="Preserves the control plane and current dataset catalog before risky writes. Only the latest point is shown by default; restore always starts with a preview and creates a safety point." /></small>
         </div>
         <div className={`workspaceRecoveryHealth ${health}`}>
           <strong>{health === "attention" ? biText("需要检查", "Attention") : health === "ready" ? biText("可恢复", "Recoverable") : biText("尚无恢复点", "No recovery point")}</strong>

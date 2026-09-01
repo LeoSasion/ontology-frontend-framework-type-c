@@ -191,7 +191,7 @@ export function SourceWorkbenchQueryFormulaPanel({
             <p className="quietText">{queryIntentLabel(queryInfo.sqlIntent)}</p>
             <div className="formulaMeta">
               <span>{biText("执行引擎", "Runtime")}: {runtimeLabel(queryRuntime?.engine ?? runtimeStatus?.engine)}</span>
-              <span>{biText("同步行", "Synced rows")}: {queryRuntime?.syncedRows ?? "-"}</span>
+              <span>{biText("数据行", "Dataset rows")}: {queryRuntime?.datasetRowCount?.toLocaleString() ?? "-"}</span>
               {queryInfo.fallbackReason ? <strong>{biText("已切换到备用查询", "Using fallback query")}</strong> : null}
             </div>
             {queryRuntime?.compiledSql ? <pre className="compactCode">{queryRuntime.compiledSql}</pre> : null}

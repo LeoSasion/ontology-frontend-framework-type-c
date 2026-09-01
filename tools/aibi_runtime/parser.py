@@ -1210,6 +1210,7 @@ def build_parser() -> argparse.ArgumentParser:
     query.add_argument("--request", default="")
 
     query_table = sub.add_parser("query-table")
+    query_table.add_argument("--workspace", required=True)
     query_table.add_argument("--table")
     query_table.add_argument("--view")
     query_table.add_argument("--mode", default="detail", choices=["detail", "aggregate"])
@@ -1217,11 +1218,15 @@ def build_parser() -> argparse.ArgumentParser:
     query_table.add_argument("--filter", action="append", default=[])
     query_table.add_argument("--sort", action="append", default=[])
     query_table.add_argument("--search")
-    query_table.add_argument("--offset", type=int, default=0)
+    query_table.add_argument("--cursor")
     query_table.add_argument("--limit", type=int, default=50)
     query_table.add_argument("--group", action="append", default=[])
     query_table.add_argument("--measure", default="")
     query_table.add_argument("--agg", default="count", choices=sorted(SAFE_AGGREGATIONS))
+
+    query_table_batch = sub.add_parser("query-table-batch", description="Execute bounded table-query plans in one DuckDB read snapshot.")
+    query_table_batch.add_argument("--workspace", required=True)
+    query_table_batch.add_argument("--plan", action="append", default=[], help="One JSON-encoded table-query plan; at most 32 plans are accepted.")
 
     list_views = sub.add_parser("list-views")
     list_views.add_argument("--table")

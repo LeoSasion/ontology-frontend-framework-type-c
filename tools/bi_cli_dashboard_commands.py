@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sqlite3
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from bi_cli_core import DUCKDB_PATH, now_iso, quote_identifier, slug, source_label, unique_key
@@ -23,15 +26,34 @@ from connector_adapter_service import adapter_contracts
 from dashboard_widget_contracts import B_DASHBOARD_FILTER_OPERATORS
 from domain_pack_service import domain_pack_runtime_context
 from evidence_run_store import list_source_intelligence_runs
-from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, duckdb_status, replica_table_name, sync_table_to_duckdb
+from dataset_version_store import (
+    activate_dataset_version,
+    active_dataset_version,
+    duckdb_parquet_relation,
+    prepare_dataset_version,
+    publish_dataset_version,
+    resolve_dataset_object_paths,
+)
+from query_runtime import DuckDBUnavailable, SAFE_AGGREGATIONS, duckdb_status, publish_dataset_view, replica_source_version
 from relationship_command_service import (
     recommend_relationships_for_connection as recommend_relationships_for_connection_service,
     relation_candidate_fields as relation_candidate_fields_service,
     relationship_name_score as relationship_name_score_service,
-    sample_field_values as sample_field_values_service,
     saved_relationship_signatures as saved_relationship_signatures_service,
 )
 from relationship_tools import build_relationship_preview
+from source_activation_journal_service import (
+    PHASE_COMMIT_STARTED,
+    PHASE_FINALIZED,
+    PHASE_PREPARED,
+    PHASE_REPLICA_PUBLISHED,
+    PHASE_SOURCE_SELECTION_COMMITTED,
+    capture_replica_manifest,
+    prepare_activation,
+    reconcile_activation,
+    restore_replica_manifest,
+    transition_activation,
+)
 
 B_INDEX_REASON_WEIGHTS = {
     "identity-key": 40,
@@ -57,7 +79,6 @@ def recommend_relationships_for_connection(connection: sqlite3.Connection, limit
         build_relationship_preview=build_relationship_preview,
         relation_candidate_fields=lambda conn, registry: relation_candidate_fields_service(conn, registry, active_workspace_id=active_workspace_id, table_columns=table_columns),
         relationship_name_score=relationship_name_score_service,
-        sample_field_values=lambda conn, physical_table, field, limit=300: sample_field_values_service(conn, physical_table, field, limit, quote_identifier=quote_identifier),
         saved_relationship_signatures=lambda conn: saved_relationship_signatures_service(conn, active_workspace_id=active_workspace_id),
     )
 
@@ -490,18 +511,19 @@ def recommend_indexes_for_table(connection: sqlite3.Connection, registry: sqlite
         score = sum(B_INDEX_REASON_WEIGHTS.get(reason, 0) for reason in reasons)
         if score <= 0:
             continue
-        index_key = slug(f"idx_{physical_table}_{field}")[:62]
+        layout_key = slug(f"layout_{physical_table}_{field}")[:62]
         recommendations.append(
             {
                 "tableKey": registry["table_key"],
                 "tableName": registry["display_name"],
                 "physicalTable": physical_table,
                 "field": field,
-                "indexKey": index_key,
+                "layoutKey": layout_key,
                 "score": score,
                 "reasons": sorted(reasons),
                 "rowCount": registry["row_count"],
-                "engine": "duckdb",
+                "engine": "duckdb-parquet",
+                "optimizationKind": "parquet-zone-map-sort",
                 "sideEffectBoundary": "dry-run-until---yes",
             }
         )
@@ -526,10 +548,10 @@ def recommend_indexes_command(args: argparse.Namespace) -> dict[str, Any]:
     recommendations.sort(key=lambda item: (-item["score"], -int(item.get("rowCount") or 0), str(item["tableKey"]), str(item["field"])))
     return {
         "ok": True,
-        "engine": "duckdb",
+        "engine": "duckdb-parquet",
         "dryRun": True,
         "recommendations": recommendations[: max(1, int(args.limit or 12))],
-        "source": "recommend-indexes adapted to the workspace DuckDB runtime",
+        "source": "Parquet zone-map layout recommendations from workspace query usage",
     }
 
 
@@ -541,19 +563,22 @@ def build_index_plan(connection: sqlite3.Connection, table: str, field: str, ind
         raise ValueError(f"Unknown field for index: {field}")
     recommendations = recommend_indexes_for_table(connection, registry, 100)
     recommendation = next((item for item in recommendations if item["field"] == field), None)
-    resolved_index_key = slug(index_key or (recommendation or {}).get("indexKey") or f"idx_{physical_table}_{field}")[:62]
-    source_version = f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}"
-    replica_table = replica_table_name(str(physical_table), source_version)
+    resolved_index_key = slug(index_key or (recommendation or {}).get("layoutKey") or f"layout_{physical_table}_{field}")[:62]
+    current_version = active_dataset_version(connection, str(registry["workspace_id"]), str(registry["table_key"]))
+    if current_version is None:
+        raise ValueError("Dataset optimization requires an active Parquet version.")
     proposed = {
         "tableKey": registry["table_key"],
         "tableName": registry["display_name"],
         "physicalTable": physical_table,
-        "sourceVersion": source_version,
-        "replicaTable": replica_table,
+        "sourceVersion": replica_source_version(registry),
+        "expectedVersionId": current_version["versionId"],
         "field": field,
-        "indexKey": resolved_index_key,
-        "engine": "duckdb",
-        "compiledSql": f"CREATE INDEX IF NOT EXISTS {quote_identifier(resolved_index_key)} ON {quote_identifier(replica_table)} ({quote_identifier(field)})",
+        "layoutKey": resolved_index_key,
+        "engine": "duckdb-parquet",
+        "optimizationKind": "parquet-zone-map-sort",
+        "sortFields": [field, "__aibi_row_id"],
+        "compiledPlan": "DuckDB external sort -> ZSTD Parquet row groups -> atomic dataset-version activation",
         "recommendation": recommendation,
     }
     return proposed, columns
@@ -564,23 +589,179 @@ def execute_index_plan(connection: sqlite3.Connection, proposed: dict[str, Any],
         import duckdb  # type: ignore
     except Exception as exc:  # pragma: no cover
         raise DuckDBUnavailable(str(exc)) from exc
+    registry = resolve_table_registry(connection, str(proposed["tableKey"]))
+    current_version = active_dataset_version(connection, str(registry["workspace_id"]), str(registry["table_key"]))
+    if current_version is None or str(current_version["versionId"]) != str(proposed["expectedVersionId"]):
+        raise ValueError("Dataset changed after the optimization preview; preview it again.")
+    source_paths = resolve_dataset_object_paths(current_version, verify=False)
     DUCKDB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(DUCKDB_PATH)) as duck_connection:
-        replica = sync_table_to_duckdb(
-            connection,
-            duck_connection,
-            str(proposed["physicalTable"]),
-            columns,
-            source_version=str(proposed["sourceVersion"]),
+    with TemporaryDirectory(prefix="aibi-layout-v2-", dir=str(DUCKDB_PATH.parent)) as directory:
+        prepared_path = Path(directory) / "optimized.parquet"
+        relation = duckdb_parquet_relation(source_paths)
+        destination = "'" + prepared_path.as_posix().replace("'", "''") + "'"
+        with duckdb.connect(":memory:") as optimizer:
+            optimizer.execute(
+                f"COPY (SELECT * FROM {relation} ORDER BY {quote_identifier(str(proposed['field']))} NULLS LAST, "
+                f"{quote_identifier('__aibi_row_id')}) TO {destination} "
+                "(FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 122880)"
+            )
+        optimized = prepare_dataset_version(
+            workspace_id=str(registry["workspace_id"]),
+            table_key=str(registry["table_key"]),
+            parquet_path=prepared_path,
+            schema_fields=list(current_version["schemaFields"]),
+            row_count=int(current_version["rowCount"]),
+            source_file=f"layout:{proposed['field']}",
         )
-        duck_connection.execute(str(proposed["compiledSql"]))
+    if str(optimized["versionId"]) == str(current_version["versionId"]):
+        return {
+            "ok": True,
+            "confirmed": True,
+            "changed": False,
+            "optimizedDataset": {
+                **proposed,
+                "versionId": current_version["versionId"],
+                "contentFingerprint": current_version["contentFingerprint"],
+                "rowCount": current_version["rowCount"],
+            },
+        }
+    optimized_paths = resolve_dataset_object_paths(optimized, verify=False)
+    files = [item for item in optimized.get("files") or [] if isinstance(item, dict)]
+    logical_table = str(registry["physical_table"])
+    workspace_id = str(registry["workspace_id"])
+    table_key = str(registry["table_key"])
+    rollback_manifest = capture_replica_manifest(DUCKDB_PATH, [logical_table])
+    expected_manifest = [{
+        "logicalTable": logical_table,
+        "present": True,
+        "relationKind": "VIEW",
+        "sourceVersion": replica_source_version(registry),
+        "versionId": str(optimized["versionId"]),
+        "objectKeys": [str(item["objectKey"]) for item in files],
+        "objectHashes": [str(item["objectHash"]) for item in files],
+        "schemaFingerprint": str(optimized["schemaFingerprint"]),
+        "contentFingerprint": str(optimized["contentFingerprint"]),
+        "rowCount": int(optimized["rowCount"]),
+    }]
+    plan_fingerprint = hashlib.sha256(json.dumps({
+        "schema": "aibi-layout-activation/v2",
+        "workspaceId": workspace_id,
+        "tableKey": table_key,
+        "fromVersionId": str(current_version["versionId"]),
+        "toVersionId": str(optimized["versionId"]),
+        "field": str(proposed["field"]),
+    }, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    job_key = f"layout-v2:{table_key}:{optimized['versionId']}"
+    publish_dataset_version(connection, optimized)
+    journal = prepare_activation(
+        connection,
+        workspace_id=workspace_id,
+        job_key=job_key,
+        plan_fingerprint=plan_fingerprint,
+        parent_source_run_id=None,
+        table_keys=[table_key],
+        expected_manifest=expected_manifest,
+        rollback_manifest=rollback_manifest,
+        now_iso=now_iso,
+    )
+    connection.commit()
+    if journal["phase"] != PHASE_PREPARED:
+        reconcile_activation(connection, journal=journal, duckdb_path=DUCKDB_PATH, now_iso=now_iso)
+        connection.commit()
+        journal = prepare_activation(
+            connection,
+            workspace_id=workspace_id,
+            job_key=job_key,
+            plan_fingerprint=plan_fingerprint,
+            parent_source_run_id=None,
+            table_keys=[table_key],
+            expected_manifest=expected_manifest,
+            rollback_manifest=rollback_manifest,
+            now_iso=now_iso,
+        )
+        connection.commit()
+    journal = transition_activation(
+        connection,
+        workspace_id=workspace_id,
+        journal_key=str(journal["journalKey"]),
+        phase=PHASE_COMMIT_STARTED,
+        now_iso=now_iso,
+    )
+    connection.commit()
+    try:
+        with duckdb.connect(str(DUCKDB_PATH)) as duck_connection:
+            publish_dataset_view(
+                duck_connection,
+                logical_table=logical_table,
+                source_version=replica_source_version(registry),
+                version_id=str(optimized["versionId"]),
+                object_keys=[str(item["objectKey"]) for item in files],
+                object_paths=optimized_paths,
+                object_hashes=[str(item["objectHash"]) for item in files],
+                schema_fingerprint=str(optimized["schemaFingerprint"]),
+                content_fingerprint=str(optimized["contentFingerprint"]),
+                row_count=int(optimized["rowCount"]),
+            )
+        journal = transition_activation(
+            connection,
+            workspace_id=workspace_id,
+            journal_key=str(journal["journalKey"]),
+            phase=PHASE_REPLICA_PUBLISHED,
+            expected_manifest=expected_manifest,
+            now_iso=now_iso,
+        )
+        connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
+        activate_dataset_version(connection, optimized)
+        connection.execute(
+            "UPDATE table_registry SET updated_at = ? WHERE workspace_id = ? AND table_key = ?",
+            (now_iso(), workspace_id, table_key),
+        )
+        journal = transition_activation(
+            connection,
+            workspace_id=workspace_id,
+            journal_key=str(journal["journalKey"]),
+            phase=PHASE_SOURCE_SELECTION_COMMITTED,
+            expected_manifest=expected_manifest,
+            now_iso=now_iso,
+        )
+        connection.commit()
+        transition_activation(
+            connection,
+            workspace_id=workspace_id,
+            journal_key=str(journal["journalKey"]),
+            phase=PHASE_FINALIZED,
+            outcome="committed",
+            event_type="layout_activation_committed",
+            now_iso=now_iso,
+        )
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        restore_replica_manifest(DUCKDB_PATH, rollback_manifest)
+        publish_dataset_version(connection, current_version)
+        activate_dataset_version(connection, current_version)
+        transition_activation(
+            connection,
+            workspace_id=workspace_id,
+            journal_key=str(journal["journalKey"]),
+            phase=PHASE_FINALIZED,
+            outcome="rolled_back",
+            event_type="layout_activation_rolled_back",
+            now_iso=now_iso,
+        )
+        connection.commit()
+        raise
     return {
         "ok": True,
         "confirmed": True,
-        "createdIndex": proposed,
-        "syncedRows": replica["syncedRows"],
-        "replicaStatus": replica["replicaStatus"],
-        "replicaTable": replica["replicaTable"],
+        "changed": True,
+        "optimizedDataset": {
+            **proposed,
+            "versionId": optimized["versionId"],
+            "contentFingerprint": optimized["contentFingerprint"],
+            "rowCount": optimized["rowCount"],
+        },
     }
 
 

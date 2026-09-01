@@ -113,7 +113,7 @@ class FakeSqlServerSession:
                 result.append(item)
         return result
 
-    def iter_snapshot(
+    def iter_snapshot_batches(
         self,
         selection: Mapping[str, Any],
         *,
@@ -121,9 +121,8 @@ class FakeSqlServerSession:
         page_size: int,
         deadline: float,
         cancelled: Callable[[], bool],
-    ) -> Iterator[Mapping[str, Any]]:
-        del page_size
-        self.operations.append("iter_snapshot")
+    ) -> Iterator[Sequence[Mapping[str, Any]]]:
+        self.operations.append("iter_snapshot_batches")
         resource_key = str(selection.get("resourceKey") or "")
         if resource_key == self._fail_on_resource:
             raise RuntimeError("fake partial table failure")
@@ -136,11 +135,17 @@ class FakeSqlServerSession:
             fields = [str(watermark.get("column") or ""), *[str(item) for item in watermark.get("tieBreakers") or []]]
             rows = [row for row in rows if tuple(row.get(field) for field in fields) > boundary]
         columns = [str(item) for item in selection.get("columns") or []]
+        batch: list[dict[str, Any]] = []
         for index, row in enumerate(rows):
             self._check(deadline, cancelled)
             if index >= max_rows:
                 break
-            yield {column: row.get(column) for column in columns}
+            batch.append({column: row.get(column) for column in columns})
+            if len(batch) >= max(1, int(page_size)):
+                yield batch
+                batch = []
+        if batch:
+            yield batch
 
     def close(self) -> None:
         self.closed = True

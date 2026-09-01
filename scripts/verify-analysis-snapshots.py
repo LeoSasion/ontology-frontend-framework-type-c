@@ -176,8 +176,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-analysis-snapshots-") as temp_dir:
         binding = json.loads(stored["binding_json"] if stored else "{}")
         indexes = {str(row[1]) for row in connection.execute("PRAGMA index_list(analysis_snapshots)").fetchall()}
     check(
-        "schema-v17-persists-content-provenance-and-indexes",
-        version == 17
+        "schema-v18-persists-content-provenance-and-indexes",
+        version == 18
         and stored is not None
         and len(content.get("unit", {}).get("rows") or []) == 1
         and binding.keys() >= {"unitKey", "queryReceiptKey", "unitDefinitionFingerprint", "resultFingerprint", "receiptBindingFingerprint", "source", "domainPackFingerprint", "workspaceManifestFingerprint"}

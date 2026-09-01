@@ -13,7 +13,8 @@ export interface QueryResult {
       engine: string;
       database: string;
       compiledSql: string;
-      syncedRows?: number | null;
+      catalogStatus?: string | null;
+      datasetRowCount?: number | null;
     };
     fallbackReason?: string | null;
   };

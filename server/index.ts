@@ -314,6 +314,7 @@ async function handleIdempotentMutation(
 }
 
 function actionForApiPath(url: URL) {
+  if (url.pathname.includes("query-table/batch")) return "query-table-batch";
   if (url.pathname.includes("query-table")) return "query-table";
   if (url.pathname.includes("query")) return "query";
   if (url.pathname.includes("evidence") || url.pathname.includes("export")) return "evidence";
@@ -455,6 +456,8 @@ async function handleApi(request: IncomingMessage, response: ServerResponse, url
   sendJson(response, 404, { ok: false, action: actionForApiPath(url), error: `No route for ${request.method} ${url.pathname}` });
 }
 
+let serverDraining = false;
+
 const server = createServer(async (request, response) => {
   const startedAt = Date.now();
   const incomingRequestId = String(request.headers["x-request-id"] ?? "");
@@ -474,6 +477,16 @@ const server = createServer(async (request, response) => {
       durationMs: Date.now() - startedAt,
     }));
   });
+  if (serverDraining) {
+    response.setHeader("connection", "close");
+    sendJson(response, 503, {
+      ok: false,
+      action: url.pathname.startsWith("/api/") ? actionForApiPath(url) : "static",
+      errorCode: "server-draining",
+      error: "The local service is shutting down and is not accepting new work.",
+    });
+    return;
+  }
   try {
     if (url.pathname.startsWith("/api/")) {
       const boundaryFailure = apiBoundaryFailure(request);
@@ -533,12 +546,50 @@ server.listen(port, host, () => {
   console.log(`AIBI-C API listening on http://${host}:${port}`);
 });
 
+let shutdownPromise: Promise<void> | null = null;
+
+function shutdownServer() {
+  if (shutdownPromise) return shutdownPromise;
+  serverDraining = true;
+  const serverClose = new Promise<void>((resolveClose, rejectClose) => {
+    server.close((error) => {
+      if (error) rejectClose(error);
+      else resolveClose();
+    });
+  });
+  shutdownPromise = (async () => {
+    // Stop accepting work first, then let already accepted requests finish
+    // before their Durable Job and Runtime Host dependencies are drained.
+    await serverClose;
+    await jobRuntime.shutdown();
+    await shutdownRuntimeHosts();
+  })();
+  return shutdownPromise;
+}
+
+function exitAfterShutdown() {
+  void shutdownServer().then(
+    () => process.exit(0),
+    (error) => {
+      console.error(JSON.stringify({
+        event: "server_shutdown_failed",
+        error: error instanceof Error ? error.message : String(error),
+      }));
+      process.exit(1);
+    },
+  );
+}
+
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.once(signal, () => {
-    void (async () => {
-      await jobRuntime.shutdown();
-      await shutdownRuntimeHosts();
-      server.close(() => process.exit(0));
-    })();
+  process.once(signal, exitAfterShutdown);
+}
+
+// An IPC channel exists only when a trusted parent process explicitly creates
+// one. Verification uses it to exercise the real graceful shutdown path on
+// Windows, where SIGTERM and taskkill are forceful or permission-dependent.
+if (typeof process.send === "function") {
+  process.on("message", (message: unknown) => {
+    if (!message || typeof message !== "object" || (message as { type?: unknown }).type !== "aibi-runtime-shutdown") return;
+    exitAfterShutdown();
   });
 }

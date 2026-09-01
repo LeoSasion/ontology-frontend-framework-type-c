@@ -1,23 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import {
   copyView,
-  createSourceDashboardDraft,
-  deleteSource,
   deleteView,
-  inspectSource,
-  navigationOperation,
-  previewFolderImport,
-  previewImportWithOptions,
-  removeConnector,
-  removeImportJob,
-  renameSource,
   runQuery,
-  runSourceIntelligence,
   runTableQuery,
-  saveConnector,
   saveView,
-  setImportPolicy,
-  syncConnector,
 } from "./api";
 import type { AppNavigationTarget } from "./appNavigationModel";
 import type { AppSection } from "./appSections";
@@ -40,6 +27,9 @@ import {
   type CreateImportJobOptions,
 } from "./apiImportJobs";
 import type { AnalysisJob } from "./typesJobs";
+import type { TableQueryOptions } from "./apiViews";
+import type { TableQueryCacheInvalidation } from "./dashboardWidgetQueryRuntime";
+import { shouldCommitTableQueryResult } from "./tableQueryRequestGuard";
 import { latestUsableSourceIntelligenceRun } from "./workspaceFlowModel";
 import type {
   ActionDraft,
@@ -53,8 +43,15 @@ import type {
 } from "./types";
 
 type ApiModel = typeof import("./apiModel");
+type SourceApi = typeof import("./apiSource");
 const loadApiModel = () => import("./apiModel");
 const loadRelationshipWorkspaceActions = () => import("./relationshipWorkspaceActions");
+const loadTableQueryRuntime = () => import("./dashboardWidgetQueryRuntime");
+const loadSourceApi = () => import("./apiSource");
+
+function invalidateTableQueryCache(invalidation: TableQueryCacheInvalidation) {
+  return loadTableQueryRuntime().then(({ invalidateTableQueryCache: invalidate }) => invalidate(invalidation));
+}
 
 type AppDataActionsOptions = {
   activeWorkspaceId: string;
@@ -103,6 +100,22 @@ function sameAnalysisJobs(left: AnalysisJob[], right: AnalysisJob[]) {
   });
 }
 
+function importJobTableKeys(job: AnalysisJob) {
+  const keys = new Set<string>();
+  const inputKeys = job.input.tableKeys;
+  if (Array.isArray(inputKeys)) inputKeys.map(String).filter(Boolean).forEach((key) => keys.add(key));
+  const result = job.result && typeof job.result === "object" && !Array.isArray(job.result)
+    ? job.result as Record<string, unknown>
+    : null;
+  const tables = Array.isArray(result?.tables) ? result.tables : [];
+  for (const table of tables) {
+    if (!table || typeof table !== "object" || Array.isArray(table)) continue;
+    const tableKey = String((table as Record<string, unknown>).tableKey ?? "").trim();
+    if (tableKey) keys.add(tableKey);
+  }
+  return [...keys];
+}
+
 export function useAppDataActions({
   activeWorkspaceId,
   workbench,
@@ -119,12 +132,22 @@ export function useAppDataActions({
   setWorkbench,
 }: AppDataActionsOptions) {
   const sourceIntelligenceRequestRef = useRef(0);
+  const tableQueryRequestRef = useRef(0);
+  const tableQueryControllerRef = useRef<AbortController | null>(null);
+  const activeWorkspaceRef = useRef(activeWorkspaceId);
+  activeWorkspaceRef.current = activeWorkspaceId;
   const sourceIntelligenceLaunchingRef = useRef(false);
   const sourceIntelligenceRecoveryKeyRef = useRef("");
   const hydratedSourceIntelligenceJobsRef = useRef(new Set<string>());
   const [sourceIntelligenceJobs, setSourceIntelligenceJobs] = useState<AnalysisJob[]>([]);
+  useEffect(() => {
+    tableQueryRequestRef.current += 1;
+    tableQueryControllerRef.current?.abort();
+    tableQueryControllerRef.current = null;
+  }, [activeWorkspaceId]);
   const setSection = useCallback((section: AppSection) => navigateTo({ section }), [navigateTo]);
   const handlePreview = useCallback(async (options: { filePath: string; table?: string; uniqueFields?: string[]; conflictRule?: string }) => {
+    const { previewImportWithOptions } = await loadSourceApi();
     const result = await previewImportWithOptions(options);
     setPreview(result);
     setSection("sources");
@@ -132,6 +155,7 @@ export function useAppDataActions({
   }, [setPreview, setSection]);
 
   const handlePreviewFolderImport = useCallback(async (options: { path: string; limit?: number; recursive?: boolean; uniqueFields?: string[]; conflictRule?: string }) => {
+    const { previewFolderImport } = await loadSourceApi();
     const result = await previewFolderImport(options);
     setSection("sources");
     return result;
@@ -179,6 +203,18 @@ export function useAppDataActions({
   const handleImportJobCompleted = useCallback(async (job: AnalysisJob) => {
     requireActiveImportJob(job, "complete-import-job");
     if (job.status !== "succeeded") return;
+    const tableKeys = importJobTableKeys(job);
+    if (tableKeys.length) {
+      for (const table of tableKeys) {
+        await invalidateTableQueryCache({
+          workspaceId: activeWorkspaceId,
+          table,
+          views: workbench.savedViews.filter((view) => view.table_key === table).map((view) => view.view_key),
+        });
+      }
+    } else {
+      await invalidateTableQueryCache({ workspaceId: activeWorkspaceId });
+    }
     const refreshed = await refreshStatusAndWorkbench();
     if (refreshed.status.workspace.id !== activeWorkspaceId) {
       throw new Error("The refreshed import surface belongs to another workspace.");
@@ -187,12 +223,12 @@ export function useAppDataActions({
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
     navigateTo({ section: "sources", tableKey: refreshed.workbench.tables[0]?.table_key });
-  }, [activeWorkspaceId, navigateTo, requireActiveImportJob, setLastActionResult, setStatus, setWorkbench]);
+  }, [activeWorkspaceId, navigateTo, requireActiveImportJob, setLastActionResult, setStatus, setWorkbench, workbench.savedViews]);
 
   const handleWorkspaceRecoveryInvalidated = useCallback((keys: string[]) => {
     const requested = new Set(keys);
     if (!requested.has("workspace-status") && !requested.has("workbench")) return;
-    void refreshStatusAndWorkbench().then((refreshed) => {
+    void invalidateTableQueryCache({ workspaceId: activeWorkspaceId }).then(() => refreshStatusAndWorkbench()).then((refreshed) => {
       if (refreshed.status.workspace.id !== activeWorkspaceId) return;
       if (requested.has("workspace-status")) setStatus(refreshed.status);
       if (requested.has("workbench")) setWorkbench(refreshed.workbench);
@@ -202,6 +238,7 @@ export function useAppDataActions({
   }, [activeWorkspaceId, setLastActionResult, setStatus, setWorkbench]);
 
   const handleImportPolicy = useCallback(async (options: { table: string; uniqueFields: string[]; conflictRule?: string; confirm?: boolean }) => {
+    const { setImportPolicy } = await loadSourceApi();
     const result = await setImportPolicy(options);
     setLastActionResult(result);
     setWorkbench(await refreshWorkbench());
@@ -209,6 +246,7 @@ export function useAppDataActions({
   }, [setLastActionResult, setSection, setWorkbench]);
 
   const handleRemoveImportJob = useCallback(async (options: { jobKey: string; confirm?: boolean }) => {
+    const { removeImportJob } = await loadSourceApi();
     const result = await removeImportJob(options);
     setLastActionResult(result);
     setWorkbench(await refreshWorkbench());
@@ -216,12 +254,14 @@ export function useAppDataActions({
   }, [setLastActionResult, setSection, setWorkbench]);
 
   const handleInspectSource = useCallback(async (table: string) => {
+    const { inspectSource } = await loadSourceApi();
     const result = await inspectSource(table);
     setLastActionResult(result);
     navigateTo({ section: "sources", tableKey: table });
   }, [navigateTo, setLastActionResult]);
 
   const handleRenameSource = useCallback(async (options: { source: string; name: string; confirm?: boolean }) => {
+    const { renameSource } = await loadSourceApi();
     const result = await renameSource(options);
     const refreshed = await refreshStatusWorkbenchDashboards();
     setLastActionResult(result);
@@ -231,7 +271,8 @@ export function useAppDataActions({
     setSection("sources");
   }, [setDashboards, setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleNavigationOperation = useCallback(async (options: Parameters<typeof navigationOperation>[0]) => {
+  const handleNavigationOperation = useCallback(async (options: Parameters<SourceApi["navigationOperation"]>[0]) => {
+    const { navigationOperation } = await loadSourceApi();
     const result = await navigationOperation(options);
     setLastActionResult(result);
     if (options.confirm) {
@@ -245,16 +286,25 @@ export function useAppDataActions({
   }, [setDashboards, setLastActionResult, setSection, setStatus, setWorkbench]);
 
   const handleDeleteSource = useCallback(async (options: { source: string; confirm?: boolean }) => {
+    const { deleteSource } = await loadSourceApi();
     const result = await deleteSource(options);
+    if (options.confirm && result.ok !== false) {
+      await invalidateTableQueryCache({
+        workspaceId: activeWorkspaceId,
+        table: options.source,
+        views: workbench.savedViews.filter((view) => view.table_key === options.source).map((view) => view.view_key),
+      });
+    }
     const refreshed = await refreshStatusWorkbenchDashboards();
     setLastActionResult(result);
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
     setDashboards(refreshed.dashboards);
     setSection("sources");
-  }, [setDashboards, setLastActionResult, setSection, setStatus, setWorkbench]);
+  }, [activeWorkspaceId, setDashboards, setLastActionResult, setSection, setStatus, setWorkbench, workbench.savedViews]);
 
-  const handleSaveConnector = useCallback(async (options: Parameters<typeof saveConnector>[0]) => {
+  const handleSaveConnector = useCallback(async (options: Parameters<SourceApi["saveConnector"]>[0]) => {
+    const { saveConnector } = await loadSourceApi();
     const result = await saveConnector(options);
     const refreshed = await refreshStatusAndWorkbench();
     setLastActionResult(result);
@@ -263,17 +313,20 @@ export function useAppDataActions({
     setSection("sources");
   }, [setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleSyncConnector = useCallback(async (options: Parameters<typeof syncConnector>[0]) => {
+  const handleSyncConnector = useCallback(async (options: Parameters<SourceApi["syncConnector"]>[0]) => {
+    const { syncConnector } = await loadSourceApi();
     const result = await syncConnector(options);
+    if (result.ok !== false) await invalidateTableQueryCache({ workspaceId: activeWorkspaceId });
     const refreshed = await refreshStatusAndWorkbench();
     setLastActionResult(result);
     setStatus(refreshed.status);
     setWorkbench(refreshed.workbench);
     setSection("sources");
     return result;
-  }, [setLastActionResult, setSection, setStatus, setWorkbench]);
+  }, [activeWorkspaceId, setLastActionResult, setSection, setStatus, setWorkbench]);
 
-  const handleRemoveConnector = useCallback(async (options: Parameters<typeof removeConnector>[0]) => {
+  const handleRemoveConnector = useCallback(async (options: Parameters<SourceApi["removeConnector"]>[0]) => {
+    const { removeConnector } = await loadSourceApi();
     const result = await removeConnector(options);
     const refreshed = await refreshStatusAndWorkbench();
     setLastActionResult(result);
@@ -296,9 +349,22 @@ export function useAppDataActions({
     setSection("sources");
   }, [setLastActionResult, setQuery, setSection]);
 
-  const handleTableQuery = useCallback(async (options: Parameters<typeof runTableQuery>[0]) => {
+  const handleTableQuery = useCallback(async (options: TableQueryOptions) => {
+    const requestId = tableQueryRequestRef.current + 1;
+    tableQueryRequestRef.current = requestId;
+    tableQueryControllerRef.current?.abort();
+    const controller = new AbortController();
+    tableQueryControllerRef.current = controller;
+    const expectedWorkspaceId = activeWorkspaceId;
     try {
-      const result = await runTableQuery(options);
+      const result = await runTableQuery(expectedWorkspaceId, options, controller.signal);
+      if (!shouldCommitTableQueryResult({
+        requestId,
+        currentRequestId: tableQueryRequestRef.current,
+        expectedWorkspaceId,
+        activeWorkspaceId: activeWorkspaceRef.current,
+        aborted: controller.signal.aborted,
+      })) return;
       setTableQuery(result);
       navigateTo({
         section: "views",
@@ -306,11 +372,20 @@ export function useAppDataActions({
         viewKey: result.tableQuery.viewKey,
       });
     } catch (error) {
+      if (!shouldCommitTableQueryResult({
+        requestId,
+        currentRequestId: tableQueryRequestRef.current,
+        expectedWorkspaceId,
+        activeWorkspaceId: activeWorkspaceRef.current,
+        aborted: controller.signal.aborted,
+      })) return;
       setLastActionResult(actionErrorResult("query-table", error));
       navigateTo({ section: "views" });
       throw error;
+    } finally {
+      if (tableQueryControllerRef.current === controller) tableQueryControllerRef.current = null;
     }
-  }, [navigateTo, setLastActionResult, setTableQuery]);
+  }, [activeWorkspaceId, navigateTo, setLastActionResult, setTableQuery]);
 
   const handleSaveView = useCallback(async (options: Parameters<typeof saveView>[0]) => {
     const result = await saveView(options);
@@ -490,6 +565,7 @@ export function useAppDataActions({
     sourceIntelligenceLaunchingRef.current = true;
     const request = { ...sourceOptions, async: true, inputs, workspaceId: activeWorkspaceId };
     try {
+      const { runSourceIntelligence } = await loadSourceApi();
       const accepted = await runSourceIntelligence(request);
       if (!("job" in accepted)) {
         const result = accepted;
@@ -630,7 +706,8 @@ export function useAppDataActions({
     return () => window.clearTimeout(timer);
   }, [activeWorkspaceId, handleSourceIntelligenceRun, workbench.importJobs, workbench.sourceIntelligenceRuns, workbench.tables]);
 
-  const handleSourceDashboardDraft = useCallback(async (options: Parameters<typeof createSourceDashboardDraft>[0]) => {
+  const handleSourceDashboardDraft = useCallback(async (options: Parameters<SourceApi["createSourceDashboardDraft"]>[0]) => {
+    const { createSourceDashboardDraft } = await loadSourceApi();
     const result = await createSourceDashboardDraft(options);
     const refreshed = await refreshStatusWorkbenchDrafts();
     setLastActionResult(result);

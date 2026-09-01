@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Callable
 from unittest.mock import patch
 
+import duckdb
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
@@ -36,6 +38,17 @@ checks: list[dict[str, Any]] = []
 
 def check(label: str, ok: bool, evidence: Any = None) -> None:
     checks.append({"label": label, "ok": bool(ok), "evidence": evidence})
+
+
+def parquet_contains(path: Path, column: str, expected: str) -> bool:
+    connection = duckdb.connect(":memory:")
+    try:
+        return bool(connection.execute(
+            f'SELECT count(*) > 0 FROM read_parquet(?) WHERE "{column}" = ?',
+            [str(path), expected],
+        ).fetchone()[0])
+    finally:
+        connection.close()
 
 
 def expect_error(label: str, code: str, action: Callable[[], Any]) -> SqlServerAdapterError | None:
@@ -460,7 +473,7 @@ try:
     )
     check(
         "business-rows-exist-only-in-owned-staging-artifact",
-        any("VerySecretCustomerName" in path.read_text(encoding="utf-8") for path in STAGING_ROOT.rglob("*.csv")),
+        any(parquet_contains(path, "customer_note", "VerySecretCustomerName") for path in STAGING_ROOT.rglob("*.parquet")),
     )
 
     missing_db = VERIFY_ROOT / "missing-schema.sqlite"

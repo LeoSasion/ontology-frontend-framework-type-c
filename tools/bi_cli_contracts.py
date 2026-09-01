@@ -200,6 +200,7 @@ COMMAND_DOMAINS: dict[str, str] = {
     "apply-config": "config",
     "query": "query",
     "query-table": "query",
+    "query-table-batch": "query",
     "list-views": "view",
     "save-view": "view",
     "copy-view": "view",

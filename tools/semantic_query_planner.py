@@ -7,6 +7,8 @@ import sqlite3
 from collections import deque
 from typing import Any, Callable
 
+from dataset_version_store import schema_columns
+
 
 PLAN_SCHEMA = "aibi-semantic-query-plan/v1"
 BLOCKING_STATUSES = {"needs-clarification", "needs-relationship", "needs-validation"}
@@ -732,10 +734,6 @@ def build_semantic_query_plan(
     }
 
 
-def _quote_identifier(value: str) -> str:
-    return f'"{str(value).replace(chr(34), chr(34) * 2)}"'
-
-
 def build_workspace_semantic_plan(
     connection: sqlite3.Connection,
     workspace_id: str,
@@ -745,7 +743,7 @@ def build_workspace_semantic_plan(
     table_columns: Callable[[sqlite3.Connection, str], list[str]] | None = None,
 ) -> dict[str, Any]:
     registries = connection.execute(
-        "SELECT table_key, display_name, physical_table, data_version FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
+        "SELECT table_key, display_name, physical_table, data_version, schema_json FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
         (workspace_id,),
     ).fetchall()
     semantics = connection.execute(
@@ -773,7 +771,9 @@ def build_workspace_semantic_plan(
         if table_columns:
             columns = table_columns(connection, physical_table)
         else:
-            columns = [str(row[1]) for row in connection.execute(f"PRAGMA table_info({_quote_identifier(physical_table)})")]
+            columns = schema_columns(registry["schema_json"])
+        if not columns:
+            raise ValueError(f"Dataset schema metadata is unavailable for table: {table_key}")
         for field_name in columns:
             if field_name.startswith("__"):
                 continue

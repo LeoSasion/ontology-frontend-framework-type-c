@@ -10,6 +10,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from bi_cli_core import DB_PATH, now_iso
 from sqlserver_snapshot_adapter_service import (
+    RECEIPT_SCHEMA,
     SqlServerAdapterError,
     SqlServerDriver,
     adapter_contract,
@@ -519,7 +520,7 @@ def _stored_activation_receipt(
         raise SqlServerAdapterError("SQLSERVER_RECEIPT_INTEGRITY_FAILED", "The persisted SQL Server activation receipt is unreadable.") from error
     if (
         not isinstance(receipt, dict)
-        or receipt.get("schema") != "aibi-sqlserver-snapshot-receipt/v1"
+        or receipt.get("schema") != RECEIPT_SCHEMA
         or receipt.get("operation") != "activate"
         or receipt.get("workspaceId") != workspace_id
         or receipt.get("connectorKey") != connector_key
@@ -1065,7 +1066,7 @@ def _committed_activation_receipt(
         return None
     return {
         "ok": True,
-        "schema": "aibi-sqlserver-snapshot-receipt/v1",
+        "schema": RECEIPT_SCHEMA,
         "operation": "activate",
         "workspaceId": workspace_id,
         "connectorKey": connector_key,

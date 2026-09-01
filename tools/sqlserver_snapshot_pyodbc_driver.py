@@ -81,7 +81,8 @@ class PyodbcSqlServerSession:
         for schema_name, name, resource_type, row_estimate in resources:
             _runtime_check(deadline, cancelled)
             columns = cursor.execute(
-                f"SELECT TOP {int(max_columns_per_table) + 1} c.name, t.name, c.is_nullable, c.column_id "
+                f"SELECT TOP {int(max_columns_per_table) + 1} c.name, t.name, c.is_nullable, c.column_id, "
+                "c.max_length, c.precision, c.scale "
                 "FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id "
                 "JOIN sys.objects o ON o.object_id = c.object_id "
                 "JOIN sys.schemas s ON s.schema_id = o.schema_id "
@@ -108,7 +109,15 @@ class PyodbcSqlServerSession:
                 "type": str(resource_type),
                 "rowEstimate": int(row_estimate or 0),
                 "columns": [
-                    {"name": str(column[0]), "dataType": str(column[1]), "nullable": bool(column[2]), "ordinal": int(column[3])}
+                    {
+                        "name": str(column[0]),
+                        "dataType": str(column[1]),
+                        "nullable": bool(column[2]),
+                        "ordinal": int(column[3]),
+                        "maxLength": int(column[4]),
+                        "precision": int(column[5]),
+                        "scale": int(column[6]),
+                    }
                     for column in columns
                 ],
                 "keyCandidates": list(keys.values()),
@@ -176,7 +185,8 @@ class PyodbcSqlServerSession:
             if not resource_row:
                 continue
             columns = cursor.execute(
-                f"SELECT TOP {int(max_columns_per_table) + 1} c.name, t.name, c.is_nullable, c.column_id "
+                f"SELECT TOP {int(max_columns_per_table) + 1} c.name, t.name, c.is_nullable, c.column_id, "
+                "c.max_length, c.precision, c.scale "
                 "FROM sys.columns c JOIN sys.types t ON t.user_type_id = c.user_type_id "
                 "JOIN sys.objects o ON o.object_id = c.object_id "
                 "JOIN sys.schemas s ON s.schema_id = o.schema_id "
@@ -202,14 +212,22 @@ class PyodbcSqlServerSession:
                 "type": str(resource_row[0]),
                 "rowEstimate": int(resource_row[1] or 0),
                 "columns": [
-                    {"name": str(column[0]), "dataType": str(column[1]), "nullable": bool(column[2]), "ordinal": int(column[3])}
+                    {
+                        "name": str(column[0]),
+                        "dataType": str(column[1]),
+                        "nullable": bool(column[2]),
+                        "ordinal": int(column[3]),
+                        "maxLength": int(column[4]),
+                        "precision": int(column[5]),
+                        "scale": int(column[6]),
+                    }
                     for column in columns
                 ],
                 "keyCandidates": list(keys.values()),
             })
         return result
 
-    def iter_snapshot(
+    def iter_snapshot_batches(
         self,
         selection: Mapping[str, Any],
         *,
@@ -217,7 +235,7 @@ class PyodbcSqlServerSession:
         page_size: int,
         deadline: float,
         cancelled: Callable[[], bool],
-    ) -> Iterator[Mapping[str, Any]]:
+    ) -> Iterator[Sequence[Mapping[str, Any]]]:
         _runtime_check(deadline, cancelled)
         resource_key = str(selection.get("resourceKey") or "")
         schema_name, separator, name = resource_key.partition(".")
@@ -259,8 +277,7 @@ class PyodbcSqlServerSession:
             batch = cursor.fetchmany(max(1, int(page_size)))
             if not batch:
                 return
-            for row in batch:
-                yield dict(zip(names, row))
+            yield [dict(zip(names, row)) for row in batch]
 
     def close(self) -> None:
         self.connection.close()

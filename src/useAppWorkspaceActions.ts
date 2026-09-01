@@ -1,11 +1,22 @@
 import { useCallback, type Dispatch, type SetStateAction } from "react";
 import { createWorkspace, deleteWorkspace, renameWorkspace, selectWorkspace } from "./api";
 import type { AppSection } from "./components/Sidebar";
-import { emptyAgentResult } from "./emptyWorkspaceData";
+import { emptyAgentResult, emptyImportPreview, emptyQueryResult, emptyTableQuery } from "./emptyWorkspaceData";
 import { refreshStatusDashboardsWorkbenchDrafts } from "./appRefreshModel";
 import { preferredLandingSection } from "./appWorkspaceModel";
 import { invalidateRelationshipRequests } from "./relationshipRequestGuard";
-import type { ActionDraft, AgentAskResult, DashboardPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
+const loadTableQueryRuntime = () => import("./dashboardWidgetQueryRuntime");
+
+async function activateTableQueryWorkspace(workspaceId: string) {
+  const { activateTableQueryWorkspace: activate } = await loadTableQueryRuntime();
+  activate(workspaceId);
+}
+
+async function resetTableQueryRuntime() {
+  const { resetTableQueryRuntime: reset } = await loadTableQueryRuntime();
+  reset();
+}
+import type { ActionDraft, AgentAskResult, DashboardPayload, ImportPreview, QueryResult, TableQueryPayload, WorkbenchPayload, WorkspaceStatus } from "./types";
 import type { AppNavigationContext } from "./appNavigationModel";
 import type { EvidenceFocus } from "./types";
 
@@ -19,6 +30,9 @@ type AppWorkspaceActionsOptions = {
   setAgent: StateSetter<AgentAskResult>;
   setDashboards: StateSetter<DashboardPayload>;
   setLastActionResult: StateSetter<Record<string, unknown> | null>;
+  setPreview: StateSetter<ImportPreview>;
+  setQuery: StateSetter<QueryResult>;
+  setTableQuery: StateSetter<TableQueryPayload>;
   setNavigationContext: StateSetter<AppNavigationContext>;
   setEvidenceFocus: StateSetter<EvidenceFocus | null>;
   setSection: StateSetter<AppSection>;
@@ -34,6 +48,9 @@ export function useAppWorkspaceActions({
   setAgent,
   setDashboards,
   setLastActionResult,
+  setPreview,
+  setQuery,
+  setTableQuery,
   setNavigationContext,
   setEvidenceFocus,
   setSection,
@@ -43,15 +60,19 @@ export function useAppWorkspaceActions({
   const reloadWorkspaceSurface = useCallback(async () => {
     invalidateRelationshipRequests();
     const surface = await refreshStatusDashboardsWorkbenchDrafts();
+    await activateTableQueryWorkspace(surface.status.workspace.id);
     setStatus(surface.status);
     setWorkbench(surface.workbench);
     setDashboards(surface.dashboards);
     setAgent(emptyAgentResult);
+    setPreview(emptyImportPreview);
+    setQuery(emptyQueryResult);
+    setTableQuery(emptyTableQuery);
     setActionDrafts(surface.actionDrafts);
     setActiveDashboardKey(surface.dashboards.dashboards[0]?.dashboard_key ?? "default");
     setActiveViewKey(surface.workbench.savedViews[0]?.view_key ?? "");
     return surface;
-  }, [setActionDrafts, setActiveDashboardKey, setActiveViewKey, setAgent, setDashboards, setStatus, setWorkbench]);
+  }, [setActionDrafts, setActiveDashboardKey, setActiveViewKey, setAgent, setDashboards, setPreview, setQuery, setStatus, setTableQuery, setWorkbench]);
 
   const openWorkspaceLanding = useCallback(async (forceHome = false) => {
     const surface = await reloadWorkspaceSurface();
@@ -67,7 +88,23 @@ export function useAppWorkspaceActions({
       setLastActionResult(previewResult);
       return previewResult;
     }
-    const result = await createWorkspace(name, true);
+    await resetTableQueryRuntime();
+    let createdWorkspaceActivated = false;
+    let result: Record<string, unknown>;
+    try {
+      result = await createWorkspace(name, true);
+      const created = result.created && typeof result.created === "object" ? result.created as Record<string, unknown> : null;
+      const createdWorkspaceId = typeof created?.id === "string" ? created.id : "";
+      if (result.ok !== false && createdWorkspaceId) {
+        createdWorkspaceActivated = true;
+        await activateTableQueryWorkspace(createdWorkspaceId);
+      } else {
+        await activateTableQueryWorkspace(activeWorkspaceId);
+      }
+    } catch (error) {
+      await activateTableQueryWorkspace(activeWorkspaceId);
+      throw error;
+    }
     setLastActionResult(result);
     const created = result.created && typeof result.created === "object" ? result.created as Record<string, unknown> : null;
     const createdWorkspaceId = typeof created?.id === "string" ? created.id : "";
@@ -77,14 +114,28 @@ export function useAppWorkspaceActions({
       if (surface.status.workspace.id !== createdWorkspaceId) throw new Error("Created workspace was not activated.");
       return { ...result, enteredWorkspace: createdWorkspaceId };
     }
+    if (!createdWorkspaceActivated) await activateTableQueryWorkspace(activeWorkspaceId);
     return result;
-  }, [openWorkspaceLanding, setLastActionResult]);
+  }, [activeWorkspaceId, openWorkspaceLanding, setLastActionResult]);
 
   const handleWorkspaceSelect = useCallback(async (workspaceId: string) => {
     if (!workspaceId || workspaceId === activeWorkspaceId) return;
-    const result = await selectWorkspace(workspaceId, true);
-    setLastActionResult(result);
-    if (result.ok !== false) await openWorkspaceLanding();
+    await resetTableQueryRuntime();
+    let switched = false;
+    try {
+      const result = await selectWorkspace(workspaceId, true);
+      setLastActionResult(result);
+      if (result.ok === false) {
+        await activateTableQueryWorkspace(activeWorkspaceId);
+        return;
+      }
+      switched = true;
+      await activateTableQueryWorkspace(workspaceId);
+      await openWorkspaceLanding();
+    } catch (error) {
+      await activateTableQueryWorkspace(switched ? workspaceId : activeWorkspaceId);
+      throw error;
+    }
   }, [activeWorkspaceId, openWorkspaceLanding, setLastActionResult]);
 
   const handleWorkspaceDelete = useCallback(async (

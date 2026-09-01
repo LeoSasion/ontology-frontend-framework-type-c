@@ -10,6 +10,7 @@ from typing import Any
 
 from bi_cli_core import quote_identifier
 from bi_cli_core import DUCKDB_PATH
+from bi_cli_schema import table_columns as dataset_columns
 from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 from trusted_query_service import current_source_run_binding
 
@@ -27,6 +28,9 @@ ENTITY_ALIASES: dict[str, tuple[str, ...]] = {
 AMBIGUOUS_SKU_ALIASES = {"sku", "商品编码", "货号", "规格"}
 SCOPE_FIELD_TOKENS = ("平台", "渠道", "店铺", "shop", "store", "channel", "platform")
 PII_FIELD_TOKENS = ("姓名", "手机", "电话", "地址", "邮箱", "身份证", "收件人", "联系人", "phone", "mobile", "email")
+MAX_SCOPE_FIELDS = 4
+MAX_SCOPE_VALUES_PER_FIELD = 100
+MAX_TIME_FIELDS = 2
 
 
 def _normalized(value: Any) -> str:
@@ -67,20 +71,46 @@ def _apparel_domain_enabled(connection: sqlite3.Connection, workspace_id: str) -
     return bool(row and int(row["enabled"] or 0) == 1)
 
 
-def _columns(connection: sqlite3.Connection, physical_table: str) -> list[str]:
-    return [str(row["name"]) for row in connection.execute(f"PRAGMA table_info({quote_identifier(physical_table)})")]
+def _sql_literal(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
 
 
 def _scope_snapshot(connection: Any, registry: sqlite3.Row, columns: list[str]) -> dict[str, Any]:
-    fields = [field for field in columns if any(token.casefold() in field.casefold() for token in SCOPE_FIELD_TOKENS)]
-    values: dict[str, list[str]] = {}
-    for field in fields[:4]:
-        rows = cursor_rows(connection.execute(
-            f"SELECT DISTINCT CAST({quote_identifier(field)} AS TEXT) AS value "
-            f"FROM {quote_identifier(registry['physical_table'])} "
-            f"WHERE TRIM(CAST({quote_identifier(field)} AS TEXT)) <> '' ORDER BY value LIMIT 100"
-        ))
-        values[field] = [str(row["value"]) for row in rows]
+    fields = [
+        field for field in columns
+        if any(token.casefold() in field.casefold() for token in SCOPE_FIELD_TOKENS)
+    ]
+    selected = fields[:MAX_SCOPE_FIELDS]
+    values: dict[str, list[str]] = {field: [] for field in selected}
+    if selected:
+        exploded_values = ", ".join(
+            f"({_sql_literal(field)}, CAST(t.{quote_identifier(field)} AS VARCHAR))"
+            for field in selected
+        )
+        rows = cursor_rows(connection.execute(f"""
+            WITH exploded AS MATERIALIZED (
+              SELECT field_name, TRIM(value) AS value
+              FROM {quote_identifier(registry['physical_table'])} AS t
+              CROSS JOIN LATERAL (VALUES {exploded_values}) AS fields(field_name, value)
+              WHERE value IS NOT NULL AND TRIM(value) <> ''
+            ),
+            distinct_values AS (
+              SELECT field_name, value FROM exploded GROUP BY field_name, value
+            ),
+            ranked AS (
+              SELECT
+                field_name,
+                value,
+                ROW_NUMBER() OVER (PARTITION BY field_name ORDER BY value) AS value_rank
+              FROM distinct_values
+            )
+            SELECT field_name, value
+            FROM ranked
+            WHERE value_rank <= {MAX_SCOPE_VALUES_PER_FIELD}
+            ORDER BY field_name, value
+        """))
+        for row in rows:
+            values[str(row["field_name"])].append(str(row["value"]))
     return {"fields": fields, "values": values, "proven": bool(fields)}
 
 
@@ -101,18 +131,27 @@ def _time_snapshot(
     ).fetchall()
     fields = [str(row["field_name"]) for row in rows if str(row["field_name"]) in columns]
     windows: dict[str, dict[str, Any]] = {}
-    for field in fields[:2]:
-        row = analysis_connection.execute(
-            f"SELECT MIN(TRY_CAST({quote_identifier(field)} AS TIMESTAMP)) AS start_at, "
-            f"MAX(TRY_CAST({quote_identifier(field)} AS TIMESTAMP)) AS end_at, "
-            f"SUM(CASE WHEN TRY_CAST({quote_identifier(field)} AS TIMESTAMP) IS NOT NULL THEN 1 ELSE 0 END) AS parsed_rows "
-            f"FROM {quote_identifier(registry['physical_table'])}"
-        ).fetchone()
-        windows[field] = {
-            "startAt": str(row[0]) if row[0] is not None else None,
-            "endAt": str(row[1]) if row[1] is not None else None,
-            "parsedRows": int(row[2] or 0),
-        }
+    selected = fields[:MAX_TIME_FIELDS]
+    if selected:
+        select_parts: list[str] = []
+        for index, field in enumerate(selected):
+            timestamp = f"TRY_CAST({quote_identifier(field)} AS TIMESTAMP)"
+            select_parts.extend([
+                f"MIN({timestamp}) AS {quote_identifier(f'__start_{index}')}",
+                f"MAX({timestamp}) AS {quote_identifier(f'__end_{index}')}",
+                f"COUNT({timestamp})::BIGINT AS {quote_identifier(f'__parsed_{index}')}",
+            ])
+        summary = cursor_rows(analysis_connection.execute(
+            f"SELECT {', '.join(select_parts)} FROM {quote_identifier(registry['physical_table'])}"
+        ))[0]
+        for index, field in enumerate(selected):
+            start = summary[f"__start_{index}"]
+            end = summary[f"__end_{index}"]
+            windows[field] = {
+                "startAt": str(start) if start is not None else None,
+                "endAt": str(end) if end is not None else None,
+                "parsedRows": int(summary[f"__parsed_{index}"] or 0),
+            }
     return {"fields": fields, "windows": windows, "proven": any(item["parsedRows"] > 0 for item in windows.values())}
 
 
@@ -182,8 +221,8 @@ def build_apparel_entity_mapping_proof(
             "reason": "platform-commerce-domain-pack-disabled",
             "blockers": [],
         }
-    left_columns = _columns(connection, left_registry["physical_table"])
-    right_columns = _columns(connection, right_registry["physical_table"])
+    left_columns = dataset_columns(connection, left_registry["physical_table"])
+    right_columns = dataset_columns(connection, right_registry["physical_table"])
     mapping_proofs = []
     apparel_signal = False
     blockers: list[str] = []

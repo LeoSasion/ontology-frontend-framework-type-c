@@ -125,16 +125,14 @@ export function appendSourceContractExtendedChecks(context) {
           byLabel["cli-filter-clear-dry-run"].parsed?.requiresConfirmation === true,
       },
     {
-        label: "b-performance-indexes-duckdb-boundary",
-        ok: byLabel["cli-recommend-indexes"].parsed?.recommendations?.some((item) => item.field === "channel" && item.engine === "duckdb") &&
+        label: "b-performance-layout-duckdb-parquet-boundary",
+        ok: byLabel["cli-recommend-indexes"].parsed?.recommendations?.some((item) => item.field === "channel" && item.engine === "duckdb-parquet" && item.optimizationKind === "parquet-zone-map-sort") &&
           byLabel["cli-create-index-dry-run"].parsed?.requiresConfirmation === true &&
-          byLabel["cli-create-index-dry-run"].parsed?.proposed?.engine === "duckdb" &&
+          byLabel["cli-create-index-dry-run"].parsed?.proposed?.engine === "duckdb-parquet" &&
           byLabel["cli-create-index-confirm"].parsed?.confirmed === true &&
-          byLabel["cli-create-index-confirm"].parsed?.createdIndex?.field === "channel" &&
-          byLabel["cli-create-index-confirm"].parsed?.createdIndex?.replicaTable?.startsWith("__aibi_replica_") &&
-          Number.isInteger(byLabel["cli-create-index-confirm"].parsed?.syncedRows) &&
-          byLabel["cli-create-index-confirm"].parsed?.syncedRows >= 0 &&
-          ["current", "published"].includes(byLabel["cli-create-index-confirm"].parsed?.replicaStatus),
+          byLabel["cli-create-index-confirm"].parsed?.optimizedDataset?.field === "channel" &&
+          byLabel["cli-create-index-confirm"].parsed?.optimizedDataset?.optimizationKind === "parquet-zone-map-sort" &&
+          Boolean(byLabel["cli-create-index-confirm"].parsed?.optimizedDataset?.versionId),
       },
     {
         label: "frontend-widget-filter-routing",

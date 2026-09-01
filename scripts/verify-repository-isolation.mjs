@@ -11,7 +11,7 @@ import {
 } from "./repository-boundary-policy.mjs";
 
 const root = resolve(process.cwd());
-const ignoredDirectories = new Set([".git", "node_modules", "dist", "coverage", "data"]);
+const ignoredDirectories = new Set([".git", "node_modules", "dist", "coverage", "data", "tmp"]);
 const textExtensions = new Set([".cjs", ".css", ".env", ".example", ".html", ".js", ".json", ".jsx", ".md", ".mjs", ".py", ".ps1", ".ts", ".tsx", ".txt", ".yaml", ".yml"]);
 const forbiddenPatterns = [
   {
@@ -45,17 +45,45 @@ function insideRoot(path) {
   return relation === "" || (!relation.startsWith(`..${sep}`) && relation !== "..");
 }
 
-function walk(directory, files, symlinkEscapes) {
-  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+function walk(directory, files, symlinkEscapes, scanErrors) {
+  let entries;
+  try {
+    entries = readdirSync(directory, { withFileTypes: true });
+  } catch (error) {
+    scanErrors.push({
+      path: relative(root, directory).replaceAll("\\", "/") || ".",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+  for (const entry of entries) {
     if (entry.isDirectory() && ignoredDirectories.has(entry.name)) continue;
     const path = join(directory, entry.name);
-    const stats = lstatSync(path);
+    let stats;
+    try {
+      stats = lstatSync(path);
+    } catch (error) {
+      scanErrors.push({
+        path: relative(root, path).replaceAll("\\", "/"),
+        error: error instanceof Error ? error.message : String(error),
+      });
+      continue;
+    }
     if (stats.isSymbolicLink()) {
-      const target = realpathSync(path);
+      let target;
+      try {
+        target = realpathSync(path);
+      } catch (error) {
+        scanErrors.push({
+          path: relative(root, path).replaceAll("\\", "/"),
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
       if (!insideRoot(target)) symlinkEscapes.push({ path: relative(root, path), target });
       continue;
     }
-    if (stats.isDirectory()) walk(path, files, symlinkEscapes);
+    if (stats.isDirectory()) walk(path, files, symlinkEscapes, scanErrors);
     else if (stats.isFile()) files.push(path);
   }
 }
@@ -83,7 +111,8 @@ const remote = String(remoteResult.stdout ?? "").trim().replace(/\/$/, "");
 const packageJson = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
 const files = [];
 const symlinkEscapes = [];
-walk(root, files, symlinkEscapes);
+const scanErrors = [];
+walk(root, files, symlinkEscapes, scanErrors);
 
 const forbiddenReferences = [];
 const intentionalNegativeFixtureReferences = [];
@@ -176,6 +205,7 @@ const checks = [
   { label: "clean-room-project-references-are-not-paths", ok: cleanRoomReferencesRemainAllowed, detail: { cleanRoomDoc: relative(root, cleanRoomDocPath).replaceAll("\\", "/") } },
   { label: "remote-project-references-are-not-local-paths", ok: remoteProjectReferencesRemainAllowed, detail: { remoteProjectReferenceFixtures } },
   { label: "intentional-negative-fixture-is-explicitly-scoped", ok: intentionalNegativeFixtureIsExplicit, detail: intentionalNegativeFixtureReferences },
+  { label: "repository-source-tree-is-readable", ok: scanErrors.length === 0, detail: scanErrors },
   { label: "no-external-symlink", ok: symlinkEscapes.length === 0, detail: symlinkEscapes },
   { label: "no-cross-project-reference", ok: forbiddenReferences.length === 0, detail: forbiddenReferences },
   { label: "runtime-paths-do-not-use-other-projects", ok: unsafeRuntimePaths.length === 0, detail: unsafeRuntimePaths },

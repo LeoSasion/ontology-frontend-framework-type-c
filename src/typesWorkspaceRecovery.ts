@@ -1,13 +1,13 @@
 export type WorkspaceRecoveryOperation = "create" | "restore" | "delete";
 
 export interface WorkspaceRecoveryFileSummary {
-  kind: "sqlite-control" | "duckdb-replica";
+  kind: "sqlite-control" | "duckdb-catalog";
   bytes: number;
   sha256: string;
 }
 
 export interface WorkspaceRecoveryPoint {
-  schema: "aibi-workspace-recovery-point/v1";
+  schema: "aibi-workspace-recovery-point/v2";
   workspaceId: string;
   recoveryPointKey: string;
   createdAt: string;

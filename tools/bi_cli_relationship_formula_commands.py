@@ -42,7 +42,6 @@ from relationship_command_service import (
     relationship_save_command as relationship_save_command_service,
     remove_relationship_command as remove_relationship_command_service,
     resolve_relationship_query_inputs as resolve_relationship_query_inputs_service,
-    sample_field_values as sample_field_values_service,
     saved_relationship_signatures as saved_relationship_signatures_service,
     to_number as relationship_to_number_service,
 )
@@ -81,10 +80,6 @@ def relationship_name_score(left_field: str, right_field: str) -> tuple[int, lis
     return relationship_name_score_service(left_field, right_field)
 
 
-def sample_field_values(connection: sqlite3.Connection, physical_table: str, field: str, limit: int = 300) -> set[str]:
-    return sample_field_values_service(connection, physical_table, field, limit, quote_identifier=quote_identifier)
-
-
 def saved_relationship_signatures(connection: sqlite3.Connection) -> set[tuple[str, str, str, str]]:
     return saved_relationship_signatures_service(connection, active_workspace_id=active_workspace_id)
 
@@ -99,7 +94,6 @@ def recommend_relationships_for_connection(connection: sqlite3.Connection, limit
         build_relationship_preview=build_relationship_preview,
         relation_candidate_fields=relation_candidate_fields,
         relationship_name_score=relationship_name_score,
-        sample_field_values=sample_field_values,
         saved_relationship_signatures=saved_relationship_signatures,
     )
 

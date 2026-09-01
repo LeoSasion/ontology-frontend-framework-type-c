@@ -12,7 +12,7 @@
 | --- | --- | --- |
 | 工作区与导航 | 稳定 | 工作区隔离；对象级 URL 可恢复；统一 Journey 模型把接入、自动理解、提问、结果核对和写入确认映射为一个主任务，刷新后从持久 Run、Job 和当前 Agent 结果恢复 |
 | 导入、画像与来源激活 | 稳定受控 | CSV/XLSX/XLSM、文件与文件夹统一预检；受支持文件先进入工作区隔离的 Sealed Import Stage，一次原始解析后由预检、确认和 Durable Job 复用同一哈希绑定，TTL、配额、符号链接和跨工作区访问 fail closed；整表替换逐字段列出新增、移除、保留及完整下游依赖，字段结构变化需在冻结计划上额外确认；确认路径绑定规范化 Import Plan fingerprint、来源哈希、父版本、依赖影响指纹与 `requestKey`；全局单写者队列、lease token/epoch、跨进程写锁和 Activation Journal 对账完成 DuckDB 发布与 current sourceRun 原子切换，刷新或进程退出后可查询、取消或恢复；旧 XLS 仅画像读取 |
-| 跨引擎查询正确性 | 稳定门禁 | SQLite 权威控制面与已发布 DuckDB 分析副本使用固定等价性矩阵核对公式、关系、筛选、排序、分页、NULL、版本和 Receipt 绑定；查询路径只读已发布副本，副本缺失、manifest 漂移、半发布或旧版本均阻断，不隐式整表同步或回退 SQLite |
+| 跨引擎查询正确性 | 稳定门禁 | SQLite 元数据控制面、内容寻址 Parquet 数据版本与 DuckDB 目录视图使用固定等价性矩阵核对公式、关系、筛选、排序、keyset 分页、NULL、版本和 Receipt 绑定；查询路径只读版本化视图，绑定缺失、manifest 漂移、半发布或旧版本均阻断，不复制业务行或回退 SQLite；百万行发布、流式 stage、集合化 merge、深分页、批量看板和内存预算由[数据面性能合同](million-scale-data-plane.md)独立门禁 |
 | 工作区恢复 | 稳定受控 | 工作区隔离恢复点支持创建、校验、表版本/来源指纹影响对比、预演恢复、确认恢复、删除与启动期未完成恢复对账；对比不读取或展示业务行；恢复仅回退正向 allowlist 内的当前业务配置和物理数据，Publication/Ledger、Receipt、来源历史、Job/Event 与 Activation Journal 原样保留并按 current binding 变 stale；manifest 和内容哈希不一致、跨工作区或非服务端路径请求 fail closed，恢复失败保留确定性后续动作，高级 UI 按需加载 |
 | 工作区上下文目录 | 首版已接入 | Workspace Manifest、Runtime Catalog 与 Business Field Profile 从当前工作区只读派生，并通过 CLI/API 供证据页、数据工作台和 Agent 使用；候选与手工确认分离，敏感字段只公开风险和统计，规划绑定覆盖数据、画像、语义、关系、Context、Pack 与 Skill 指纹 |
 | Connector Adapter | 稳定受控 / SQL Server 可选 | 本地表格、allowlist HTTP JSON 与 allowlist SQLite table 支持有界预览、计划和确认导入；可选 SQL Server 路径完成驱动/策略 probe、只读 test、catalog discover、snapshot plan、密封 stage、标准 Durable Import 与 Activation Journal 激活，凭据只使用 Secret Ref；UI 显示 Job/Journal 进度，只有 `succeeded + finalized/committed` 才显示 active |
@@ -40,7 +40,7 @@
 | 通用扩展 | 稳定受控 | Domain Pack 管业务语义，既有通用 Analytical Skill 管分析方法；两者独立 lint、版本化和工作区启停，Skill 只能引用登记 Capability，不能携带代码、SQL、URL 或任意工具；业务理解扩展状态以上一行和 [专题设计](business-understanding-skills.md) 为准 |
 | Provider | 稳定受控 | 工作区 Runtime Profile 分离 Provider、模型、wire API 与预算；deterministic 默认，DeepSeek 和显式 loopback OpenAI-compatible 只解释有界证据；严格 JSON/数字/evidence 校验、零原始行出站、失败降级、shadow evaluation 与持久评估摘要可用 |
 | 证据兼容性 | 稳定受控 | Run、Receipt、Unit 绑定工作区、数据、来源、schema、Pack 与 Workspace Planning Binding 指纹；证据制品按内容哈希寻址并复核完整性，stale 记录不用于当前规划 |
-| 本地运维 | 稳定 | SQLite schema v17、DuckDB schema v1；长驻 Runtime Host 固定一个写者与两个读者，提供有界队列、命令截止时间和健康状态；DuckDB 分析副本按来源版本发布、由 manifest 和逻辑视图原子切换，工作区清理同步移除视图、版本表和 manifest，并由 `prepared → duckdb_deleted → sqlite_deleted → completed` 回执支持崩溃续作；兼容检查、配置可移植、隔离迁移、恢复点和双库回滚可用；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
+| 本地运维 | 稳定 | SQLite schema v18、DuckDB schema v2，旧数据库 fail closed 且无迁移入口；长驻 Runtime Host 固定一个写者与两个读者，提供有界队列、命令截止时间和健康状态；Parquet 数据版本由 Activation Journal、DuckDB manifest/view 与 SQLite active pointer 协调切换，布局优化和来源激活均可在崩溃后确定完成或回滚；恢复点保存控制目录而不复制业务行；`preflight` 只停止本轮拥有且令牌验证通过的服务，陈旧 PID 不会直接触发终止 |
 | 响应式 Web | 稳定 | 横向 1280×720、竖向 720×1280 及以上按可用空间响应式排版与缩放字体；短边低于 720 时冻结基准布局并整体缩放，保留主导航、工作区切换、高级工具与设置；请求失败显示明确错误且不回退陈旧业务结果；不提供原生移动客户端 |
 
 BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contract.md) 维护。
@@ -79,7 +79,7 @@ BI CLI 的实时命令、参数和突变模式只由 [CLI 合同](bi-cli-contrac
 | `tools/aibi_runtime/` | CLI parser、命令注册表、Control/Analysis/Data/Delivery 四个领域分发器、统一生命周期与显式 Application Use Cases；`kernel.py` 只保留兼容组合出口 |
 | `tools/aibi_runtime_host.py` | 长驻 CLI 进程协议；一次装载命令目录，通过逐行 JSON envelope 服务 Runtime Host，不承载 HTTP 或业务授权 |
 | `tools/*.py` | 确定性 BI、语义、关系、证据、Job、导出、扩展和基础设施服务 |
-| `scripts/` | 构建、迁移、浏览器、发布、安全与回归门禁 |
+| `scripts/` | 构建、备份恢复、浏览器、发布、安全、容量与回归门禁 |
 
 Web 生产入口固定为 `src/main.tsx` 和 `server/index.ts`，自动化与诊断入口固定为 `tools/aibi_cli.py`。P0-A 首批拆分已把组合内核缩为只含兼容导出的组合面，运行时调用者直接依赖 `use_cases/` 下的 Control、Analysis、Data、Delivery、Lifecycle 与 Agent Interaction 边界；其中 Agent Interaction 仍是下一批继续拆分 Prompt Resolution、Answer Composition 与 Action Confirmation 的主要对象，类型化 Command/Result 也尚未完成。HTTP API 只接受 loopback Host/Origin，本地会话令牌约束突变请求，幂等键防止重试重复写入；非成功状态保留为非 2xx，并携带可关联 Trace。组件依赖、CLI 注册完整性和文件清单由代码与自动化维护，不在 Markdown 复制；`npm run verify:architecture` 会阻断入口不可达的 TypeScript、JavaScript 与 CSS 源码，也会阻断旧 CLI 路径回流、parser/registry 不一致、Use Case 清单漂移、领域依赖倒退和组合内核重新膨胀。
 
@@ -110,7 +110,7 @@ npm run verify:domain-regressions
 npm run verify:connector-adapters
 npm run verify:domain-neutrality
 npm run verify:ui
-npm run verify:migration
+npm run verify:performance
 npm run verify:production
 npm run preflight
 python tools/aibi_cli.py --json status

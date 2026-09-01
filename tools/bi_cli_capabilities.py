@@ -11,8 +11,8 @@ BI_CLI_CAPABILITY_MAP = [
     {
         "area": "query-runtime",
         "compatibilityCommands": ["query", "query-table"],
-        "commands": ["query", "query-table"],
-        "integration": "mapped-to-duckdb-whitelist-table-query",
+        "commands": ["query", "query-table", "query-table-batch"],
+        "integration": "mapped-to-duckdb-whitelist-table-query-and-bounded-batch-snapshot",
         "status": "active",
     },
     {
@@ -44,10 +44,10 @@ BI_CLI_CAPABILITY_MAP = [
         "status": "active",
     },
     {
-        "area": "performance-indexes",
+        "area": "performance-layout",
         "compatibilityCommands": ["recommend-indexes", "create-index"],
         "commands": ["recommend-indexes", "create-index", "query", "query-table"],
-        "integration": "mapped-to-duckdb-local-index-suggestions-and-confirmed-create-index",
+        "integration": "mapped-to-confirmed-duckdb-external-sort-and-parquet-zone-map-layout-activation",
         "status": "active",
     },
     {

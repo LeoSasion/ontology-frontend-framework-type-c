@@ -3,9 +3,9 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
-from import_policy import record_unique_key
+from import_stage_service import resolve_import_stage_parquet
 
 
 ATOMIC_IMPORT_PLAN_SCHEMA = "aibi-atomic-import-plan/v1"
@@ -20,12 +20,28 @@ def _canonical_fingerprint(value: Any) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def file_content_hash(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        while chunk := stream.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _duckdb() -> Any:
+    try:
+        import duckdb  # type: ignore
+    except ImportError as error:  # pragma: no cover - deployment contract
+        raise RuntimeError("DuckDB is required for atomic import planning.") from error
+    return duckdb
+
+
+def _quote_identifier(value: str) -> str:
+    return '"' + str(value).replace('"', '""') + '"'
+
+
+def _sql_literal(value: str | Path) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _required_import_stage(preview: dict[str, Any]) -> dict[str, Any]:
+    stage = preview.get("importStage") if isinstance(preview.get("importStage"), dict) else {}
+    required = ("stageKey", "contentHash", "contentFingerprint", "parserVersion")
+    if stage.get("sealed") is not True or any(not str(stage.get(field) or "").strip() for field in required):
+        raise ValueError("Import planning requires a sealed Parquet stage.")
+    return stage
 
 
 def bind_single_import_plan(
@@ -37,7 +53,7 @@ def bind_single_import_plan(
     """Bind a single-file preview to the exact bytes and workspace parent version."""
     resolved_path = path.resolve()
     merge_preview = preview.get("mergePolicyPreview") if isinstance(preview.get("mergePolicyPreview"), dict) else {}
-    import_stage = preview.get("importStage") if isinstance(preview.get("importStage"), dict) else {}
+    import_stage = _required_import_stage(preview)
     matched_table = preview.get("matchedTable") if isinstance(preview.get("matchedTable"), dict) else None
     commit_options = {
         "table": str((matched_table or {}).get("table_key") or preview.get("suggestedTableKey") or ""),
@@ -51,10 +67,10 @@ def bind_single_import_plan(
         "kind": "single-file",
         "workspaceId": str(preview.get("workspaceId") or ""),
         "file": resolved_path.as_posix(),
-        "contentHash": str(import_stage.get("contentHash") or file_content_hash(resolved_path)),
-        "stageKey": str(import_stage.get("stageKey") or ""),
-        "stageFingerprint": str(import_stage.get("contentFingerprint") or ""),
-        "parserVersion": str(import_stage.get("parserVersion") or "legacy-direct-read"),
+        "contentHash": str(import_stage["contentHash"]),
+        "stageKey": str(import_stage["stageKey"]),
+        "stageFingerprint": str(import_stage["contentFingerprint"]),
+        "parserVersion": str(import_stage["parserVersion"]),
         "parentSourceRunId": current_source_run_id,
         "commitOptions": commit_options,
         "schemaDecision": [
@@ -115,7 +131,7 @@ def _key_quality_blockers(quality: dict[str, Any] | None) -> list[str]:
 def _cross_file_key_stats(
     items: list[dict[str, Any]],
     unique_fields: list[str],
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
+    workspace_id: str,
 ) -> dict[str, Any]:
     if not unique_fields:
         return {
@@ -126,43 +142,75 @@ def _cross_file_key_stats(
             "emptyKeyRows": 0,
             "partialEmptyKeyRows": 0,
         }
-    key_files: dict[str, set[str]] = {}
-    key_counts: dict[str, int] = {}
-    empty_rows = 0
-    partial_empty_rows = 0
+    relations: list[str] = []
     for item in items:
-        path = Path(str(item["absolutePath"]))
-        _headers, rows = read_table_file(path)
-        for row in rows:
-            values = [str(row.get(field) or "").strip() for field in unique_fields]
-            if not values or all(not value for value in values):
-                empty_rows += 1
-                continue
-            if any(not value for value in values):
-                partial_empty_rows += 1
-            key = record_unique_key(row, unique_fields)
-            if key is None:
-                continue
-            key_files.setdefault(key, set()).add(str(item["fileIdentity"]))
-            key_counts[key] = key_counts.get(key, 0) + 1
-    cross_file_keys = [key for key, files in key_files.items() if len(files) > 1]
+        stage_key = str(item.get("stageKey") or "")
+        if not stage_key:
+            raise ValueError("Atomic import planning requires a sealed Parquet stage for every file.")
+        parquet_path, manifest = resolve_import_stage_parquet(
+            stage_key=stage_key,
+            workspace_id=workspace_id,
+        )
+        headers = {str(field["name"]) for field in manifest["schemaFields"]}
+        missing = [field for field in unique_fields if field not in headers]
+        if missing:
+            raise ValueError(f"Atomic import key fields are missing from a stage: {', '.join(missing)}")
+        file_identity = _sql_literal(str(item["fileIdentity"]))
+        key_projection = ", ".join(
+            f"trim(COALESCE(CAST({_quote_identifier(field)} AS VARCHAR), '')) AS {_quote_identifier(field)}"
+            for field in unique_fields
+        )
+        relations.append(
+            f"SELECT {key_projection}, {file_identity} AS __file_identity FROM read_parquet({_sql_literal(parquet_path)})"
+        )
+    union_relation = " UNION ALL ".join(relations)
+    all_empty = " AND ".join(f"({_quote_identifier(field)} = '')" for field in unique_fields)
+    any_empty = " OR ".join(f"({_quote_identifier(field)} = '')" for field in unique_fields)
+    group_fields = ", ".join(_quote_identifier(field) for field in unique_fields)
+    connection = _duckdb().connect(":memory:")
+    try:
+        row = connection.execute(
+            f"""
+            WITH source AS ({union_relation}), keyed AS (
+              SELECT {group_fields}, COUNT(*)::BIGINT AS key_count,
+                     COUNT(DISTINCT __file_identity)::BIGINT AS file_count
+              FROM source WHERE NOT ({all_empty}) GROUP BY {group_fields}
+            ), totals AS (
+              SELECT
+                SUM(CASE WHEN {all_empty} THEN 1 ELSE 0 END)::BIGINT AS empty_rows,
+                SUM(CASE WHEN NOT ({all_empty}) AND ({any_empty}) THEN 1 ELSE 0 END)::BIGINT AS partial_rows
+              FROM source
+            )
+            SELECT
+              COUNT(keyed.key_count)::BIGINT AS distinct_keys,
+              SUM(CASE WHEN keyed.file_count > 1 THEN 1 ELSE 0 END)::BIGINT AS cross_file_keys,
+              SUM(CASE WHEN keyed.file_count > 1 THEN keyed.key_count - 1 ELSE 0 END)::BIGINT AS cross_file_rows,
+              totals.empty_rows,
+              totals.partial_rows
+            FROM totals LEFT JOIN keyed ON TRUE
+            GROUP BY totals.empty_rows, totals.partial_rows
+            """
+        ).fetchone()
+    finally:
+        connection.close()
     return {
         "uniqueFields": unique_fields,
-        "distinctKeys": len(key_counts),
-        "duplicateKeyCount": len(cross_file_keys),
-        "duplicateRowsAcrossFiles": sum(key_counts[key] - 1 for key in cross_file_keys),
-        "emptyKeyRows": empty_rows,
-        "partialEmptyKeyRows": partial_empty_rows,
+        "distinctKeys": int(row[0] or 0),
+        "duplicateKeyCount": int(row[1] or 0),
+        "duplicateRowsAcrossFiles": int(row[2] or 0),
+        "emptyKeyRows": int(row[3] or 0),
+        "partialEmptyKeyRows": int(row[4] or 0),
+        "evaluationMode": "duckdb-set-based",
     }
 
 
 def enrich_atomic_import_plan(
     base_plan: dict[str, Any],
     *,
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     current_source_run_id: str | None,
 ) -> dict[str, Any]:
     root = Path(str(base_plan["path"])).resolve()
+    workspace_id = str(base_plan.get("workspaceId") or "")
     item_by_table: dict[str, list[dict[str, Any]]] = {}
     enriched_items: list[dict[str, Any]] = []
     for raw in base_plan.get("items") or []:
@@ -170,7 +218,11 @@ def enrich_atomic_import_plan(
         path = Path(str(item["absolutePath"])).resolve()
         preview = item.pop("_preview", {}) if isinstance(item.get("_preview"), dict) else {}
         profile = preview.get("profile") if isinstance(preview.get("profile"), dict) else {}
-        headers, _rows = read_table_file(path)
+        headers = [
+            str(field.get("name") or field.get("field") or "")
+            for field in profile.get("schemaFields") or profile.get("fields") or []
+            if str(field.get("name") or field.get("field") or "")
+        ]
         saved_policy = (preview.get("mergePolicyPreview") or {}).get("savedPolicy")
         unique_fields = list(item.get("uniqueFields") or [])
         key_authority = (
@@ -187,13 +239,13 @@ def enrich_atomic_import_plan(
             "skipRows": 0,
             "afterRowsEstimate": int(item.get("rowCount") or 0),
         }
-        import_stage = preview.get("importStage") if isinstance(preview.get("importStage"), dict) else {}
+        import_stage = _required_import_stage(preview)
         item.update({
             "fileIdentity": _source_identity(path, root if root.is_dir() else root.parent),
-            "contentHash": str(import_stage.get("contentHash") or file_content_hash(path)),
-            "stageKey": str(import_stage.get("stageKey") or "") or None,
-            "stageFingerprint": str(import_stage.get("contentFingerprint") or "") or None,
-            "parserVersion": str(import_stage.get("parserVersion") or "legacy-direct-read"),
+            "contentHash": str(import_stage["contentHash"]),
+            "stageKey": str(import_stage["stageKey"]),
+            "stageFingerprint": str(import_stage["contentFingerprint"]),
+            "parserVersion": str(import_stage["parserVersion"]),
             "schemaDecision": {
                 "headers": headers,
                 "fieldProfiles": [
@@ -226,7 +278,7 @@ def enrich_atomic_import_plan(
         unique_fields = list(group.get("uniqueFields") or [])
         authorities = {str((item.get("keyDecision") or {}).get("authority") or "") for item in group_items}
         key_authority = "owner_confirmed" if authorities == {"owner_confirmed"} else "auto_candidate" if unique_fields else "not_required"
-        cross_file = _cross_file_key_stats(group_items, unique_fields, read_table_file)
+        cross_file = _cross_file_key_stats(group_items, unique_fields, workspace_id)
         group_blockers: list[str] = []
         if group.get("willMerge"):
             if not unique_fields:

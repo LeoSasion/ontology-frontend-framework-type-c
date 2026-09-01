@@ -17,6 +17,7 @@
 | [未来开发队列](development-roadmap.md) | 尚未交付事项、优先级和退出条件 |
 | [可信能力吸收开发规格](trusted-capability-absorption.md) | 持久导入、恢复点、激活日志、审核证据、SQL Server、决策框架与召回评测的本批执行合同 |
 | [跨项目能力吸收与开发规格](cross-project-capability-development.md) | 外部同类产品只读研究的取舍、密封导入、首个可信答案、语义发布、指标合同、Recipe、恢复对比与办公导出合同 |
+| [百万行数据面与性能合同](million-scale-data-plane.md) | clean storage v2、Parquet/DuckDB 数据面、版本发布、算法禁止项与容量退出条件 |
 
 ## 技术合同与证据
 
@@ -55,6 +56,7 @@
 | 业务表达与计划质量如何评测 | `docs/plan-quality-evaluation.md` |
 | 已验证结果如何形成可恢复分支与结果板 | `docs/exploration-threads.md` |
 | 本地预测准备度、快照、监控和联邦证明如何受限 | `docs/local-trusted-analytics.md` |
+| 百万行导入、查询、合并和恢复如何实现与验收 | `docs/million-scale-data-plane.md` |
 | 当前提交是否通过 | 在该提交运行对应验证；仅有独立审计价值的日期证据才进入 `artifacts/` |
 | CLI 当前命令与参数 | `docs/bi-cli-contract.md` 的实时生成结果 |
 

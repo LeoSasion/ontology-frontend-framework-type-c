@@ -2,7 +2,7 @@
 
 Schema: `aibi-bi-cli-contract/v1`
 Entrypoint: `python tools/aibi_cli.py --json <command>`
-Command count: `217`
+Command count: `218`
 
 This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` as the source of truth and regenerate this document after changing CLI commands.
 
@@ -25,7 +25,7 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `metric` | 7 |
 | `navigation` | 2 |
 | `performance` | 2 |
-| `query` | 4 |
+| `query` | 5 |
 | `relationship` | 6 |
 | `semantic` | 12 |
 | `settings` | 2 |
@@ -44,7 +44,7 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `artifact-export` | 2 |
 | `dry-run-confirm` | 85 |
 | `evidence-receipt` | 15 |
-| `read-only` | 97 |
+| `read-only` | 98 |
 | `runtime-receipt` | 15 |
 
 ## Commands
@@ -188,7 +188,8 @@ This file is generated from the live argparse surface. Keep `tools/aibi_cli.py` 
 | `query-metric` | `query` | `read-only` | `no` | `no` | `metric`, `--group`, `--filter`, `--sort`, `--limit` |
 | `query-receipts` | `evidence` | `read-only` | `no` | `no` | `--receipt`, `--limit` |
 | `query-relationship` | `relationship` | `read-only` | `no` | `no` | `--relationship`, `--left-table`, `--right-table`, `--left-field`, `--right-field`, `--map`, `--map-json`, `--join-type`, `...` |
-| `query-table` | `query` | `read-only` | `no` | `no` | `--table`, `--view`, `--mode`, `--column`, `--filter`, `--sort`, `--search`, `--offset`, `...` |
+| `query-table` | `query` | `read-only` | `no` | `no` | `--workspace`, `--table`, `--view`, `--mode`, `--column`, `--filter`, `--sort`, `--search`, `...` |
+| `query-table-batch` | `query` | `read-only` | `no` | `no` | `--workspace`, `--plan` |
 | `recall-receipts` | `evidence` | `read-only` | `no` | `no` | `--receipt`, `--limit` |
 | `recommend-indexes` | `performance` | `read-only` | `no` | `no` | `--table`, `--limit` |
 | `recommend-relationships` | `relationship` | `read-only` | `no` | `no` | `--limit` |

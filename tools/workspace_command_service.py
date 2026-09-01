@@ -9,6 +9,11 @@ import sqlite3
 from typing import Any, Callable
 
 from bi_cli_core import now_iso, quote_identifier, workspace_slug
+from dataset_version_store import (
+    collect_unreferenced_dataset_objects,
+    dataset_object_candidates,
+    delete_dataset_versions,
+)
 from reviewed_publication_service import tombstone_reviewed_publication, verify_evidence_ledger
 from workspace_recovery_service import (
     DUCKDB_ARTIFACT,
@@ -18,6 +23,7 @@ from workspace_recovery_service import (
     _read_recovery_operation,
     _request_key,
     _workspace_state,
+    recovery_point_duckdb_catalogs,
 )
 
 
@@ -407,8 +413,13 @@ def _assert_workspace_delete_snapshot_matches_current(
 
 
 def _verify_duckdb_tables_deleted(duckdb_path: Path, physical_tables: list[str]) -> None:
-    if not physical_tables or not duckdb_path.exists():
+    if not physical_tables:
         return
+    if not duckdb_path.is_file():
+        raise WorkspaceRecoveryError(
+            "WORKSPACE_DELETE_DUCKDB_UNAVAILABLE",
+            "DuckDB catalogue is unavailable; workspace deletion stopped before metadata removal.",
+        )
     try:
         import duckdb  # type: ignore
     except Exception as error:
@@ -430,7 +441,7 @@ def _verify_duckdb_tables_deleted(duckdb_path: Path, physical_tables: list[str])
             if relation or manifest_row:
                 raise WorkspaceRecoveryError(
                     "WORKSPACE_DELETE_DUCKDB_INCOMPLETE",
-                    "DuckDB workspace replicas were not fully deleted.",
+                    "DuckDB workspace dataset views were not fully deleted.",
                     "Run workspace-recovery-reconcile before continuing.",
                 )
 
@@ -478,17 +489,6 @@ def drop_duckdb_tables(duckdb_path: Path | None, physical_tables: list[str]) -> 
         duck_connection.execute("BEGIN TRANSACTION")
         try:
             for table_name in physical_tables:
-                replica_tables = [
-                    str(row[0])
-                    for row in (
-                        duck_connection.execute(
-                            "SELECT replica_table FROM __aibi_replica_manifest WHERE logical_table = ?",
-                            [table_name],
-                        ).fetchall()
-                        if manifest_exists
-                        else []
-                    )
-                ]
                 relation = duck_connection.execute(
                     "SELECT table_type FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?",
                     [table_name],
@@ -497,16 +497,15 @@ def drop_duckdb_tables(duckdb_path: Path | None, physical_tables: list[str]) -> 
                     duck_connection.execute(f"DROP VIEW {quote_identifier(table_name)}")
                     dropped.append(table_name)
                 elif relation:
-                    duck_connection.execute(f"DROP TABLE {quote_identifier(table_name)}")
-                    dropped.append(table_name)
+                    raise WorkspaceRecoveryError(
+                        "WORKSPACE_DELETE_DUCKDB_RELATION_INVALID",
+                        "Dataset v2 logical relations must be DuckDB views.",
+                    )
                 if manifest_exists:
                     duck_connection.execute(
                         "DELETE FROM __aibi_replica_manifest WHERE logical_table = ?",
                         [table_name],
                     )
-                for replica_table in replica_tables:
-                    duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(replica_table)}")
-                    dropped.append(replica_table)
             duck_connection.execute("COMMIT")
         except Exception:
             duck_connection.execute("ROLLBACK")
@@ -517,7 +516,6 @@ def drop_duckdb_tables(duckdb_path: Path | None, physical_tables: list[str]) -> 
 def _delete_workspace_sqlite(
     service: WorkspaceRecoveryService,
     workspace_id: str,
-    physical_tables: list[str],
 ) -> dict[str, int]:
     with closing(service.open_db()) as connection:
         connection.row_factory = sqlite3.Row
@@ -526,9 +524,7 @@ def _delete_workspace_sqlite(
             if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
                 connection.rollback()
                 return {}
-            for physical_table in physical_tables:
-                connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(physical_table)}")
-            deleted_counts: dict[str, int] = {}
+            deleted_counts = delete_dataset_versions(connection, workspace_id=workspace_id)
             for table_name in WORKSPACE_SCOPED_TABLES:
                 if table_has_column(connection, table_name, "workspace_id"):
                     cursor = connection.execute(
@@ -568,12 +564,22 @@ def _advance_workspace_delete(
         raise WorkspaceRecoveryError("WORKSPACE_DELETE_RECEIPT_INVALID", "Workspace delete receipt fingerprints are invalid.")
     if status == "completed":
         return {**result, "changed": False, "idempotentReplay": True}
+    resumed_from_attention = False
     if status == "needs_attention":
-        raise WorkspaceRecoveryError(
-            "WORKSPACE_DELETE_NEEDS_ATTENTION",
-            "Workspace deletion requires operator attention before it can continue.",
-            "Inspect the recovery point and delete receipt before retrying reconciliation.",
-        )
+        resume_from_status = str(result.get("resumeFromStatus") or "")
+        if not resume_from_status and isinstance(result.get("deletedCounts"), dict):
+            # v1 receipts written before resumeFromStatus existed still carry
+            # the durable SQLite deletion result.  The state is reverified
+            # below before final object garbage collection can continue.
+            resume_from_status = "sqlite_deleted"
+        if resume_from_status != "sqlite_deleted":
+            raise WorkspaceRecoveryError(
+                "WORKSPACE_DELETE_NEEDS_ATTENTION",
+                "Workspace deletion requires operator attention before it can continue.",
+                "Inspect the recovery point and delete receipt before retrying reconciliation.",
+            )
+        status = resume_from_status
+        resumed_from_attention = True
     if status not in {"prepared", "duckdb_deleted", "sqlite_deleted"}:
         raise WorkspaceRecoveryError("WORKSPACE_DELETE_RECEIPT_INVALID", "Workspace delete receipt stage is invalid.")
 
@@ -582,6 +588,14 @@ def _advance_workspace_delete(
     with closing(service.open_db()) as connection:
         connection.row_factory = sqlite3.Row
         workspace_exists = bool(connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone())
+    if resumed_from_attention:
+        if workspace_exists:
+            raise WorkspaceRecoveryError(
+                "WORKSPACE_DELETE_RESUME_STATE_INVALID",
+                "Workspace delete receipt cannot resume after metadata reappeared.",
+                "Inspect the recovery point and delete receipt before retrying reconciliation.",
+            )
+        _verify_duckdb_tables_deleted(service.duckdb_path, physical_tables)
 
     if status == "prepared" and workspace_exists:
         with closing(service.open_db()) as connection:
@@ -630,6 +644,12 @@ def _advance_workspace_delete(
             recovery_point_key,
             str(recovery_point.get("workspaceStateFingerprint") or ""),
         )
+        with closing(service.open_db()) as connection:
+            connection.row_factory = sqlite3.Row
+            result["datasetObjectCandidates"] = dataset_object_candidates(
+                connection,
+                workspace_id=workspace_id,
+            )
         _persist_workspace_delete_receipt(
             service,
             workspace_id=workspace_id,
@@ -669,9 +689,8 @@ def _advance_workspace_delete(
 
     if status == "duckdb_deleted":
         _verify_duckdb_tables_deleted(service.duckdb_path, physical_tables)
-        deleted_counts = _delete_workspace_sqlite(service, workspace_id, physical_tables)
+        deleted_counts = _delete_workspace_sqlite(service, workspace_id)
         result["deletedCounts"] = deleted_counts
-        result["droppedPhysicalTables"] = physical_tables
         _persist_workspace_delete_receipt(
             service,
             workspace_id=workspace_id,
@@ -691,9 +710,27 @@ def _advance_workspace_delete(
         with closing(service.open_db()) as connection:
             if connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
                 raise WorkspaceRecoveryError("WORKSPACE_DELETE_SQLITE_INCOMPLETE", "Workspace metadata deletion is incomplete.")
+            protected_catalogs = [
+                service.duckdb_path,
+                *recovery_point_duckdb_catalogs(service.recovery_root, workspace_id=workspace_id),
+            ]
+            result["datasetObjectGc"] = collect_unreferenced_dataset_objects(
+                connection,
+                candidates=[
+                    dict(item)
+                    for item in result.get("datasetObjectCandidates") or []
+                    if isinstance(item, dict)
+                ],
+                duckdb_paths=protected_catalogs,
+            )
         result["ok"] = True
         result["confirmed"] = True
         result["changed"] = True
+        if resumed_from_attention:
+            result["recoveredFromNeedsAttention"] = True
+        result.pop("errorCode", None)
+        result.pop("recoveryAction", None)
+        result.pop("resumeFromStatus", None)
         _persist_workspace_delete_receipt(
             service,
             workspace_id=workspace_id,
@@ -723,6 +760,11 @@ def mark_workspace_delete_needs_attention(
     receipt = _read_recovery_operation(receipt_path)
     result = dict(receipt.get("result") or {}) if isinstance(receipt.get("result"), dict) else {}
     plan = _validate_workspace_delete_plan(dict(result.get("deletePlan") or {}))
+    durable_status = str(receipt.get("status") or "")
+    if durable_status in {"prepared", "duckdb_deleted", "sqlite_deleted"}:
+        result["resumeFromStatus"] = durable_status
+    elif durable_status == "needs_attention" and not result.get("resumeFromStatus") and isinstance(result.get("deletedCounts"), dict):
+        result["resumeFromStatus"] = "sqlite_deleted"
     result["recoveryAction"] = "workspace-recovery-reconcile"
     result["errorCode"] = getattr(error, "code", "WORKSPACE_DELETE_RECONCILE_FAILED")
     _persist_workspace_delete_receipt(

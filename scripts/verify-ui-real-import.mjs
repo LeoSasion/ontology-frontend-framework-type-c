@@ -299,10 +299,11 @@ try {
           const confirm = document.querySelector('[data-testid="folder-import-confirm-button"]');
           const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
           return {
-            ok: Boolean(plan && confirm) && groups.length > 0 && !error,
+            ok: Boolean(plan && confirm && !confirm.disabled) && groups.length > 0 && !error,
             hasPlan: Boolean(plan),
             groupCount: groups.length,
             hasConfirm: Boolean(confirm),
+            confirmDisabled: Boolean(confirm?.disabled),
             hasError: Boolean(error),
             text: text.slice(0, 700),
           };
@@ -320,10 +321,13 @@ try {
         const previewReady = await waitForUi(browser.client, "import preview", () => {
           const text = document.body?.innerText || "";
           const summary = document.querySelector('[data-testid="import-confirmation-summary"]');
+          const confirm = document.querySelector('[data-testid="import-confirmation-confirm"]');
           const error = document.querySelector(".appFallback, .fallbackPanel, [data-testid='source-intelligence-error']");
           return {
-            ok: Boolean(summary) && !error,
+            ok: Boolean(summary && confirm && !confirm.disabled) && !error,
             hasSummary: Boolean(summary),
+            hasConfirm: Boolean(confirm),
+            confirmDisabled: Boolean(confirm?.disabled),
             hasError: Boolean(error),
             text: text.slice(0, 500),
           };

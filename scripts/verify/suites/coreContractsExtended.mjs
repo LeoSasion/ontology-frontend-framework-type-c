@@ -260,7 +260,10 @@ export function appendCoreContractExtendedChecks(context) {
           sourceManagementCommandServiceSource.includes("def build_delete_source_plan(") &&
           sourceManagementCommandServiceSource.includes("def delete_source_command(") &&
           sourceManagementCommandServiceSource.includes("UPDATE table_registry SET display_name = ? WHERE table_key = ? AND workspace_id = ?") &&
-          sourceManagementCommandServiceSource.includes("DROP TABLE IF EXISTS") &&
+          !sourceManagementCommandServiceSource.includes("DROP TABLE IF EXISTS") &&
+          sourceManagementCommandServiceSource.includes("restore_replica_manifest(DUCKDB_PATH, expected_manifest)") &&
+          sourceManagementCommandServiceSource.includes("delete_dataset_versions(") &&
+          sourceManagementCommandServiceSource.includes("collect_unreferenced_dataset_objects(") &&
           sourceManagementCommandServiceSource.includes("DELETE FROM table_registry WHERE table_key = ? AND workspace_id = ?") &&
           sourceManagementCommandServiceSource.includes("affectedWidgets") &&
           sourceManagementCommandServiceSource.includes("affectedConnectors") &&
@@ -460,9 +463,10 @@ export function appendCoreContractExtendedChecks(context) {
         ok: byLabel["cli-status"]?.parsed?.queryRuntime?.fallbackEngine === null &&
           ["current", "blocked"].includes(byLabel["cli-status"]?.parsed?.queryRuntime?.queryAvailability) &&
           byLabel["cli-query"]?.parsed?.query?.runtime?.engine === "duckdb" &&
-          byLabel["cli-query"]?.parsed?.query?.runtime?.compiledSql?.includes("TRY_CAST") &&
-          byLabel["cli-query"]?.parsed?.query?.runtime?.replicaStatus === "current" &&
-          byLabel["cli-query"]?.parsed?.query?.runtime?.syncedRows === 0,
+          byLabel["cli-query"]?.parsed?.query?.runtime?.compiledSql?.includes('SUM("net_sales")') &&
+          !byLabel["cli-query"]?.parsed?.query?.runtime?.compiledSql?.includes("TRY_CAST") &&
+          byLabel["cli-query"]?.parsed?.query?.runtime?.catalogStatus === "current" &&
+          byLabel["cli-query"]?.parsed?.query?.runtime?.datasetRowCount > 0,
       },
     {
         label: "workspace-create-default-dry-run",
@@ -516,7 +520,10 @@ export function appendCoreContractExtendedChecks(context) {
           workspaceCommandServiceSource.includes("WORKSPACE_DELETE_STAGES") &&
           workspaceCommandServiceSource.includes("def reconcile_workspace_delete_receipt(") &&
           workspaceCommandServiceSource.includes("WORKSPACE_SCOPED_TABLES") &&
-          workspaceCommandServiceSource.includes("DROP TABLE IF EXISTS") &&
+          !workspaceCommandServiceSource.includes("DROP TABLE IF EXISTS") &&
+          workspaceCommandServiceSource.includes("delete_dataset_versions(") &&
+          workspaceCommandServiceSource.includes("collect_unreferenced_dataset_objects(") &&
+          workspaceCommandServiceSource.includes('status="duckdb_deleted"') &&
           workspaceCommandServiceSource.includes("INSERT INTO workspaces") &&
           workspaceCommandServiceSource.includes("ON CONFLICT(key) DO UPDATE") &&
           biCliRuntimeSource.includes("workspace_delete_command_service(") &&

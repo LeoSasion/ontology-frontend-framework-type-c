@@ -49,7 +49,7 @@ function buildImportActionError(action: string, error: unknown) {
       : category === "plan-changed"
           ? biText("来源或导入规则与刚才的预演不再一致。", "The source or import rules no longer match the last preview.")
           : isPreview
-            ? biText("系统没有读取到可预演的来源；请检查路径是否存在，且文件是 CSV 或 Excel。", "No previewable source was read. Check that the path exists and the file is CSV or Excel.")
+            ? biText("系统没有读取到可预演的来源；请检查路径是否存在，且文件是 CSV、Parquet 或 Excel。", "No previewable source was read. Check that the path exists and the file is CSV, Parquet, or Excel.")
             : biText("本次操作没有完成，页面没有把它标记为成功。", "This operation did not complete, and the page has not marked it as successful.");
   const title = isConfirm
     ? biText("导入结果尚未确认", "Import result is not yet confirmed")
@@ -132,12 +132,13 @@ export function SourceWorkbenchImportPanel({
   const [importActionError, setImportActionError] = useState<ImportPanelActionError | null>(null);
   const [rulesOpen, setRulesOpen] = useState(false);
   const createTargetLabel = preview.suggestedDisplayName || targetName || preview.suggestedTableKey || targetTable;
-  const sourceLooksLikeFile = /\.(?:csv|tsv|xlsx?|xlsm)$/i.test(filePath.trim());
+  const sourceLooksLikeFile = /\.(?:csv|tsv|parquet|xlsx?|xlsm)$/i.test(filePath.trim());
   const sourceCheckBusy = busy === "preview" || busy === "folder-preview";
   const plannedMode = String(preview.commitOptions?.mode || preview.mergePolicyPreview.mode || importMode);
   const replacingTable = previewReadable && plannedMode === "replace" && Boolean(preview.matchedTable);
   const previewBlocked = preview.readyToCommit === false;
   const mergeSchemaBlocked = preview.blockers?.includes("merge-schema-mismatch") === true;
+  const mergeTargetMissingBlocked = preview.blockers?.includes("merge-target-missing") === true;
   const sourceChecked = previewReadable || folderImportPlan !== null;
 
   useEffect(() => {
@@ -145,8 +146,8 @@ export function SourceWorkbenchImportPanel({
   }, [conflictRule, filePath, importMode, targetName, targetTable, uniqueFields]);
 
   useEffect(() => {
-    if (mergeSchemaBlocked) setRulesOpen(true);
-  }, [mergeSchemaBlocked]);
+    if (mergeSchemaBlocked || mergeTargetMissingBlocked) setRulesOpen(true);
+  }, [mergeSchemaBlocked, mergeTargetMissingBlocked]);
 
   async function runImportAction(label: string, action: () => Promise<void>) {
     setImportActionError(null);
@@ -173,6 +174,11 @@ export function SourceWorkbenchImportPanel({
     return runImportAction("preview", () => runImportPreviewAction("replace"));
   }
 
+  function switchToCreateAndRecheck() {
+    setImportMode("create");
+    return runImportAction("preview", () => runImportPreviewAction("create"));
+  }
+
   return (
     <article className="workbenchPanel widePanel sourceImportPanel">
       <div className="tileHeader">
@@ -191,7 +197,7 @@ export function SourceWorkbenchImportPanel({
             onChange={(event) => setFilePath(event.target.value)}
             placeholder={biText("粘贴本地文件或文件夹路径", "Paste a local file or folder path")}
           />
-          <small className="importPathExample">{biText("支持 CSV、XLSX、XLSM；也可粘贴包含这些文件的文件夹", "Supports CSV, XLSX, and XLSM, or a folder containing those files")}</small>
+          <small className="importPathExample">{biText("支持 CSV、Parquet、XLSX、XLSM；也可粘贴包含这些文件的文件夹", "Supports CSV, Parquet, XLSX, and XLSM, or a folder containing those files")}</small>
         </label>
         {recentImportPaths.length ? (
           <div className="recentImportPaths" data-testid="recent-import-paths">
@@ -262,6 +268,7 @@ export function SourceWorkbenchImportPanel({
           <label>
             <span>{biText("写入模式", "Write mode")}</span>
             <select value={importMode} onChange={(event) => setImportMode(event.target.value)}>
+              <option value="auto">{biText("自动判断", "Auto-detect")}</option>
               <option value="merge">{biText("合并更新", "Merge updates")}</option>
               <option value="create">{biText("新建数据表", "Create table")}</option>
               <option value="replace">{biText("替换整表", "Replace table")}</option>
@@ -382,6 +389,8 @@ export function SourceWorkbenchImportPanel({
               <span className={`statusBadge ${previewBlocked ? "warn" : "ok"}`}>{previewBlocked ? biText("计划已阻断", "Plan blocked") : biText("预检通过", "Preflight passed")}</span>
               <h4>{mergeSchemaBlocked
                 ? biText("字段结构不同，不能直接合并", "Schemas differ; direct merge is blocked")
+                : mergeTargetMissingBlocked
+                  ? biText("目标表不存在，不能执行合并", "The target table does not exist, so merge is blocked")
                 : replacingTable
                   ? biText(`替换 ${matchedTableName}`, `Replace ${matchedTableName}`)
                   : preview.matchedTable
@@ -389,6 +398,8 @@ export function SourceWorkbenchImportPanel({
                     : biText(`新建 ${createTargetLabel}`, `Create ${createTargetLabel}`)}</h4>
               <p>{mergeSchemaBlocked
                 ? biText("请选择“替换整表”并重新检查来源；确认前不会写入。", "Choose Replace table and check the source again; nothing writes before confirmation.")
+                : mergeTargetMissingBlocked
+                  ? biText("请选择“新建数据表”并重新检查来源；确认前不会写入。", "Choose Create table and check the source again; nothing writes before confirmation.")
                 : biText("确认前不会写入；你可以先看影响，再决定是否导入。", "Nothing writes before confirmation. Review the impact before importing.")}</p>
               {mergeSchemaBlocked ? (
                 <button
@@ -399,6 +410,17 @@ export function SourceWorkbenchImportPanel({
                   type="button"
                 >
                   {biText("改为替换整表并重新检查", "Switch to replace and check again")}
+                </button>
+              ) : null}
+              {mergeTargetMissingBlocked ? (
+                <button
+                  className="secondaryButton compactAction importReplaceRecovery"
+                  data-testid="import-switch-create-and-recheck"
+                  disabled={sourceCheckBusy || importJobActive}
+                  onClick={() => void switchToCreateAndRecheck()}
+                  type="button"
+                >
+                  {biText("改为新建数据表并重新检查", "Switch to create and check again")}
                 </button>
               ) : null}
             </div>
@@ -455,6 +477,8 @@ export function SourceWorkbenchImportPanel({
                 <span className="folderImportBlocker" role="status">
                   {mergeSchemaBlocked
                     ? biText("字段不同，不能合并；切换为替换整表后重新检查。", "Schemas differ; choose Replace table and check again.")
+                    : mergeTargetMissingBlocked
+                      ? biText("目标表不存在；切换为新建数据表后重新检查。", "The target table does not exist; choose Create table and check again.")
                     : biText("来源或导入规则已变化，请重新检查来源。", "The source or import rules changed. Check the source again.")}
                 </span>
               ) : null}

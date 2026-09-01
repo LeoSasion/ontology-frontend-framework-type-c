@@ -11,8 +11,7 @@ from typing import Iterator
 
 from atomic_import_plan_service import bind_single_import_plan
 from bi_cli_core import DB_PATH, DUCKDB_PATH, ROOT, now_iso
-from bi_cli_io_services import read_table_file
-from bi_cli_schema import active_workspace_id, open_db, physical_table_for_workspace, table_columns
+from bi_cli_schema import active_workspace_id, open_db, physical_table_for_workspace
 from bi_cli_source_commands import (
     build_import_preview,
     execute_import_commit,
@@ -35,11 +34,11 @@ from workspace_mutation_lock_service import (
 from workspace_recovery_service import configured_recovery_root, unfinished_recovery_fences
 
 
-LEGACY_IMPORT_REQUEST_SCHEMA = "aibi-legacy-import-request/v1"
-LEGACY_IMPORT_LOCK_PATH = DB_PATH.parent / ".aibi-cross-engine-writer.lock"
+DIRECT_IMPORT_REQUEST_SCHEMA = "aibi-direct-import-request/v2"
+IMPORT_LOCK_PATH = DB_PATH.parent / ".aibi-cross-engine-writer.lock"
 
 
-def _assert_legacy_recovery_clear() -> None:
+def _assert_recovery_clear() -> None:
     fences = unfinished_recovery_fences(configured_recovery_root(ROOT))
     if fences:
         workspaces = sorted({item["workspaceId"] for item in fences})
@@ -49,18 +48,18 @@ def _assert_legacy_recovery_clear() -> None:
 
 
 @contextmanager
-def legacy_import_preview_boundary() -> Iterator[None]:
-    """Keep compatibility previews behind recovery's shared read boundary."""
-    with workspace_read_lock(LEGACY_IMPORT_LOCK_PATH):
-        _assert_legacy_recovery_clear()
+def import_preview_boundary() -> Iterator[None]:
+    """Keep source previews behind recovery's shared read boundary."""
+    with workspace_read_lock(IMPORT_LOCK_PATH):
+        _assert_recovery_clear()
         yield
 
 
 @contextmanager
-def _legacy_import_create_boundary() -> Iterator[None]:
+def _import_create_boundary() -> Iterator[None]:
     """Persist only the queued job while briefly owning the writer boundary."""
-    with workspace_mutation_lock(LEGACY_IMPORT_LOCK_PATH):
-        _assert_legacy_recovery_clear()
+    with workspace_mutation_lock(IMPORT_LOCK_PATH):
+        _assert_recovery_clear()
         yield
 
 
@@ -71,13 +70,12 @@ def _create_import_job_with_preview(args, preview_builder):
         active_workspace_id=active_workspace_id,
         build_import_preview=preview_builder,
         build_folder_import_plan=build_folder_import_plan,
-        read_table_file=read_table_file,
         now_iso=now_iso,
     )
 
 
-def _create_legacy_import_job_with_boundary(args, preview_builder):
-    with _legacy_import_create_boundary():
+def _create_import_job_with_boundary(args, preview_builder):
+    with _import_create_boundary():
         return _create_import_job_with_preview(args, preview_builder)
 
 
@@ -94,9 +92,7 @@ def _run_import_job_with_preview(args, preview_builder):
         build_folder_import_plan=build_folder_import_plan,
         execute_import_commit=execute_import_commit,
         execute_folder_import_plan=execute_folder_import_plan,
-        read_table_file=read_table_file,
         physical_table_for_workspace=physical_table_for_workspace,
-        table_columns=table_columns,
         duckdb_path=DUCKDB_PATH,
         mutation_lock_path=DB_PATH.parent / ".aibi-cross-engine-writer.lock",
         recovery_root=configured_recovery_root(ROOT),
@@ -115,7 +111,6 @@ def import_job_resume_command(args):
         active_workspace_id=active_workspace_id,
         build_import_preview=build_import_preview,
         build_folder_import_plan=build_folder_import_plan,
-        read_table_file=read_table_file,
         now_iso=now_iso,
     )
 
@@ -140,9 +135,9 @@ def import_job_process_exit_command(args):
     )
 
 
-def _legacy_import_workspace(args: argparse.Namespace) -> str:
+def _direct_import_workspace(args: argparse.Namespace) -> str:
     requested = str(getattr(args, "workspace", "") or "").strip()
-    with legacy_import_preview_boundary():
+    with import_preview_boundary():
         with open_db() as connection:
             workspace_id = requested or active_workspace_id(connection)
             if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
@@ -150,18 +145,18 @@ def _legacy_import_workspace(args: argparse.Namespace) -> str:
     return workspace_id
 
 
-def _legacy_import_request_key(
+def _direct_import_request_key(
     args: argparse.Namespace,
     *,
     workspace_id: str,
     import_kind: str,
     expected_plan: str,
 ) -> str:
-    """Bind legacy retries to the exact confirmed input without exposing its path."""
+    """Bind direct-command retries to the exact confirmed input without exposing its path."""
     path_value = getattr(args, "file", None) if import_kind == "single" else getattr(args, "path", None)
     path = Path(str(path_value or "")).resolve()
     material = {
-        "schema": LEGACY_IMPORT_REQUEST_SCHEMA,
+        "schema": DIRECT_IMPORT_REQUEST_SCHEMA,
         "workspaceId": workspace_id,
         "importKind": import_kind,
         "path": path.as_posix(),
@@ -175,10 +170,10 @@ def _legacy_import_request_key(
         "limit": max(1, min(int(getattr(args, "limit", 200) or 200), 200)),
     }
     canonical = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-    return f"legacy-import:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+    return f"direct-import-v2:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
 
 
-def _run_legacy_import_job(
+def _run_direct_import_job(
     args: argparse.Namespace,
     *,
     import_kind: str,
@@ -199,11 +194,11 @@ def _run_legacy_import_job(
     requested_workspace = str(getattr(args, "workspace", "") or "").strip()
     plan_workspace = str(plan.get("workspaceId") or "").strip()
     if requested_workspace and plan_workspace and requested_workspace != plan_workspace:
-        raise RuntimeError("Legacy import plan does not belong to the requested workspace.")
-    workspace_id = plan_workspace or _legacy_import_workspace(args)
+        raise RuntimeError("Import plan does not belong to the requested workspace.")
+    workspace_id = plan_workspace or _direct_import_workspace(args)
     if not workspace_id:
-        raise RuntimeError("Legacy import plan did not bind a workspace.")
-    request_key = _legacy_import_request_key(
+        raise RuntimeError("Import plan did not bind a workspace.")
+    request_key = _direct_import_request_key(
         args,
         workspace_id=workspace_id,
         import_kind=import_kind,
@@ -215,7 +210,7 @@ def _run_legacy_import_job(
         for item in (plan.get("items") or [])
         if isinstance(item, dict) and item.get("fileIdentity") and item.get("stageKey")
     }
-    created = _create_legacy_import_job_with_boundary(argparse.Namespace(
+    created = _create_import_job_with_boundary(argparse.Namespace(
         workspace=workspace_id,
         import_kind=import_kind,
         path=str(path_value or ""),
@@ -231,7 +226,7 @@ def _run_legacy_import_job(
         conflict_rule=getattr(args, "conflict_rule", None),
         no_recursive=bool(getattr(args, "no_recursive", False)),
         limit=max(1, min(int(getattr(args, "limit", 200) or 200), 200)),
-        label=f"Legacy confirmed import: {Path(str(path_value or '')).name or 'local-source'}",
+        label=f"Confirmed import: {Path(str(path_value or '')).name or 'local-source'}",
     ), preview_builder)
     job = created.get("job") if isinstance(created.get("job"), dict) else {}
     job_key = str(job.get("jobKey") or "")
@@ -250,11 +245,11 @@ def _run_legacy_import_job(
     return final_job, public_result
 
 
-def legacy_import_commit_command(args: argparse.Namespace) -> dict:
-    """Run the confirmed legacy single-file command through W1/W3."""
-    workspace_id = _legacy_import_workspace(args)
+def direct_import_commit_command(args: argparse.Namespace) -> dict:
+    """Run the confirmed single-file command through the durable writer."""
+    workspace_id = _direct_import_workspace(args)
     execution_mode = str(getattr(args, "mode", "") or "create")
-    with legacy_import_preview_boundary():
+    with import_preview_boundary():
         plan = preview_import_command(argparse.Namespace(
             workspace=workspace_id,
             file=args.file,
@@ -277,7 +272,7 @@ def legacy_import_commit_command(args: argparse.Namespace) -> dict:
         or plan_options.get("mode")
         or "create"
     )
-    final_job, public_result = _run_legacy_import_job(
+    final_job, public_result = _run_direct_import_job(
         args,
         import_kind="single",
         plan=plan,
@@ -290,7 +285,7 @@ def legacy_import_commit_command(args: argparse.Namespace) -> dict:
     table["mode"] = str(getattr(args, "mode", "") or table.get("mode") or "create")
     source_run = None
     try:
-        with legacy_import_preview_boundary():
+        with import_preview_boundary():
             with open_db() as connection:
                 source_run = connection.execute(
                     "SELECT profile_json FROM source_runs WHERE workspace_id = ? AND id = ?",
@@ -314,10 +309,10 @@ def legacy_import_commit_command(args: argparse.Namespace) -> dict:
     }
 
 
-def legacy_import_folder_command(args: argparse.Namespace) -> dict:
-    """Run the confirmed legacy folder command through W1/W3."""
-    workspace_id = _legacy_import_workspace(args)
-    with legacy_import_preview_boundary():
+def direct_import_folder_command(args: argparse.Namespace) -> dict:
+    """Run the confirmed folder command through the durable writer."""
+    workspace_id = _direct_import_workspace(args)
+    with import_preview_boundary():
         plan = preview_import_folder_command(argparse.Namespace(
             workspace=workspace_id,
             path=args.path,
@@ -326,7 +321,7 @@ def legacy_import_folder_command(args: argparse.Namespace) -> dict:
             unique_fields=getattr(args, "unique_fields", None),
             conflict_rule=getattr(args, "conflict_rule", None),
         ))
-    final_job, public_result = _run_legacy_import_job(args, import_kind="folder", plan=plan)
+    final_job, public_result = _run_direct_import_job(args, import_kind="folder", plan=plan)
     tables = public_result.get("tables") if isinstance(public_result.get("tables"), list) else []
     return {
         "ok": True,

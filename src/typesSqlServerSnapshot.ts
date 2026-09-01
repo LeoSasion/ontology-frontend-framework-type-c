@@ -17,7 +17,7 @@ export interface SqlServerPublicTarget {
 
 export interface SqlServerAdapterContract {
   schema: "aibi-connector-adapter/v1";
-  adapterId: "sqlserver-snapshot/v1";
+  adapterId: "sqlserver-snapshot/v2";
   connectorType: "sqlserver";
   available: boolean;
   capability: SqlServerAdapterCapability;
@@ -43,6 +43,9 @@ export interface SqlServerCatalogColumn {
   dataType: string;
   nullable: boolean;
   ordinal: number;
+  maxLength?: number | null;
+  precision?: number | null;
+  scale?: number | null;
 }
 
 export interface SqlServerCatalogResource {
@@ -94,7 +97,7 @@ export interface SqlServerSnapshotBudget {
 
 export interface SqlServerSnapshotPlan {
   ok: true;
-  schema: "aibi-sqlserver-snapshot-plan/v1";
+  schema: "aibi-sqlserver-snapshot-plan/v2";
   workspaceId: string;
   requestKey: string;
   createdAt: string;
@@ -104,16 +107,22 @@ export interface SqlServerSnapshotPlan {
   networkBindingFingerprint: string;
   selections: Array<SqlServerSnapshotSelectionInput & {
     orderingBasis: "catalog_unique_key" | "user_confirmed_non_null";
+    schemaFields: Array<{
+      name: string;
+      type: string;
+      nullable: boolean;
+      sqlServerType: string;
+    }>;
   }>;
   budget: SqlServerSnapshotBudget;
-  staging: { format: "csv-utf8"; artifactKey: string };
+  staging: { format: "parquet-v2"; artifactKey: string };
   activation: { required: true; boundary: "durable-import-and-source-activation-journal" };
   planFingerprint: string;
 }
 
 export interface SqlServerSnapshotReceipt {
   ok: true;
-  schema: "aibi-sqlserver-snapshot-receipt/v1";
+  schema: "aibi-sqlserver-snapshot-receipt/v2";
   operation: "test" | "preview" | "snapshot" | "activate";
   workspaceId: string;
   capability: SqlServerAdapterCapability;

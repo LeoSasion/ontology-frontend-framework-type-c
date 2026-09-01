@@ -72,16 +72,6 @@ try {
   const uiPayload = spawnSync("node", ["--import", "tsx", "-e", "import('./src/dashboardCanvasRelationshipModel.ts').then(({buildRelationshipSavePayload}) => { const payload=buildRelationshipSavePayload({leftTableKey:'orders',rightTableKey:'refunds',fieldMappings:[{leftField:'order_id',rightField:'order_id'},{leftField:'item_id',rightField:'item_id'}],joinType:'left'},false); console.log(JSON.stringify({ok:payload?.fieldMappings?.length===2,payload})); })"], { cwd: root, encoding: "utf8", windowsHide: true });
   results.push({ label: "ui-payload", status: uiPayload.status, parsed: JSON.parse(uiPayload.stdout.trim()), stdout: uiPayload.stdout, stderr: uiPayload.stderr });
   results.push(run("initialize", ["status"]));
-  const legacySetup = spawnSync("python", ["-c", [
-    "import sqlite3, sys",
-    "db = sqlite3.connect(sys.argv[1])",
-    "db.execute('DROP TABLE relationships')",
-    "db.execute(\"CREATE TABLE relationships(relation_key TEXT NOT NULL, workspace_id TEXT NOT NULL DEFAULT 'default', name TEXT NOT NULL, left_table_key TEXT NOT NULL, right_table_key TEXT NOT NULL, left_field TEXT NOT NULL, right_field TEXT NOT NULL, join_type TEXT NOT NULL, confidence REAL NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(workspace_id, relation_key))\")",
-    "db.execute(\"INSERT INTO relationships VALUES('legacy_rel', 'default', 'legacy', 'legacy_left', 'legacy_right', 'id', 'id', 'inner', 0.9, '2026-01-01T00:00:00Z')\")",
-    "db.commit()",
-  ].join(";"), databaseFile], { cwd: root, encoding: "utf8", windowsHide: true });
-  results.push({ label: "legacy-setup", status: legacySetup.status, parsed: null, stdout: legacySetup.stdout, stderr: legacySetup.stderr });
-  results.push(run("legacy-list", ["list-relationships"]));
   results.push(run("import-orders", ["import-commit", ordersFile, "--table", "orders", "--name", "订单", "--mode", "create", "--yes"]));
   results.push(run("import-refunds", ["import-commit", refundsFile, "--table", "refunds", "--name", "退款", "--mode", "create", "--yes"]));
   results.push(bindCurrentBatch("bind-current-source-run-batch", "composite-relationship-fixture-batch", ["orders", "refunds"]));
@@ -113,7 +103,6 @@ try {
   const queryRows = byLabel["composite-query"].parsed?.relationshipQuery?.rows ?? [];
   const queryMetricName = byLabel["composite-query"].parsed?.relationshipQuery?.metricName;
   const queryValues = Object.fromEntries(queryRows.map((row) => [row["左表.channel"], row[queryMetricName]]));
-  const listedLegacy = byLabel["legacy-list"].parsed?.relationships?.find((item) => item.relation_key === "legacy_rel");
   const preaggregatedSaved = byLabel["preaggregation-save"].parsed?.saved;
   const listedPreaggregated = byLabel["preaggregation-list"].parsed?.relationships?.find((item) => item.relation_key === "orders_refunds_order_id_order_id");
   const preaggregationRows = byLabel["preaggregation-query"].parsed?.relationshipQuery?.rows ?? [];
@@ -132,13 +121,6 @@ try {
         && byLabel["api-mapping"].parsed?.ok === true
         && byLabel["ui-payload"].status === 0
         && byLabel["ui-payload"].parsed?.ok === true,
-    },
-    {
-      label: "legacy-single-field-row-migrates-without-data-loss",
-      ok: byLabel["legacy-setup"].status === 0
-        && listedLegacy?.fieldMappings?.length === 1
-        && listedLegacy?.fieldMappings?.[0]?.leftField === "id"
-        && listedLegacy?.fieldMappings?.[0]?.rightField === "id",
     },
     {
       label: "multi-table-fixture-is-one-current-source-run",
@@ -232,7 +214,7 @@ try {
     {
       label: "failed-auto-revalidation-blocks-stale-query",
       ok: stalePreaggregation?.validation?.status === "stale"
-        && stalePreaggregation?.validation?.blockers?.includes("revalidation-failed")
+        && stalePreaggregation?.validation?.blockers?.includes("relationship-schema-invalid-after-publish")
         && byLabel["stale-preaggregation-query"].status !== 0,
     },
   ];

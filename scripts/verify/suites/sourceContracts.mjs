@@ -604,7 +604,7 @@ export function appendSourceContractChecks(context) {
     {
         label: "b-query-table-and-saved-views",
         ok: byLabel["cli-query-table-detail"].parsed?.tableQuery?.filteredRows === 4 &&
-          byLabel["cli-query-table-detail"].parsed?.tableQuery?.rows?.[0]?.net_sales === "1280" &&
+          byLabel["cli-query-table-detail"].parsed?.tableQuery?.rows?.[0]?.net_sales === 1280 &&
           byLabel["cli-query-table-view"].parsed?.tableQuery?.viewKey === "view_orders_default" &&
           byLabel["cli-list-views"].parsed?.savedViews?.length >= 2 &&
           byLabel["cli-save-view-dry-run"].parsed?.requiresConfirmation === true &&
@@ -721,12 +721,12 @@ export function appendSourceContractChecks(context) {
       },
     {
         label: "b-bi-cli-bridge-core-areas",
-        ok: ["source-management", "query-runtime", "saved-views", "dashboard-pages", "dashboard-widgets", "filters", "performance-indexes", "relationships", "import", "field-metric-formula", "connectors-preferences", "config-portability"].every((area) =>
+        ok: ["source-management", "query-runtime", "saved-views", "dashboard-pages", "dashboard-widgets", "filters", "performance-layout", "relationships", "import", "field-metric-formula", "connectors-preferences", "config-portability"].every((area) =>
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === area && capability.status === "active")
         ) &&
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "dashboard-widgets" && capability.commands?.includes("add-relationship-widget") && capability.commands?.includes("save-dashboard-modules") && capability.commands?.includes("business-dashboard")) &&
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "filters" && capability.commands?.includes("remove-stale-filters")) &&
-          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "performance-indexes" && capability.commands?.includes("recommend-indexes") && capability.commands?.includes("create-index")) &&
+          byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "performance-layout" && capability.commands?.includes("recommend-indexes") && capability.commands?.includes("create-index")) &&
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "relationships" && capability.commands?.includes("recommend-relationships") && capability.commands?.includes("query-relationship")) &&
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "import" && capability.commands?.includes("set-import-policy") && capability.commands?.includes("list-import-jobs")) &&
           byLabel["cli-capabilities"].parsed?.capabilities?.some((capability) => capability.area === "field-metric-formula" && capability.commands?.includes("infer-semantics") && capability.commands?.includes("set-semantic") && capability.commands?.includes("infer-metrics") && capability.commands?.includes("query-metric")) &&

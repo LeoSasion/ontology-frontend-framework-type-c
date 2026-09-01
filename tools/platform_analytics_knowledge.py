@@ -8,10 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from bi_cli_core import DUCKDB_PATH
+from bi_cli_schema import table_columns
 from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 
 
 KNOWLEDGE_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "platform-commerce.v1.json"
+MAX_KNOWLEDGE_ROWS = 500
+MAX_KNOWLEDGE_BYTES = 1_000_000
 
 
 def _quote(name: str) -> str:
@@ -83,10 +86,7 @@ def _table_catalog(connection: sqlite3.Connection, workspace_id: str) -> list[di
     catalog: list[dict[str, Any]] = []
     for row in rows:
         item = dict(row)
-        item["fields"] = {
-            str(column["name"])
-            for column in connection.execute(f"PRAGMA table_info({_quote(item['physical_table'])})").fetchall()
-        }
+        item["fields"] = set(table_columns(connection, str(item["physical_table"])))
         catalog.append(item)
     return catalog
 
@@ -198,14 +198,20 @@ def execute_platform_knowledge(
     if match.get("threshold") is not None:
         params["threshold"] = match["threshold"]
     roles = list(match["roles"].values())
+    bounded_sql = f"SELECT * FROM ({match['sql']}) AS __aibi_knowledge_result LIMIT {MAX_KNOWLEDGE_ROWS + 1}"
     with open_validated_duckdb_query(
         duckdb_path,
         [replica_expectation(table) for table in roles],
     ) as analysis_connection:
-        cursor = analysis_connection.connection.execute(match["sql"], params)
+        cursor = analysis_connection.connection.execute(bounded_sql, params)
         rows = cursor_rows(cursor)
+        if len(rows) > MAX_KNOWLEDGE_ROWS:
+            raise ValueError("Platform knowledge result exceeded its bounded row contract.")
+        encoded_size = len(json.dumps(rows, ensure_ascii=False, default=str, separators=(",", ":")).encode("utf-8"))
+        if encoded_size > MAX_KNOWLEDGE_BYTES:
+            raise ValueError("Platform knowledge result exceeded its bounded byte contract.")
         runtime = analysis_connection.runtime(
-            compiled_sql=match["sql"],
+            compiled_sql=bounded_sql,
             params=[params[key] for key in sorted(params)],
         )
     metrics = [

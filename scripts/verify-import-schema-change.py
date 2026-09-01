@@ -41,12 +41,13 @@ def main() -> int:
 
         from atomic_import_plan_service import bind_single_import_plan
         from bi_cli_core import now_iso
-        from bi_cli_io_services import read_table_file
         from bi_cli_schema import active_workspace_id, open_db as raw_open_db, physical_table_for_workspace, table_columns
         from bi_cli_source_commands import build_import_preview, execute_import_commit
+        from dataset_version_store import activate_dataset_version, resolve_dataset_object_paths
         from import_command_service import build_folder_import_plan, execute_folder_import_plan
         from import_job_service import import_job_create_command, import_job_run_command
         from job_runtime_service import get_job
+        from query_runtime import publish_dataset_view, replica_source_version
         from source_activation_journal_service import activation_for_job
 
         @contextmanager
@@ -82,6 +83,26 @@ def main() -> int:
                 "create",
                 workspace_id="default",
             )
+            seeded_version = dict(seeded["datasetVersion"])
+            seeded_registry = connection.execute(
+                "SELECT * FROM table_registry WHERE workspace_id = 'default' AND table_key = 'orders'"
+            ).fetchone()
+            seeded_files = [item for item in seeded_version.get("files") or [] if isinstance(item, dict)]
+            import duckdb  # type: ignore
+            with duckdb.connect(str(duckdb_path)) as duck_connection:
+                publish_dataset_view(
+                    duck_connection,
+                    logical_table=str(seeded_registry["physical_table"]),
+                    source_version=replica_source_version(seeded_registry),
+                    version_id=str(seeded_version["versionId"]),
+                    object_keys=[str(item["objectKey"]) for item in seeded_files],
+                    object_paths=resolve_dataset_object_paths(seeded_version),
+                    object_hashes=[str(item["objectHash"]) for item in seeded_files],
+                    schema_fingerprint=str(seeded_version["schemaFingerprint"]),
+                    content_fingerprint=str(seeded_version["contentFingerprint"]),
+                    row_count=int(seeded_version["rowCount"]),
+                )
+            activate_dataset_version(connection, seeded_version)
             timestamp = now_iso()
             connection.execute(
                 """
@@ -221,7 +242,6 @@ def main() -> int:
             "active_workspace_id": active_workspace_id,
             "build_import_preview": build_import_preview,
             "build_folder_import_plan": build_folder_import_plan,
-            "read_table_file": read_table_file,
             "now_iso": now_iso,
         }
 
@@ -336,9 +356,7 @@ def main() -> int:
             build_folder_import_plan=build_folder_import_plan,
             execute_import_commit=execute_import_commit,
             execute_folder_import_plan=execute_folder_import_plan,
-            read_table_file=read_table_file,
             physical_table_for_workspace=physical_table_for_workspace,
-            table_columns=table_columns,
             duckdb_path=duckdb_path,
             mutation_lock_path=temp_root / ".aibi-cross-engine-writer.lock",
             recovery_root=temp_root / "recovery",
@@ -350,9 +368,6 @@ def main() -> int:
             ).fetchone()
             physical_table = str(registry["physical_table"])
             columns = table_columns(connection, physical_table)
-            rows = [tuple(row) for row in connection.execute(
-                f'SELECT "id", "amount", "channel" FROM "{physical_table}" ORDER BY "id"'
-            )]
             persisted = get_job(connection, workspace_id="default", job_key=job_key, event_limit=100)
             journal = activation_for_job(connection, workspace_id="default", job_key=job_key)
         import duckdb  # type: ignore
@@ -371,9 +386,8 @@ def main() -> int:
             and journal.get("phase") == "finalized"
             and journal.get("outcome") == "committed"
             and columns == ["id", "amount", "channel"]
-            and rows == [("o-3", "300", "online"), ("o-4", "400", "store")]
-            and replica_rows == rows,
-            {"job": persisted, "journal": journal, "columns": columns, "rows": rows, "replicaRows": replica_rows},
+            and replica_rows == [("o-3", 300, "online"), ("o-4", 400, "store")],
+            {"job": persisted, "journal": journal, "columns": columns, "replicaRows": replica_rows},
         )
 
     failed = [item for item in checks if not item["ok"]]

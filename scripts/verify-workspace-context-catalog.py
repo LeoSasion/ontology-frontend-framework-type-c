@@ -252,12 +252,12 @@ def main() -> None:
             customer_candidate,
         )
         check(
-            "zero-false-and-mixed-time-observations-are-normalized-without-crashing",
+            "sealed-types-win-while-bounded-sample-evidence-remains-available",
             zero_candidate.get("observedShape", {}).get("logicalType") != "empty"
             and zero_candidate.get("observedShape", {}).get("boundedSampleSize") == 3
             and boolean_candidate.get("observedShape", {}).get("logicalType") == "boolean"
             and boolean_candidate.get("observedShape", {}).get("boundedSampleSize") == 3
-            and mixed_time_candidate.get("observedShape", {}).get("logicalType") == "datetime"
+            and mixed_time_candidate.get("observedShape", {}).get("logicalType") == "string"
             and mixed_time_candidate.get("observedShape", {}).get("timeCoverage", {}).get("minimum") == "2026-01-01T00:00:00"
             and mixed_time_candidate.get("observedShape", {}).get("timeCoverage", {}).get("maximum") == "2026-01-03T00:00:00",
             {
@@ -531,15 +531,28 @@ def main() -> None:
             ]
         finally:
             traced_connection.close()
-        bounded_sample_reads = [
+        business_table_reads = [
             statement
             for statement in traced_statements
-            if " LIMIT 500" in statement and any(f'FROM "{table}"' in statement for table in physical_tables)
+            if any(f'FROM "{table}"' in statement for table in physical_tables)
+        ]
+        source_profile_reads = [statement for statement in traced_statements if "FROM source_runs" in statement]
+        semantic_batch_reads = [
+            statement
+            for statement in traced_statements
+            if "FROM field_semantics" in statement and "table_key IN" in statement
         ]
         check(
-            "field-profiling-uses-one-bounded-sample-read-per-table",
-            len(bounded_sample_reads) == len(physical_tables),
-            {"tableCount": len(physical_tables), "sampleReadCount": len(bounded_sample_reads)},
+            "field-profiling-uses-batched-metadata-with-zero-business-samples",
+            not business_table_reads
+            and len(source_profile_reads) == 1
+            and len(semantic_batch_reads) == 1,
+            {
+                "tableCount": len(physical_tables),
+                "businessReadCount": len(business_table_reads),
+                "sourceProfileReadCount": len(source_profile_reads),
+                "semanticBatchReadCount": len(semantic_batch_reads),
+            },
         )
         agent_interaction_source = (
             ROOT / "tools" / "aibi_runtime" / "use_cases" / "agent_interaction.py"

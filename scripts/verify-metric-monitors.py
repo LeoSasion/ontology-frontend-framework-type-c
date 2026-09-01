@@ -218,8 +218,8 @@ with tempfile.TemporaryDirectory(prefix="aibi-metric-monitor-", ignore_cleanup_e
         indexes = {str(row[0]) for row in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
         trace_count = int(connection.execute("SELECT COUNT(*) FROM metric_monitor_evaluations WHERE workspace_id = 'default' AND monitor_key = ?", (monitor_key,)).fetchone()[0])
     check(
-        "schema-v17-persists-monitor-definitions-and-replayable-traces",
-        version == 17
+        "schema-v18-persists-monitor-definitions-and-replayable-traces",
+        version == 18
         and {"metric_monitors", "metric_monitor_evaluations"}.issubset(tables)
         and {"idx_metric_monitors_workspace_status", "idx_metric_monitors_workspace_input", "idx_metric_monitor_evaluations_workspace_monitor"}.issubset(indexes)
         and trace_count == 3,

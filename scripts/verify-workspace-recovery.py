@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sqlite3
 import sys
@@ -26,6 +27,8 @@ from workspace_recovery_service import (  # noqa: E402
     _workspace_bucket,
     unfinished_recovery_fences,
 )
+from dataset_version_store import active_dataset_version, file_sha256, resolve_object_key  # noqa: E402
+from query_runtime_test_support import FixtureTable, publish_fixture_tables_to_duckdb  # noqa: E402
 
 
 checks: list[dict[str, Any]] = []
@@ -52,7 +55,7 @@ def build_sqlite(path: Path) -> None:
     with closing(sqlite3.connect(path)) as connection:
         connection.executescript(
             """
-            PRAGMA user_version = 15;
+            PRAGMA user_version = 18;
             CREATE TABLE workspaces(
               id TEXT PRIMARY KEY,
               name TEXT NOT NULL,
@@ -72,7 +75,33 @@ def build_sqlite(path: Path) -> None:
               data_version INTEGER NOT NULL,
               created_at TEXT NOT NULL,
               updated_at TEXT NOT NULL,
+              active_version_id TEXT NOT NULL DEFAULT '',
+              schema_json TEXT NOT NULL DEFAULT '[]',
+              schema_fingerprint TEXT NOT NULL DEFAULT '',
+              content_fingerprint TEXT NOT NULL DEFAULT '',
               PRIMARY KEY(workspace_id, table_key)
+            );
+            CREATE TABLE dataset_versions(
+              version_id TEXT PRIMARY KEY,
+              workspace_id TEXT NOT NULL,
+              table_key TEXT NOT NULL,
+              row_count INTEGER NOT NULL,
+              column_count INTEGER NOT NULL,
+              schema_json TEXT NOT NULL,
+              schema_fingerprint TEXT NOT NULL,
+              content_fingerprint TEXT NOT NULL,
+              source_file TEXT NOT NULL,
+              created_at TEXT NOT NULL,
+              UNIQUE(workspace_id, table_key, content_fingerprint)
+            );
+            CREATE TABLE dataset_version_files(
+              version_id TEXT NOT NULL,
+              ordinal INTEGER NOT NULL,
+              object_key TEXT NOT NULL,
+              object_hash TEXT NOT NULL,
+              row_count INTEGER NOT NULL,
+              byte_size INTEGER NOT NULL,
+              PRIMARY KEY(version_id, ordinal)
             );
             CREATE TABLE source_runs(
               id TEXT NOT NULL,
@@ -108,16 +137,20 @@ def build_sqlite(path: Path) -> None:
             CREATE TABLE analysis_job_events(workspace_id TEXT NOT NULL, job_key TEXT NOT NULL, event_sequence INTEGER NOT NULL, status TEXT NOT NULL, PRIMARY KEY(workspace_id, job_key, event_sequence));
             CREATE TABLE source_activation_journals(workspace_id TEXT NOT NULL, journal_key TEXT NOT NULL, job_key TEXT NOT NULL, phase TEXT NOT NULL, PRIMARY KEY(workspace_id, journal_key));
             CREATE TABLE import_workspace_leases(workspace_id TEXT PRIMARY KEY, job_key TEXT NOT NULL, lease_token TEXT NOT NULL, active INTEGER NOT NULL);
-            CREATE TABLE data_workspace_a(workspace_id TEXT NOT NULL, amount REAL NOT NULL);
-            CREATE TABLE data_workspace_b(workspace_id TEXT NOT NULL, amount REAL NOT NULL);
-
             INSERT INTO workspaces VALUES('workspace-a', 'Workspace A', 'run-a-1', '2026-08-13T00:00:00+00:00');
             INSERT INTO workspaces VALUES('workspace-b', 'Workspace B', 'run-b-1', '2026-08-13T00:00:00+00:00');
             INSERT INTO system_flags VALUES('active_workspace_id', 'workspace-a', '2026-08-13T00:00:00+00:00');
             INSERT INTO global_settings VALUES('unscoped', 'must-not-enter-workspace-artifact');
-            INSERT INTO table_registry VALUES('orders', 'workspace-a', 'Orders', 'data_workspace_a', 'redacted', 2, 2, 1, '2026-08-13T00:00:00+00:00', '2026-08-13T00:00:00+00:00');
-            INSERT INTO table_registry VALUES('ledger', 'workspace-b', 'Ledger', 'data_workspace_b', 'redacted', 1, 2, 1, '2026-08-13T00:00:00+00:00', '2026-08-13T00:00:00+00:00');
+            INSERT INTO table_registry(
+              table_key, workspace_id, display_name, physical_table, source_file,
+              row_count, column_count, data_version, created_at, updated_at
+            ) VALUES('orders', 'workspace-a', 'Orders', 'data_workspace_a', 'typed-fixture', 2, 2, 1, '2026-08-13T00:00:00+00:00', '2026-08-13T00:00:00+00:00');
+            INSERT INTO table_registry(
+              table_key, workspace_id, display_name, physical_table, source_file,
+              row_count, column_count, data_version, created_at, updated_at
+            ) VALUES('ledger', 'workspace-b', 'Ledger', 'data_workspace_b', 'typed-fixture', 1, 2, 1, '2026-08-13T00:00:00+00:00', '2026-08-13T00:00:00+00:00');
             INSERT INTO source_runs VALUES('run-a-1', 'workspace-a', 'orders', 'ready', '2026-08-13T00:00:00+00:00');
+            INSERT INTO source_runs VALUES('run-a-history', 'workspace-a', 'orders', 'ready', '2026-08-12T00:00:00+00:00');
             INSERT INTO source_runs VALUES('run-b-1', 'workspace-b', 'ledger', 'ready', '2026-08-13T00:00:00+00:00');
             INSERT INTO dashboards VALUES('workspace-a', 'dashboard-a', 'Original A');
             INSERT INTO dashboards VALUES('workspace-b', 'dashboard-b', 'Original B');
@@ -125,32 +158,9 @@ def build_sqlite(path: Path) -> None:
             INSERT INTO relationships VALUES('workspace-b', 'relationship-b', '{"status":"validated"}');
             INSERT INTO query_plan_receipts VALUES('workspace-a', 'receipt-a', 'executed', 'run-a-1', 'current');
             INSERT INTO query_plan_receipts VALUES('workspace-b', 'receipt-b', 'executed', 'run-b-1', 'current');
-            INSERT INTO data_workspace_a VALUES('customer-east', 10.0), ('customer-west', 20.0);
-            INSERT INTO data_workspace_b VALUES('workspace-a', 99.0);
             """
         )
         connection.commit()
-
-
-def build_duckdb(path: Path) -> None:
-    import duckdb  # type: ignore
-
-    with duckdb.connect(str(path)) as connection:
-        connection.execute("CREATE TABLE __aibi_schema_metadata(key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)")
-        connection.execute("INSERT INTO __aibi_schema_metadata VALUES ('schema_version', '1')")
-        connection.execute(
-            "CREATE TABLE __aibi_replica_manifest("
-            "logical_table VARCHAR PRIMARY KEY, source_version VARCHAR NOT NULL, replica_table VARCHAR NOT NULL, "
-            "row_count BIGINT NOT NULL, published_at VARCHAR NOT NULL)"
-        )
-        connection.execute("CREATE TABLE replica_a_1(workspace_id VARCHAR, amount DOUBLE)")
-        connection.execute("INSERT INTO replica_a_1 VALUES ('customer-east', 10), ('customer-west', 20)")
-        connection.execute("CREATE VIEW data_workspace_a AS SELECT * FROM replica_a_1")
-        connection.execute("INSERT INTO __aibi_replica_manifest VALUES ('data_workspace_a', '1', 'replica_a_1', 2, '2026-08-13T00:00:00+00:00')")
-        connection.execute("CREATE TABLE replica_b_1(workspace_id VARCHAR, amount DOUBLE)")
-        connection.execute("INSERT INTO replica_b_1 VALUES ('workspace-a', 99)")
-        connection.execute("CREATE VIEW data_workspace_b AS SELECT * FROM replica_b_1")
-        connection.execute("INSERT INTO __aibi_replica_manifest VALUES ('data_workspace_b', '1', 'replica_b_1', 1, '2026-08-13T00:00:00+00:00')")
 
 
 def mutate_workspace_a(sqlite_path: Path, duckdb_path: Path, *, suffix: str, amount: float) -> None:
@@ -160,31 +170,28 @@ def mutate_workspace_a(sqlite_path: Path, duckdb_path: Path, *, suffix: str, amo
             "INSERT INTO source_runs VALUES(?, 'workspace-a', 'orders', 'ready', ?)",
             (f"run-a-{suffix}", f"2026-08-13T00:0{suffix}:00+00:00"),
         )
-        connection.execute("UPDATE table_registry SET data_version = data_version + 1, row_count = 1, updated_at = ? WHERE workspace_id = 'workspace-a'", (f"2026-08-13T00:0{suffix}:00+00:00",))
         connection.execute("UPDATE dashboards SET name = ? WHERE workspace_id = 'workspace-a'", (f"Changed A {suffix}",))
         connection.execute("UPDATE relationships SET validation_json = ? WHERE workspace_id = 'workspace-a'", (json.dumps({"status": f"changed-{suffix}"}),))
         connection.execute(
             "INSERT OR REPLACE INTO query_plan_receipts VALUES('workspace-a', ?, 'executed', ?, 'stale')",
             (f"receipt-a-{suffix}", f"run-a-{suffix}"),
         )
-        connection.execute("DELETE FROM data_workspace_a")
-        connection.execute("INSERT INTO data_workspace_a VALUES('changed-customer', ?)", (amount,))
         connection.commit()
-
-    import duckdb  # type: ignore
-
-    with duckdb.connect(str(duckdb_path)) as connection:
-        old_replica = str(connection.execute("SELECT replica_table FROM __aibi_replica_manifest WHERE logical_table = 'data_workspace_a'").fetchone()[0])
-        connection.execute("DROP VIEW data_workspace_a")
-        connection.execute("DELETE FROM __aibi_replica_manifest WHERE logical_table = 'data_workspace_a'")
-        connection.execute(f'DROP TABLE "{old_replica}"')
-        replica = f"replica_a_{suffix}"
-        connection.execute(f'CREATE TABLE "{replica}"(workspace_id VARCHAR, amount DOUBLE)')
-        connection.execute(f'INSERT INTO "{replica}" VALUES (\'changed-customer\', ?)', [amount])
-        connection.execute(f'CREATE VIEW data_workspace_a AS SELECT * FROM "{replica}"')
-        connection.execute(
-            "INSERT INTO __aibi_replica_manifest VALUES ('data_workspace_a', ?, ?, 1, ?)",
-            [suffix, replica, f"2026-08-13T00:0{suffix}:00+00:00"],
+    with closing(sqlite3.connect(sqlite_path)) as connection:
+        connection.row_factory = sqlite3.Row
+        publish_fixture_tables_to_duckdb(
+            connection,
+            duckdb_path,
+            [FixtureTable(
+                workspace_id="workspace-a",
+                table_key="orders",
+                physical_table="data_workspace_a",
+                columns=(("workspace_id", "VARCHAR"), ("amount", "DOUBLE")),
+                rows=(("changed-customer", amount),),
+                data_version=int(suffix),
+                display_name="Orders",
+            )],
+            reset=False,
         )
 
 
@@ -193,8 +200,47 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
     sqlite_path = temp / "runtime.sqlite"
     duckdb_path = temp / "runtime.duckdb"
     recovery_root = temp / "workspace-recovery"
+    os.environ["AIBI_DATASET_OBJECT_ROOT"] = str(temp / "runtime-dataset-objects-v2")
     build_sqlite(sqlite_path)
-    build_duckdb(duckdb_path)
+    with closing(sqlite3.connect(sqlite_path)) as fixture_connection:
+        fixture_connection.row_factory = sqlite3.Row
+        publish_fixture_tables_to_duckdb(
+            fixture_connection,
+            duckdb_path,
+            [FixtureTable(
+                workspace_id="workspace-a",
+                table_key="orders",
+                physical_table="data_workspace_a",
+                columns=(("workspace_id", "VARCHAR"), ("amount", "DOUBLE")),
+                rows=(("historical-customer", 5.0),),
+                data_version=0,
+                display_name="Orders",
+            )],
+            reset=True,
+        )
+        publish_fixture_tables_to_duckdb(
+            fixture_connection,
+            duckdb_path,
+            [
+                FixtureTable(
+                    workspace_id="workspace-a",
+                    table_key="orders",
+                    physical_table="data_workspace_a",
+                    columns=(("workspace_id", "VARCHAR"), ("amount", "DOUBLE")),
+                    rows=(("customer-east", 10.0), ("customer-west", 20.0)),
+                    display_name="Orders",
+                ),
+                FixtureTable(
+                    workspace_id="workspace-b",
+                    table_key="ledger",
+                    physical_table="data_workspace_b",
+                    columns=(("workspace_id", "VARCHAR"), ("amount", "DOUBLE")),
+                    rows=(("workspace-a", 99.0),),
+                    display_name="Ledger",
+                ),
+            ],
+            reset=True,
+        )
 
     def open_db() -> sqlite3.Connection:
         connection = sqlite3.connect(sqlite_path)
@@ -210,6 +256,9 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
 
     before_a = service._state("workspace-a")
     before_b = service._state("workspace-b")
+    with closing(open_db()) as connection:
+        baseline_dataset_version = active_dataset_version(connection, "workspace-a", "orders")
+    baseline_version_id = str((baseline_dataset_version or {}).get("versionId") or "")
     preview = service.create("workspace-a", "Baseline before replacement", "create-baseline")
     check("create-is-dry-run-first", preview.get("dryRun") is True and preview.get("requiresConfirmation") is True and not recovery_root.exists(), preview)
     point_key = str(preview["recoveryPlan"]["recoveryPointKey"])
@@ -274,20 +323,82 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
     point_dir = recovery_root / _workspace_bucket("workspace-a") / point_key
     with closing(sqlite3.connect(point_dir / SQLITE_ARTIFACT)) as snapshot:
         snapshot_workspaces = [row[0] for row in snapshot.execute("SELECT id FROM workspaces ORDER BY id")]
-        snapshot_business_rows = snapshot.execute("SELECT workspace_id, amount FROM data_workspace_a ORDER BY amount").fetchall()
+        snapshot_binding = snapshot.execute(
+            "SELECT table_key, active_version_id FROM table_registry ORDER BY table_key"
+        ).fetchall()
+        snapshot_versions = snapshot.execute(
+            "SELECT version_id FROM dataset_versions WHERE workspace_id = 'workspace-a' ORDER BY version_id"
+        ).fetchall()
+        snapshot_files = snapshot.execute(
+            "SELECT version_id, object_key, object_hash FROM dataset_version_files ORDER BY version_id, ordinal"
+        ).fetchall()
+        snapshot_lineage = snapshot.execute(
+            "SELECT id FROM source_runs WHERE workspace_id = 'workspace-a' ORDER BY id"
+        ).fetchall()
         other_dashboard = snapshot.execute("SELECT COUNT(*) FROM dashboards WHERE workspace_id = 'workspace-b'").fetchone()[0]
         other_physical = snapshot.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='data_workspace_b'").fetchone()
+        target_physical = snapshot.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='data_workspace_a'").fetchone()
         global_rows = snapshot.execute("SELECT COUNT(*) FROM global_settings").fetchone()[0]
     check(
-        "sqlite-artifact-is-workspace-isolated-with-business-workspace-column-preserved",
-        snapshot_workspaces == ["workspace-a"] and snapshot_business_rows == [("customer-east", 10.0), ("customer-west", 20.0)] and other_dashboard == 0 and other_physical is None and global_rows == 0,
-        {"workspaces": snapshot_workspaces, "rows": snapshot_business_rows, "otherDashboard": other_dashboard, "otherPhysical": other_physical, "globalRows": global_rows},
+        "sqlite-artifact-is-workspace-isolated-and-contains-only-dataset-pointers",
+        snapshot_workspaces == ["workspace-a"]
+        and len(snapshot_binding) == 1
+        and snapshot_binding[0][0] == "orders"
+        and bool(snapshot_binding[0][1])
+        and [row[0] for row in snapshot_versions] == [baseline_version_id]
+        and len(snapshot_files) == 1
+        and snapshot_files[0][0] == baseline_version_id
+        and bool(snapshot_files[0][1])
+        and bool(snapshot_files[0][2])
+        and [row[0] for row in snapshot_lineage] == ["run-a-1"]
+        and other_dashboard == 0
+        and other_physical is None
+        and target_physical is None
+        and global_rows == 0,
+        {
+            "workspaces": snapshot_workspaces,
+            "binding": snapshot_binding,
+            "versions": snapshot_versions,
+            "files": snapshot_files,
+            "lineage": snapshot_lineage,
+            "otherDashboard": other_dashboard,
+            "otherPhysical": other_physical,
+            "targetPhysical": target_physical,
+            "globalRows": global_rows,
+        },
     )
     import duckdb  # type: ignore
     with duckdb.connect(str(point_dir / DUCKDB_ARTIFACT), read_only=True) as snapshot_duck:
-        replica_manifest = snapshot_duck.execute("SELECT logical_table, replica_table FROM __aibi_replica_manifest ORDER BY logical_table").fetchall()
+        dataset_manifest = snapshot_duck.execute(
+            "SELECT logical_table, version_id FROM __aibi_replica_manifest ORDER BY logical_table"
+        ).fetchall()
+        point_object_keys = json.loads(snapshot_duck.execute(
+            "SELECT object_keys_json FROM __aibi_replica_manifest ORDER BY logical_table LIMIT 1"
+        ).fetchone()[0])
+        snapshot_rows = snapshot_duck.execute(
+            "SELECT workspace_id, amount FROM data_workspace_a ORDER BY amount"
+        ).fetchall()
         other_duck = snapshot_duck.execute("SELECT 1 FROM information_schema.tables WHERE table_name = 'data_workspace_b'").fetchone()
-    check("duckdb-artifact-only-contains-workspace-replica", replica_manifest == [("data_workspace_a", "replica_a_1")] and other_duck is None, replica_manifest)
+    check(
+        "duckdb-artifact-only-contains-workspace-dataset-view",
+        len(dataset_manifest) == 1
+        and dataset_manifest[0][0] == "data_workspace_a"
+        and bool(dataset_manifest[0][1])
+        and snapshot_rows == [("customer-east", 10.0), ("customer-west", 20.0)]
+        and other_duck is None,
+        {"manifest": dataset_manifest, "rows": snapshot_rows, "other": other_duck},
+    )
+    point_object = resolve_object_key(str(point_object_keys[0]))
+    hidden_object = point_object.with_name(point_object.name + ".missing")
+    os.replace(point_object, hidden_object)
+    try:
+        expect_error(
+            "missing-parquet-object-invalidates-recovery-point",
+            "RECOVERY_DATASET_OBJECT_INTEGRITY_FAILED",
+            lambda: service.inspect("workspace-a", point_key, verify=True),
+        )
+    finally:
+        os.replace(hidden_object, point_object)
 
     listing = service.list("workspace-a", limit=5, verify=True)
     check("list-is-bounded-and-verified", listing.get("count") == 1 and listing.get("health") == "ready" and listing.get("recoveryPoints", [])[0].get("verified") is True, listing)
@@ -300,6 +411,13 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
         expect_error("symlink-root-is-blocked", "RECOVERY_SYMLINK_BLOCKED", lambda: _ensure_root(recovery_root, create=False))
 
     mutate_workspace_a(sqlite_path, duckdb_path, suffix="2", amount=200.0)
+    with closing(open_db()) as connection:
+        connection.execute("DELETE FROM dataset_version_files WHERE version_id = ?", (baseline_version_id,))
+        connection.execute("DELETE FROM dataset_versions WHERE version_id = ?", (baseline_version_id,))
+        connection.execute(
+            "DELETE FROM source_runs WHERE workspace_id = 'workspace-a' AND id IN ('run-a-1', 'run-a-history')"
+        )
+        connection.commit()
     changed_a = service._state("workspace-a")
     check("fixture-mutates-the-target-workspace", changed_a["fingerprint"] != before_a["fingerprint"], changed_a)
     comparison = service.compare("workspace-a", point_key)
@@ -331,7 +449,19 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
         freshness_rows = connection.execute(
             "SELECT receipt_key, source_run_id, freshness FROM query_plan_receipts WHERE workspace_id = 'workspace-a' ORDER BY receipt_key"
         ).fetchall()
-        rows = connection.execute("SELECT workspace_id, amount FROM data_workspace_a ORDER BY amount").fetchall()
+        restored_active_version = active_dataset_version(connection, "workspace-a", "orders")
+        restored_source_runs = connection.execute(
+            "SELECT id FROM source_runs WHERE workspace_id = 'workspace-a' ORDER BY id"
+        ).fetchall()
+        restored_workspace_run = connection.execute(
+            "SELECT current_source_run_id FROM workspaces WHERE id = 'workspace-a'"
+        ).fetchone()[0]
+    restored_files = list((restored_active_version or {}).get("files") or [])
+    restored_object = resolve_object_key(str(restored_files[0]["objectKey"])) if restored_files else None
+    with duckdb.connect(str(duckdb_path), read_only=True) as connection:
+        restored_rows = connection.execute(
+            "SELECT workspace_id, amount FROM data_workspace_a ORDER BY amount"
+        ).fetchall()
     check(
         "restore-rehydrates-source-relationship-dashboard-and-query-freshness",
         restored.get("confirmed") is True
@@ -341,8 +471,23 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
         and json.loads(relationship)["status"] == "validated"
         and ("receipt-a", "run-a-1", "current") in [tuple(item) for item in freshness_rows]
         and ("receipt-a-2", "run-a-2", "stale") in [tuple(item) for item in freshness_rows]
-        and [tuple(row) for row in rows] == [("customer-east", 10.0), ("customer-west", 20.0)],
-        {"restored": restored, "dashboard": dashboard_name, "relationship": relationship, "freshness": [tuple(item) for item in freshness_rows], "rows": [tuple(row) for row in rows]},
+        and (restored_active_version or {}).get("versionId") == baseline_version_id
+        and len(restored_files) == 1
+        and restored_object is not None
+        and restored_object.is_file()
+        and file_sha256(restored_object) == restored_files[0]["objectHash"]
+        and restored_workspace_run == "run-a-1"
+        and [row[0] for row in restored_source_runs] == ["run-a-1", "run-a-2"]
+        and restored_rows == [("customer-east", 10.0), ("customer-west", 20.0)],
+        {
+            "restored": restored,
+            "dashboard": dashboard_name,
+            "relationship": relationship,
+            "freshness": [tuple(item) for item in freshness_rows],
+            "activeVersion": restored_active_version,
+            "sourceRuns": [tuple(item) for item in restored_source_runs],
+            "rows": restored_rows,
+        },
     )
     check("restore-does-not-change-other-workspace", after_restore_b["fingerprint"] == before_b["fingerprint"], {"before": before_b, "after": after_restore_b})
     restore_replay = service.restore(
@@ -376,6 +521,19 @@ with tempfile.TemporaryDirectory(prefix="aibi-c-workspace-recovery-") as tempora
     )
 
     mutate_workspace_a(sqlite_path, duckdb_path, suffix="3", amount=300.0)
+    with closing(open_db()) as connection:
+        republished_version = active_dataset_version(connection, "workspace-a", "orders")
+    republished_files = list((republished_version or {}).get("files") or [])
+    republished_object = resolve_object_key(str(republished_files[0]["objectKey"])) if republished_files else None
+    check(
+        "restored-version-catalog-supports-subsequent-dataset-republish",
+        (republished_version or {}).get("versionId") != baseline_version_id
+        and len(republished_files) == 1
+        and republished_object is not None
+        and republished_object.is_file()
+        and file_sha256(republished_object) == republished_files[0]["objectHash"],
+        republished_version,
+    )
     before_interrupted_restore = service._state("workspace-a")
     interrupted_preview = service.restore("workspace-a", point_key, "restore-interrupted")
     interrupted_error = expect_error(

@@ -2,13 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from contextlib import contextmanager
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Iterator, Mapping, Sequence
+
+from dataset_version_store import file_sha256, resolve_object_key
 
 
 SAFE_AGGREGATIONS = {"count", "count-distinct", "sum", "avg", "min", "max"}
+DATASET_MANIFEST_TABLE = "__aibi_replica_manifest"
+DATASET_MANIFEST_VERSION = 2
+_FINGERPRINT = re.compile(r"^[0-9a-f]{64}$")
+_NUMERIC_TYPE = re.compile(r"^(?:U?(?:TINY|SMALL|BIG|HUGE)?INT(?:EGER)?|DECIMAL(?:\(\d+(?:,\d+)?\))?|NUMERIC(?:\(\d+(?:,\d+)?\))?|REAL|FLOAT|DOUBLE)$")
+_TEMPORAL_TYPE = re.compile(r"^(?:DATE|TIME(?:STAMP)?(?: WITH TIME ZONE)?|INTERVAL)$")
 
 
 class DuckDBUnavailable(RuntimeError):
@@ -17,6 +25,56 @@ class DuckDBUnavailable(RuntimeError):
 
 class QueryRuntimeError(RuntimeError):
     pass
+
+
+def _acquire_duckdb_reader(duckdb: Any, database_path: Path) -> tuple[Any, str | None]:
+    """Open one reader whose lifetime cannot outlive the cross-process read boundary."""
+    return duckdb.connect(str(database_path), read_only=True), None
+
+
+def _release_duckdb_reader(connection: Any, cache_key: str | None, *, discard: bool = False) -> None:
+    del cache_key, discard
+    try:
+        connection.close()
+    except Exception:
+        pass
+
+
+def close_cached_duckdb_readers() -> int:
+    """Protocol hook retained for writer barriers; request-scoped readers leave no cache."""
+    return 0
+
+
+@contextmanager
+def _open_duckdb_snapshot(duckdb_path: Path) -> Iterator[Any]:
+    """Open or lease one reader and isolate exactly one request transaction."""
+    try:
+        import duckdb  # type: ignore
+    except Exception as exc:  # pragma: no cover - depends on local Python env
+        raise DuckDBUnavailable("duckdb-unavailable") from exc
+    if not duckdb_path.is_file():
+        raise QueryRuntimeError("replica-database-missing")
+    try:
+        connection, cache_key = _acquire_duckdb_reader(duckdb, duckdb_path)
+    except Exception as exc:
+        raise QueryRuntimeError("replica-database-open-failed") from exc
+    transaction_started = False
+    discard = False
+    try:
+        try:
+            connection.execute("BEGIN TRANSACTION")
+            transaction_started = True
+        except Exception as exc:
+            discard = True
+            raise QueryRuntimeError("replica-transaction-start-failed") from exc
+        yield connection
+    finally:
+        if transaction_started:
+            try:
+                connection.execute("ROLLBACK")
+            except Exception:
+                discard = True
+        _release_duckdb_reader(connection, cache_key, discard=discard)
 
 
 def duckdb_status(database_path: Path) -> dict[str, Any]:
@@ -48,7 +106,11 @@ def duckdb_status(database_path: Path) -> dict[str, Any]:
 class ReplicaExpectation:
     logical_table: str
     source_version: str
+    version_id: str
+    content_fingerprint: str
+    schema_fingerprint: str
     row_count: int
+    object_hashes: tuple[str, ...] = ()
 
 
 def replica_source_version(registry: Mapping[str, Any]) -> str:
@@ -58,11 +120,38 @@ def replica_source_version(registry: Mapping[str, Any]) -> str:
     )
 
 
+def _mapping_value(registry: Mapping[str, Any], key: str) -> Any:
+    try:
+        return registry[key]
+    except (KeyError, IndexError):
+        return None
+
+
+def _required_registry_value(registry: Mapping[str, Any], key: str) -> str:
+    value = str(_mapping_value(registry, key) or "").strip()
+    if not value:
+        raise QueryRuntimeError(f"dataset-binding-missing:{key}")
+    return value
+
+
 def replica_expectation(registry: Mapping[str, Any]) -> ReplicaExpectation:
+    raw_hashes = _mapping_value(registry, "object_hashes")
+    if raw_hashes is None:
+        raw_hashes = _mapping_value(registry, "object_hashes_json")
+    if isinstance(raw_hashes, str):
+        try:
+            raw_hashes = json.loads(raw_hashes)
+        except json.JSONDecodeError:
+            raw_hashes = []
+    object_hashes = tuple(str(value) for value in raw_hashes) if isinstance(raw_hashes, (list, tuple)) else ()
     return ReplicaExpectation(
         logical_table=str(registry["physical_table"]),
         source_version=replica_source_version(registry),
+        version_id=_required_registry_value(registry, "active_version_id"),
+        content_fingerprint=_required_registry_value(registry, "content_fingerprint"),
+        schema_fingerprint=_required_registry_value(registry, "schema_fingerprint"),
         row_count=int(registry["row_count"] or 0),
+        object_hashes=object_hashes,
     )
 
 
@@ -108,30 +197,12 @@ def open_validated_duckdb_query(
     duckdb_path: Path,
     expectations: Sequence[ReplicaExpectation],
 ) -> Iterator[ValidatedDuckDBQuery]:
-    """Open one read-only reader and fail closed unless every binding is current."""
-    try:
-        import duckdb  # type: ignore
-    except Exception as exc:  # pragma: no cover - depends on local Python env
-        raise DuckDBUnavailable("duckdb-unavailable") from exc
-    if not duckdb_path.is_file():
-        raise QueryRuntimeError("replica-database-missing")
+    """Use one request snapshot and fail closed unless every binding is current."""
     if not expectations:
         raise QueryRuntimeError("replica-expectations-required")
-    try:
-        duck_connection = duckdb.connect(str(duckdb_path), read_only=True)
-    except Exception as exc:
-        raise QueryRuntimeError("replica-database-open-failed") from exc
-    try:
+    with _open_duckdb_snapshot(duckdb_path) as duck_connection:
         try:
-            replicas = [
-                validate_replica_binding(
-                    duck_connection,
-                    logical_table=item.logical_table,
-                    expected_source_version=item.source_version,
-                    expected_row_count=item.row_count,
-                )
-                for item in expectations
-            ]
+            replicas = validate_replica_bindings(duck_connection, expectations)
         except QueryRuntimeError:
             raise
         except Exception as exc:
@@ -139,8 +210,25 @@ def open_validated_duckdb_query(
         # Consumer exceptions describe compile/business safety failures and must
         # retain their own stable semantics; only reader open/validation is wrapped.
         yield ValidatedDuckDBQuery(duck_connection, replicas)
-    finally:
-        duck_connection.close()
+
+
+@contextmanager
+def open_batch_validated_duckdb_query(
+    duckdb_path: Path,
+    expectations: Sequence[ReplicaExpectation],
+) -> Iterator[tuple[ValidatedDuckDBQuery, dict[str, str]]]:
+    """Open one read-only reader and validate a batch in one metadata query.
+
+    Unlike the single-query context, a batch keeps validation failures scoped to
+    the affected logical table so one stale widget cannot hide otherwise valid
+    widgets in the same render pass.  The returned ``errors`` map contains the
+    stable replica error code for each failed logical table.
+    """
+    if not expectations:
+        raise QueryRuntimeError("replica-expectations-required")
+    with _open_duckdb_snapshot(duckdb_path) as duck_connection:
+        validated, errors = validate_replica_bindings_batch(duck_connection, expectations)
+        yield ValidatedDuckDBQuery(duck_connection, validated), errors
 
 
 def quote_identifier(name: str) -> str:
@@ -151,36 +239,72 @@ def numeric_sql(expression: str) -> str:
     return f"TRY_CAST(NULLIF(REPLACE(TRIM(CAST({expression} AS VARCHAR)), ',', ''), '') AS DOUBLE)"
 
 
-def compile_filter_sql(filters: list[dict[str, Any]] | None, *, dialect: str) -> tuple[str, list[Any]]:
+def _is_numeric_type(data_type: str) -> bool:
+    return bool(_NUMERIC_TYPE.fullmatch(str(data_type or "").strip().upper()))
+
+
+def _is_temporal_type(data_type: str) -> bool:
+    return bool(_TEMPORAL_TYPE.fullmatch(str(data_type or "").strip().upper()))
+
+
+def _is_string_type(data_type: str) -> bool:
+    normalized = str(data_type or "").strip().upper()
+    return normalized in {"VARCHAR", "TEXT", "STRING", "CHAR", "BPCHAR"} or normalized.startswith(("VARCHAR(", "CHAR("))
+
+
+def _typed_parameter(data_type: str) -> str:
+    normalized = str(data_type or "").strip().upper()
+    if (_is_numeric_type(normalized) or _is_temporal_type(normalized) or normalized == "BOOLEAN") and re.fullmatch(r"[A-Z0-9_(), ]+", normalized):
+        return f"TRY_CAST(? AS {normalized})"
+    return "?"
+
+
+def compile_filter_sql(
+    filters: list[dict[str, Any]] | None,
+    *,
+    dialect: str,
+    field_types: Mapping[str, str] | None = None,
+) -> tuple[str, list[Any]]:
     if dialect != "duckdb":
         raise QueryRuntimeError(f"Unsupported filter dialect: {dialect}")
     clauses: list[str] = []
     params: list[Any] = []
     for item in filters or []:
-        field = quote_identifier(str(item.get("field") or ""))
+        field_name = str(item.get("field") or "")
+        field = quote_identifier(field_name)
         operator = str(item.get("operator") or "")
         value = item.get("value")
+        data_type = str((field_types or {}).get(field_name) or "").upper()
+        parameter_sql = _typed_parameter(data_type)
         if not field or field == '""':
             raise QueryRuntimeError("Filter field is required")
         if operator == "equals":
-            clauses.append(f"CAST({field} AS VARCHAR) = ?")
-            params.append(str(value))
+            clauses.append(f"{field} = {parameter_sql}" if data_type else f"CAST({field} AS VARCHAR) = ?")
+            params.append(value if data_type else str(value))
         elif operator == "not-equals":
-            clauses.append(f"CAST({field} AS VARCHAR) <> ?")
-            params.append(str(value))
+            clauses.append(f"{field} <> {parameter_sql}" if data_type else f"CAST({field} AS VARCHAR) <> ?")
+            params.append(value if data_type else str(value))
         elif operator == "contains":
-            clauses.append(f"CAST({field} AS VARCHAR) LIKE '%' || ? || '%'")
+            clauses.append(f"{field if _is_string_type(data_type) else f'CAST({field} AS VARCHAR)'} LIKE '%' || ? || '%'")
             params.append(str(value))
         elif operator == "not-contains":
-            clauses.append(f"CAST({field} AS VARCHAR) NOT LIKE '%' || ? || '%'")
+            clauses.append(f"{field if _is_string_type(data_type) else f'CAST({field} AS VARCHAR)'} NOT LIKE '%' || ? || '%'")
             params.append(str(value))
         elif operator in {"gt", "gte", "lt", "lte"}:
             comparison = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}[operator]
-            clauses.append(f"{numeric_sql(field)} {comparison} TRY_CAST(? AS DOUBLE)")
+            if _is_numeric_type(data_type) or _is_temporal_type(data_type):
+                expression = field
+                placeholder = parameter_sql
+            else:
+                expression = numeric_sql(field)
+                placeholder = "TRY_CAST(? AS DOUBLE)"
+            clauses.append(f"{expression} {comparison} {placeholder}")
             params.append(value)
         elif operator in {"date-gte", "date-lt"}:
             comparison = ">=" if operator == "date-gte" else "<"
-            clauses.append(f"TRY_CAST({field} AS TIMESTAMP) {comparison} TRY_CAST(? AS TIMESTAMP)")
+            expression = field if _is_temporal_type(data_type) else f"TRY_CAST({field} AS TIMESTAMP)"
+            placeholder = parameter_sql if _is_temporal_type(data_type) else "TRY_CAST(? AS TIMESTAMP)"
+            clauses.append(f"{expression} {comparison} {placeholder}")
             params.append(value)
         else:
             raise QueryRuntimeError(f"Unsupported filter operator: {operator}")
@@ -192,17 +316,6 @@ def cursor_rows(cursor: Any) -> list[dict[str, Any]]:
     return [dict(zip(columns, row)) for row in cursor.fetchall()]
 
 
-def sqlite_rows(connection: Any, physical_table: str, columns: list[str]) -> list[list[Any]]:
-    select_sql = ", ".join(quote_identifier(column) for column in columns)
-    rows = connection.execute(f"SELECT {select_sql} FROM {quote_identifier(physical_table)}").fetchall()
-    return [[row[column] for column in columns] for row in rows]
-
-
-def replica_table_name(physical_table: str, source_version: str) -> str:
-    digest = hashlib.sha256(f"{physical_table}:{source_version}".encode("utf-8")).hexdigest()[:16]
-    return f"__aibi_replica_{digest}"
-
-
 def _relation_kind(duck_connection: Any, name: str) -> str | None:
     row = duck_connection.execute(
         "SELECT table_type FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?",
@@ -211,18 +324,351 @@ def _relation_kind(duck_connection: Any, name: str) -> str | None:
     return str(row[0]) if row else None
 
 
-def _ensure_manifest(duck_connection: Any) -> None:
-    duck_connection.execute(
-        """
-        CREATE TABLE IF NOT EXISTS __aibi_replica_manifest (
-          logical_table VARCHAR PRIMARY KEY,
-          source_version VARCHAR NOT NULL,
-          replica_table VARCHAR NOT NULL,
-          row_count BIGINT NOT NULL,
-          published_at TIMESTAMP DEFAULT current_timestamp
+def _validated_fingerprint(value: str, label: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if not _FINGERPRINT.fullmatch(normalized):
+        raise QueryRuntimeError(f"dataset-{label}-invalid")
+    return normalized
+
+
+def _validated_object_key(value: str) -> str:
+    normalized = str(value or "").strip().replace("\\", "/")
+    path = PurePosixPath(normalized)
+    if (
+        not normalized
+        or path.is_absolute()
+        or re.match(r"^[A-Za-z]:", normalized)
+        or ".." in path.parts
+        or "." in path.parts
+    ):
+        raise QueryRuntimeError("dataset-object-key-invalid")
+    return path.as_posix()
+
+
+def _sql_string(value: str) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _ensure_manifest_v2(duck_connection: Any) -> None:
+    metadata_kind = _relation_kind(duck_connection, "__aibi_schema_metadata")
+    if metadata_kind is None:
+        duck_connection.execute(
+            "CREATE TABLE __aibi_schema_metadata (key VARCHAR PRIMARY KEY, value VARCHAR NOT NULL)"
         )
+        duck_connection.execute(
+            "INSERT INTO __aibi_schema_metadata(key, value) VALUES ('schema_version', ?)",
+            [str(DATASET_MANIFEST_VERSION)],
+        )
+    elif metadata_kind != "BASE TABLE":
+        raise QueryRuntimeError("duckdb-schema-metadata-invalid")
+    else:
+        version = duck_connection.execute(
+            "SELECT value FROM __aibi_schema_metadata WHERE key = 'schema_version'"
+        ).fetchone()
+        if version is None or int(version[0]) != DATASET_MANIFEST_VERSION:
+            raise QueryRuntimeError("duckdb-schema-v2-required")
+    kind = _relation_kind(duck_connection, DATASET_MANIFEST_TABLE)
+    if kind is None:
+        duck_connection.execute(
+            f"""
+            CREATE TABLE {quote_identifier(DATASET_MANIFEST_TABLE)} (
+              manifest_version INTEGER NOT NULL,
+              logical_table VARCHAR PRIMARY KEY,
+              source_version VARCHAR NOT NULL,
+              version_id VARCHAR NOT NULL,
+              object_keys_json VARCHAR NOT NULL,
+              object_paths_json VARCHAR NOT NULL,
+              object_hashes_json VARCHAR NOT NULL,
+              schema_fingerprint VARCHAR NOT NULL,
+              content_fingerprint VARCHAR NOT NULL,
+              row_count BIGINT NOT NULL,
+              published_at TIMESTAMP NOT NULL DEFAULT current_timestamp
+            )
+            """
+        )
+        return
+    if kind != "BASE TABLE":
+        raise QueryRuntimeError("replica-manifest-v2-required")
+    columns = {
+        str(row[0])
+        for row in duck_connection.execute(
+            f"DESCRIBE {quote_identifier(DATASET_MANIFEST_TABLE)}"
+        ).fetchall()
+    }
+    required = {
+        "manifest_version",
+        "logical_table",
+        "source_version",
+        "version_id",
+        "object_keys_json",
+        "object_paths_json",
+        "object_hashes_json",
+        "schema_fingerprint",
+        "content_fingerprint",
+        "row_count",
+        "published_at",
+    }
+    if not required.issubset(columns):
+        raise QueryRuntimeError("replica-manifest-v2-required")
+
+
+def publish_dataset_view(
+    duck_connection: Any,
+    *,
+    logical_table: str,
+    source_version: str,
+    version_id: str,
+    object_keys: Sequence[str],
+    object_paths: Sequence[Path],
+    object_hashes: Sequence[str],
+    schema_fingerprint: str,
+    content_fingerprint: str,
+    row_count: int,
+    object_root: Path | None = None,
+) -> dict[str, Any]:
+    """Atomically publish one immutable typed-Parquet dataset as a logical view.
+
+    `object_keys` are repository-independent CAS keys safe to persist. Absolute
+    `object_paths` are private inputs supplied by the dataset store and are
+    embedded only in DuckDB's local view definition.
+    """
+    logical_name = str(logical_table or "").strip()
+    source = str(source_version or "").strip()
+    version = str(version_id or "").strip()
+    if not logical_name:
+        raise QueryRuntimeError("dataset-logical-table-required")
+    if not version:
+        raise QueryRuntimeError("dataset-version-id-required")
+    if not source:
+        raise QueryRuntimeError("dataset-source-version-required")
+    keys = [_validated_object_key(value) for value in object_keys]
+    supplied_paths = [Path(value) for value in object_paths]
+    hashes = [_validated_fingerprint(value, "object-hash") for value in object_hashes]
+    if not keys or len(keys) != len(supplied_paths) or len(keys) != len(hashes):
+        raise QueryRuntimeError("dataset-object-binding-invalid")
+    paths: list[Path] = []
+    for object_key, supplied_path, object_hash in zip(keys, supplied_paths, hashes, strict=True):
+        try:
+            canonical_path = resolve_object_key(object_key, root=object_root)
+        except (PermissionError, ValueError) as exc:
+            raise QueryRuntimeError("dataset-object-key-invalid") from exc
+        if supplied_path.is_symlink() or supplied_path.resolve() != canonical_path:
+            raise QueryRuntimeError("dataset-object-path-mismatch")
+        if canonical_path.name != f"{object_hash}.parquet":
+            raise QueryRuntimeError("dataset-object-key-hash-mismatch")
+        if not canonical_path.is_file() or canonical_path.is_symlink():
+            raise QueryRuntimeError("dataset-object-missing")
+        if file_sha256(canonical_path) != object_hash:
+            raise QueryRuntimeError("dataset-object-hash-mismatch")
+        paths.append(canonical_path)
+    content_hash = _validated_fingerprint(content_fingerprint, "content-fingerprint")
+    schema_hash = _validated_fingerprint(schema_fingerprint, "schema-fingerprint")
+    expected_rows = int(row_count)
+    if expected_rows < 0:
+        raise QueryRuntimeError("dataset-row-count-invalid")
+    keys_json = json.dumps(keys, ensure_ascii=False, separators=(",", ":"))
+    paths_json = json.dumps([path.as_posix() for path in paths], ensure_ascii=False, separators=(",", ":"))
+    hashes_json = json.dumps(hashes, separators=(",", ":"))
+    parquet_paths = ", ".join(_sql_string(path.as_posix()) for path in paths)
+    source_sql = f"read_parquet([{parquet_paths}], union_by_name = true)"
+    _ensure_manifest_v2(duck_connection)
+    duck_connection.execute("BEGIN TRANSACTION")
+    try:
+        duck_connection.execute(
+            f"CREATE OR REPLACE VIEW {quote_identifier(logical_name)} AS SELECT * FROM {source_sql}"
+        )
+        duck_connection.execute(
+            f"""
+            INSERT INTO {quote_identifier(DATASET_MANIFEST_TABLE)} (
+              manifest_version, logical_table, source_version, version_id,
+              object_keys_json, object_paths_json, object_hashes_json,
+              schema_fingerprint, content_fingerprint, row_count, published_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, current_timestamp)
+            ON CONFLICT (logical_table) DO UPDATE SET
+              manifest_version = excluded.manifest_version,
+              source_version = excluded.source_version,
+              version_id = excluded.version_id,
+              object_keys_json = excluded.object_keys_json,
+              object_paths_json = excluded.object_paths_json,
+              object_hashes_json = excluded.object_hashes_json,
+              schema_fingerprint = excluded.schema_fingerprint,
+              content_fingerprint = excluded.content_fingerprint,
+              row_count = excluded.row_count,
+              published_at = excluded.published_at
+            """,
+            [
+                DATASET_MANIFEST_VERSION,
+                logical_name,
+                source,
+                version,
+                keys_json,
+                paths_json,
+                hashes_json,
+                schema_hash,
+                content_hash,
+                expected_rows,
+            ],
+        )
+        duck_connection.execute("COMMIT")
+    except Exception:
+        duck_connection.execute("ROLLBACK")
+        raise
+    return {
+        "logicalTable": logical_name,
+        "sourceVersion": source,
+        "versionId": version,
+        "objectHashes": hashes,
+        "schemaFingerprint": schema_hash,
+        "contentFingerprint": content_hash,
+        "rowCount": expected_rows,
+        "status": "published",
+    }
+
+
+def _replica_validation_error(row: dict[str, Any], expected: ReplicaExpectation) -> str | None:
+    logical_name = str(expected.logical_table)
+    if row.get("manifest_version") is None:
+        return f"replica-binding-missing:{logical_name}"
+    if int(row["manifest_version"]) != DATASET_MANIFEST_VERSION:
+        return f"replica-manifest-version-stale:{logical_name}"
+    if str(row.get("source_version") or "") != str(row["expected_source_version"]):
+        return f"replica-source-version-stale:{logical_name}"
+    if str(row.get("version_id") or "") != str(row["expected_version_id"]):
+        return f"replica-version-stale:{logical_name}"
+    if str(row.get("content_fingerprint") or "") != str(row["expected_content_fingerprint"]):
+        return f"replica-content-fingerprint-drift:{logical_name}"
+    if str(row.get("schema_fingerprint") or "") != str(row["expected_schema_fingerprint"]):
+        return f"replica-schema-drift:{logical_name}"
+    if int(row.get("row_count") or 0) != int(row["expected_row_count"]):
+        return f"replica-row-count-drift:{logical_name}"
+    if str(row.get("table_type") or "").upper() != "VIEW":
+        return f"replica-view-not-published:{logical_name}"
+    try:
+        object_hashes = tuple(str(value) for value in json.loads(str(row["object_hashes_json"])))
+    except (json.JSONDecodeError, TypeError):
+        return f"replica-object-hash-drift:{logical_name}"
+    if not object_hashes or any(not _FINGERPRINT.fullmatch(value) for value in object_hashes):
+        return f"replica-object-hash-drift:{logical_name}"
+    if expected.object_hashes and object_hashes != expected.object_hashes:
+        return f"replica-object-hash-drift:{logical_name}"
+    return None
+
+
+def _validated_replica_from_row(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "logicalTable": str(row["logical_table"]),
+        "sourceVersion": str(row["source_version"]),
+        "versionId": str(row["version_id"]),
+        "objectHashes": [str(value) for value in json.loads(str(row["object_hashes_json"]))],
+        "schemaFingerprint": str(row["schema_fingerprint"]),
+        "contentFingerprint": str(row["content_fingerprint"]),
+        "rowCount": int(row["row_count"]),
+        "status": "current",
+    }
+
+
+def validate_replica_bindings_batch(
+    duck_connection: Any,
+    expectations: Sequence[ReplicaExpectation],
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Validate a set of datasets with one metadata query and scoped errors.
+
+    The normal query path remains fail-closed through ``validate_replica_bindings``.
+    Batch consumers use this variant to keep one stale dataset from suppressing
+    independent widgets that are still bound to current immutable versions.
+    """
+    requested = list(expectations)
+    if not requested:
+        raise QueryRuntimeError("replica-expectations-required")
+    by_table: dict[str, ReplicaExpectation] = {}
+    errors: dict[str, str] = {}
+    conflicts: set[str] = set()
+    for item in requested:
+        current = by_table.get(item.logical_table)
+        if current is not None and current != item:
+            conflicts.add(item.logical_table)
+            errors[item.logical_table] = f"replica-expectation-conflict:{item.logical_table}"
+            continue
+        by_table[item.logical_table] = item
+    unique = [item for key, item in by_table.items() if key not in conflicts]
+    placeholders = ", ".join("(?, ?, ?, ?, ?, ?, ?)" for _ in unique)
+    params: list[Any] = []
+    for ordinal, item in enumerate(unique):
+        params.extend([
+            item.logical_table,
+            item.source_version,
+            item.version_id,
+            item.content_fingerprint,
+            item.schema_fingerprint,
+            int(item.row_count),
+            ordinal,
+        ])
+    if unique:
+        sql = f"""
+            WITH expected(
+              logical_table, source_version, version_id, content_fingerprint,
+              schema_fingerprint, row_count, ordinal
+            ) AS (VALUES {placeholders})
+            SELECT
+              e.logical_table,
+              e.source_version AS expected_source_version,
+              e.version_id AS expected_version_id,
+              e.content_fingerprint AS expected_content_fingerprint,
+              e.schema_fingerprint AS expected_schema_fingerprint,
+              e.row_count AS expected_row_count,
+              m.manifest_version,
+              m.source_version,
+              m.version_id,
+              m.object_hashes_json,
+              m.schema_fingerprint,
+              m.content_fingerprint,
+              m.row_count,
+              relation.table_type
+            FROM expected e
+            LEFT JOIN {quote_identifier(DATASET_MANIFEST_TABLE)} m
+              ON m.logical_table = e.logical_table
+            LEFT JOIN information_schema.tables relation
+              ON relation.table_catalog = current_database()
+             AND relation.table_schema = current_schema()
+             AND relation.table_name = e.logical_table
+            ORDER BY e.ordinal
         """
-    )
+        try:
+            rows = cursor_rows(duck_connection.execute(sql, params))
+        except Exception as exc:
+            message = str(exc).casefold()
+            if DATASET_MANIFEST_TABLE.casefold() in message and (
+                "does not exist" in message or "not found" in message
+            ):
+                raise QueryRuntimeError("replica-manifest-missing") from exc
+            raise QueryRuntimeError("replica-manifest-v2-required") from exc
+    else:
+        rows = []
+    validated: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        logical_name = str(row["logical_table"])
+        expected = by_table[logical_name]
+        error = _replica_validation_error(row, expected)
+        if error:
+            errors[logical_name] = error
+            continue
+        validated[logical_name] = _validated_replica_from_row(row)
+    return [dict(validated[item.logical_table]) for item in requested if item.logical_table in validated], errors
+
+
+def validate_replica_bindings(
+    duck_connection: Any,
+    expectations: Sequence[ReplicaExpectation],
+) -> list[dict[str, Any]]:
+    """Validate every requested dataset with one metadata-only DuckDB query."""
+    requested = list(expectations)
+    validated, errors = validate_replica_bindings_batch(duck_connection, requested)
+    for item in requested:
+        error = errors.get(item.logical_table)
+        if error:
+            raise QueryRuntimeError(error)
+    by_table = {str(item["logicalTable"]): item for item in validated}
+    return [dict(by_table[item.logical_table]) for item in requested]
 
 
 def validate_replica_binding(
@@ -230,133 +676,21 @@ def validate_replica_binding(
     *,
     logical_table: str,
     expected_source_version: str,
-    expected_row_count: int | None = None,
+    expected_version_id: str,
+    expected_content_fingerprint: str,
+    expected_schema_fingerprint: str,
+    expected_row_count: int,
+    expected_object_hashes: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """Fail closed when a published replica is missing, stale, or only half switched."""
-    if _relation_kind(duck_connection, "__aibi_replica_manifest") is None:
-        raise QueryRuntimeError("replica-manifest-missing")
-    row = duck_connection.execute(
-        "SELECT source_version, replica_table, row_count FROM __aibi_replica_manifest WHERE logical_table = ?",
-        [logical_table],
-    ).fetchone()
-    if row is None:
-        raise QueryRuntimeError(f"replica-binding-missing:{logical_table}")
-    source_version = str(row[0])
-    replica_table = str(row[1])
-    row_count = int(row[2] or 0)
-    if source_version != str(expected_source_version):
-        raise QueryRuntimeError(f"replica-version-stale:{logical_table}")
-    if expected_row_count is not None and row_count != int(expected_row_count):
-        raise QueryRuntimeError(f"replica-row-count-drift:{logical_table}")
-    if _relation_kind(duck_connection, replica_table) != "BASE TABLE":
-        raise QueryRuntimeError(f"replica-table-missing:{logical_table}")
-    if _relation_kind(duck_connection, logical_table) != "VIEW":
-        raise QueryRuntimeError(f"replica-view-not-published:{logical_table}")
-    physical_count = int(duck_connection.execute(
-        f"SELECT COUNT(*) FROM {quote_identifier(replica_table)}"
-    ).fetchone()[0] or 0)
-    view_count = int(duck_connection.execute(
-        f"SELECT COUNT(*) FROM {quote_identifier(logical_table)}"
-    ).fetchone()[0] or 0)
-    if physical_count != row_count or view_count != row_count:
-        raise QueryRuntimeError(f"replica-content-drift:{logical_table}")
-    return {
-        "logicalTable": logical_table,
-        "sourceVersion": source_version,
-        "replicaTable": replica_table,
-        "rowCount": row_count,
-        "status": "current",
-    }
-
-
-def sync_table_to_duckdb(
-    sqlite_connection: Any,
-    duck_connection: Any,
-    physical_table: str,
-    columns: list[str],
-    *,
-    source_version: str,
-    cleanup_stale: bool = True,
-) -> dict[str, Any]:
-    _ensure_manifest(duck_connection)
-    current = duck_connection.execute(
-        "SELECT source_version, replica_table, row_count FROM __aibi_replica_manifest WHERE logical_table = ?",
-        [physical_table],
-    ).fetchone()
-    if current and str(current[0]) == source_version and _relation_kind(duck_connection, physical_table) == "VIEW":
-        validated = validate_replica_binding(
-            duck_connection,
-            logical_table=physical_table,
-            expected_source_version=source_version,
-            expected_row_count=int(current[2] or 0),
-        )
-        return {
-            "syncedRows": 0,
-            "replicaStatus": "current",
-            "replicaTable": str(validated["replicaTable"]),
-            "rowCount": int(validated["rowCount"]),
-        }
-
-    replica_table = replica_table_name(physical_table, source_version)
-    duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(replica_table)}")
-    column_sql = ", ".join(f"{quote_identifier(column)} VARCHAR" for column in columns)
-    duck_connection.execute(f"CREATE TABLE {quote_identifier(replica_table)} ({column_sql})")
-    rows = sqlite_rows(sqlite_connection, physical_table, columns)
-    if rows:
-        placeholders = ", ".join("?" for _ in columns)
-        insert_sql = f"INSERT INTO {quote_identifier(replica_table)} VALUES ({placeholders})"
-        duck_connection.executemany(insert_sql, rows)
-    duck_connection.execute("BEGIN TRANSACTION")
-    try:
-        relation_kind = _relation_kind(duck_connection, physical_table)
-        if relation_kind == "VIEW":
-            duck_connection.execute(f"DROP VIEW {quote_identifier(physical_table)}")
-        elif relation_kind:
-            duck_connection.execute(f"DROP TABLE {quote_identifier(physical_table)}")
-        duck_connection.execute(
-            f"CREATE VIEW {quote_identifier(physical_table)} AS SELECT * FROM {quote_identifier(replica_table)}"
-        )
-        duck_connection.execute(
-            """
-            INSERT INTO __aibi_replica_manifest (logical_table, source_version, replica_table, row_count, published_at)
-            VALUES (?, ?, ?, ?, current_timestamp)
-            ON CONFLICT (logical_table) DO UPDATE SET
-              source_version = excluded.source_version,
-              replica_table = excluded.replica_table,
-              row_count = excluded.row_count,
-              published_at = excluded.published_at
-            """,
-            [physical_table, source_version, replica_table, len(rows)],
-        )
-        duck_connection.execute("COMMIT")
-    except Exception:
-        duck_connection.execute("ROLLBACK")
-        raise
-    validate_replica_binding(
-        duck_connection,
-        logical_table=physical_table,
-        expected_source_version=source_version,
-        expected_row_count=len(rows),
-    )
-    if cleanup_stale:
-        stale_replicas = duck_connection.execute(
-            "SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_name LIKE '__aibi_replica_%' AND table_name NOT IN (?, '__aibi_replica_manifest')",
-            [replica_table],
-        ).fetchall()
-        active_replicas = {
-            str(row[0])
-            for row in duck_connection.execute("SELECT replica_table FROM __aibi_replica_manifest").fetchall()
-        }
-        for stale in stale_replicas:
-            stale_name = str(stale[0])
-            if stale_name not in active_replicas:
-                duck_connection.execute(f"DROP TABLE IF EXISTS {quote_identifier(stale_name)}")
-    return {
-        "syncedRows": len(rows),
-        "replicaStatus": "published",
-        "replicaTable": replica_table,
-        "rowCount": len(rows),
-    }
+    return validate_replica_bindings(duck_connection, [ReplicaExpectation(
+        logical_table=str(logical_table),
+        source_version=str(expected_source_version),
+        version_id=str(expected_version_id),
+        content_fingerprint=str(expected_content_fingerprint),
+        schema_fingerprint=str(expected_schema_fingerprint),
+        row_count=int(expected_row_count),
+        object_hashes=tuple(str(value) for value in expected_object_hashes),
+    )])[0]
 
 
 def compile_aggregate_sql(
@@ -367,6 +701,7 @@ def compile_aggregate_sql(
     aggregation: str,
     limit: int,
     filters: list[dict[str, Any]] | None = None,
+    field_types: Mapping[str, str] | None = None,
 ) -> tuple[str, list[Any]]:
     if aggregation not in SAFE_AGGREGATIONS:
         raise QueryRuntimeError(f"Unsupported aggregation: {aggregation}")
@@ -375,8 +710,9 @@ def compile_aggregate_sql(
     elif aggregation == "count-distinct":
         select_measure = f"COUNT(DISTINCT {quote_identifier(measure)}) AS value"
     else:
-        select_measure = f"{aggregation.upper()}({numeric_sql(quote_identifier(measure))}) AS value"
-    where_sql, params = compile_filter_sql(filters, dialect="duckdb")
+        measure_sql = quote_identifier(measure) if _is_numeric_type(str((field_types or {}).get(measure) or "")) else numeric_sql(quote_identifier(measure))
+        select_measure = f"{aggregation.upper()}({measure_sql}) AS value"
+    where_sql, params = compile_filter_sql(filters, dialect="duckdb", field_types=field_types)
     where_clause = f"WHERE {where_sql} " if where_sql else ""
     if group:
         safe_limit = max(1, min(int(limit), 500))
@@ -403,7 +739,11 @@ def run_duckdb_aggregate_query(
     limit: int,
     filters: list[dict[str, Any]] | None = None,
     source_version: str,
+    version_id: str,
+    content_fingerprint: str,
+    schema_fingerprint: str,
     expected_row_count: int,
+    field_types: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     sql, params = compile_aggregate_sql(
         physical_table=physical_table,
@@ -412,10 +752,14 @@ def run_duckdb_aggregate_query(
         aggregation=aggregation,
         limit=limit,
         filters=filters,
+        field_types=field_types,
     )
     expectation = ReplicaExpectation(
         logical_table=physical_table,
         source_version=str(source_version),
+        version_id=str(version_id),
+        content_fingerprint=str(content_fingerprint),
+        schema_fingerprint=str(schema_fingerprint),
         row_count=int(expected_row_count),
     )
     with open_validated_duckdb_query(duckdb_path, [expectation]) as query:
@@ -424,10 +768,12 @@ def run_duckdb_aggregate_query(
         runtime = query.runtime(compiled_sql=sql, params=params)
     return {
         **runtime,
-        "syncedRows": 0,
         "sourceVersion": str(source_version),
-        "replicaStatus": replica["status"],
-        "replicaTable": replica["replicaTable"],
-        "replicaRowCount": replica["rowCount"],
+        "versionId": str(version_id),
+        "contentFingerprint": str(content_fingerprint),
+        "schemaFingerprint": str(schema_fingerprint),
+        "catalogStatus": replica["status"],
+        "objectHashes": replica["objectHashes"],
+        "datasetRowCount": replica["rowCount"],
         "rows": rows,
     }

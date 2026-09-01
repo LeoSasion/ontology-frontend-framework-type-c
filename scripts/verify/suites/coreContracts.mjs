@@ -422,19 +422,21 @@ export function appendCoreContractChecks(context) {
           importTableWriterServiceSource.includes("def should_create_metric_for_measure(") &&
           importTableWriterServiceSource.includes("def default_metric_dimension(") &&
           importTableWriterServiceSource.includes('not text.startswith("__")') &&
-          importTableWriterServiceSource.includes("CREATE TABLE") &&
+          !importTableWriterServiceSource.includes("CREATE TABLE") &&
           importTableWriterServiceSource.includes("def upsert_table_registry_record(") &&
           importTableWriterServiceSource.includes("ON CONFLICT(workspace_id, table_key) DO UPDATE SET") &&
           importTableWriterServiceSource.includes("def revalidate_relationships_for_table(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO source_runs(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO field_semantics(") &&
           importTableWriterServiceSource.includes("INSERT OR REPLACE INTO import_jobs(") &&
-          importTableWriterServiceSource.includes("existing_rows_by_unique_key(") &&
+          !importTableWriterServiceSource.includes("existing_rows_by_unique_key(") &&
+          importTableWriterServiceSource.includes("preview_merge_plan_parquet(") &&
+          importTableWriterServiceSource.includes("duckdb-parquet-set-based") &&
           importTableWriterServiceSource.includes("\"writeSummary\"") &&
           importTableWriterServiceSource.includes("导入文件字段与目标表不匹配") &&
           byLabel["cli-import-delete-source-validation-input"]?.parsed?.committed === true &&
           byLabel["cli-import-delete-source-validation-input"]?.parsed?.result?.sourceRunId &&
-          byLabel["cli-sync-connector-confirm"]?.parsed?.connectorSync?.importResult?.writeSummary?.rowCountAfter === 10 &&
+          byLabel["cli-sync-connector-confirm"]?.parsed?.connectorSync?.importResult?.writeSummary?.afterRows === 10 &&
           byLabel["cli-agent-confirm-import"]?.parsed?.importResult?.sourceRunId,
       },
     {
@@ -473,7 +475,9 @@ export function appendCoreContractChecks(context) {
           relationshipCommandServiceSource.includes("def normalize_relation_field_name(") &&
           relationshipCommandServiceSource.includes("def relation_candidate_fields(") &&
           relationshipCommandServiceSource.includes("def relationship_name_score(") &&
-          relationshipCommandServiceSource.includes("def sample_field_values(") &&
+          relationshipCommandServiceSource.includes("def _candidate_profile_values(") &&
+          relationshipCommandServiceSource.includes("def revalidate_published_relationships_for_tables(") &&
+          relationshipCommandServiceSource.includes("open_validated_duckdb_query(") &&
           relationshipCommandServiceSource.includes("def saved_relationship_signatures(") &&
           relationshipCommandServiceSource.includes("def recommend_relationships_for_connection(") &&
           relationshipCommandServiceSource.includes("def recommend_relationships_command(") &&

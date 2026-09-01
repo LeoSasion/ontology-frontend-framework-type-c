@@ -3,7 +3,7 @@ const PRE_SERVICE_NPM_STAGES = [
   ["core, CLI, and AI verification", "verify"],
   ["workspace landing flow", "verify:workspace-flow"],
   ["local backup and restore", "verify:backup"],
-  ["local schema migration and rollback", "verify:migration"],
+  ["million-scale data plane", "verify:performance"],
   ["multi-domain Beta repeatability", "verify:multi-domain-beta"],
   ["local query release baseline", "verify:release-baseline"],
   ["production readiness", "verify:production"],

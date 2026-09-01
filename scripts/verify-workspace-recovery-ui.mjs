@@ -36,7 +36,7 @@ const checks = [
     ok: api.includes("fetchJsonStrict")
       && api.includes('"x-idempotency-key": input.requestKey')
       && api.includes("/api/workspace-recovery/${input.operation}")
-      && types.includes('"aibi-workspace-recovery-point/v1"'),
+      && types.includes('"aibi-workspace-recovery-point/v2"'),
   },
   {
     label: "restore-impact-is-compared-before-operator-confirmation",

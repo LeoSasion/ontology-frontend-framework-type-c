@@ -6,15 +6,20 @@ import json
 import re
 import sqlite3
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Mapping
 
 from atomic_import_plan_service import bind_single_import_plan, enrich_atomic_import_plan
 from bi_cli_core import now_iso, parse_csv_list, slug, source_label, unique_key
+from dataset_version_store import activate_dataset_version, active_dataset_version, resolve_dataset_object_paths, schema_columns
+from import_policy import (
+    analyze_unique_key_quality_parquet as analyze_unique_key_quality_parquet_v2,
+    preview_merge_plan_parquet as preview_merge_plan_parquet_v2,
+)
 from import_schema_change_service import build_import_schema_change_preview
-from import_stage_service import create_import_stage, read_import_stage
+from import_stage_service import create_import_stage, resolve_import_stage_parquet
 from import_table_writer_service import revalidate_relationships_for_table
 
-SUPPORTED_IMPORT_SUFFIXES = {".csv", ".xlsx", ".xlsm"}
+SUPPORTED_IMPORT_SUFFIXES = {".csv", ".xlsx", ".xlsm", ".parquet"}
 
 DATE_SUFFIX_PATTERNS = [
     re.compile(r"[\s._-]*(?:19|20)\d{2}年?\d{1,2}月(?:\d{1,2}日?)?$", re.IGNORECASE),
@@ -117,7 +122,6 @@ def build_folder_import_plan(
     workspace_id: str | None = None,
     stage_bindings: dict[str, str] | None = None,
     build_import_preview: Callable[..., dict[str, Any]],
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     resolved_workspace_id = str(workspace_id or active_workspace_id(connection)).strip()
@@ -213,26 +217,8 @@ def build_folder_import_plan(
         "willWrite": False,
     }
 
-    stages_by_path = {
-        str(Path(item["absolutePath"]).resolve()): str(
-            ((item.get("_preview") or {}).get("importStage") or {}).get("stageKey") or ""
-        )
-        for item in items
-    }
-
-    def read_sealed_plan_file(file_path: Path):
-        stage_key = stages_by_path.get(str(Path(file_path).resolve()))
-        if not stage_key:
-            return read_table_file(file_path)
-        headers, rows, _profile, _summary = read_import_stage(
-            stage_key=stage_key,
-            workspace_id=resolved_workspace_id,
-        )
-        return headers, rows
-
     return enrich_atomic_import_plan(
         base_plan,
-        read_table_file=read_sealed_plan_file,
         current_source_run_id=(str(workspace["current_source_run_id"] or "") or None) if workspace else None,
     )
 
@@ -247,17 +233,10 @@ def build_import_preview(
     workspace_id: str | None = None,
     mode_value: str | None = None,
     stage_key: str | None = None,
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
-    profile_rows: Callable[[list[str], list[dict[str, Any]]], dict[str, Any]],
-    normalize_records_for_columns: Callable[[list[dict[str, Any]], list[str]], list[dict[str, Any]]],
-    analyze_unique_key_quality: Callable[[list[dict[str, Any]], list[str]], dict[str, Any]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
     saved_import_policy: Callable[..., dict[str, Any] | None],
-    table_columns: Callable[[sqlite3.Connection, str], list[str]],
     registry_for_table: Callable[..., sqlite3.Row | None],
-    preview_merge_plan: Callable[..., dict[str, Any]],
     sanitize_unique_fields: Callable[..., list[str]],
-    quote_identifier: Callable[[str], str],
     source_pipeline_contract: Callable[[], dict[str, Any]],
 ) -> dict[str, Any]:
     resolved_workspace_id = str(workspace_id or active_workspace_id(connection)).strip()
@@ -268,37 +247,50 @@ def build_import_preview(
         raise ValueError(f"Unsupported import preview mode: {requested_mode}")
     path = Path(file).resolve()
     if stage_key:
-        headers, rows, profile, import_stage = read_import_stage(
+        stage_path, stage_manifest = resolve_import_stage_parquet(
             stage_key=str(stage_key),
             workspace_id=resolved_workspace_id,
         )
+        import_stage = {
+            key: stage_manifest[key]
+            for key in (
+                "schema", "stageKey", "workspaceId", "contentHash", "contentFingerprint",
+                "parserVersion", "sourceName", "sourceBytes", "rowCount", "columnCount",
+                "schemaFields", "internalColumns", "schemaFingerprint", "objectHash", "objectBytes",
+                "createdAt", "expiresAt", "sealed",
+            )
+        }
     else:
         if not path.exists():
             raise FileNotFoundError(path)
-        headers, rows = read_table_file(path)
-        profile = profile_rows(headers, rows)
-        import_stage = create_import_stage(
-            source_path=path,
+        import_stage = create_import_stage(source_path=path, workspace_id=resolved_workspace_id)
+        stage_path, stage_manifest = resolve_import_stage_parquet(
+            stage_key=str(import_stage["stageKey"]),
             workspace_id=resolved_workspace_id,
-            headers=headers,
-            rows=rows,
-            profile=profile,
         )
+    profile = dict(stage_manifest["profile"])
+    headers = [str(field["name"]) for field in stage_manifest["schemaFields"]]
+    row_count = int(stage_manifest["rowCount"])
     table_key = suggested_import_table_key(path, table)
     suggested_display_name = suggested_import_display_name(path)
     matches: list[dict[str, Any]] = []
-    unique_candidates = [field["field"] for field in profile["fields"] if field["role"] == "identity_key"]
+    unique_candidates = [
+        field["field"] for field in profile["fields"] if field["role"] in {"identity_key", "identifier"}
+    ]
     if not unique_candidates:
         unique_candidates = [
             field["field"]
             for field in profile["fields"]
-            if rows and field["uniqueCount"] >= max(1, int(len(rows) * 0.9)) and field["nonEmpty"] == len(rows)
+            if row_count
+            and int(field["uniqueCount"]) >= max(1, int(row_count * 0.9))
+            and int(field["nonEmpty"]) == row_count
         ][:2]
     explicit_unique_fields = parse_csv_list(unique_fields_value)
     conflict_rule_arg = conflict_rule_value
-    normalized_rows = normalize_records_for_columns(rows, headers)
-    unique_quality = None
-    merge_plan = None
+    # Destination discovery is metadata-only until one target has been chosen.
+    # This keeps an explicit create/replace O(1) in the number and size of
+    # same-schema datasets instead of profiling every million-row candidate.
+    allow_discovered_match = not str(table or "").strip() and requested_mode in {"auto", "merge"}
     row = connection.execute(
         """
         SELECT table_key, display_name, row_count
@@ -311,54 +303,79 @@ def build_import_preview(
     import_policy = saved_import_policy(connection, table_key, workspace_id=resolved_workspace_id)
     selected_unique_fields = explicit_unique_fields or (import_policy["uniqueFields"] if import_policy else unique_candidates[:2])
     conflict_rule = conflict_rule_arg or (import_policy["conflictRule"] if import_policy else "overwrite")
-    unique_quality = analyze_unique_key_quality(normalized_rows, selected_unique_fields) if selected_unique_fields else None
-    for registry in connection.execute(
-        "SELECT * FROM table_registry WHERE workspace_id = ? ORDER BY display_name",
-        (resolved_workspace_id,),
-    ):
-        physical_columns = table_columns(connection, registry["physical_table"])
-        same_count = len(headers) == len(physical_columns)
-        same_fields = same_count and set(headers) == set(physical_columns)
-        if not same_fields:
-            continue
-        registry_policy = saved_import_policy(
-            connection,
-            registry["table_key"],
-            workspace_id=resolved_workspace_id,
+    quality_cache: dict[tuple[str, ...], dict[str, Any]] = {}
+
+    def quality_for(fields: list[str]) -> dict[str, Any] | None:
+        key = tuple(fields)
+        if not key:
+            return None
+        if key not in quality_cache:
+            quality_cache[key] = analyze_unique_key_quality_parquet_v2(stage_path, list(key))
+        return quality_cache[key]
+
+    def merge_preview_for(
+        registry: Mapping[str, Any],
+        fields: list[str],
+        rule: str,
+    ) -> dict[str, Any] | None:
+        if not fields or requested_mode not in {"auto", "merge"}:
+            return None
+        physical_columns = schema_columns(registry["schema_json"])
+        if set(headers) != set(physical_columns):
+            return None
+        active = active_dataset_version(connection, resolved_workspace_id, str(registry["table_key"]))
+        if active is None:
+            return None
+        active_types = {str(field["name"]): str(field["type"]) for field in active["schemaFields"]}
+        return preview_merge_plan_parquet_v2(
+            active_paths=resolve_dataset_object_paths(active),
+            incoming_path=stage_path,
+            schema_fields=[{"name": column, "type": active_types[column]} for column in physical_columns],
+            unique_fields=sanitize_unique_fields(fields, physical_columns, allow_empty=False),
+            conflict_rule=rule,
         )
-        registry_unique_fields = explicit_unique_fields or (registry_policy["uniqueFields"] if registry_policy else unique_candidates[:2])
-        match_unique_fields = [field for field in registry_unique_fields if field in physical_columns]
-        match_conflict_rule = conflict_rule_arg or (registry_policy["conflictRule"] if registry_policy else conflict_rule)
-        match_merge_plan = None
-        if match_unique_fields:
-            match_records = normalize_records_for_columns(rows, physical_columns)
-            match_merge_plan = preview_merge_plan(
+
+    unique_quality = (
+        None
+        if not existing and allow_discovered_match
+        else quality_for(selected_unique_fields)
+    )
+    merge_plan = None
+    if not existing and allow_discovered_match:
+        for registry in connection.execute(
+            "SELECT * FROM table_registry WHERE workspace_id = ? ORDER BY display_name",
+            (resolved_workspace_id,),
+        ):
+            physical_columns = schema_columns(registry["schema_json"])
+            same_count = len(headers) == len(physical_columns)
+            if not (same_count and set(headers) == set(physical_columns)):
+                continue
+            registry_policy = saved_import_policy(
                 connection,
-                registry["physical_table"],
-                physical_columns,
-                match_records,
-                match_unique_fields,
-                match_conflict_rule,
-                quote_identifier,
+                registry["table_key"],
+                workspace_id=resolved_workspace_id,
             )
-        item = {
-            "tableKey": registry["table_key"],
-            "displayName": registry["display_name"],
-            "rowCount": registry["row_count"],
-            "matchType": "exactOrder" if headers == physical_columns else "exactFields",
-            "fieldCount": len(physical_columns),
-            "matchedFieldCount": len(set(headers) & set(physical_columns)),
-            "score": 100 if headers == physical_columns else 96,
-            "policyUniqueFields": match_unique_fields,
-            "policyConflictRule": match_conflict_rule,
-            "savedPolicy": registry_policy,
-            "policyQuality": analyze_unique_key_quality(
-                normalize_records_for_columns(rows, physical_columns),
-                match_unique_fields,
-            ) if match_unique_fields else None,
-            "policyMergePlan": match_merge_plan,
-        }
-        matches.append(item)
+            registry_unique_fields = explicit_unique_fields or (
+                registry_policy["uniqueFields"] if registry_policy else unique_candidates[:2]
+            )
+            match_unique_fields = [field for field in registry_unique_fields if field in physical_columns]
+            match_conflict_rule = conflict_rule_arg or (
+                registry_policy["conflictRule"] if registry_policy else conflict_rule
+            )
+            matches.append({
+                "tableKey": registry["table_key"],
+                "displayName": registry["display_name"],
+                "rowCount": registry["row_count"],
+                "matchType": "exactOrder" if headers == physical_columns else "exactFields",
+                "fieldCount": len(physical_columns),
+                "matchedFieldCount": len(set(headers) & set(physical_columns)),
+                "score": 100 if headers == physical_columns else 96,
+                "policyUniqueFields": match_unique_fields,
+                "policyConflictRule": match_conflict_rule,
+                "savedPolicy": registry_policy,
+                "policyQuality": None,
+                "policyMergePlan": None,
+            })
     if not existing and matches:
         best_match = sorted(matches, key=lambda item: (int(item["score"]), item["matchType"] == "exactOrder"), reverse=True)[0]
         existing = {
@@ -370,22 +387,20 @@ def build_import_preview(
         selected_unique_fields = list(best_match.get("policyUniqueFields") or [])
         conflict_rule = str(best_match.get("policyConflictRule") or conflict_rule)
         import_policy = best_match.get("savedPolicy")
-        unique_quality = best_match.get("policyQuality")
-        merge_plan = best_match.get("policyMergePlan")
+        unique_quality = quality_for(selected_unique_fields)
+        selected_registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
+        merge_plan = merge_preview_for(selected_registry, selected_unique_fields, conflict_rule) if selected_registry else None
+        best_match["policyQuality"] = unique_quality
+        best_match["policyMergePlan"] = merge_plan
     if existing and selected_unique_fields:
         registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
-        if registry:
-            physical_columns = table_columns(connection, registry["physical_table"])
-            if set(headers) == set(physical_columns):
-                merge_plan = preview_merge_plan(
-                    connection,
-                    registry["physical_table"],
-                    physical_columns,
-                    normalize_records_for_columns(rows, physical_columns),
-                    sanitize_unique_fields(selected_unique_fields, physical_columns, allow_empty=False),
-                    conflict_rule,
-                    quote_identifier,
-                )
+        if registry and merge_plan is None:
+            merge_plan = merge_preview_for(registry, selected_unique_fields, conflict_rule)
+    if unique_quality is None and selected_unique_fields:
+        # Discovery stays metadata-only while candidates are considered, but the
+        # final preview must bind key quality for the selected destination/key.
+        # Atomic folder planning fails closed when this evidence is absent.
+        unique_quality = quality_for(selected_unique_fields)
     effective_mode = "create"
     schema_compatible = True
     schema_change = None
@@ -393,7 +408,7 @@ def build_import_preview(
     if existing:
         effective_mode = "replace" if requested_mode in {"create", "replace"} else "merge"
         registry = registry_for_table(connection, table_key, workspace_id=resolved_workspace_id)
-        physical_columns = table_columns(connection, registry["physical_table"]) if registry else []
+        physical_columns = schema_columns(registry["schema_json"]) if registry else []
         schema_compatible = set(headers) == set(physical_columns)
         if effective_mode == "replace":
             schema_change = build_import_schema_change_preview(
@@ -404,6 +419,10 @@ def build_import_preview(
             )
         elif not schema_compatible:
             blockers.append("merge-schema-mismatch")
+    elif requested_mode == "merge":
+        effective_mode = "merge"
+        schema_compatible = False
+        blockers.append("merge-target-missing")
     return {
         "ok": True,
         "dryRun": True,
@@ -491,6 +510,9 @@ def execute_import_commit(
     resolved_workspace_id = str(preview.get("workspaceId") or "")
     if not resolved_workspace_id or (workspace_id is not None and resolved_workspace_id != str(workspace_id)):
         raise RuntimeError("Import commit preview escaped the requested workspace.")
+    preview_blockers = [str(item) for item in preview.get("blockers") or [] if str(item)]
+    if preview_blockers:
+        raise ValueError("Import preview is blocked: " + ", ".join(preview_blockers))
     if mode == "merge":
         unique_fields = parse_csv_list(unique_fields_value) or preview["mergePolicyPreview"]["uniqueFields"]
         conflict_rule = conflict_rule_value or preview["mergePolicyPreview"]["conflictRule"]
@@ -536,6 +558,9 @@ def import_commit_command(
     build_import_preview: Callable[..., dict[str, Any]],
     execute_import_commit: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
+    if bool(getattr(args, "yes", False)):
+        raise RuntimeError("Confirmed imports must be dispatched through the durable publish-and-activation boundary.")
+    del execute_import_commit
     with open_db() as connection:
         preview = build_import_preview(
             connection,
@@ -554,36 +579,13 @@ def import_commit_command(
             Path(args.file),
             current_source_run_id=_current_source_run_id(connection, workspace_id),
         )
-        if not args.yes:
-            bound_plan["requiresConfirmation"] = True
-            recommended_mode = str((bound_plan.get("commitOptions") or {}).get("mode") or args.mode)
-            bound_plan["recommendedCommand"] = (
-                f"python tools/aibi_cli.py --json import-commit {args.file} --mode {recommended_mode} "
-                f"--expected-plan {bound_plan['planFingerprint']} --yes"
-            )
-            return bound_plan
-        expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
-        if getattr(args, "require_plan", False) and not expected_plan:
-            raise ValueError("Single-file import requires the plan fingerprint from the latest preview.")
-        if expected_plan and expected_plan != str(bound_plan.get("planFingerprint") or ""):
-            raise ValueError("Single-file import plan changed after preview; run preview-import again.")
-        expected_mode = str((bound_plan.get("commitOptions") or {}).get("mode") or "")
-        if expected_plan and str(args.mode or "") != expected_mode:
-            raise ValueError(f"Import mode changed after preview; re-run preview-import for mode {args.mode}.")
-        result = execute_import_commit(
-            connection,
-            args.file,
-            args.table,
-            args.name,
-            args.mode,
-            args.unique_fields,
-            args.conflict_rule,
-            workspace_id=workspace_id,
+        bound_plan["requiresConfirmation"] = True
+        recommended_mode = str((bound_plan.get("commitOptions") or {}).get("mode") or args.mode)
+        bound_plan["recommendedCommand"] = (
+            f"python tools/aibi_cli.py --json import-commit {args.file} --mode {recommended_mode} "
+            f"--expected-plan {bound_plan['planFingerprint']} --yes"
         )
-        if str(result.get("workspaceId") or "") != workspace_id:
-            raise RuntimeError("Import commit escaped the preview workspace.")
-        connection.commit()
-    return {"ok": True, "committed": True, "planFingerprint": bound_plan["planFingerprint"], "result": result}
+        return bound_plan
 
 
 def preview_import_folder_command(
@@ -591,7 +593,6 @@ def preview_import_folder_command(
     *,
     open_db: Callable[[], Any],
     build_import_preview: Callable[..., dict[str, Any]],
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     with open_db() as connection:
@@ -604,7 +605,6 @@ def preview_import_folder_command(
             conflict_rule_value=getattr(args, "conflict_rule", None),
             workspace_id=(str(getattr(args, "workspace", "") or "").strip() or None),
             build_import_preview=build_import_preview,
-            read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
 
@@ -624,9 +624,14 @@ def execute_folder_import_plan(
     if str(plan.get("workspaceId") or "") != resolved_workspace_id:
         raise RuntimeError("Folder import plan does not belong to the requested workspace.")
     results = []
+    remaining_by_table: dict[str, int] = {}
+    for planned_item in plan["items"]:
+        planned_table = str(planned_item.get("tableKey") or "")
+        remaining_by_table[planned_table] = remaining_by_table.get(planned_table, 0) + 1
     for item in plan["items"]:
         mode = str(item.get("mode") or "create")
         unique_fields = list((item.get("keyDecision") or {}).get("uniqueFields") or [])
+        conflict_rule = str(item.get("conflictPolicy") or "overwrite")
         result = execute_import_commit(
             connection,
             item["absolutePath"],
@@ -634,18 +639,30 @@ def execute_folder_import_plan(
             item["displayName"],
             mode,
             ",".join(unique_fields),
-            None,
+            conflict_rule,
             workspace_id=resolved_workspace_id,
             stage_key=str(item.get("stageKey") or "") or None,
         )
         if str(result.get("workspaceId") or "") != resolved_workspace_id:
             raise RuntimeError("Folder import item escaped the requested workspace.")
+        item_table_key = str(item["tableKey"])
+        remaining_by_table[item_table_key] -= 1
+        if remaining_by_table[item_table_key] > 0:
+            dataset_version = result.get("datasetVersion")
+            if not isinstance(dataset_version, dict):
+                raise RuntimeError("Folder import did not prepare an intermediate dataset version.")
+            # This pointer remains inside the caller-owned SQLite transaction.
+            # It lets the next file merge against the just-prepared Parquet
+            # version without exposing an un-published version to readers.
+            activate_dataset_version(connection, dataset_version)
         results.append({
             "file": item["file"],
             "mode": mode,
             "tableKey": result.get("tableKey"),
             "displayName": result.get("displayName"),
             "rowCount": (result.get("profile") or {}).get("rowCount") if isinstance(result.get("profile"), dict) else None,
+            "profile": result.get("profile"),
+            "datasetVersion": result.get("datasetVersion"),
             "writeSummary": result.get("writeSummary"),
             "dataVersion": result.get("dataVersion"),
             "sourceRunId": result.get("sourceRunId"),
@@ -739,9 +756,11 @@ def import_folder_command(
     open_db: Callable[[], Any],
     build_import_preview: Callable[..., dict[str, Any]],
     execute_import_commit: Callable[..., dict[str, Any]],
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
+    if bool(getattr(args, "yes", False)):
+        raise RuntimeError("Confirmed folder imports must be dispatched through the durable publish-and-activation boundary.")
+    del execute_import_commit
     with open_db() as connection:
         workspace_id = str(getattr(args, "workspace", "") or active_workspace_id(connection)).strip()
         if not connection.execute("SELECT 1 FROM workspaces WHERE id = ?", (workspace_id,)).fetchone():
@@ -755,31 +774,13 @@ def import_folder_command(
             conflict_rule_value=getattr(args, "conflict_rule", None),
             workspace_id=workspace_id,
             build_import_preview=build_import_preview,
-            read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
-        if not args.yes:
-            return {
-                **plan,
-                "requiresConfirmation": True,
-                "recommendedCommand": (
-                    f"python tools/aibi_cli.py --json import-folder {args.path} "
-                    f"--expected-plan {plan['planFingerprint']} --yes"
-                ),
-            }
-        expected_plan = str(getattr(args, "expected_plan", "") or "").strip()
-        if not expected_plan:
-            raise ValueError("Atomic folder import requires --expected-plan from the latest preview.")
-        if expected_plan != str(plan.get("planFingerprint") or ""):
-            raise ValueError("Folder import plan changed after preview; run preview-import-folder again.")
-        if plan.get("readyToCommit") is not True:
-            raise ValueError(f"Folder import plan is blocked: {', '.join(plan.get('blockers') or ['owner-review-required'])}")
-        result = execute_folder_import_plan(
-            connection,
-            plan,
-            workspace_id=workspace_id,
-            execute_import_commit=execute_import_commit,
-            active_workspace_id=active_workspace_id,
-        )
-        connection.commit()
-    return result
+        return {
+            **plan,
+            "requiresConfirmation": True,
+            "recommendedCommand": (
+                f"python tools/aibi_cli.py --json import-folder {args.path} "
+                f"--expected-plan {plan['planFingerprint']} --yes"
+            ),
+        }

@@ -9,6 +9,7 @@ import sqlite3
 from typing import Any, Callable
 
 from bi_cli_core import ROOT, quote_identifier
+from bi_cli_schema import table_columns
 
 
 ADAPTER_SCHEMA = "aibi-knowledge-source-adapter/v1"
@@ -349,14 +350,18 @@ def _workspace_id(connection: sqlite3.Connection, args: argparse.Namespace, acti
 def _workspace_schema_fingerprint(connection: sqlite3.Connection, workspace_id: str) -> str:
     tables: list[dict[str, Any]] = []
     for row in connection.execute(
-        "SELECT table_key, display_name, physical_table FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
+        "SELECT table_key, display_name, physical_table, active_version_id, schema_fingerprint "
+        "FROM table_registry WHERE workspace_id = ? ORDER BY table_key",
         (workspace_id,),
     ).fetchall():
-        columns = [
-            {"name": str(column["name"]), "type": str(column["type"] or ""), "notNull": bool(column["notnull"]), "pk": bool(column["pk"])}
-            for column in connection.execute(f"PRAGMA table_info({quote_identifier(str(row['physical_table']))})").fetchall()
-        ]
-        tables.append({"tableKey": str(row["table_key"]), "displayName": str(row["display_name"]), "columns": columns})
+        columns = table_columns(connection, str(row["physical_table"]))
+        tables.append({
+            "tableKey": str(row["table_key"]),
+            "displayName": str(row["display_name"]),
+            "activeVersionId": str(row["active_version_id"] or ""),
+            "schemaFingerprint": str(row["schema_fingerprint"] or ""),
+            "columns": columns,
+        })
     return _fingerprint({"workspaceId": workspace_id, "tables": tables})
 
 
@@ -414,7 +419,7 @@ def _assert_field_exists(connection: sqlite3.Connection, workspace_id: str, afte
     ).fetchone()
     if not registry:
         raise ValueError(f"Unknown table in semantic proposal: {after['tableKey']}")
-    fields = {str(row["name"]) for row in connection.execute(f"PRAGMA table_info({quote_identifier(str(registry['physical_table']))})")}
+    fields = set(table_columns(connection, str(registry["physical_table"])))
     if after["fieldName"] not in fields:
         raise ValueError(f"Unknown field in semantic proposal: {after['tableKey']}.{after['fieldName']}")
 

@@ -25,7 +25,8 @@ from job_runtime_service import (
     transition_job,
     update_job_progress,
 )
-from query_runtime import sync_table_to_duckdb
+from dataset_version_store import activate_dataset_version, resolve_dataset_object_paths
+from query_runtime import publish_dataset_view, replica_source_version
 from import_stage_service import validate_import_stage_for_confirmation
 from source_activation_journal_service import (
     PHASE_COMMIT_STARTED,
@@ -37,7 +38,7 @@ from source_activation_journal_service import (
     capture_replica_manifest,
     claim_import_workspace,
     cleanup_stale_replicas,
-    ensure_activation_journal_schema,
+    assert_activation_journal_schema,
     prepare_activation,
     reconcile_activation,
     release_import_workspace,
@@ -48,6 +49,7 @@ from source_activation_journal_service import (
 )
 from workspace_mutation_lock_service import workspace_mutation_lock
 from workspace_recovery_service import unfinished_recovery_fences
+from relationship_command_service import revalidate_published_relationships_for_tables
 
 
 JOB_KIND = "import"
@@ -93,7 +95,6 @@ def _build_current_plan(
     private_input: dict[str, Any],
     build_import_preview: Callable[..., dict[str, Any]],
     build_folder_import_plan: Callable[..., dict[str, Any]],
-    read_table_file: Callable[..., Any],
     active_workspace_id: Callable[[sqlite3.Connection], str],
 ) -> dict[str, Any]:
     import_kind = str(private_input.get("importKind") or "single")
@@ -135,7 +136,6 @@ def _build_current_plan(
         workspace_id=workspace_id,
         stage_bindings=private_input.get("stageBindings") if isinstance(private_input.get("stageBindings"), dict) else None,
         build_import_preview=build_import_preview,
-        read_table_file=read_table_file,
         active_workspace_id=active_workspace_id,
     )
     if str(plan.get("workspaceId") or "") != workspace_id:
@@ -241,7 +241,6 @@ def import_job_create_command(
     active_workspace_id: Callable[[sqlite3.Connection], str],
     build_import_preview: Callable[..., dict[str, Any]],
     build_folder_import_plan: Callable[..., dict[str, Any]],
-    read_table_file: Callable[..., Any],
     now_iso: Callable[[], str],
 ) -> dict[str, Any]:
     import_kind = str(getattr(args, "import_kind", "") or "single").strip().lower()
@@ -271,7 +270,7 @@ def import_job_create_command(
     if confirm_schema_change:
         private_input["confirmSchemaChange"] = True
     with open_db() as connection:
-        ensure_activation_journal_schema(connection)
+        assert_activation_journal_schema(connection)
         workspace_id = _workspace_id(connection, args, active_workspace_id)
         private_input["workspaceId"] = workspace_id
         existing = connection.execute(
@@ -322,7 +321,6 @@ def import_job_create_command(
             private_input=private_input,
             build_import_preview=build_import_preview,
             build_folder_import_plan=build_folder_import_plan,
-            read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
         planned_stage_key = str(plan.get("stageKey") or ((plan.get("importStage") or {}).get("stageKey") if isinstance(plan.get("importStage"), dict) else "") or "")
@@ -404,13 +402,20 @@ def _expected_manifest_intents(
     for item in plan.get("items") or []:
         if isinstance(item, dict) and str(item.get("tableKey") or "") in occurrence:
             occurrence[str(item["tableKey"])] += 1
+    if not table_keys:
+        return []
+    placeholders = ", ".join("?" for _ in table_keys)
+    current_versions = {
+        str(row["table_key"]): int(row["data_version"] or 0)
+        for row in connection.execute(
+            f"SELECT table_key, data_version FROM table_registry "
+            f"WHERE workspace_id = ? AND table_key IN ({placeholders})",
+            (workspace_id, *table_keys),
+        ).fetchall()
+    }
     intents: list[dict[str, Any]] = []
     for table_key in table_keys:
-        current = connection.execute(
-            "SELECT data_version FROM table_registry WHERE workspace_id = ? AND table_key = ?",
-            (workspace_id, table_key),
-        ).fetchone()
-        current_version = int(current["data_version"] or 0) if current else 0
+        current_version = current_versions.get(table_key, 0)
         increment = max(1, occurrence.get(table_key, 0))
         intents.append({
             "logicalTable": physical_table_for_workspace(workspace_id, table_key),
@@ -426,7 +431,7 @@ def _publish_current_replicas(
     workspace_id: str,
     table_keys: list[str],
     duckdb_path: Path,
-    table_columns: Callable[[sqlite3.Connection, str], list[str]],
+    raw_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
     try:
         import duckdb  # type: ignore
@@ -434,32 +439,63 @@ def _publish_current_replicas(
         raise RuntimeError(f"DuckDB runtime is unavailable: {exc}") from exc
     duckdb_path.parent.mkdir(parents=True, exist_ok=True)
     published: list[dict[str, Any]] = []
+    result_items = raw_result.get("results") if isinstance(raw_result.get("results"), list) else [raw_result]
+    versions_by_table: dict[str, dict[str, Any]] = {}
+    for item in result_items:
+        if not isinstance(item, dict) or not isinstance(item.get("datasetVersion"), dict):
+            continue
+        versions_by_table[str(item.get("tableKey") or "")] = dict(item["datasetVersion"])
+    if not table_keys:
+        return published
+    placeholders = ", ".join("?" for _ in table_keys)
+    registries_by_table = {
+        str(row["table_key"]): row
+        for row in connection.execute(
+            f"SELECT * FROM table_registry WHERE workspace_id = ? "
+            f"AND table_key IN ({placeholders})",
+            (workspace_id, *table_keys),
+        ).fetchall()
+    }
     with duckdb.connect(str(duckdb_path)) as duck_connection:
         for table_key in table_keys:
-            registry = connection.execute(
-                "SELECT * FROM table_registry WHERE workspace_id = ? AND table_key = ?",
-                (workspace_id, table_key),
-            ).fetchone()
+            registry = registries_by_table.get(table_key)
             if registry is None:
                 raise RuntimeError(f"Import staging did not create table registry entry: {table_key}")
             physical_table = str(registry["physical_table"])
-            row_count = int(registry["row_count"] or 0)
-            data_version = int(registry["data_version"] or 0)
-            source_version = f"{workspace_id}:{table_key}:{data_version}:{row_count}"
-            replica = sync_table_to_duckdb(
-                connection,
-                duck_connection,
-                physical_table,
-                table_columns(connection, physical_table),
-                source_version=source_version,
-                cleanup_stale=False,
+            version = versions_by_table.get(table_key)
+            if version is None:
+                raise RuntimeError(f"Import did not prepare a dataset version: {table_key}")
+            private_paths = version.get("_internalObjectPaths")
+            object_paths = (
+                [Path(str(value)).resolve() for value in private_paths]
+                if isinstance(private_paths, list) and private_paths
+                else resolve_dataset_object_paths(version, verify=False)
             )
+            files = [item for item in version.get("files") or [] if isinstance(item, dict)]
+            data_version = int(registry["data_version"] or 0)
+            source_version = replica_source_version(registry)
+            published_view = publish_dataset_view(
+                duck_connection,
+                logical_table=physical_table,
+                source_version=source_version,
+                version_id=str(version["versionId"]),
+                object_keys=[str(item["objectKey"]) for item in files],
+                object_paths=object_paths,
+                object_hashes=[str(item["objectHash"]) for item in files],
+                schema_fingerprint=str(version["schemaFingerprint"]),
+                content_fingerprint=str(version["contentFingerprint"]),
+                row_count=int(version["rowCount"]),
+            )
+            activate_dataset_version(connection, version)
             published.append({
                 "logicalTable": physical_table,
                 "tableKey": table_key,
                 "sourceVersion": source_version,
-                "replicaTable": replica["replicaTable"],
-                "rowCount": int(replica["rowCount"]),
+                "versionId": str(version["versionId"]),
+                "objectHashes": list(published_view["objectHashes"]),
+                "schemaFingerprint": str(version["schemaFingerprint"]),
+                "contentFingerprint": str(version["contentFingerprint"]),
+                "rowCount": int(version["rowCount"]),
                 "dataVersion": data_version,
             })
     return published
@@ -514,9 +550,7 @@ def import_job_run_command(
     build_folder_import_plan: Callable[..., dict[str, Any]],
     execute_import_commit: Callable[..., dict[str, Any]],
     execute_folder_import_plan: Callable[..., dict[str, Any]],
-    read_table_file: Callable[..., Any],
     physical_table_for_workspace: Callable[[str, str], str],
-    table_columns: Callable[[sqlite3.Connection, str], list[str]],
     duckdb_path: Path,
     mutation_lock_path: Path,
     recovery_root: Path,
@@ -545,7 +579,7 @@ def import_job_run_command(
 
     try:
         with open_db() as connection:
-            ensure_activation_journal_schema(connection)
+            assert_activation_journal_schema(connection)
             workspace_id = _workspace_id(connection, args, active_workspace_id)
             current_job = get_job(connection, workspace_id=workspace_id, job_key=job_key, event_limit=20)
             if current_job["kind"] != JOB_KIND:
@@ -606,7 +640,6 @@ def import_job_run_command(
                 private_input=private_input,
                 build_import_preview=build_import_preview,
                 build_folder_import_plan=build_folder_import_plan,
-                read_table_file=read_table_file,
                 active_workspace_id=active_workspace_id,
             )
             if str(plan.get("planFingerprint") or "") != str(private_input.get("expectedPlan") or ""):
@@ -786,7 +819,7 @@ def import_job_run_command(
                 workspace_id=workspace_id,
                 table_keys=table_keys,
                 duckdb_path=duckdb_path,
-                table_columns=table_columns,
+                raw_result=raw_result,
             )
             journal = transition_activation(
                 connection,
@@ -797,6 +830,22 @@ def import_job_run_command(
                 expected_manifest=expected_manifest,
                 now_iso=now_iso,
             )
+            published_relationships = revalidate_published_relationships_for_tables(
+                connection,
+                workspace_id=workspace_id,
+                table_keys=table_keys,
+                duckdb_path=duckdb_path,
+            )
+            table_results = raw_result.get("results") if isinstance(raw_result.get("results"), list) else [raw_result]
+            for table_result in table_results:
+                if not isinstance(table_result, dict):
+                    continue
+                result_table_key = str(table_result.get("tableKey") or "")
+                table_result["relationshipRevalidations"] = [
+                    receipt
+                    for receipt in published_relationships
+                    if result_table_key in receipt["tableKeys"]
+                ]
             update_job_progress(
                 connection,
                 workspace_id=workspace_id,
@@ -884,7 +933,7 @@ def import_job_run_command(
                 },
             }
         with open_db() as recovery_connection:
-            ensure_activation_journal_schema(recovery_connection)
+            assert_activation_journal_schema(recovery_connection)
             if not workspace_id:
                 workspace_id = _workspace_id(recovery_connection, args, active_workspace_id)
             current_job = get_job(recovery_connection, workspace_id=workspace_id, job_key=job_key, event_limit=20)
@@ -967,7 +1016,7 @@ def import_job_run_command(
             mutation_guard.__exit__(None, None, None)
         if lease_claimed and workspace_id:
             with open_db() as lease_connection:
-                ensure_activation_journal_schema(lease_connection)
+                assert_activation_journal_schema(lease_connection)
                 release_import_workspace(
                     lease_connection,
                     workspace_id=workspace_id,
@@ -986,12 +1035,11 @@ def import_job_resume_command(
     active_workspace_id: Callable[[sqlite3.Connection], str],
     build_import_preview: Callable[..., dict[str, Any]],
     build_folder_import_plan: Callable[..., dict[str, Any]],
-    read_table_file: Callable[..., Any],
     now_iso: Callable[[], str],
 ) -> dict[str, Any]:
     job_key = str(getattr(args, "job", "") or "").strip()
     with open_db() as connection:
-        ensure_activation_journal_schema(connection)
+        assert_activation_journal_schema(connection)
         workspace_id = _workspace_id(connection, args, active_workspace_id)
         current = get_job(connection, workspace_id=workspace_id, job_key=job_key, event_limit=20)
         if current["kind"] != JOB_KIND:
@@ -1004,7 +1052,6 @@ def import_job_resume_command(
             private_input=private_input,
             build_import_preview=build_import_preview,
             build_folder_import_plan=build_folder_import_plan,
-            read_table_file=read_table_file,
             active_workspace_id=active_workspace_id,
         )
         if str(plan.get("planFingerprint") or "") != str(private_input.get("expectedPlan") or ""):
@@ -1039,7 +1086,7 @@ def recover_import_jobs(
     workspace_id: str | None = None,
     job_key: str | None = None,
 ) -> list[dict[str, Any]]:
-    ensure_activation_journal_schema(connection)
+    assert_activation_journal_schema(connection)
     reconciled: dict[tuple[str, str], dict[str, Any]] = {}
     for journal in unfinished_activations(connection, workspace_id=workspace_id):
         if job_key and str(journal["jobKey"]) != job_key:
@@ -1161,7 +1208,7 @@ def import_job_process_exit_command(
         raise ValueError("Import worker process-exit reconciliation requires its lease token.")
     with open_db() as connection:
         workspace_id = _workspace_id(connection, args, active_workspace_id)
-        ensure_activation_journal_schema(connection)
+        assert_activation_journal_schema(connection)
         connection.execute("BEGIN IMMEDIATE")
         owner_row = connection.execute(
             """

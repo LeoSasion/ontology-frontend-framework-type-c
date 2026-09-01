@@ -147,13 +147,11 @@ export function appendAgentWorkflowContractChecks(context) {
           byLabel["cli-agent-index-draft"].parsed?.matched?.indexField === "channel" &&
           byLabel["cli-agent-confirm-index-dry-run"].parsed?.requiresConfirmation === true &&
           byLabel["cli-agent-confirm-index-dry-run"].parsed?.decision === "confirm" &&
-          byLabel["cli-agent-confirm-index-dry-run"].parsed?.proposedExecution?.engine === "duckdb" &&
+          byLabel["cli-agent-confirm-index-dry-run"].parsed?.proposedExecution?.engine === "duckdb-parquet" &&
           byLabel["cli-agent-confirm-index-dry-run"].parsed?.proposedExecution?.field === "channel" &&
           byLabel["cli-agent-confirm-index"].parsed?.confirmed === true &&
-          byLabel["cli-agent-confirm-index"].parsed?.createdIndex?.field === "channel" &&
-          byLabel["cli-agent-confirm-index"].parsed?.createdIndex?.replicaTable?.startsWith("__aibi_replica_") &&
-          Number.isInteger(byLabel["cli-agent-confirm-index"].parsed?.syncedRows) &&
-          byLabel["cli-agent-confirm-index"].parsed?.syncedRows >= 0 &&
+          byLabel["cli-agent-confirm-index"].parsed?.optimizedDataset?.field === "channel" &&
+          byLabel["cli-agent-confirm-index"].parsed?.optimizedDataset?.optimizationKind === "parquet-zone-map-sort" &&
           !byLabel["cli-agent-action-drafts-after-index-confirm"].parsed?.actionDrafts?.some((draft) =>
             draft.action_key === byLabel["cli-agent-index-draft"].parsed?.actionDraft?.actionKey
           )

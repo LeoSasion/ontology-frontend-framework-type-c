@@ -13,9 +13,10 @@ const workflow = read(".github/workflows/ci.yml");
 const configService = read("tools/config_command_service.py");
 const backupScript = read("scripts/backup-local-data.mjs");
 const restoreScript = read("scripts/restore-local-data.mjs");
-const migrationScript = read("scripts/migrate-local-data.mjs");
 const schemaSource = read("tools/bi_cli_schema.py");
+const coreSource = read("tools/bi_cli_core.py");
 const snapshotScript = read("scripts/local-data-snapshot.mjs");
+const restoreTransactionScript = read("scripts/local-data-restore-transaction.mjs");
 
 function check(label, ok, detail) {
   return { label, ok: Boolean(ok), detail };
@@ -39,9 +40,19 @@ const checks = [
   check("safe-env-example", envExample.includes("AIBI_API_HOST=127.0.0.1") && envExample.includes("AIBI_MAX_BODY_BYTES=1048576") && envExample.includes("AIBI_CORS_ORIGIN="), "Documented defaults preserve the local-only boundary."),
   check("local-env-untracked", /^\.env$/m.test(gitignore) || /^\.env\*/m.test(gitignore), "Local secrets stay outside Git."),
   check("config-backup-and-redaction", configService.includes("shutil.copy2(DB_PATH, backup_path)") && configService.includes("redact_secret_value"), "Config restore creates a backup and redacts secret-like values."),
-  check("data-backup-manifest", backupScript.includes('schema: "aibi-local-backup/v1"') && snapshotScript.includes("sha256") && snapshotScript.includes("loadLocalEnv") && backupScript.includes("assertLocalServiceStopped"), "Local database backup reads the active local configuration, requires stopped services, and writes checksums."),
-  check("data-restore-guard", restoreScript.includes('args.has("--confirm")') && restoreScript.includes("verifyManifestFiles") && restoreScript.includes("createSafetyBackup"), "Restore previews by default, verifies checksums, and preserves current files before writing."),
-  check("schema-migration-guard", migrationScript.includes('args.has("--confirm")') && migrationScript.includes("createSafetyBackup") && migrationScript.includes("originalUnchanged") && schemaSource.includes("CURRENT_SQLITE_SCHEMA_VERSION") && schemaSource.includes("assert_duckdb_schema_compatible"), "Schema upgrades preview on isolated copies, preserve a restore point, and block incompatible SQLite or DuckDB versions."),
+  check("data-backup-manifest-v2", snapshotScript.includes('BACKUP_SCHEMA = "aibi-local-backup/v2"') && snapshotScript.includes("sha256") && snapshotScript.includes("loadLocalEnv") && backupScript.includes("assertLocalServiceStopped") && snapshotScript.includes("dataset-object"), "Local v2 backup covers both databases and content-addressed Parquet objects with checksums while services are stopped."),
+  check("data-restore-guard", restoreScript.includes('args.has("--confirm")')
+    && restoreScript.includes("verifyManifestFiles")
+    && restoreScript.includes("createRestoreTransaction")
+    && restoreScript.includes("recoverRestoreTransactions")
+    && restoreTransactionScript.includes("createSafetySnapshot")
+    && restoreTransactionScript.includes('phase = "installing"')
+    && restoreTransactionScript.includes('installMode === "rollback"'), "Restore previews by default, validates the complete snapshot, and uses a durable safety-backed transaction with crash recovery."),
+  check("storage-generation-clean-break", !packageJson.scripts?.["migrate:local"]
+    && schemaSource.includes("CURRENT_SQLITE_SCHEMA_VERSION = 18")
+    && schemaSource.includes("CURRENT_DUCKDB_SCHEMA_VERSION = 2")
+    && coreSource.includes("aibi_control_v2.sqlite")
+    && coreSource.includes("aibi_catalog_v2.duckdb"), "Storage v2 uses isolated paths, exact schema guards, and exposes no in-place migration command."),
   check("startup-compatibility-fails-before-reconciliation", serverIndex.includes('const startupCompatibility = await cli(["status"])')
     && serverIndex.includes("startupCompatibility.ok !== true")
     && serverIndex.indexOf("startupCompatibility.ok !== true") < serverIndex.indexOf('workspace-recovery-reconcile'), "The API reports an incompatible local schema before any recovery command can misclassify the startup failure."),

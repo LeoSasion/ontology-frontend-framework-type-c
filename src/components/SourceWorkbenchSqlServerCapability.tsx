@@ -9,6 +9,7 @@ import {
   testSqlServerConnection,
 } from "../apiSqlServerSnapshot";
 import { fetchImportJob } from "../apiImportJobs";
+import { invalidateTableQueryCache } from "../dashboardWidgetQueryRuntime";
 import type { AnalysisJob } from "../typesJobs";
 import type {
   SqlServerActivationPayload,
@@ -64,6 +65,22 @@ function publicErrorMessage(error: unknown) {
     .replace(/\/\/[^@\s/]+@/g, "//[redacted]@")
     .replace(/\s+/g, " ")
     .slice(0, 320);
+}
+
+function activatedTableKeys(job?: AnalysisJob) {
+  const keys = new Set<string>();
+  const inputKeys = job?.input.tableKeys;
+  if (Array.isArray(inputKeys)) inputKeys.map(String).filter(Boolean).forEach((key) => keys.add(key));
+  const result = job?.result && typeof job.result === "object" && !Array.isArray(job.result)
+    ? job.result as Record<string, unknown>
+    : null;
+  const tables = Array.isArray(result?.tables) ? result.tables : [];
+  for (const table of tables) {
+    if (!table || typeof table !== "object" || Array.isArray(table)) continue;
+    const tableKey = String((table as Record<string, unknown>).tableKey ?? "").trim();
+    if (tableKey) keys.add(tableKey);
+  }
+  return [...keys];
 }
 
 function shortHash(value: string) {
@@ -244,6 +261,12 @@ export function SourceWorkbenchSqlServerCapability({
       if (controller.signal.aborted || connectorKeyRef.current !== connectorKey) return;
       setLifecycle((current) => ({ ...current, activation, job: activation.job ?? current.job }));
       if (activation.capability === "active") {
+        const tableKeys = activatedTableKeys(activation.job ?? lifecycle.job);
+        if (tableKeys.length) {
+          tableKeys.forEach((table) => invalidateTableQueryCache({ workspaceId: activationWorkspaceId, table }));
+        } else {
+          invalidateTableQueryCache({ workspaceId: activationWorkspaceId });
+        }
         setContractState((current) => current?.connectorKey === connectorKey
           ? { connectorKey, value: { ...current.value, capability: "active" } }
           : current);

@@ -273,7 +273,7 @@ export function actionResultDetail(result: Record<string, unknown>, draft?: Acti
   const proposedFormula = resultRecord(result, ["proposedFormula", "savedFormula"]);
   const proposedView = resultRecord(result, ["proposedView", "savedView"]);
   const relationship = resultRecord(result, ["relationship", "savedRelationship"]);
-  const proposedExecution = resultRecord(result, ["proposedExecution", "createdIndex"]);
+  const proposedExecution = resultRecord(result, ["proposedExecution", "optimizedDataset"]);
   if (proposedDashboard) {
     const name = stringField(proposedDashboard, "dashboardName") || stringField(proposedDashboard, "name") || stringField(proposedDashboard, "dashboardKey");
     const widgetCount = typeof proposedDashboard.widgetCount === "number" ? proposedDashboard.widgetCount : undefined;

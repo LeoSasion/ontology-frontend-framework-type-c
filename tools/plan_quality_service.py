@@ -285,27 +285,38 @@ def _fixture_connection(variant: str) -> sqlite3.Connection:
     connection.row_factory = sqlite3.Row
     connection.executescript(
         """
-        CREATE TABLE table_registry(workspace_id TEXT, table_key TEXT, display_name TEXT, physical_table TEXT, data_version INTEGER, updated_at TEXT DEFAULT '');
+        CREATE TABLE table_registry(workspace_id TEXT, table_key TEXT, display_name TEXT, physical_table TEXT, data_version INTEGER, schema_json TEXT NOT NULL, updated_at TEXT DEFAULT '');
         CREATE TABLE field_semantics(workspace_id TEXT, table_key TEXT, field_name TEXT, role TEXT, confidence REAL, usage TEXT DEFAULT '', tags_json TEXT DEFAULT '[]', usage_json TEXT DEFAULT '{}', source TEXT DEFAULT 'confirmed');
         CREATE TABLE metric_definitions(workspace_id TEXT, table_key TEXT, label TEXT, measure TEXT, aggregation TEXT, dimension TEXT, time_field TEXT);
         CREATE TABLE relationships(workspace_id TEXT, relation_key TEXT, left_table_key TEXT, right_table_key TEXT, left_field TEXT, right_field TEXT, mappings_json TEXT DEFAULT '[]', join_type TEXT, confidence REAL, validation_json TEXT DEFAULT '{}', filters_json TEXT DEFAULT '[]', preaggregation_json TEXT DEFAULT '{}', updated_at TEXT DEFAULT '');
-        CREATE TABLE sites(site_id TEXT, region TEXT, status TEXT, opened_at TEXT);
-        CREATE TABLE assets(asset_id TEXT, site_id TEXT, status TEXT, asset_type TEXT);
-        CREATE TABLE observations(observation_id TEXT, asset_id TEXT, observed_at TEXT, energy_kwh REAL, alert_flag INTEGER, temperature REAL);
-        CREATE TABLE other_private(secret_measure REAL);
-        INSERT INTO sites VALUES ('S1','north','active','2025-01-01'),('S2','south','active','2025-02-01');
-        INSERT INTO assets VALUES ('A1','S1','online','pump'),('A2','S1','offline','sensor'),('A3','S2','online','pump');
-        INSERT INTO observations VALUES ('O1','A1','2026-07-01',12.5,0,24.1),('O2','A2','2026-07-02',8.0,1,29.3),('O3','A3','2026-07-02',14.0,0,25.0);
-        INSERT INTO other_private VALUES (999);
         """
     )
     connection.executemany(
-        "INSERT INTO table_registry(workspace_id,table_key,display_name,physical_table,data_version) VALUES(?,?,?,?,1)",
+        "INSERT INTO table_registry(workspace_id,table_key,display_name,physical_table,data_version,schema_json) VALUES(?,?,?,?,1,?)",
         [
-            (FIXTURE_WORKSPACE, "sites", "Sites", "sites"),
-            (FIXTURE_WORKSPACE, "assets", "Assets", "assets"),
-            (FIXTURE_WORKSPACE, "observations", "Observations", "observations"),
-            (OTHER_WORKSPACE, "other_private", "Other private", "other_private"),
+            (FIXTURE_WORKSPACE, "sites", "Sites", "sites", json.dumps({"fields": [
+                {"name": "site_id", "type": "VARCHAR"},
+                {"name": "region", "type": "VARCHAR"},
+                {"name": "status", "type": "VARCHAR"},
+                {"name": "opened_at", "type": "DATE"},
+            ]}, sort_keys=True)),
+            (FIXTURE_WORKSPACE, "assets", "Assets", "assets", json.dumps({"fields": [
+                {"name": "asset_id", "type": "VARCHAR"},
+                {"name": "site_id", "type": "VARCHAR"},
+                {"name": "status", "type": "VARCHAR"},
+                {"name": "asset_type", "type": "VARCHAR"},
+            ]}, sort_keys=True)),
+            (FIXTURE_WORKSPACE, "observations", "Observations", "observations", json.dumps({"fields": [
+                {"name": "observation_id", "type": "VARCHAR"},
+                {"name": "asset_id", "type": "VARCHAR"},
+                {"name": "observed_at", "type": "DATE"},
+                {"name": "energy_kwh", "type": "DOUBLE"},
+                {"name": "alert_flag", "type": "BIGINT"},
+                {"name": "temperature", "type": "DOUBLE"},
+            ]}, sort_keys=True)),
+            (OTHER_WORKSPACE, "other_private", "Other private", "other_private", json.dumps({"fields": [
+                {"name": "secret_measure", "type": "DOUBLE"},
+            ]}, sort_keys=True)),
         ],
     )
     semantics = [

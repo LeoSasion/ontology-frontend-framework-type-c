@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
@@ -92,6 +93,31 @@ try {
       && health.readers.length === 2
       && health.readers.every((reader) => reader.ready && reader.starts === 1),
     detail: health,
+  });
+
+  const readerPoolVerify = spawnSync(
+    process.env.PYTHON || "python",
+    [resolve(import.meta.dirname, "verify-runtime-reader-connection-pool.py")],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env: { ...process.env, PYTHONIOENCODING: "utf-8" },
+    },
+  );
+  let readerPoolReceipt: Record<string, unknown> = {};
+  try {
+    readerPoolReceipt = JSON.parse(readerPoolVerify.stdout || "{}") as Record<string, unknown>;
+  } catch {
+    readerPoolReceipt = {};
+  }
+  checks.push({
+    label: "runtime-reader-lifetime-preserves-independent-writers",
+    ok: readerPoolVerify.status === 0 && readerPoolReceipt.ok === true,
+    detail: readerPoolReceipt.ok === true ? undefined : {
+      status: readerPoolVerify.status,
+      stdout: readerPoolVerify.stdout.slice(0, 2_000),
+      stderr: readerPoolVerify.stderr.slice(0, 2_000),
+    },
   });
 
   const fixture = resolve(import.meta.dirname, "fixtures", "runtime-host-fixture.py");
@@ -198,6 +224,87 @@ try {
     detail: { events: blockedEvents, health: blockedHost.health() },
   });
   delete process.env.AIBI_RUNTIME_FIXTURE_RECONCILE_BLOCKED;
+  process.env.AIBI_RUNTIME_FIXTURE_LOG = fixtureLog;
+
+  const barrierLog = join(temp, "runtime-host-reader-barrier.ndjson");
+  process.env.AIBI_RUNTIME_FIXTURE_LOG = barrierLog;
+  const barrierHost = new RuntimeHostPool(process.cwd(), 2, {
+    workerScript: fixture,
+    deadlineMs: 2_000,
+    startupDeadlineMs: 2_000,
+    maxQueueDepth: 10,
+  });
+  fixtureHosts.push(barrierHost);
+  await barrierHost.start();
+  await barrierHost.run(["workspace-recovery-reconcile", "--all"]);
+  const explicitRecoveryEvents = readFileSync(barrierLog, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as { command: string });
+  const workspaceRecoveryIndex = explicitRecoveryEvents.findIndex(
+    (event) => event.command === "workspace-recovery-reconcile",
+  );
+  const importRecoveryIndex = explicitRecoveryEvents.findIndex(
+    (event) => event.command === "import-job-recover",
+  );
+  const sqlServerRecoveryIndex = explicitRecoveryEvents.findIndex(
+    (event) => event.command === "sqlserver-adapter-activation-finalize",
+  );
+  checks.push({
+    label: "explicit-workspace-recovery-completes-every-startup-recovery-pass",
+    ok: workspaceRecoveryIndex >= 0
+      && importRecoveryIndex > workspaceRecoveryIndex
+      && sqlServerRecoveryIndex > importRecoveryIndex
+      && barrierHost.health().recovery.ready === true,
+    detail: explicitRecoveryEvents,
+  });
+  const invalidationBefore = barrierHost.health().readerInvalidation;
+  writeFileSync(barrierLog, "", "utf8");
+  const beforeReadOne = barrierHost.run(["read-sleep", "before-1"]);
+  const beforeReadTwo = barrierHost.run(["read-sleep", "before-2"]);
+  const bothReadersQueued = await waitForQueue(barrierHost, 2);
+  const barrierWrite = barrierHost.run(["write", "barrier-write"]);
+  const writerQueued = await waitForQueue(barrierHost, 3);
+  const afterRead = barrierHost.run(["read", "after-write"]);
+  const barrierResults = await Promise.all([beforeReadOne, beforeReadTwo, barrierWrite, afterRead]);
+  const invalidationAfter = barrierHost.health().readerInvalidation;
+  const barrierEvents = readFileSync(barrierLog, "utf8")
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as {
+      pid: number;
+      role: string;
+      command: string;
+      phase?: string;
+      tag?: string;
+      closedConnections?: number;
+    });
+  const writerIndex = barrierEvents.findIndex(
+    (event) => event.command === "write" && event.tag === "barrier-write",
+  );
+  const afterReadIndex = barrierEvents.findIndex(
+    (event) => event.command === "read" && event.tag === "after-write",
+  );
+  checks.push({
+    label: "writer-waits-readers-invalidates-every-cache-and-blocks-new-reads",
+    ok: bothReadersQueued
+      && writerQueued
+      && barrierResults.every((result) => result.ok === true)
+      && invalidationAfter.rounds - invalidationBefore.rounds === 1
+      && invalidationAfter.closedConnections - invalidationBefore.closedConnections === 2
+      // Each fixture reader is single-threaded, so closing both simulated caches
+      // proves both preceding read-sleep requests finished before the writer ran.
+      && writerIndex >= 0
+      && writerIndex < afterReadIndex,
+    detail: {
+      events: barrierEvents,
+      invalidationBefore,
+      invalidationAfter,
+      results: barrierResults,
+    },
+  });
   process.env.AIBI_RUNTIME_FIXTURE_LOG = fixtureLog;
 
   const shutdownHost = new RuntimeHostPool(process.cwd(), 2, {

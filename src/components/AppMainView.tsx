@@ -157,6 +157,7 @@ export function AppMainView({
   if (section === "dashboards") {
     return (
       <DashboardCanvas
+        workspaceId={status.workspace.id}
         dashboards={dashboards}
         focusedTableKey={focusedTableKey}
         query={query}

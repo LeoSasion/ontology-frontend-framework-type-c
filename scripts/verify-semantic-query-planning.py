@@ -4,6 +4,7 @@ import json
 import sqlite3
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 
@@ -17,15 +18,58 @@ from semantic_query_execution import (  # noqa: E402
 )
 from relationship_tools import build_relationship_query  # noqa: E402
 from context_pack_service import workspace_schema_fingerprint  # noqa: E402
-from query_runtime_test_support import publish_sqlite_fixture_to_duckdb  # noqa: E402
+from query_runtime_test_support import (  # noqa: E402
+    FixtureTable,
+    fixture_table_columns,
+    initialize_fixture_control_plane,
+    publish_fixture_tables_to_duckdb,
+)
 
 
 TEST_REPLICA_ROOT = tempfile.TemporaryDirectory(prefix="aibi-c-semantic-plan-")
 TEST_REPLICA_PATH = Path(TEST_REPLICA_ROOT.name) / "analysis.duckdb"
+FIXTURE_STATES: dict[int, dict[str, FixtureTable]] = {}
+
+
+INITIAL_FIXTURES = (
+    FixtureTable(
+        workspace_id="default",
+        table_key="orders",
+        physical_table="orders",
+        columns=(("order_id", "VARCHAR"), ("channel", "VARCHAR"), ("month", "VARCHAR"), ("amount", "DOUBLE"), ("status", "VARCHAR")),
+        rows=(("O1", "Douyin", "2026-07", 100.0, "paid"), ("O1", "Douyin", "2026-07", 200.0, "paid"), ("O2", "Tmall", "2026-07", 150.0, "paid")),
+        display_name="订单表",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="items",
+        physical_table="items",
+        columns=(("order_id", "VARCHAR"), ("item_id", "VARCHAR")),
+        rows=(("O1", "I1"), ("O2", "I3")),
+        display_name="订单明细表",
+    ),
+    FixtureTable(
+        workspace_id="default",
+        table_key="refunds",
+        physical_table="refunds",
+        columns=(("order_id", "VARCHAR"), ("item_id", "VARCHAR"), ("amount", "DOUBLE"), ("refund_amount", "DOUBLE"), ("status", "VARCHAR")),
+        rows=(("O1", "I1", 10.0, 10.0, "success"), ("O2", "I3", 5.0, 5.0, "pending")),
+        display_name="退款表",
+    ),
+)
+
+
+def fixture_tables(connection: sqlite3.Connection) -> list[FixtureTable]:
+    return list(FIXTURE_STATES[id(connection)].values())
+
+
+def replace_fixture_rows(connection: sqlite3.Connection, table_key: str, rows: tuple[tuple[object, ...], ...]) -> None:
+    current = FIXTURE_STATES[id(connection)][table_key]
+    FIXTURE_STATES[id(connection)][table_key] = replace(current, rows=rows)
 
 
 def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: object, **kwargs: object) -> dict[str, object]:
-    publish_sqlite_fixture_to_duckdb(connection, TEST_REPLICA_PATH)
+    publish_fixture_tables_to_duckdb(connection, TEST_REPLICA_PATH, fixture_tables(connection), reset=True)
     return execute_workspace_semantic_query_runtime(
         connection,
         *args,
@@ -36,52 +80,39 @@ def execute_workspace_semantic_query(connection: sqlite3.Connection, *args: obje
 
 def create_connection() -> sqlite3.Connection:
     connection = sqlite3.connect(":memory:")
-    connection.row_factory = sqlite3.Row
+    initialize_fixture_control_plane(connection)
     connection.executescript(
         """
-        CREATE TABLE table_registry(workspace_id TEXT, table_key TEXT, display_name TEXT, physical_table TEXT, data_version INTEGER, updated_at TEXT DEFAULT '');
-        CREATE TABLE field_semantics(
-          workspace_id TEXT, table_key TEXT, field_name TEXT, role TEXT, confidence REAL,
-          usage TEXT DEFAULT '', tags_json TEXT DEFAULT '[]', usage_json TEXT DEFAULT '{}', source TEXT DEFAULT 'auto'
-        );
-        CREATE TABLE metric_definitions(workspace_id TEXT, table_key TEXT, label TEXT, measure TEXT, aggregation TEXT, dimension TEXT, time_field TEXT);
-        CREATE TABLE relationships(
-          workspace_id TEXT, relation_key TEXT, left_table_key TEXT, right_table_key TEXT,
-          left_field TEXT, right_field TEXT, mappings_json TEXT DEFAULT '[]', join_type TEXT,
-          confidence REAL, validation_json TEXT DEFAULT '{}', filters_json TEXT DEFAULT '[]',
-          preaggregation_json TEXT DEFAULT '{}', updated_at TEXT DEFAULT ''
-        );
-        CREATE TABLE orders(order_id TEXT, channel TEXT, month TEXT, amount REAL, status TEXT);
-        CREATE TABLE items(order_id TEXT, item_id TEXT);
-        CREATE TABLE refunds(order_id TEXT, item_id TEXT, amount REAL, refund_amount REAL, status TEXT);
-        INSERT INTO table_registry(workspace_id, table_key, display_name, physical_table, data_version) VALUES
-          ('default', 'orders', '订单表', 'orders', 1),
-          ('default', 'items', '订单明细表', 'items', 1),
-          ('default', 'refunds', '退款表', 'refunds', 1);
-        INSERT INTO field_semantics(workspace_id, table_key, field_name, role, confidence) VALUES
-          ('default', 'orders', 'order_id', 'identity_key', 0.98),
-          ('default', 'orders', 'channel', 'dimension', 0.95),
-          ('default', 'orders', 'month', 'event_time', 0.92),
-          ('default', 'orders', 'amount', 'measure', 0.88),
-          ('default', 'orders', 'status', 'status', 0.91),
-          ('default', 'items', 'order_id', 'identity_key', 0.96),
-          ('default', 'items', 'item_id', 'identity_key', 0.96),
-          ('default', 'refunds', 'item_id', 'identity_key', 0.96),
-          ('default', 'refunds', 'amount', 'measure', 0.90),
-          ('default', 'refunds', 'refund_amount', 'measure', 0.97);
-        INSERT INTO field_semantics(workspace_id, table_key, field_name, role, confidence) VALUES ('default', 'refunds', 'status', 'status', 0.91);
-        INSERT INTO metric_definitions VALUES
-          ('default', 'orders', '渠道', 'amount', 'sum', 'channel', 'month'),
-          ('default', 'orders', '月份', 'amount', 'sum', 'month', 'month'),
-          ('default', 'refunds', '退款金额', 'refund_amount', 'sum', NULL, NULL);
-        INSERT INTO relationships VALUES
-          ('default', 'orders-items', 'orders', 'items', 'order_id', 'order_id', '[{"leftField":"order_id","rightField":"order_id"}]', 'inner', 0.91, '{"status":"validated","dataVersions":{"orders":1,"items":1},"metrics":{"rowExpansion":1}}', '[]', '{}', '2026-07-13T00:00:00Z'),
-          ('default', 'items-refunds', 'items', 'refunds', 'item_id', 'item_id', '[{"leftField":"item_id","rightField":"item_id"}]', 'inner', 0.89, '{"status":"validated","dataVersions":{"items":1,"refunds":1},"metrics":{"rowExpansion":1}}', '[]', '{}', '2026-07-13T00:00:00Z');
-        INSERT INTO orders VALUES ('O1', 'Douyin', '2026-07', 100, 'paid'), ('O1', 'Douyin', '2026-07', 200, 'paid'), ('O2', 'Tmall', '2026-07', 150, 'paid');
-        INSERT INTO items VALUES ('O1', 'I1'), ('O2', 'I3');
-        INSERT INTO refunds VALUES ('O1', 'I1', 10, 10, 'success'), ('O2', 'I3', 5, 5, 'pending');
+        INSERT INTO field_semantics(workspace_id, table_key, field_name, role, usage, confidence) VALUES
+          ('default', 'orders', 'order_id', 'identity_key', 'fixture', 0.98),
+          ('default', 'orders', 'channel', 'dimension', 'fixture', 0.95),
+          ('default', 'orders', 'month', 'event_time', 'fixture', 0.92),
+          ('default', 'orders', 'amount', 'measure', 'fixture', 0.88),
+          ('default', 'orders', 'status', 'status', 'fixture', 0.91),
+          ('default', 'items', 'order_id', 'identity_key', 'fixture', 0.96),
+          ('default', 'items', 'item_id', 'identity_key', 'fixture', 0.96),
+          ('default', 'refunds', 'item_id', 'identity_key', 'fixture', 0.96),
+          ('default', 'refunds', 'amount', 'measure', 'fixture', 0.90),
+          ('default', 'refunds', 'refund_amount', 'measure', 'fixture', 0.97),
+          ('default', 'refunds', 'status', 'status', 'fixture', 0.91);
+        INSERT INTO metric_definitions(
+          metric_key, workspace_id, label, table_key, measure, aggregation,
+          dimension, time_field, value_format, created_at
+        ) VALUES
+          ('orders-channel', 'default', '渠道', 'orders', 'amount', 'sum', 'channel', 'month', 'number', '2026-07-13T00:00:00Z'),
+          ('orders-month', 'default', '月份', 'orders', 'amount', 'sum', 'month', 'month', 'number', '2026-07-13T00:00:00Z'),
+          ('refund-amount', 'default', '退款金额', 'refunds', 'refund_amount', 'sum', NULL, NULL, 'number', '2026-07-13T00:00:00Z');
+        INSERT INTO relationships(
+          relation_key, workspace_id, name, left_table_key, right_table_key,
+          left_field, right_field, mappings_json, join_type, confidence,
+          validation_json, filters_json, preaggregation_json, created_at, updated_at
+        ) VALUES
+          ('orders-items', 'default', 'orders-items', 'orders', 'items', 'order_id', 'order_id', '[{"leftField":"order_id","rightField":"order_id"}]', 'inner', 0.91, '{"status":"validated","dataVersions":{"orders":1,"items":1},"metrics":{"rowExpansion":1}}', '[]', '{}', '2026-07-13T00:00:00Z', '2026-07-13T00:00:00Z'),
+          ('items-refunds', 'default', 'items-refunds', 'items', 'refunds', 'item_id', 'item_id', '[{"leftField":"item_id","rightField":"item_id"}]', 'inner', 0.89, '{"status":"validated","dataVersions":{"items":1,"refunds":1},"metrics":{"rowExpansion":1}}', '[]', '{}', '2026-07-13T00:00:00Z', '2026-07-13T00:00:00Z');
         """
     )
+    FIXTURE_STATES[id(connection)] = {table.table_key: table for table in INITIAL_FIXTURES}
+    publish_fixture_tables_to_duckdb(connection, TEST_REPLICA_PATH, fixture_tables(connection), reset=True)
     return connection
 
 
@@ -93,21 +124,21 @@ def check(label: str, ok: bool, detail: object) -> None:
 
 
 connection = create_connection()
-ambiguous = build_workspace_semantic_plan(connection, "default", "看 amount")
+ambiguous = build_workspace_semantic_plan(connection, "default", "看 amount", table_columns=fixture_table_columns)
 check(
     "same-name-field-needs-table-clarification",
     ambiguous["status"] == "needs-clarification" and len(ambiguous["fieldResolution"]["unresolved"]) == 1,
     ambiguous,
 )
 
-explicit = build_workspace_semantic_plan(connection, "default", "看退款表的 amount")
+explicit = build_workspace_semantic_plan(connection, "default", "看退款表的 amount", table_columns=fixture_table_columns)
 check(
     "explicit-table-resolves-same-name-field",
     explicit["status"] == "ready" and explicit["fieldResolution"]["selected"][0]["tableKey"] == "refunds",
     explicit,
 )
 
-combined_ambiguity = build_workspace_semantic_plan(connection, "default", "看 amount 和 status")
+combined_ambiguity = build_workspace_semantic_plan(connection, "default", "看 amount 和 status", table_columns=fixture_table_columns)
 check(
     "multiple-ambiguous-fields-return-one-combined-bundle",
     combined_ambiguity["status"] == "needs-clarification"
@@ -115,7 +146,7 @@ check(
     and {item["mention"] for item in combined_ambiguity["fieldResolution"]["unresolved"]} == {"amount", "status"},
     combined_ambiguity,
 )
-combined_explicit = build_workspace_semantic_plan(connection, "default", "看订单表的 amount 和退款表的 status")
+combined_explicit = build_workspace_semantic_plan(connection, "default", "看订单表的 amount 和退款表的 status", table_columns=fixture_table_columns)
 check(
     "combined-table-field-bindings-resolve-before-path-safety-validation",
     combined_explicit["status"] == "needs-validation"
@@ -131,6 +162,7 @@ selected_context = build_workspace_semantic_plan(
     "default",
     "筛选 channel=Douyin",
     selected_table_key="orders",
+    table_columns=fixture_table_columns,
 )
 check(
     "selected-object-context-resolves-same-name-field",
@@ -140,7 +172,7 @@ check(
     selected_context,
 )
 
-multi_hop = build_workspace_semantic_plan(connection, "default", "按 channel 和 month 看退款金额")
+multi_hop = build_workspace_semantic_plan(connection, "default", "按 channel 和 month 看退款金额", table_columns=fixture_table_columns)
 selected_path = multi_hop["joinPlan"]["targets"][0]["selectedPath"] if multi_hop["joinPlan"]["targets"] else None
 check(
     "multi-dimension-two-hop-plan",
@@ -153,13 +185,22 @@ check(
 )
 
 connection.execute("DELETE FROM relationships")
-missing = build_workspace_semantic_plan(connection, "default", "按 channel 看退款金额")
+missing = build_workspace_semantic_plan(connection, "default", "按 channel 看退款金额", table_columns=fixture_table_columns)
 check("missing-relationship-blocks-plan", missing["status"] == "needs-relationship", missing)
 
 connection.execute(
-    "INSERT INTO relationships VALUES ('default', 'orders-refunds-low', 'orders', 'refunds', 'order_id', 'item_id', '[{\"leftField\":\"order_id\",\"rightField\":\"item_id\"}]', 'inner', 0.2, '{\"status\":\"validated\",\"dataVersions\":{\"orders\":1,\"refunds\":1},\"metrics\":{\"rowExpansion\":1}}', '[]', '{}', '2026-07-13T00:00:00Z')"
+    """INSERT INTO relationships(
+      relation_key, workspace_id, name, left_table_key, right_table_key,
+      left_field, right_field, mappings_json, join_type, confidence,
+      validation_json, filters_json, preaggregation_json, created_at, updated_at
+    ) VALUES (
+      'orders-refunds-low', 'default', 'orders-refunds-low', 'orders', 'refunds',
+      'order_id', 'item_id', '[{\"leftField\":\"order_id\",\"rightField\":\"item_id\"}]', 'inner', 0.2,
+      '{\"status\":\"validated\",\"dataVersions\":{\"orders\":1,\"refunds\":1},\"metrics\":{\"rowExpansion\":1}}',
+      '[]', '{}', '2026-07-13T00:00:00Z', '2026-07-13T00:00:00Z'
+    )"""
 )
-low_confidence = build_workspace_semantic_plan(connection, "default", "按 channel 看退款金额")
+low_confidence = build_workspace_semantic_plan(connection, "default", "按 channel 看退款金额", table_columns=fixture_table_columns)
 check("low-confidence-path-needs-validation", low_confidence["status"] == "needs-validation", low_confidence)
 check(
     "semantic-plan-never-auto-executes",
@@ -171,16 +212,20 @@ execution_connection = create_connection()
 execution_connection.execute("DELETE FROM relationships")
 execution_connection.execute(
     """
-    INSERT INTO relationships VALUES(
-      'default', 'orders-refunds', 'orders', 'refunds', 'order_id', 'order_id',
+    INSERT INTO relationships(
+      relation_key, workspace_id, name, left_table_key, right_table_key,
+      left_field, right_field, mappings_json, join_type, confidence,
+      validation_json, filters_json, preaggregation_json, created_at, updated_at
+    ) VALUES(
+      'orders-refunds', 'default', 'orders-refunds', 'orders', 'refunds', 'order_id', 'order_id',
       '[{"leftField":"order_id","rightField":"order_id"}]', 'left', 0.96,
       '{"status":"validated","dataVersions":{"orders":1,"refunds":1},"metrics":{"rowExpansion":1}}',
       '[]', '{"side":"right","groupFields":["order_id"],"measures":[{"field":"refund_amount","aggregation":"sum"}]}',
-      '2026-07-13T00:00:00Z'
+      '2026-07-13T00:00:00Z', '2026-07-13T00:00:00Z'
     )
     """
 )
-single_hop_semantic = build_workspace_semantic_plan(execution_connection, "default", "按 channel 看退款金额")
+single_hop_semantic = build_workspace_semantic_plan(execution_connection, "default", "按 channel 看退款金额", table_columns=fixture_table_columns)
 single_hop_execution = build_semantic_query_execution_plan(single_hop_semantic)
 check(
     "validated-single-hop-builds-hashed-execution-plan",
@@ -195,7 +240,7 @@ executed = execute_workspace_semantic_query(
     "default",
     "按 channel 看退款金额",
     limit=20,
-    table_columns=lambda db, table: [str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')],
+    table_columns=fixture_table_columns,
     quote_identifier=lambda value: f'"{str(value).replace(chr(34), chr(34) * 2)}"',
     build_relationship_query=build_relationship_query,
 )
@@ -209,13 +254,17 @@ check(
     and float(execution_values.get("Tmall") or 0) == 5,
     executed,
 )
-execution_connection.execute("UPDATE orders SET channel = 'Other' WHERE rowid = (SELECT MAX(rowid) FROM orders WHERE order_id = 'O1')")
+replace_fixture_rows(
+    execution_connection,
+    "orders",
+    (("O1", "Douyin", "2026-07", 100.0, "paid"), ("O1", "Other", "2026-07", 200.0, "paid"), ("O2", "Tmall", "2026-07", 150.0, "paid")),
+)
 unsafe_grain = execute_workspace_semantic_query(
     execution_connection,
     "default",
     "按 channel 看退款金额",
     limit=20,
-    table_columns=lambda db, table: [str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')],
+    table_columns=fixture_table_columns,
     quote_identifier=lambda value: f'"{str(value).replace(chr(34), chr(34) * 2)}"',
     build_relationship_query=build_relationship_query,
 )
@@ -225,16 +274,20 @@ check(
     and "left-group-not-functionally-dependent-on-join-key" in unsafe_grain["executionPlan"]["blockers"],
     unsafe_grain,
 )
-execution_connection.execute("UPDATE orders SET channel = 'Douyin' WHERE order_id = 'O1'")
+replace_fixture_rows(
+    execution_connection,
+    "orders",
+    (("O1", "Douyin", "2026-07", 100.0, "paid"), ("O1", "Douyin", "2026-07", 200.0, "paid"), ("O2", "Tmall", "2026-07", 150.0, "paid")),
+)
 two_hop_connection = create_connection()
-two_hop_plan = build_workspace_semantic_plan(two_hop_connection, "default", "按 channel 和 month 看退款金额")
+two_hop_plan = build_workspace_semantic_plan(two_hop_connection, "default", "按 channel 和 month 看退款金额", table_columns=fixture_table_columns)
 two_hop_execution = build_semantic_query_execution_plan(two_hop_plan)
 two_hop_result = execute_workspace_semantic_query(
     two_hop_connection,
     "default",
     "按 channel 和 month 看退款金额",
     limit=20,
-    table_columns=lambda db, table: [str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')],
+    table_columns=fixture_table_columns,
     quote_identifier=lambda value: f'"{str(value).replace(chr(34), chr(34) * 2)}"',
     build_relationship_query=build_relationship_query,
     semantic_plan=two_hop_plan,
@@ -253,14 +306,14 @@ check(
     two_hop_result,
 )
 changed_connection = create_connection()
-changed_plan = build_workspace_semantic_plan(changed_connection, "default", "按 channel 和 month 看退款金额")
+changed_plan = build_workspace_semantic_plan(changed_connection, "default", "按 channel 和 month 看退款金额", table_columns=fixture_table_columns)
 changed_connection.execute("DELETE FROM relationships WHERE relation_key = 'items-refunds'")
 changed_result = execute_workspace_semantic_query(
     changed_connection,
     "default",
     "按 channel 和 month 看退款金额",
     limit=20,
-    table_columns=lambda db, table: [str(row[1]) for row in db.execute(f'PRAGMA table_info("{table}")')],
+    table_columns=fixture_table_columns,
     quote_identifier=lambda value: f'"{str(value).replace(chr(34), chr(34) * 2)}"',
     build_relationship_query=build_relationship_query,
     semantic_plan=changed_plan,
@@ -282,7 +335,7 @@ check(
 execution_connection.execute(
     "UPDATE relationships SET validation_json = '{\"status\":\"stale\",\"dataVersions\":{\"orders\":1,\"refunds\":1},\"metrics\":{\"rowExpansion\":1}}' WHERE relation_key = 'orders-refunds'"
 )
-stale_semantic = build_workspace_semantic_plan(execution_connection, "default", "按 channel 看退款金额")
+stale_semantic = build_workspace_semantic_plan(execution_connection, "default", "按 channel 看退款金额", table_columns=fixture_table_columns)
 check("stale-relationship-blocks-before-execution", stale_semantic["status"] == "needs-validation" and "stale-relationship" in stale_semantic["joinPlan"]["targets"][0]["selectedPath"]["risks"], stale_semantic)
 
 fingerprint_connection = create_connection()

@@ -245,11 +245,8 @@ def sync_connector_command(
     args: argparse.Namespace,
     *,
     open_db: Callable[[], Any],
-    read_table_file: Callable[[Path], tuple[list[str], list[dict[str, Any]]]],
     registry_for_table: Callable[[sqlite3.Connection, str], sqlite3.Row | None],
     saved_import_policy: Callable[[sqlite3.Connection, str], dict[str, Any] | None],
-    merge_import_into_table: Callable[..., dict[str, Any]],
-    import_csv_as_table: Callable[..., dict[str, Any]],
 ) -> dict[str, Any]:
     # The dispatcher intentionally leaves this facade unlocked. Planning owns
     # a shared boundary; the actual data change delegates to Durable Import,
@@ -311,11 +308,11 @@ def sync_connector_command(
         temporary_source = Path(handle.name)
         source_path = temporary_source
 
-    from import_job_commands import legacy_import_commit_command
+    from import_job_commands import direct_import_commit_command
 
     durable_mode = "create" if mode == "replace" else mode
     try:
-        durable = legacy_import_commit_command(argparse.Namespace(
+        durable = direct_import_commit_command(argparse.Namespace(
             workspace=str(connector["workspaceId"]),
             file=str(source_path),
             table=target_table,

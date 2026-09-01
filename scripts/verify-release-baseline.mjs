@@ -97,7 +97,7 @@ function runReleaseBaseline() {
     ]);
     if (!imported.ok) throw new Error(imported.parsed?.error || imported.stderr || "Release baseline import failed.");
     const queryArgs = [
-      "query-table", "--table", "release_orders", "--mode", "aggregate",
+      "query-table", "--workspace", "default", "--table", "release_orders", "--mode", "aggregate",
       "--group", "channel", "--measure", "net_sales", "--agg", "sum", "--limit", "20",
     ];
     for (let index = 0; index < WARMUP_COUNT; index += 1) {

@@ -41,6 +41,30 @@ def _key(prefix: str, *values: str) -> str:
     return f"{prefix}_{hashlib.sha256(material.encode('utf-8')).hexdigest()[:16]}"
 
 
+def _dataset_schema(raw: Any) -> list[dict[str, Any]]:
+    try:
+        parsed = json.loads(str(raw or "[]"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return []
+    columns: list[dict[str, Any]] = []
+    for item in parsed if isinstance(parsed, list) else []:
+        if isinstance(item, str):
+            columns.append({"name": item, "type": "VARCHAR", "notnull": 0, "pk": 0})
+            continue
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or item.get("field") or "")
+        if not name or bool(item.get("internal")) or name.startswith("__aibi_"):
+            continue
+        columns.append({
+            "name": name,
+            "type": str(item.get("type") or item.get("physicalType") or "VARCHAR"),
+            "notnull": int(bool(item.get("notNull") or item.get("notnull"))),
+            "pk": 0,
+        })
+    return columns
+
+
 def workspace_schema_fingerprint(
     connection: sqlite3.Connection,
     workspace_id: str,
@@ -52,48 +76,58 @@ def workspace_schema_fingerprint(
         where += " AND table_key = ?"
         params.append(table_key)
     registries = connection.execute(
-        f"SELECT table_key, physical_table, data_version, updated_at FROM table_registry WHERE {where} ORDER BY table_key",
+        f"SELECT table_key, physical_table, data_version, updated_at, active_version_id, schema_json, schema_fingerprint "
+        f"FROM table_registry WHERE {where} ORDER BY table_key",
         tuple(params),
     ).fetchall()
+    semantic_params: list[Any] = [workspace_id]
+    semantic_where = "workspace_id = ?"
+    if table_key:
+        semantic_where += " AND table_key = ?"
+        semantic_params.append(table_key)
+    semantics_by_table: dict[str, list[dict[str, Any]]] = {}
+    for row in connection.execute(
+        f"""
+        SELECT table_key, field_name, role, usage, confidence, tags_json, usage_json, source
+        FROM field_semantics
+        WHERE {semantic_where}
+        ORDER BY table_key, field_name
+        """,
+        tuple(semantic_params),
+    ).fetchall():
+        semantics_by_table.setdefault(str(row["table_key"]), []).append({
+            key: value for key, value in dict(row).items() if key != "table_key"
+        })
     tables: list[dict[str, Any]] = []
     for registry in registries:
-        columns = [
-            {"name": row["name"], "type": row["type"], "notnull": int(row["notnull"]), "pk": int(row["pk"])}
-            for row in connection.execute(f'PRAGMA table_info("{str(registry["physical_table"]).replace(chr(34), chr(34) * 2)}")')
-        ]
-        semantics = [
-            dict(row)
-            for row in connection.execute(
-                """
-                SELECT field_name, role, usage, confidence, tags_json, usage_json, source
-                FROM field_semantics
-                WHERE workspace_id = ? AND table_key = ?
-                ORDER BY field_name
-                """,
-                (workspace_id, registry["table_key"]),
-            ).fetchall()
-        ]
+        columns = _dataset_schema(registry["schema_json"])
         tables.append({
             "tableKey": registry["table_key"],
             "dataVersion": int(registry["data_version"] or 1),
+            "activeVersionId": str(registry["active_version_id"] or ""),
+            "schemaFingerprint": str(registry["schema_fingerprint"] or ""),
             "updatedAt": str(registry["updated_at"] or ""),
             "columns": columns,
-            "semantics": semantics,
+            "semantics": semantics_by_table.get(str(registry["table_key"]), []),
         })
+    relationship_params: list[Any] = [workspace_id]
+    relationship_where = "workspace_id = ?"
+    if table_key:
+        relationship_where += " AND (left_table_key = ? OR right_table_key = ?)"
+        relationship_params.extend([table_key, table_key])
     relationships = [
         dict(row)
         for row in connection.execute(
-            """
+            f"""
             SELECT relation_key, left_table_key, right_table_key, left_field, right_field,
                    mappings_json, filters_json, preaggregation_json, join_type, confidence,
                    validation_json, updated_at
             FROM relationships
-            WHERE workspace_id = ?
+            WHERE {relationship_where}
             ORDER BY relation_key
             """,
-            (workspace_id,),
+            tuple(relationship_params),
         ).fetchall()
-        if not table_key or table_key in {row["left_table_key"], row["right_table_key"]}
     ]
     material = json.dumps({"tables": tables, "relationships": relationships}, ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
@@ -113,12 +147,15 @@ def workspace_data_fingerprint(
         {
             "tableKey": row["table_key"],
             "dataVersion": int(row["data_version"] or 1),
+            "activeVersionId": str(row["active_version_id"] or ""),
+            "contentFingerprint": str(row["content_fingerprint"] or ""),
             "rowCount": int(row["row_count"] or 0),
             "columnCount": int(row["column_count"] or 0),
             "updatedAt": str(row["updated_at"] or ""),
         }
         for row in connection.execute(
-            f"SELECT table_key, data_version, row_count, column_count, updated_at FROM table_registry WHERE {where} ORDER BY table_key",
+            f"SELECT table_key, data_version, active_version_id, content_fingerprint, row_count, column_count, updated_at "
+            f"FROM table_registry WHERE {where} ORDER BY table_key",
             tuple(params),
         ).fetchall()
     ]

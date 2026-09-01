@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from bi_cli_core import DB_PATH, DEFAULT_DATA_DIR, ROOT, now_iso, quote_identifier
-from bi_cli_schema import table_exists
+from bi_cli_schema import table_columns as dataset_table_columns, table_exists
 from preferences_theme_command_service import list_theme_palettes, load_user_preferences
 
 
@@ -40,8 +40,8 @@ CONFIG_TABLES = [
 CONFIG_KIND = "aibi-hybrid-local-bi-config"
 
 
-def table_columns(connection: sqlite3.Connection, physical_table: str) -> list[str]:
-    return [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(physical_table)})")]
+def control_table_columns(connection: sqlite3.Connection, table_name: str) -> list[str]:
+    return [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(table_name)})")]
 
 
 def parse_json_object(value: Any, default: Any | None = None) -> Any:
@@ -148,7 +148,7 @@ def restore_config_rows(connection: sqlite3.Connection, table_name: str, rows: l
     connection.execute(f"DELETE FROM {quote_identifier(table_name)}")
     if not rows:
         return 0
-    columns = table_columns(connection, table_name)
+    columns = control_table_columns(connection, table_name)
     insert_columns = [column for column in columns if any(column in row for row in rows)]
     if not insert_columns:
         return 0
@@ -198,7 +198,7 @@ def validate_metadata_config(
         if not row:
             column_cache[table_key] = set()
             return set()
-        column_cache[table_key] = set(table_columns(connection, row["physical_table"])) | calculated_field_names_for_table(connection, table_key)
+        column_cache[table_key] = set(dataset_table_columns(connection, row["physical_table"])) | calculated_field_names_for_table(connection, table_key)
         return column_cache[table_key]
 
     for row in connection.execute("SELECT table_key, field_name FROM field_semantics").fetchall():

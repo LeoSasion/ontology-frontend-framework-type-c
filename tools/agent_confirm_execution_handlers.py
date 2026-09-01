@@ -35,8 +35,7 @@ def handle_index_create_confirmation(
     connection.commit()
     return confirmed_response(
         action_key,
-        createdIndex=execution.get("createdIndex"),
-        syncedRows=execution.get("syncedRows"),
+        optimizedDataset=execution.get("optimizedDataset"),
     )
 
 

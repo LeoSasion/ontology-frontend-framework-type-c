@@ -9,6 +9,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+import duckdb
+
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
@@ -240,7 +242,11 @@ def main() -> None:
                 "SELECT COUNT(*) FROM sqlserver_snapshot_receipts WHERE workspace_id = 'default' AND operation = 'activate'"
             ).fetchone()[0])
             journal = activation_for_job(connection, workspace_id="default", job_key=job_key)
-            row_count = int(connection.execute("SELECT COUNT(*) FROM data_sql_orders").fetchone()[0])
+        replica = duckdb.connect(str(temp_root / "runtime.duckdb"), read_only=True)
+        try:
+            row_count = int(replica.execute("SELECT COUNT(*) FROM data_sql_orders").fetchone()[0])
+        finally:
+            replica.close()
         check(
             checks,
             "activation-finalization-is-persistent-and-idempotent",

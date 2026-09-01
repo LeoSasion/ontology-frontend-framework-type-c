@@ -41,9 +41,9 @@ def main() -> None:
 
         from atomic_import_plan_service import bind_single_import_plan
         from bi_cli_core import now_iso
-        from bi_cli_io_services import read_table_file
-        from bi_cli_schema import active_workspace_id, open_db as raw_open_db, physical_table_for_workspace, table_columns
+        from bi_cli_schema import active_workspace_id, open_db as raw_open_db, physical_table_for_workspace
         from bi_cli_source_commands import build_import_preview, execute_import_commit
+        import import_command_service as import_command_runtime
         from import_command_service import build_folder_import_plan, execute_folder_import_plan
         import import_job_service as import_job_runtime
         from import_job_service import (
@@ -116,7 +116,6 @@ def main() -> None:
             "active_workspace_id": active_workspace_id,
             "build_import_preview": build_import_preview,
             "build_folder_import_plan": build_folder_import_plan,
-            "read_table_file": read_table_file,
             "now_iso": now_iso,
         }
         created = import_job_create_command(create_args, **create_dependencies)
@@ -162,9 +161,7 @@ def main() -> None:
             "build_folder_import_plan": build_folder_import_plan,
             "execute_import_commit": execute_import_commit,
             "execute_folder_import_plan": execute_folder_import_plan,
-            "read_table_file": read_table_file,
             "physical_table_for_workspace": physical_table_for_workspace,
-            "table_columns": table_columns,
             "duckdb_path": duckdb_path,
             "mutation_lock_path": temp_root / ".aibi-cross-engine-writer.lock",
             "recovery_root": temp_root / "workspace-recovery",
@@ -199,6 +196,124 @@ def main() -> None:
             all(stage in stages for stage in ["validate_plan", "stage_source", "publish_replica", "switch_source_run", "postprocess"])
             and [event["progress"] for event in persisted["events"]] == sorted(event["progress"] for event in persisted["events"]),
             stages,
+        )
+        explicit_target_path = temp_root / "same-schema-new-table.csv"
+        write_csv(explicit_target_path, [
+            ["订单号", "渠道", "金额", "日期"],
+            ["o-4", "门店", "300", "2026-05-04"],
+        ])
+        performance_calls = {"quality": 0, "merge": 0}
+        original_quality = import_command_runtime.analyze_unique_key_quality_parquet_v2
+        original_merge = import_command_runtime.preview_merge_plan_parquet_v2
+
+        def counted_quality(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            performance_calls["quality"] += 1
+            return original_quality(*args, **kwargs)
+
+        def counted_merge(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            performance_calls["merge"] += 1
+            return original_merge(*args, **kwargs)
+
+        with open_db() as connection:
+            connection.execute(
+                "UPDATE table_registry SET display_name = '000-orders' "
+                "WHERE workspace_id = 'default' AND table_key = 'orders'"
+            )
+            for index in range(100):
+                connection.execute(
+                    """
+                    INSERT INTO table_registry(
+                      table_key, workspace_id, display_name, physical_table, source_file,
+                      row_count, column_count, created_at, data_version, updated_at,
+                      active_version_id, schema_json, schema_fingerprint, content_fingerprint
+                    )
+                    SELECT ?, workspace_id, ?, ?, 'complexity-fixture', 0, column_count,
+                           created_at, 1, updated_at, '', schema_json, schema_fingerprint,
+                           content_fingerprint
+                    FROM table_registry
+                    WHERE workspace_id = 'default' AND table_key = 'orders'
+                    """,
+                    (f"same_schema_{index:03d}", f"same-schema-{index:03d}", f"same_schema_{index:03d}"),
+                )
+            import_command_runtime.analyze_unique_key_quality_parquet_v2 = counted_quality
+            import_command_runtime.preview_merge_plan_parquet_v2 = counted_merge
+            try:
+                explicit_target_preview = build_import_preview(
+                    connection,
+                    explicit_target_path,
+                    "same_schema_new_table",
+                    None,
+                    None,
+                    workspace_id="default",
+                    mode_value="create",
+                )
+                explicit_create_calls = dict(performance_calls)
+                performance_calls.update({"quality": 0, "merge": 0})
+                auto_target_preview = build_import_preview(
+                    connection,
+                    explicit_target_path,
+                    None,
+                    None,
+                    None,
+                    workspace_id="default",
+                    mode_value="auto",
+                )
+                auto_discovery_calls = dict(performance_calls)
+            finally:
+                import_command_runtime.analyze_unique_key_quality_parquet_v2 = original_quality
+                import_command_runtime.preview_merge_plan_parquet_v2 = original_merge
+        check(
+            checks,
+            "explicit-create-target-does-not-bind-same-schema-table",
+            explicit_target_preview["suggestedTableKey"] == "same_schema_new_table"
+            and explicit_target_preview["matchedTable"] is None
+            and explicit_target_preview["mergePolicyPreview"]["mode"] == "create"
+            and explicit_create_calls["merge"] == 0
+            and explicit_create_calls["quality"] <= 1,
+            {"preview": explicit_target_preview, "calls": explicit_create_calls},
+        )
+        check(
+            checks,
+            "auto-discovery-profiles-only-the-selected-target",
+            auto_target_preview["matchedTable"]["table_key"] == "orders"
+            and len(auto_target_preview["matches"]) == 101
+            and auto_discovery_calls == {"quality": 1, "merge": 1},
+            {"preview": auto_target_preview, "calls": auto_discovery_calls},
+        )
+        with open_db() as connection:
+            missing_merge_preview = build_import_preview(
+                connection,
+                explicit_target_path,
+                "missing_merge_target",
+                None,
+                None,
+                workspace_id="default",
+                mode_value="merge",
+            )
+            missing_merge_error = ""
+            try:
+                execute_import_commit(
+                    connection,
+                    explicit_target_path,
+                    "missing_merge_target",
+                    "Missing merge target",
+                    "merge",
+                    workspace_id="default",
+                )
+            except ValueError as error:
+                missing_merge_error = str(error)
+            missing_merge_created = connection.execute(
+                "SELECT 1 FROM table_registry WHERE workspace_id = 'default' AND table_key = 'missing_merge_target'"
+            ).fetchone()
+        check(
+            checks,
+            "explicit-merge-missing-target-is-blocked-before-write",
+            missing_merge_preview["readyToCommit"] is False
+            and missing_merge_preview["mergePolicyPreview"]["mode"] == "merge"
+            and "merge-target-missing" in missing_merge_preview["blockers"]
+            and "merge-target-missing" in missing_merge_error
+            and missing_merge_created is None,
+            {"preview": missing_merge_preview, "error": missing_merge_error},
         )
         injected_path = r"C:\Users\Analyst\private\orders.csv"
         injected_email = "analyst@example.com"
@@ -275,15 +390,12 @@ def main() -> None:
                         rows,
                         key=lambda item: json.dumps(item, ensure_ascii=False, sort_keys=True, default=str),
                     )
-                safe_physical = physical_table.replace('"', '""')
-                snapshot["sqlite"][physical_table] = [
-                    tuple(row)
-                    for row in connection.execute(f'SELECT * FROM "{safe_physical}" ORDER BY rowid')
-                ]
             with duckdb.connect(str(duckdb_path), read_only=True) as duck_connection:
                 snapshot["duckdb"]["manifest"] = duck_connection.execute(
                     """
-                    SELECT logical_table, source_version, replica_table, row_count
+                    SELECT logical_table, source_version, version_id,
+                           object_hashes_json, schema_fingerprint,
+                           content_fingerprint, row_count
                     FROM __aibi_replica_manifest WHERE logical_table = ?
                     """,
                     [physical_table],
@@ -295,15 +407,15 @@ def main() -> None:
             return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
         with duckdb.connect(str(duckdb_path), read_only=True) as duck_connection:
-            replica = duck_connection.execute(
-                "SELECT source_version, replica_table, row_count FROM __aibi_replica_manifest WHERE logical_table = 'data_orders'"
+            dataset = duck_connection.execute(
+                "SELECT source_version, version_id, row_count FROM __aibi_replica_manifest WHERE logical_table = 'data_orders'"
             ).fetchone()
-            replica_rows = duck_connection.execute("SELECT COUNT(*) FROM data_orders").fetchone()[0]
+            dataset_rows = duck_connection.execute("SELECT COUNT(*) FROM data_orders").fetchone()[0]
         check(
             checks,
-            "duckdb-versioned-replica-is-current",
-            bool(replica) and int(replica[2]) == 3 and int(replica_rows) == 3,
-            {"manifest": replica, "rows": replica_rows},
+            "duckdb-versioned-dataset-is-current",
+            bool(dataset) and bool(dataset[1]) and int(dataset[2]) == 3 and int(dataset_rows) == 3,
+            {"manifest": dataset, "rows": dataset_rows},
         )
         response_lost_replay = import_job_create_command(create_args, **create_dependencies)
         check(
@@ -409,9 +521,6 @@ def main() -> None:
                 "SELECT row_count, physical_table FROM table_registry WHERE workspace_id = ? AND table_key = ?",
                 (workspace_a, shared_table),
             ).fetchone()
-            workspace_a_rows = connection.execute(
-                f'SELECT * FROM "{physical_a}" ORDER BY rowid'
-            ).fetchall()
             connection.execute(
                 "UPDATE system_flags SET value = 'default', updated_at = ? WHERE key = 'active_workspace_id'",
                 (now_iso(),),
@@ -422,9 +531,9 @@ def main() -> None:
                 "SELECT row_count FROM __aibi_replica_manifest WHERE logical_table = ?",
                 [physical_a],
             ).fetchone()
-            workspace_a_replica_rows = duck_connection.execute(
-                f'SELECT COUNT(*) FROM "{physical_a}"'
-            ).fetchone()[0]
+            workspace_a_dataset_rows = duck_connection.execute(
+                f'SELECT id, amount FROM "{physical_a}" ORDER BY __aibi_row_id'
+            ).fetchall()
         check(
             checks,
             "durable-job-freezes-workspace-across-active-switch",
@@ -434,9 +543,9 @@ def main() -> None:
             and active_after_a == workspace_b
             and workspace_a_current == completed_a["job"]["sourceRunId"]
             and tuple(workspace_a_registry or ()) == (2, physical_a)
-            and [tuple(row) for row in workspace_a_rows] == [("a-1", "10"), ("a-2", "20")]
+            and [tuple(row) for row in workspace_a_dataset_rows] == [("a-1", 10), ("a-2", 20)]
             and tuple(workspace_a_manifest or ()) == (2,)
-            and int(workspace_a_replica_rows) == 2,
+            and len(workspace_a_dataset_rows) == 2,
             {
                 "workspaceAResult": completed_a,
                 "activeWorkspace": active_after_a,
@@ -544,12 +653,7 @@ def main() -> None:
             commit_reconcile,
         )
 
-        injected_manifest = [{
-            "logicalTable": "data_orders",
-            "sourceVersion": "verify-injected-version",
-            "replicaTable": "__aibi_replica_verify_injected",
-            "rowCount": 1,
-        }]
+        injected_manifest = [{**rollback_manifest[0], "sourceVersion": "verify-injected-version"}]
         with open_db() as connection:
             replica_phase = prepare_activation(
                 connection,
@@ -571,19 +675,10 @@ def main() -> None:
             )
             connection.commit()
         with duckdb.connect(str(duckdb_path)) as duck_connection:
-            duck_connection.execute("CREATE TABLE __aibi_replica_verify_injected AS SELECT 'injected' AS marker")
-            duck_connection.execute("DROP VIEW data_orders")
-            duck_connection.execute("CREATE VIEW data_orders AS SELECT * FROM __aibi_replica_verify_injected")
             duck_connection.execute(
-                """
-                INSERT INTO __aibi_replica_manifest(logical_table, source_version, replica_table, row_count, published_at)
-                VALUES('data_orders', 'verify-injected-version', '__aibi_replica_verify_injected', 1, current_timestamp)
-                ON CONFLICT(logical_table) DO UPDATE SET
-                  source_version = excluded.source_version,
-                  replica_table = excluded.replica_table,
-                  row_count = excluded.row_count,
-                  published_at = excluded.published_at
-                """
+                "UPDATE __aibi_replica_manifest SET source_version = ?, published_at = current_timestamp "
+                "WHERE logical_table = 'data_orders'",
+                ["verify-injected-version"],
             )
         with open_db() as connection:
             replica_phase = transition_activation(
@@ -605,7 +700,7 @@ def main() -> None:
             connection.commit()
         with duckdb.connect(str(duckdb_path), read_only=True) as duck_connection:
             restored_manifest = duck_connection.execute(
-                "SELECT source_version, replica_table, row_count FROM __aibi_replica_manifest WHERE logical_table = 'data_orders'"
+                "SELECT source_version, version_id, row_count FROM __aibi_replica_manifest WHERE logical_table = 'data_orders'"
             ).fetchone()
         check(
             checks,
@@ -613,7 +708,7 @@ def main() -> None:
             replica_reconcile["action"] == "rolled_back"
             and bool(restored_manifest)
             and str(restored_manifest[0]) == str(rollback_manifest[0]["sourceVersion"])
-            and str(restored_manifest[1]) == str(rollback_manifest[0]["replicaTable"]),
+            and str(restored_manifest[1]) == str(rollback_manifest[0]["versionId"]),
             {"reconcile": replica_reconcile, "manifest": restored_manifest},
         )
 
@@ -751,14 +846,13 @@ def main() -> None:
             file_drift_table = connection.execute(
                 "SELECT physical_table FROM table_registry WHERE workspace_id = 'default' AND table_key = 'file_drift_table'"
             ).fetchone()
-            staged_value = (
-                connection.execute(
-                    f'SELECT staged_value FROM "{file_drift_table[0]}" WHERE id = ?',
-                    ("1",),
+        staged_value = None
+        if file_drift_table is not None:
+            with duckdb.connect(str(duckdb_path), read_only=True) as duck_connection:
+                staged_value = duck_connection.execute(
+                    f'SELECT staged_value FROM "{str(file_drift_table[0]).replace(chr(34), chr(34) * 2)}" WHERE id = ?',
+                    ["1"],
                 ).fetchone()
-                if file_drift_table is not None
-                else None
-            )
         check(
             checks,
             "accepted-stage-is-immutable-after-source-drift",
@@ -980,7 +1074,6 @@ def main() -> None:
             active_workspace_id=active_workspace_id,
             build_import_preview=build_import_preview,
             build_folder_import_plan=build_folder_import_plan,
-            read_table_file=read_table_file,
             now_iso=now_iso,
         )
         check(

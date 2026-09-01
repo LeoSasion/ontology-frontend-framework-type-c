@@ -10,6 +10,7 @@ const styles = read("src/components/sourceWorkbenchCore.css");
 const api = read("src/apiImportJobs.ts");
 const runtime = read("server/durableJobRuntime.ts");
 const service = read("tools/import_stage_service.py");
+const stageSummary = service.match(/def _stage_summary[\s\S]*?(?=\n\ndef |$)/)?.[0] ?? "";
 
 const checks = [];
 const check = (label, condition) => {
@@ -22,6 +23,13 @@ check(
   controller.includes("stageKey: singleImportBinding.stageKey")
     && controller.includes("result.importStage?.stageKey")
     && api.includes("stageKey?: string"),
+);
+check(
+  "single-import-auto-mode-resolves-create-or-merge-in-one-preview",
+  controller.includes('useState("auto")')
+    && controller.includes("result.commitOptions?.mode || result.mergePolicyPreview.mode || effectiveMode")
+    && controller.includes("setImportMode(resolvedImportMode)")
+    && panel.includes('<option value="auto">'),
 );
 check(
   "folder-import-confirmation-reuses-each-preview-stage",
@@ -38,8 +46,8 @@ check(
 );
 check(
   "stage-summary-never-exposes-a-local-path",
-  service.includes('"sourceName": manifest["sourceName"]')
-    && !service.match(/_stage_summary[\s\S]{0,1000}"(?:path|databasePath|root)"/),
+  stageSummary.includes('"sourceName"')
+    && !stageSummary.match(/"(?:path|databasePath|root)"/),
 );
 check(
   "stage-seal-respects-compact-responsive-typography",

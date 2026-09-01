@@ -19,6 +19,7 @@ from bi_cli_query_view_commands import (
     delete_view_command,
     list_views_command,
     query_command,
+    query_table_batch_command,
     query_table_command,
     save_view_command,
 )

@@ -5,11 +5,18 @@ import json
 import re
 import sqlite3
 from contextlib import closing
+from pathlib import Path
 from typing import Any, Callable
 
-from bi_cli_core import DUCKDB_PATH, now_iso, slug
+from bi_cli_core import DUCKDB_PATH, now_iso, quote_identifier, slug
 from apparel_entity_mapping_service import build_apparel_entity_mapping_proof
 from query_runtime import open_validated_duckdb_query, replica_expectation
+from relationship_tools import build_relationship_preview as build_relationship_preview_runtime
+
+
+MAX_RELATIONSHIP_FIELDS_PER_TABLE = 24
+MAX_RELATIONSHIP_BLOCK_NEIGHBORS = 8
+MAX_RELATIONSHIP_PREVIEW_BUDGET = 64
 
 
 def parse_json_object(value: Any, default: Any | None = None) -> Any:
@@ -115,6 +122,144 @@ def relationship_validation_snapshot(preview: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _registry_public_columns(registry: sqlite3.Row) -> list[str]:
+    schema = parse_json_object(registry["schema_json"], [])
+    columns: list[str] = []
+    for item in schema if isinstance(schema, list) else []:
+        name = str(item if isinstance(item, str) else item.get("name") or item.get("field") or "").strip()
+        internal = name.startswith("__aibi_") or (isinstance(item, dict) and bool(item.get("internal")))
+        if name and not internal and name not in columns:
+            columns.append(name)
+    if not columns:
+        raise ValueError(f"Dataset schema has no public columns: {registry['table_key']}")
+    return columns
+
+
+def revalidate_published_relationships_for_tables(
+    connection: sqlite3.Connection,
+    *,
+    workspace_id: str,
+    table_keys: list[str],
+    duckdb_path: Path,
+) -> list[dict[str, Any]]:
+    """Refresh relationship proofs only after all affected DuckDB views are current."""
+
+    changed_tables = sorted({str(item).strip() for item in table_keys if str(item).strip()})
+    if not changed_tables:
+        return []
+    placeholders = ", ".join("?" for _ in changed_tables)
+    relationships = connection.execute(
+        f"""
+        SELECT * FROM relationships
+        WHERE workspace_id = ?
+          AND (left_table_key IN ({placeholders}) OR right_table_key IN ({placeholders}))
+        ORDER BY relation_key
+        """,
+        (workspace_id, *changed_tables, *changed_tables),
+    ).fetchall()
+    if not relationships:
+        return []
+    related_tables = sorted({
+        str(value)
+        for row in relationships
+        for value in (row["left_table_key"], row["right_table_key"])
+    })
+    registry_placeholders = ", ".join("?" for _ in related_tables)
+    registries = {
+        str(row["table_key"]): row
+        for row in connection.execute(
+            f"""
+            SELECT * FROM table_registry
+            WHERE workspace_id = ? AND table_key IN ({registry_placeholders})
+            """,
+            (workspace_id, *related_tables),
+        ).fetchall()
+    }
+    if set(registries) != set(related_tables):
+        missing = sorted(set(related_tables) - set(registries))
+        raise RuntimeError("Relationship revalidation is missing active registries: " + ", ".join(missing))
+
+    receipts: list[dict[str, Any]] = []
+    expectations = [replica_expectation(registries[key]) for key in related_tables]
+    with open_validated_duckdb_query(duckdb_path, expectations) as analysis_connection:
+        for relationship in relationships:
+            left_key = str(relationship["left_table_key"])
+            right_key = str(relationship["right_table_key"])
+            left = registries[left_key]
+            right = registries[right_key]
+            mappings = normalize_relationship_mappings(parse_json_object(relationship["mappings_json"], []))
+            if not mappings:
+                mappings = normalize_relationship_mappings([{
+                    "leftField": relationship["left_field"],
+                    "rightField": relationship["right_field"],
+                }])
+            try:
+                preview = build_relationship_preview_runtime(
+                    analysis_connection,
+                    str(left["physical_table"]),
+                    str(right["physical_table"]),
+                    _registry_public_columns(left),
+                    _registry_public_columns(right),
+                    mappings,
+                    join_type=str(relationship["join_type"] or "left"),
+                    sample_limit=50,
+                    quote_identifier=quote_identifier,
+                    filters=parse_json_object(relationship["filters_json"], []),
+                    preaggregation=parse_json_object(relationship["preaggregation_json"], {}),
+                )
+                preview["apparelEntityMappingProof"] = build_apparel_entity_mapping_proof(
+                    connection,
+                    workspace_id=workspace_id,
+                    left_table_key=left_key,
+                    right_table_key=right_key,
+                    mappings=mappings,
+                    relationship_preview=preview,
+                )
+                validation = relationship_validation_snapshot(preview)
+                validation["dataVersions"] = {
+                    left_key: int(left["data_version"] or 1),
+                    right_key: int(right["data_version"] or 1),
+                }
+                confidence = float((preview.get("metrics") or {}).get("confidence") or 0)
+            except ValueError:
+                previous = parse_json_object(relationship["validation_json"], {})
+                validation = {
+                    **(previous if isinstance(previous, dict) else {}),
+                    "schema": "aibi-relationship-validation/v1",
+                    "status": "stale",
+                    "blockers": ["relationship-schema-invalid-after-publish"],
+                    "staleReason": "relationship-schema-invalid-after-publish",
+                    "dataVersions": {
+                        left_key: int(left["data_version"] or 1),
+                        right_key: int(right["data_version"] or 1),
+                    },
+                    "validatedAt": now_iso(),
+                }
+                confidence = float(relationship["confidence"] or 0)
+            connection.execute(
+                """
+                UPDATE relationships
+                SET validation_json = ?, confidence = ?, updated_at = ?
+                WHERE workspace_id = ? AND relation_key = ?
+                """,
+                (
+                    json.dumps(validation, ensure_ascii=False),
+                    confidence,
+                    now_iso(),
+                    workspace_id,
+                    relationship["relation_key"],
+                ),
+            )
+            receipts.append({
+                "relationKey": relationship["relation_key"],
+                "tableKeys": [left_key, right_key],
+                "status": validation["status"],
+                "blockers": list(validation.get("blockers") or []),
+                "dataVersions": dict(validation.get("dataVersions") or {}),
+            })
+    return receipts
+
+
 def normalize_relation_field_name(value: str) -> str:
     text = re.sub(r"[\s_\-\.]+", "", str(value or "").strip().lower())
     replacements = {
@@ -151,6 +296,30 @@ def relation_candidate_fields(
             (registry["table_key"], workspace_id),
         ).fetchall()
     }
+    profile_row = connection.execute(
+        """
+        SELECT profile_json
+        FROM source_runs
+        WHERE workspace_id = ? AND table_key = ? AND status = 'ready'
+          AND row_count = ? AND column_count = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (
+            workspace_id,
+            registry["table_key"],
+            int(registry["row_count"] or 0),
+            int(registry["column_count"] or 0),
+        ),
+    ).fetchone()
+    profile_fields: dict[str, dict[str, Any]] = {}
+    if profile_row:
+        profile = parse_json_object(profile_row["profile_json"], {})
+        profile_fields = {
+            str(item.get("field")): item
+            for item in profile.get("fields", [])
+            if isinstance(item, dict) and str(item.get("field") or "").strip()
+        }
     candidates: list[dict[str, Any]] = []
     for field in columns:
         semantic = semantic_by_field.get(field, {})
@@ -159,6 +328,11 @@ def relation_candidate_fields(
         tags = parse_json_object(semantic.get("tags_json"), [])
         tags = tags if isinstance(tags, list) else []
         normalized = normalize_relation_field_name(field)
+        field_profile = profile_fields.get(field, {})
+        raw_samples = field_profile.get("sampleValues")
+        if not isinstance(raw_samples, list):
+            raw_samples = field_profile.get("sample")
+        sample_values = [str(value).strip() for value in (raw_samples or [])[:16] if str(value).strip()]
         text = field.lower()
         reasons: list[str] = []
         if role in {"identity_key", "identifier"}:
@@ -179,9 +353,14 @@ def relation_candidate_fields(
                     "normalizedName": normalized,
                     "reasons": sorted(set(reasons)),
                     "confidence": float(semantic.get("confidence") or 0),
+                    "sampleValues": sample_values,
+                    "uniqueCount": int(field_profile.get("uniqueCount") or 0),
+                    "nonEmpty": int(field_profile.get("nonEmpty") or 0),
+                    "inferredType": str(field_profile.get("inferredType") or ""),
                 }
             )
-    return candidates
+    candidates.sort(key=lambda item: (-float(item["confidence"]), -len(item["reasons"]), str(item["field"])))
+    return candidates[:MAX_RELATIONSHIP_FIELDS_PER_TABLE]
 
 
 def relationship_name_score(left_field: str, right_field: str) -> tuple[int, list[str]]:
@@ -203,25 +382,68 @@ def relationship_name_score(left_field: str, right_field: str) -> tuple[int, lis
     return score, reasons
 
 
-def sample_field_values(
-    connection: sqlite3.Connection,
-    physical_table: str,
-    field: str,
-    limit: int = 300,
-    *,
-    quote_identifier: Callable[[str], str],
-) -> set[str]:
-    rows = connection.execute(
-        f"""
-        SELECT DISTINCT {quote_identifier(field)} AS value
-        FROM {quote_identifier(physical_table)}
-        WHERE {quote_identifier(field)} IS NOT NULL
-          AND TRIM(CAST({quote_identifier(field)} AS TEXT)) <> ''
-        LIMIT ?
-        """,
-        (max(1, int(limit)),),
-    ).fetchall()
-    return {str(row[0]).strip() for row in rows if str(row[0]).strip()}
+def _candidate_profile_values(candidate: dict[str, Any]) -> set[str]:
+    return {
+        str(value).strip().casefold()
+        for value in candidate.get("sampleValues") or []
+        if str(value).strip()
+    }
+
+
+def _blocked_relationship_pairs(
+    registries: list[sqlite3.Row],
+    candidates_by_table: dict[str, list[dict[str, Any]]],
+) -> list[tuple[sqlite3.Row, dict[str, Any], sqlite3.Row, dict[str, Any]]]:
+    """Recall plausible field pairs in bounded near-linear time.
+
+    Exact normalized names and bounded import-profile samples form inverted
+    indexes.  Each member is compared only with a fixed number of prior
+    members, preventing common fields such as `id` from creating a quadratic
+    candidate explosion across large workspaces.
+    """
+
+    registry_by_key = {str(row["table_key"]): row for row in registries}
+    buckets: dict[str, list[tuple[str, dict[str, Any]]]] = {}
+    pair_map: dict[tuple[str, str, str, str], tuple[sqlite3.Row, dict[str, Any], sqlite3.Row, dict[str, Any]]] = {}
+    for registry in registries:
+        table_key = str(registry["table_key"])
+        for candidate in candidates_by_table.get(table_key, []):
+            normalized_name = str(candidate.get("normalizedName") or "").strip()
+            block_keys = [f"name:{normalized_name}"] if normalized_name else []
+            block_keys.extend(f"value:{value}" for value in sorted(_candidate_profile_values(candidate))[:8])
+            for block_key in block_keys:
+                bucket = buckets.setdefault(block_key, [])
+                for other_table, other_candidate in bucket[-MAX_RELATIONSHIP_BLOCK_NEIGHBORS:]:
+                    if other_table == table_key:
+                        continue
+                    if other_table < table_key:
+                        left_table, left_candidate, right_table, right_candidate = (
+                            other_table,
+                            other_candidate,
+                            table_key,
+                            candidate,
+                        )
+                    else:
+                        left_table, left_candidate, right_table, right_candidate = (
+                            table_key,
+                            candidate,
+                            other_table,
+                            other_candidate,
+                        )
+                    signature = (
+                        left_table,
+                        right_table,
+                        str(left_candidate["field"]),
+                        str(right_candidate["field"]),
+                    )
+                    pair_map.setdefault(signature, (
+                        registry_by_key[left_table],
+                        left_candidate,
+                        registry_by_key[right_table],
+                        right_candidate,
+                    ))
+                bucket.append((table_key, candidate))
+    return list(pair_map.values())
 
 
 def saved_relationship_signatures(
@@ -260,7 +482,6 @@ def recommend_relationships_for_connection(
     build_relationship_preview: Callable[..., dict[str, Any]],
     relation_candidate_fields: Callable[[sqlite3.Connection, sqlite3.Row], list[dict[str, Any]]],
     relationship_name_score: Callable[[str, str], tuple[int, list[str]]],
-    sample_field_values: Callable[[Any, str, str], set[str]],
     saved_relationship_signatures: Callable[[sqlite3.Connection], set[tuple[str, str, str, str]]],
 ) -> list[dict[str, Any]]:
     workspace_id = active_workspace_id(connection)
@@ -270,92 +491,116 @@ def recommend_relationships_for_connection(
     ).fetchall()
     saved_signatures = saved_relationship_signatures(connection)
     candidates_by_table = {row["table_key"]: relation_candidate_fields(connection, row) for row in registries}
-    value_cache: dict[tuple[str, str], set[str]] = {}
     recommendations: list[dict[str, Any]] = []
-    seen: set[tuple[str, str, str, str]] = set()
     if len(registries) < 2:
         return []
+    preliminary: list[dict[str, Any]] = []
+    for left, left_candidate, right, right_candidate in _blocked_relationship_pairs(registries, candidates_by_table):
+        left_table = str(left["table_key"])
+        right_table = str(right["table_key"])
+        left_field = str(left_candidate["field"])
+        right_field = str(right_candidate["field"])
+        signature = (left_table, right_table, left_field, right_field)
+        score, reasons = relationship_name_score(left_field, right_field)
+        if left_candidate["role"] in {"identity_key", "identifier"} or right_candidate["role"] in {"identity_key", "identifier"}:
+            score += 18
+            reasons.append("identity-key")
+        if left_candidate["usage"] == "joinable" and right_candidate["usage"] == "joinable":
+            score += 18
+            reasons.append("both-joinable")
+        tag_overlap = sorted((set(left_candidate.get("tags") or []) & set(right_candidate.get("tags") or [])) - {"identifier"})
+        if tag_overlap:
+            score += min(18, 8 * len(tag_overlap))
+            reasons.append(f"tag-overlap:{','.join(tag_overlap[:3])}")
+        if score < 48:
+            continue
+        left_values = _candidate_profile_values(left_candidate)
+        right_values = _candidate_profile_values(right_candidate)
+        overlap_ratio = len(left_values & right_values) / max(1, min(len(left_values), len(right_values))) if left_values and right_values else 0.0
+        if overlap_ratio <= 0 and score < 78:
+            continue
+        if overlap_ratio > 0:
+            score += min(38, int(round(overlap_ratio * 38)))
+            reasons.append(f"profile-sample-overlap:{round(overlap_ratio * 100)}%")
+        preliminary.append({
+            "left": left,
+            "right": right,
+            "leftCandidate": left_candidate,
+            "rightCandidate": right_candidate,
+            "signature": signature,
+            "score": score,
+            "reasons": reasons,
+            "overlapRatio": overlap_ratio,
+        })
+    preliminary.sort(key=lambda item: (-int(item["score"]), item["signature"]))
+    preview_budget = min(MAX_RELATIONSHIP_PREVIEW_BUDGET, max(12, max(0, int(limit or 12)) * 4))
+    preliminary = preliminary[:preview_budget]
+    if not preliminary:
+        return []
+    required_tables = {
+        str(item[side]["table_key"]): item[side]
+        for item in preliminary
+        for side in ("left", "right")
+    }
     with open_validated_duckdb_query(
         DUCKDB_PATH,
-        [replica_expectation(registry) for registry in registries],
+        [replica_expectation(required_tables[key]) for key in sorted(required_tables)],
     ) as analysis_connection:
-        for left_index, left in enumerate(registries):
-          for right in registries[left_index + 1:]:
-            left_table = left["table_key"]
-            right_table = right["table_key"]
-            for left_candidate in candidates_by_table.get(left_table, []):
-                for right_candidate in candidates_by_table.get(right_table, []):
-                    left_field = str(left_candidate["field"])
-                    right_field = str(right_candidate["field"])
-                    signature = (left_table, right_table, left_field, right_field)
-                    if signature in seen:
-                        continue
-                    seen.add(signature)
-                    score, reasons = relationship_name_score(left_field, right_field)
-                    if left_candidate["role"] in {"identity_key", "identifier"} or right_candidate["role"] in {"identity_key", "identifier"}:
-                        score += 18
-                        reasons.append("identity-key")
-                    if left_candidate["usage"] == "joinable" and right_candidate["usage"] == "joinable":
-                        score += 18
-                        reasons.append("both-joinable")
-                    tag_overlap = sorted((set(left_candidate.get("tags") or []) & set(right_candidate.get("tags") or [])) - {"identifier"})
-                    if tag_overlap:
-                        score += min(18, 8 * len(tag_overlap))
-                        reasons.append(f"tag-overlap:{','.join(tag_overlap[:3])}")
-                    if score < 48:
-                        continue
-                    left_values = value_cache.setdefault((left["physical_table"], left_field), sample_field_values(analysis_connection, left["physical_table"], left_field))
-                    right_values = value_cache.setdefault((right["physical_table"], right_field), sample_field_values(analysis_connection, right["physical_table"], right_field))
-                    overlap_ratio = 0.0
-                    if left_values and right_values:
-                        overlap_ratio = len(left_values & right_values) / max(1, min(len(left_values), len(right_values)))
-                    if overlap_ratio <= 0 and score < 78:
-                        continue
-                    if overlap_ratio > 0:
-                        score += min(38, int(round(overlap_ratio * 38)))
-                        reasons.append(f"sample-overlap:{round(overlap_ratio * 100)}%")
-                    preview = build_relationship_preview(
-                        analysis_connection,
-                        left["physical_table"],
-                        right["physical_table"],
-                        table_columns(connection, left["physical_table"]),
-                        table_columns(connection, right["physical_table"]),
-                        [{"leftField": left_field, "rightField": right_field}],
-                        join_type="left",
-                        sample_limit=5,
-                        quote_identifier=quote_identifier,
-                    )
-                    metrics = preview["metrics"]
-                    actual_confidence = float(metrics.get("confidence") or 0)
-                    overlap_keys = int(metrics.get("overlapKeys") or 0)
-                    min_distinct_keys = min(int(metrics.get("leftDistinctKeys") or 0), int(metrics.get("rightDistinctKeys") or 0))
-                    matched_left_rows = int(metrics.get("matchedLeftRows") or 0)
-                    joined_rows = int(metrics.get("joinedRows") or 0)
-                    join_multiplier = joined_rows / max(1, matched_left_rows)
-                    if actual_confidence < 0.55 or overlap_keys <= 0 or min_distinct_keys < 3:
-                        continue
-                    if join_multiplier > 5:
-                        continue
-                    existing = signature in saved_signatures
-                    recommendations.append(
-                        {
-                            "leftTableKey": left_table,
-                            "leftTableName": left["display_name"],
-                            "rightTableKey": right_table,
-                            "rightTableName": right["display_name"],
-                            "fieldMappings": [{"leftField": left_field, "rightField": right_field}],
-                            "joinType": "left",
-                            "score": score,
-                            "confidence": round(min(0.99, actual_confidence + min(0.05, max(0, score - 90) / 1000)), 2),
-                            "overlapRatio": round(overlap_ratio, 4),
-                            "existing": existing,
-                            "reasons": sorted(set(reasons)),
-                            "previewMetrics": metrics,
-                            "previewCommand": f"python tools/aibi_cli.py --json relationship-preview --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field}",
-                            "saveCommand": f"python tools/aibi_cli.py --json relationship-save --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field} --yes",
-                            "source": "recommend-relationships adapted to workspace relationship evidence",
-                        }
-                    )
+        for item in preliminary:
+            left = item["left"]
+            right = item["right"]
+            left_candidate = item["leftCandidate"]
+            right_candidate = item["rightCandidate"]
+            left_table = str(left["table_key"])
+            right_table = str(right["table_key"])
+            left_field = str(left_candidate["field"])
+            right_field = str(right_candidate["field"])
+            signature = item["signature"]
+            score = int(item["score"])
+            reasons = list(item["reasons"])
+            overlap_ratio = float(item["overlapRatio"])
+            preview = build_relationship_preview(
+                analysis_connection,
+                left["physical_table"],
+                right["physical_table"],
+                table_columns(connection, left["physical_table"]),
+                table_columns(connection, right["physical_table"]),
+                [{"leftField": left_field, "rightField": right_field}],
+                join_type="left",
+                sample_limit=5,
+                quote_identifier=quote_identifier,
+            )
+            metrics = preview["metrics"]
+            actual_confidence = float(metrics.get("confidence") or 0)
+            overlap_keys = int(metrics.get("overlapKeys") or 0)
+            min_distinct_keys = min(int(metrics.get("leftDistinctKeys") or 0), int(metrics.get("rightDistinctKeys") or 0))
+            matched_left_rows = int(metrics.get("matchedLeftRows") or 0)
+            joined_rows = int(metrics.get("joinedRows") or 0)
+            join_multiplier = joined_rows / max(1, matched_left_rows)
+            if actual_confidence < 0.55 or overlap_keys <= 0 or min_distinct_keys < 3:
+                continue
+            if join_multiplier > 5:
+                continue
+            existing = signature in saved_signatures
+            recommendations.append(
+                {
+                    "leftTableKey": left_table,
+                    "leftTableName": left["display_name"],
+                    "rightTableKey": right_table,
+                    "rightTableName": right["display_name"],
+                    "fieldMappings": [{"leftField": left_field, "rightField": right_field}],
+                    "joinType": "left",
+                    "score": score,
+                    "confidence": round(min(0.99, actual_confidence + min(0.05, max(0, score - 90) / 1000)), 2),
+                    "overlapRatio": round(overlap_ratio, 4),
+                    "existing": existing,
+                    "reasons": sorted(set(reasons)),
+                    "previewMetrics": metrics,
+                    "previewCommand": f"python tools/aibi_cli.py --json relationship-preview --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field}",
+                    "saveCommand": f"python tools/aibi_cli.py --json relationship-save --left-table {left_table} --right-table {right_table} --left-field {left_field} --right-field {right_field} --yes",
+                    "source": "recommend-relationships adapted to workspace relationship evidence",
+                }
+            )
     recommendations.sort(key=lambda item: (bool(item["existing"]), -float(item["confidence"]), -int(item["score"]), item["leftTableKey"], item["rightTableKey"]))
     return recommendations[: max(0, int(limit or 12))]
 

@@ -6,7 +6,7 @@ import re
 import sqlite3
 from typing import Any
 
-from bi_cli_core import now_iso, parse_csv_list, quote_identifier
+from bi_cli_core import now_iso, parse_csv_list
 from bi_cli_io_services import parse_json_object, rows_to_dicts
 from bi_cli_schema import active_workspace_id, open_db, table_columns
 from bi_cli_source_commands import resolve_table_registry
@@ -70,33 +70,100 @@ def primary_usage_from_object(usage: dict[str, Any], role: str) -> str:
     return "filterable"
 
 
-def infer_field_semantic_hybrid(connection: sqlite3.Connection, registry: sqlite3.Row, field: str) -> dict[str, Any]:
-    table_key = registry["table_key"]
-    physical_table = registry["physical_table"]
-    text = field.lower()
-    non_empty_rows = connection.execute(
-        f"""
-        SELECT {quote_identifier(field)} AS value
-        FROM {quote_identifier(physical_table)}
-        WHERE {quote_identifier(field)} IS NOT NULL
-          AND TRIM(CAST({quote_identifier(field)} AS TEXT)) <> ''
-        LIMIT 80
+def _registry_schema_types(registry: sqlite3.Row) -> dict[str, str]:
+    try:
+        payload = json.loads(str(registry["schema_json"] or "[]"))
+    except (IndexError, KeyError, TypeError, json.JSONDecodeError):
+        return {}
+    if isinstance(payload, dict):
+        payload = payload.get("fields") or payload.get("schemaFields") or []
+    if not isinstance(payload, list):
+        return {}
+    return {
+        str(item.get("name") or item.get("field")): str(
+            item.get("type") or item.get("duckdbType") or item.get("inferredType") or "VARCHAR"
+        ).upper()
+        for item in payload
+        if isinstance(item, dict) and str(item.get("name") or item.get("field") or "").strip()
+    }
+
+
+def _latest_source_field_profiles(
+    connection: sqlite3.Connection,
+    registry: sqlite3.Row,
+) -> dict[str, dict[str, Any]]:
+    row = connection.execute(
         """
-    ).fetchall()
+        SELECT profile_json
+        FROM source_runs
+        WHERE workspace_id = ?
+          AND table_key = ?
+          AND status = 'ready'
+          AND row_count = ?
+          AND column_count = ?
+        ORDER BY created_at DESC
+        LIMIT 1
+        """,
+        (
+            str(registry["workspace_id"]),
+            str(registry["table_key"]),
+            int(registry["row_count"] or 0),
+            int(registry["column_count"] or 0),
+        ),
+    ).fetchone()
+    if not row:
+        return {}
+    try:
+        profile = json.loads(str(row["profile_json"] or "{}"))
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return {
+        str(item.get("field")): item
+        for item in profile.get("fields", [])
+        if isinstance(item, dict) and str(item.get("field") or "").strip()
+    }
+
+
+def _profile_sample_values(field_profile: dict[str, Any]) -> list[Any]:
+    samples = field_profile.get("sampleValues")
+    if not isinstance(samples, list):
+        samples = field_profile.get("sample")
+    return samples[:80] if isinstance(samples, list) else []
+
+
+def _is_numeric_storage_type(storage_type: str) -> bool:
+    return str(storage_type or "").upper().startswith(
+        ("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT", "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "DECIMAL", "FLOAT", "DOUBLE", "REAL")
+    )
+
+
+def infer_field_semantic_hybrid(
+    connection: sqlite3.Connection,
+    registry: sqlite3.Row,
+    field: str,
+    *,
+    field_profile: dict[str, Any] | None = None,
+    storage_type: str = "",
+) -> dict[str, Any]:
+    table_key = registry["table_key"]
+    text = field.lower()
+    profile = field_profile or {}
+    inferred_type = str(profile.get("inferredType") or storage_type or "").upper()
+    sample_values = _profile_sample_values(profile)
     numeric = 0
-    for row in non_empty_rows:
+    for value in sample_values:
         try:
-            float(str(row["value"]).replace(",", "").replace("%", "").strip())
+            float(str(value).replace(",", "").replace("%", "").strip())
             numeric += 1
-        except ValueError:
+        except (TypeError, ValueError):
             pass
-    numeric_ratio = numeric / len(non_empty_rows) if non_empty_rows else 0.0
+    numeric_ratio = 1.0 if _is_numeric_storage_type(inferred_type) else (
+        numeric / len(sample_values) if sample_values else 0.0
+    )
     total_rows = int(registry["row_count"] or 0)
     distinct_ratio = 0.0
     if total_rows > 0:
-        distinct_count = connection.execute(
-            f"SELECT COUNT(DISTINCT {quote_identifier(field)}) FROM {quote_identifier(physical_table)}"
-        ).fetchone()[0]
+        distinct_count = int(profile.get("uniqueCount") or 0)
         distinct_ratio = min(1.0, float(distinct_count or 0) / total_rows)
 
     tags: list[str] = []
@@ -215,8 +282,16 @@ def infer_semantics_command(args: argparse.Namespace) -> dict[str, Any]:
         proposals: list[dict[str, Any]] = []
         written = 0
         for registry in registries:
+            field_profiles = _latest_source_field_profiles(connection, registry)
+            schema_types = _registry_schema_types(registry)
             for field in table_columns(connection, registry["physical_table"]):
-                proposals.append(infer_field_semantic_hybrid(connection, registry, field))
+                proposals.append(infer_field_semantic_hybrid(
+                    connection,
+                    registry,
+                    field,
+                    field_profile=field_profiles.get(field),
+                    storage_type=schema_types.get(field, ""),
+                ))
         if args.yes:
             for item in proposals:
                 if upsert_semantic_config(connection, item, overwrite_manual=args.overwrite_manual):
@@ -356,8 +431,19 @@ def infer_metrics_for_table(connection: sqlite3.Connection, registry: sqlite3.Ro
         )
     )
     if not fields:
+        field_profiles = _latest_source_field_profiles(connection, registry)
+        schema_types = _registry_schema_types(registry)
         for field in table_columns(connection, registry["physical_table"]):
-            upsert_semantic_config(connection, infer_field_semantic_hybrid(connection, registry, field))
+            upsert_semantic_config(
+                connection,
+                infer_field_semantic_hybrid(
+                    connection,
+                    registry,
+                    field,
+                    field_profile=field_profiles.get(field),
+                    storage_type=schema_types.get(field, ""),
+                ),
+            )
         fields = rows_to_dicts(
             connection.execute(
                 """

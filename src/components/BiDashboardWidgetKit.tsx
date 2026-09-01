@@ -14,6 +14,7 @@ import { BiDashboardWidgetCard, type SlicerSelections } from "./BiDashboardWidge
 import { BiDashboardWidgetKitOverview } from "./BiDashboardWidgetKitOverview";
 
 type BiDashboardWidgetKitProps = {
+  workspaceId: string;
   dashboard: DashboardPage;
   dashboards: DashboardPayload;
   query: QueryResult;
@@ -21,7 +22,21 @@ type BiDashboardWidgetKitProps = {
   onOpenEvidence?: (focus: EvidenceFocus) => void;
 };
 
-export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, onOpenEvidence }: BiDashboardWidgetKitProps) {
+function widgetCacheGeneration(widget: BiDashboardWidget, workbench: WorkbenchPayload) {
+  const view = widget.viewKey
+    ? workbench.savedViews.find((candidate) => candidate.view_key === widget.viewKey)
+    : undefined;
+  const tableKey = view?.table_key || widget.tableKey || "";
+  const table = workbench.tables.find((candidate) => candidate.table_key === tableKey);
+  return [
+    tableKey,
+    table?.data_version ?? "missing",
+    table?.updated_at ?? "",
+    view?.updated_at ?? "",
+  ].join(":");
+}
+
+export function BiDashboardWidgetKit({ workspaceId, dashboard, dashboards, query, workbench, onOpenEvidence }: BiDashboardWidgetKitProps) {
   const widgets = useMemo(() => buildBiDashboardWidgets({ dashboard, dashboards, query, workbench }), [dashboard, dashboards, query, workbench]);
   const widgetTypeSet = useMemo(() => new Set(widgets.map((widget) => widget.type)), [widgets]);
   const sourceIntelligenceRuns = Array.isArray(workbench.sourceIntelligenceRuns) ? workbench.sourceIntelligenceRuns : [];
@@ -85,17 +100,17 @@ export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, 
       setDrilldownResult(null);
       return;
     }
-    let cancelled = false;
+    const controller = new AbortController();
     setDrilldownBusy(true);
-    void runTableQuery(drilldownRequest).then((result) => {
-      if (!cancelled) setDrilldownResult(result);
+    void runTableQuery(workspaceId, drilldownRequest, controller.signal).then((result) => {
+      if (!controller.signal.aborted) setDrilldownResult(result);
     }).finally(() => {
-      if (!cancelled) setDrilldownBusy(false);
+      if (!controller.signal.aborted) setDrilldownBusy(false);
     });
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [drilldownRequest]);
+  }, [drilldownRequest, workspaceId]);
 
   async function saveDrilldownAsView(confirm: boolean) {
     if (!drilldown || !drilldownRequest) return;
@@ -205,6 +220,7 @@ export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, 
       <div className={`bWidgetGrid${widgets.length === 1 && widgets[0]?.type === "metric" ? " singleMetric" : ""}`}>
         {widgets.map((widget) => (
           <BiDashboardWidgetCard
+            cacheGeneration={widgetCacheGeneration(widget, workbench)}
             dashboardFilters={effectiveDashboardFilters}
             key={widget.id}
             onDrillDown={openWidgetDrilldown}
@@ -213,6 +229,7 @@ export function BiDashboardWidgetKit({ dashboard, dashboards, query, workbench, 
             query={query}
             slicerSelections={slicerSelections}
             widget={widget}
+            workspaceId={workspaceId}
           />
         ))}
       </div>

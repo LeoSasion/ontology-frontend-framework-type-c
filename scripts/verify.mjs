@@ -491,8 +491,8 @@ const checks = [
   run("cli-apply-config-dry-run", "python", ["tools/aibi_cli.py", "--json", "apply-config", join(verifyDataDir, "metadata-config.json")]),
   run("cli-workbench-after-connectors", "python", ["tools/aibi_cli.py", "--json", "workbench", "--limit", "3"]),
   run("cli-query", "python", ["tools/aibi_cli.py", "--json", "query", "--table", "orders", "--group", "channel", "--measure", "net_sales", "--agg", "sum"]),
-  run("cli-query-table-detail", "python", ["tools/aibi_cli.py", "--json", "query-table", "--table", "orders", "--mode", "detail", "--column", "order_date", "--column", "channel", "--column", "net_sales", "--filter", "channel:equals:Douyin", "--sort", "net_sales:desc", "--limit", "5"]),
-  run("cli-query-table-view", "python", ["tools/aibi_cli.py", "--json", "query-table", "--view", "view_orders_default", "--limit", "3"]),
+  run("cli-query-table-detail", "python", ["tools/aibi_cli.py", "--json", "query-table", "--workspace", "default", "--table", "orders", "--mode", "detail", "--column", "order_date", "--column", "channel", "--column", "net_sales", "--filter", "channel:equals:Douyin", "--sort", "net_sales:desc", "--limit", "5"]),
+  run("cli-query-table-view", "python", ["tools/aibi_cli.py", "--json", "query-table", "--workspace", "default", "--view", "view_orders_default", "--limit", "3"]),
   run("cli-list-views", "python", ["tools/aibi_cli.py", "--json", "list-views"]),
   run("cli-save-view-dry-run", "python", ["tools/aibi_cli.py", "--json", "save-view", "--table", "orders", "--name", "抖音订单视图", "--columns", "order_date,channel,sku,net_sales,status", "--filter", "channel:equals:Douyin", "--sort", "net_sales:desc"]),
   run("cli-save-view-confirm", "python", ["tools/aibi_cli.py", "--json", "save-view", "--table", "orders", "--name", "抖音订单视图", "--columns", "order_date,channel,sku,net_sales,status", "--filter", "channel:equals:Douyin", "--sort", "net_sales:desc", "--yes"]),
@@ -520,8 +520,8 @@ const checks = [
   run("cli-save-formula-confirm", "python", ["tools/aibi_cli.py", "--json", "save-formula", "--id", "verify_formula_metric", "--name", "验证公式指标", "--table", "orders", "--expression", "SAFE_DIVIDE(SUM([net_sales]), SUM([quantity]))", "--mode", "aggregate", "--dimension", "channel", "--yes"]),
   run("cli-query-formula-metric", "python", ["tools/aibi_cli.py", "--json", "query-metric", "verify_formula_metric", "--group", "channel", "--limit", "5"]),
   run("cli-save-row-formula-confirm", "python", ["tools/aibi_cli.py", "--json", "save-formula", "--id", "verify_row_formula", "--name", "net_sales_per_unit", "--table", "orders", "--expression", "SAFE_DIVIDE([net_sales],[quantity])", "--mode", "row", "--yes"]),
-  run("cli-query-row-formula-detail", "python", ["tools/aibi_cli.py", "--json", "query-table", "--table", "orders", "--mode", "detail", "--column", "channel", "--column", "net_sales_per_unit", "--filter", "net_sales_per_unit:gt:300", "--sort", "net_sales_per_unit:desc", "--limit", "3"]),
-  run("cli-query-row-formula-aggregate", "python", ["tools/aibi_cli.py", "--json", "query-table", "--table", "orders", "--mode", "aggregate", "--group", "channel", "--measure", "net_sales_per_unit", "--agg", "avg", "--limit", "5"]),
+  run("cli-query-row-formula-detail", "python", ["tools/aibi_cli.py", "--json", "query-table", "--workspace", "default", "--table", "orders", "--mode", "detail", "--column", "channel", "--column", "net_sales_per_unit", "--filter", "net_sales_per_unit:gt:300", "--sort", "net_sales_per_unit:desc", "--limit", "3"]),
+  run("cli-query-row-formula-aggregate", "python", ["tools/aibi_cli.py", "--json", "query-table", "--workspace", "default", "--table", "orders", "--mode", "aggregate", "--group", "channel", "--measure", "net_sales_per_unit", "--agg", "avg", "--limit", "5"]),
   run("cli-save-row-formula-view", "python", ["tools/aibi_cli.py", "--json", "save-view", "--view", "verify_row_formula_view", "--table", "orders", "--name", "验证公式字段视图", "--columns", "channel,net_sales_per_unit", "--filter", "net_sales_per_unit:gt:300", "--yes"]),
   run("cli-delete-row-formula-dry-blocked", "python", ["tools/aibi_cli.py", "--json", "delete-formula", "verify_row_formula"]),
   runExpectedFailure("cli-delete-row-formula-confirm-blocked", "python", ["tools/aibi_cli.py", "--json", "delete-formula", "verify_row_formula", "--yes"]),
@@ -676,7 +676,7 @@ if (agentViewDraftKey) {
   checks.push(run("cli-agent-views-after-confirm", "python", ["tools/aibi_cli.py", "--json", "list-views", "--table", "orders"]));
   checks.push(run("cli-agent-navigation-after-view-confirm", "python", ["tools/aibi_cli.py", "--json", "list-navigation"]));
   if (agentViewKey) {
-    checks.push(run("cli-agent-query-view-after-confirm", "python", ["tools/aibi_cli.py", "--json", "query-table", "--view", agentViewKey, "--limit", "5"]));
+    checks.push(run("cli-agent-query-view-after-confirm", "python", ["tools/aibi_cli.py", "--json", "query-table", "--workspace", "default", "--view", agentViewKey, "--limit", "5"]));
   }
 }
 const agentMetricDraftKey = checks.find((check) => check.label === "cli-agent-metric-draft")?.parsed?.actionDraft?.actionKey;

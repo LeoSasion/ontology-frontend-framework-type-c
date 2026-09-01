@@ -61,15 +61,12 @@ from semantic_context_router import build_semantic_context_bundle
 from agent_clarification_service import build_agent_clarification
 from agent_recommended_commands import build_agent_recommended_commands
 from bi_cli_core import (
-    DUCKDB_PATH,
     ROOT,
     now_iso,
-    quote_identifier,
     quote_relationship_identifier,
     slug,
     unique_key,
 )
-from query_runtime import cursor_rows, open_validated_duckdb_query, replica_expectation
 from context_pack_service import contextualized_prompt, matched_context
 from analysis_safety_guard import build_verified_analysis_gap, requires_verified_analysis_plan
 from domain_pack_service import domain_pack_runtime_context, is_domain_pack_enabled
@@ -868,13 +865,42 @@ def dashboard_filter_value_from_prompt(connection: sqlite3.Connection, dashboard
     dashboard, _layout, _filters, _fields = dashboard_filters_snapshot(connection, dashboard_key)
     registry = registry_for_table(connection, str(dashboard["default_table_key"] or ""))
     if registry:
-        with open_validated_duckdb_query(DUCKDB_PATH, [replica_expectation(registry)]) as analysis_connection:
-            rows = cursor_rows(analysis_connection.execute(
-                f"SELECT DISTINCT {quote_identifier(field)} AS value FROM {quote_identifier(registry['physical_table'])} WHERE {quote_identifier(field)} IS NOT NULL LIMIT 50"
-            ))
+        source_run = connection.execute(
+            """
+            SELECT profile_json
+            FROM source_runs
+            WHERE workspace_id = ? AND table_key = ? AND status = 'ready'
+              AND row_count = ? AND column_count = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (
+                str(registry["workspace_id"]),
+                str(registry["table_key"]),
+                int(registry["row_count"] or 0),
+                int(registry["column_count"] or 0),
+            ),
+        ).fetchone()
+        field_profile: dict[str, Any] = {}
+        if source_run:
+            try:
+                profile = json.loads(str(source_run["profile_json"] or "{}"))
+                field_profile = next(
+                    (
+                        item for item in profile.get("fields", [])
+                        if isinstance(item, dict) and str(item.get("field") or "") == field
+                    ),
+                    {},
+                )
+            except (TypeError, json.JSONDecodeError):
+                field_profile = {}
+        samples = field_profile.get("sampleValues")
+        if not isinstance(samples, list):
+            samples = field_profile.get("sample")
+        values = samples[:50] if isinstance(samples, list) else []
         normalized_prompt = normalize_match_text(prompt)
-        for row in rows:
-            value = str(row["value"])
+        for raw_value in values:
+            value = str(raw_value)
             if value and normalize_match_text(value) in normalized_prompt:
                 return value, "recommended"
     return "", "missing"

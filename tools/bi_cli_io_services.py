@@ -1,14 +1,10 @@
 from __future__ import annotations
 
 import argparse
-import csv
 import json
-import re
 import sqlite3
-import zipfile
 from pathlib import Path
 from typing import Any, Iterable
-from xml.etree import ElementTree
 
 from bi_cli_schema import (
     active_workspace_id,
@@ -47,129 +43,7 @@ from import_table_writer_service import (
     merge_import_into_table as merge_import_into_table_service,
     update_table_metadata_after_write as update_table_metadata_after_write_service,
 )
-from import_stage_service import read_import_stage
 from query_runtime import SAFE_AGGREGATIONS
-
-def read_csv(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
-    with path.open("r", encoding="utf-8-sig", newline="") as handle:
-        reader = csv.DictReader(handle)
-        rows = [dict(row) for row in reader]
-        return list(reader.fieldnames or []), rows
-
-
-def read_xlsx(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
-    with zipfile.ZipFile(path) as archive:
-        shared_strings: list[str] = []
-        if "xl/sharedStrings.xml" in archive.namelist():
-            shared_root = ElementTree.fromstring(archive.read("xl/sharedStrings.xml"))
-            for item in shared_root.findall(".//{http://schemas.openxmlformats.org/spreadsheetml/2006/main}t"):
-                shared_strings.append(item.text or "")
-        sheet_name = next(name for name in archive.namelist() if name.startswith("xl/worksheets/sheet"))
-        root = ElementTree.fromstring(archive.read(sheet_name))
-        ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-        raw_rows: list[list[str]] = []
-        for row in root.findall(f".//{ns}row"):
-            values: list[str] = []
-            current_col = 0
-            for cell in row.findall(f"{ns}c"):
-                ref = cell.attrib.get("r", "")
-                col_letters = re.sub(r"\d+", "", ref)
-                if col_letters:
-                    target_col = 0
-                    for char in col_letters:
-                        target_col = target_col * 26 + (ord(char.upper()) - 64)
-                    while current_col < target_col - 1:
-                        values.append("")
-                        current_col += 1
-                value_node = cell.find(f"{ns}v")
-                text = value_node.text if value_node is not None else ""
-                if cell.attrib.get("t") == "s" and text.isdigit():
-                    text = shared_strings[int(text)] if int(text) < len(shared_strings) else text
-                values.append(text or "")
-                current_col += 1
-            raw_rows.append(values)
-    headers = [value.strip() or f"column_{index + 1}" for index, value in enumerate(raw_rows[0])] if raw_rows else []
-    rows = [dict(zip(headers, row + [""] * max(0, len(headers) - len(row)))) for row in raw_rows[1:]]
-    return headers, rows
-
-
-def read_table_file(path: Path) -> tuple[list[str], list[dict[str, Any]]]:
-    if path.suffix.lower() == ".csv":
-        return read_csv(path)
-    if path.suffix.lower() in {".xlsx", ".xlsm"}:
-        return read_xlsx(path)
-    raise ValueError(f"Unsupported source file: {path}")
-
-
-def coerce_value(value: Any) -> Any:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if text == "":
-        return None
-    numeric = text.replace(",", "")
-    try:
-        if re.match(r"^-?\d+(\.\d+)?$", numeric):
-            return float(numeric) if "." in numeric else int(numeric)
-    except ValueError:
-        pass
-    return text
-
-
-def infer_role(field: str, sample_values: Iterable[Any]) -> tuple[str, str, float]:
-    name = field.lower()
-    values = [str(value).strip() for value in sample_values if str(value).strip()]
-    numeric_count = 0
-    for value in values[:30]:
-        try:
-            float(value.replace(",", ""))
-            numeric_count += 1
-        except ValueError:
-            continue
-    if "date" in name or "time" in name or "日期" in field or "时间" in field:
-        return "event_time", "filterable", 0.91
-    if any(token in name for token in ("id", "key", "code", "identifier")) or any(token in field for token in ("编号", "编码", "标识")):
-        return "identity_key", "joinable", 0.86
-    if any(token in name for token in ["amount", "value", "total", "score", "rate", "quantity", "count"]) or any(token in field for token in ["金额", "数值", "合计", "得分", "比例", "数量", "次数"]):
-        return "measure", "aggregatable", 0.88
-    if "status" in name or "状态" in field:
-        return "status", "filterable", 0.84
-    if values and numeric_count / max(1, len(values[:30])) > 0.8:
-        return "measure", "aggregatable", 0.78
-    return "dimension", "groupable", 0.74
-
-
-def profile_rows(headers: list[str], rows: list[dict[str, Any]]) -> dict[str, Any]:
-    fields = []
-    for field in headers:
-        values = [row.get(field, "") for row in rows]
-        role, usage, confidence = infer_role(field, values)
-        non_empty = sum(1 for value in values if str(value).strip())
-        unique_count = len({str(value).strip() for value in values if str(value).strip()})
-        fields.append(
-            {
-                "field": field,
-                "role": role,
-                "usage": usage,
-                "confidence": confidence,
-                "nonEmpty": non_empty,
-                "uniqueCount": unique_count,
-                "sampleValues": [str(value) for value in values[:5]],
-            }
-        )
-    measures = [field["field"] for field in fields if field["role"] == "measure"]
-    dimensions = [field["field"] for field in fields if field["role"] in {"dimension", "status"}]
-    identity_keys = [field["field"] for field in fields if field["role"] == "identity_key"]
-    return {
-        "rowCount": len(rows),
-        "columnCount": len(headers),
-        "fields": fields,
-        "measures": measures,
-        "dimensions": dimensions,
-        "identityKeys": identity_keys,
-        "warnings": [] if rows else ["Source has no data rows."],
-    }
-
 
 def import_csv_as_table(
     connection: sqlite3.Connection,
@@ -189,9 +63,6 @@ def import_csv_as_table(
         mode=mode,
         workspace_id=workspace_id,
         stage_key=stage_key,
-        read_table_file=read_table_file,
-        read_import_stage=read_import_stage,
-        profile_rows=profile_rows,
         active_workspace_id=active_workspace_id,
         physical_table_for_workspace=physical_table_for_workspace,
         upsert_navigation_module=upsert_navigation_module,
@@ -297,10 +168,6 @@ def merge_import_into_table(
         workspace_id=workspace_id,
         stage_key=stage_key,
         registry_for_table=registry_for_table,
-        read_table_file=read_table_file,
-        read_import_stage=read_import_stage,
-        table_columns=table_columns,
-        profile_rows=profile_rows,
         active_workspace_id=active_workspace_id,
     )
 

@@ -8,7 +8,9 @@ from aibi_runtime.dispatch import execute_command
 from aibi_runtime.parser import build_parser
 from aibi_runtime.registry import build_command_registry
 from aibi_runtime.use_cases import lifecycle as runtime
+from bi_cli_core import json_default
 from capability_contract_service import capability_registry
+from query_runtime import close_cached_duckdb_readers
 
 
 MAX_REQUEST_BYTES = 512 * 1024
@@ -17,7 +19,7 @@ MAX_ARGUMENT_BYTES = 16 * 1024
 
 
 def _reply(value: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(value, ensure_ascii=False, separators=(",", ":")) + "\n")
+    sys.stdout.write(json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=json_default) + "\n")
     sys.stdout.flush()
 
 
@@ -52,6 +54,18 @@ def main() -> int:
                 continue
             if operation == "catalog":
                 _reply({"id": request_id, "transportOk": True, "result": catalog})
+                continue
+            if operation == "invalidate-readers":
+                closed = close_cached_duckdb_readers()
+                _reply({
+                    "id": request_id,
+                    "transportOk": True,
+                    "result": {
+                        "ok": True,
+                        "schema": "aibi-runtime-reader-invalidation/v1",
+                        "closedConnections": closed,
+                    },
+                })
                 continue
             args = _validated_args(envelope.get("args"))
             command = args[0] if args else ""

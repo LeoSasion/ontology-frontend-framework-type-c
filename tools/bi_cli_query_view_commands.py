@@ -4,11 +4,12 @@ import argparse
 import sqlite3
 from typing import Any
 
-from bi_cli_core import DUCKDB_PATH, now_iso, quote_identifier
+from bi_cli_core import DUCKDB_PATH, now_iso
+from dataset_version_store import schema_field_types
 from bi_cli_io_services import analysis_columns_for_table
 from bi_cli_schema import active_workspace_id, open_db, registry_for_table, table_columns, upsert_navigation_module
 from bi_cli_source_commands import resolve_table_registry
-from query_runtime import SAFE_AGGREGATIONS, run_duckdb_aggregate_query
+from query_runtime import SAFE_AGGREGATIONS, replica_source_version, run_duckdb_aggregate_query
 from query_plan_receipt_service import create_query_plan_receipt
 from saved_view_query_service import (
     build_save_view_plan as build_save_view_plan_service,
@@ -16,6 +17,7 @@ from saved_view_query_service import (
     delete_view_command as delete_view_command_service,
     execute_save_view_plan as execute_save_view_plan_service,
     list_views_command as list_views_command_service,
+    query_table_batch_command as query_table_batch_command_service,
     query_table_command as query_table_command_service,
     resolve_view as resolve_view_service,
     save_view_command as save_view_command_service,
@@ -28,10 +30,10 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
     with open_db() as connection:
         registry = resolve_table_registry(connection, args.table)
         physical_table = registry["physical_table"]
-        table_columns = [row["name"] for row in connection.execute(f"PRAGMA table_info({quote_identifier(physical_table)})")]
-        if args.group and args.group not in table_columns:
+        columns = table_columns(connection, physical_table)
+        if args.group and args.group not in columns:
             raise ValueError(f"Unknown group field: {args.group}")
-        if args.measure != "*" and args.measure not in table_columns:
+        if args.measure != "*" and args.measure not in columns:
             raise ValueError(f"Unknown measure field: {args.measure}")
         runtime = run_duckdb_aggregate_query(
             duckdb_path=DUCKDB_PATH,
@@ -40,8 +42,12 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
             measure=args.measure,
             aggregation=args.agg,
             limit=args.limit,
-            source_version=f"{registry['workspace_id']}:{registry['table_key']}:{int(registry['data_version'] or 1)}:{int(registry['row_count'] or 0)}",
+            source_version=replica_source_version(registry),
+            version_id=str(registry["active_version_id"]),
+            content_fingerprint=str(registry["content_fingerprint"]),
+            schema_fingerprint=str(registry["schema_fingerprint"]),
             expected_row_count=int(registry["row_count"] or 0),
+            field_types=schema_field_types(registry["schema_json"]),
         )
         fallback_reason = None
         rows = runtime.pop("rows")
@@ -79,8 +85,19 @@ def query_command(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
-def resolve_view(connection: sqlite3.Connection, view_key: str, table_key: str | None = None) -> dict[str, Any]:
-    return resolve_view_service(connection, view_key, table_key, active_workspace_id=active_workspace_id)
+def resolve_view(
+    connection: sqlite3.Connection,
+    view_key: str,
+    table_key: str | None = None,
+    workspace_id: str | None = None,
+) -> dict[str, Any]:
+    return resolve_view_service(
+        connection,
+        view_key,
+        table_key,
+        active_workspace_id=active_workspace_id,
+        workspace_id=workspace_id,
+    )
 
 
 def saved_view_summary(connection: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
@@ -103,6 +120,18 @@ def query_table_command(args: argparse.Namespace) -> dict[str, Any]:
         resolve_view=resolve_view,
         registry_for_table=registry_for_table,
         table_columns=table_columns,
+        active_workspace_id=active_workspace_id,
+    )
+
+
+def query_table_batch_command(args: argparse.Namespace) -> dict[str, Any]:
+    return query_table_batch_command_service(
+        args,
+        open_db=open_db,
+        resolve_view=resolve_view,
+        registry_for_table=registry_for_table,
+        table_columns=table_columns,
+        active_workspace_id=active_workspace_id,
     )
 
 
